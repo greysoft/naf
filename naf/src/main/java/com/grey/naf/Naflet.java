@@ -1,0 +1,65 @@
+/*
+ * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
+ */
+package com.grey.naf;
+
+/**
+ * This class defines a NAF application, aka a NAF task. It aggregates one or more fragments of callback code
+ * into a coherent whole.
+ * <br/>
+ * In addition to overriding the explicit methods of this interface, subclasses must also provide a constructor
+ * with this signature:<br/>
+ * <code>classname(String naflet_name, com.grey.naf.reactor.Dispatcher, com.grey.base.config.XmlConfig)</code><br/>
+ * That subclass constructor must in turn call the
+ * <code>Naflet(String naflet_name, com.grey.naf.reactor.Dispatcher, com.grey.base.config.XmlConfig)</code>
+ * constructor shown below.
+ */
+abstract public class Naflet
+{
+	public final String naflet_name;
+	public final java.util.Map<String,Object> cfgdflts = new java.util.HashMap<String,Object>();
+	protected final com.grey.naf.reactor.Dispatcher dsptch;
+	protected final org.slf4j.Logger log;
+	protected final com.grey.base.config.XmlConfig appcfg;
+	private com.grey.naf.EntityReaper reaper;
+
+	abstract protected void startNaflet() throws java.io.IOException;
+	abstract protected boolean stopNaflet();
+
+	public Naflet(String name, com.grey.naf.reactor.Dispatcher dsptch_p, com.grey.base.config.XmlConfig cfg)
+			throws com.grey.base.GreyException, java.io.IOException
+	{
+		naflet_name = name;
+		dsptch = dsptch_p;
+		log = dsptch.logger;
+		log.info("Naflet="+naflet_name+": Initialising - "+getClass().getName());
+		String cfgfile = dsptch.nafcfg.getPath(cfg, "configfile", null, false, null, null);
+
+		if (cfgfile != null) {
+			String cfgroot = cfg.getValue("configfile/@root", false, null);
+			appcfg = com.grey.base.config.XmlConfig.getSection(cfgfile, cfgroot);
+		} else {
+			appcfg = cfg;
+		}
+	}
+
+	public final void start(com.grey.naf.EntityReaper rpr) throws java.io.IOException
+	{
+		reaper = rpr;
+		log.info("Naflet="+naflet_name+": Starting - reaper="+reaper);
+		startNaflet();
+	}
+
+	public final boolean stop()
+	{
+		log.info("Naflet="+naflet_name+": Received Stop request");
+		return stopNaflet();
+	}
+	
+	protected final void nafletStopped()
+	{
+		log.info("Naflet="+naflet_name+" has terminated - reaper="+reaper);
+		if (reaper != null) reaper.entityStopped(this);
+	}
+}

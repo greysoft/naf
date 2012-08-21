@@ -1,0 +1,7 @@
+<naf>
+	<baseport>21000</baseport>
+	<dispatchers>
+		<dispatcher name="testdispatcher1" survive_handlers="N">
+		</dispatcher>
+	</dispatchers>
+</naf>

@@ -1,0 +1,7 @@
+Network Application Framework (NAF)
+Copyright (C) 2010-2012 Yusef Badri  <yb a.t greybox d.o.t demon d.o.t co d.o.t uk>
+NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
+
+This product includes the SLF4J API.
+Copyright (c) 2004-2011 QOS.ch
+SLF4J is distributed under an MIT/X11 licence.

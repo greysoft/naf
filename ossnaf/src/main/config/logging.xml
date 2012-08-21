@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<loggers>
+	<logger name="default">
+		<file level="all" class="com.grey.logging.MTLatinLogger">%stdout%</file>
+	</logger>
+	<logger name="dnsbatch">
+		<file level="trc">dnsbatchresolver.log</file>
+	</logger>
+	<logger name="portfwd">
+		<file level="trc" rot="daily">%DIRLOG%/portfwd.log</file>
+	</logger>
+	<logger name="echobot">
+		<file level="trc" delta="y" class="com.grey.logging.MTLatinLogger">echobot.log</file>
+	</logger>
+</loggers>

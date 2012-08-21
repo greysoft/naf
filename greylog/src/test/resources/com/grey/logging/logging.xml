@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<loggers>
+	<logger name="default">
+		<file level="trc" rot="daily">%stderr%</file>
+	</logger>
+	<logger name="log2">
+		<alias>default</alias>
+		<file level="trc" rot="daily" delta="Y">will_be_ignored</file>
+	</logger>
+	<logger name="log3">
+		<file>%stderr%</file>
+	</logger>
+	<logger name="log4">
+		<file>%stdout%</file>
+	</logger>
+	<logger name="log5">
+		<file>%DIRTMP%/utest/factorytest.log</file>
+	</logger>
+</loggers>

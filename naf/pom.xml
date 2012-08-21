@@ -1,0 +1,33 @@
+<!--
+  Copyright 2010-2012 Yusef Badri - All rights reserved.
+  NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>com.grey.naf</groupId>
+	<artifactId>greynaf</artifactId>
+	<version>${grey.version.naf}</version>
+	<name>Network Application Framework</name>
+	<properties>
+		<grey.manifest.name>com/grey/naf/</grey.manifest.name>
+		<grey.manifest.mainclass>com.grey.naf.Launcher</grey.manifest.mainclass>
+	</properties>
+	<parent>
+		<groupId>com.grey.naf</groupId>
+		<artifactId>build-common</artifactId>
+		<version>1.0.0</version>
+	</parent>
+	<dependencies>
+		<dependency>
+			<groupId>com.grey.naf</groupId>
+			<artifactId>greybase</artifactId>
+			<version>${grey.version.greybase}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.grey.naf</groupId>
+			<artifactId>greylog-slf4j</artifactId>
+			<version>${grey.version.greylog-slf4j}</version>
+		</dependency>
+	</dependencies>
+</project>

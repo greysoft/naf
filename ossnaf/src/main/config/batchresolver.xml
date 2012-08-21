@@ -1,0 +1,21 @@
+<naf>
+	<!--
+		Uncomment to specify alternative DNS servers - or to specify any other options
+	<dnsresolver>
+		<servers>192.168.101.1 | 192.168.101.2</servers>
+	</dnsresolver>
+	-->
+	<dispatchers>
+		<dispatcher name="dnsbatch" dns="Y" zero_naflets="N">
+			<naflets>
+				<naflet name="batchdns" class="com.grey.naf.dns.batchresolver.BatchResolver">
+					<!-- Specify pathnames if you don't want stdin and stdout -->
+					<infile>-</infile>
+					<outfile>-</outfile>
+					<mode>MX</mode>
+					<mailbox>Y</mailbox>
+				</naflet>
+			</naflets>
+		</dispatcher>
+	</dispatchers>
+</naf>

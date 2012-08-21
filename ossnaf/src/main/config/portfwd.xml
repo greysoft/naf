@@ -1,0 +1,30 @@
+<naf>
+	<dispatchers>
+		<dispatcher name="portfwd" zero_naflets="N">
+			<naflets>
+				<naflet name="portfwd" class="com.grey.portfwd.Task">
+					<listeners>
+						<listener name="portfwd-web" port="18001">
+							<server class="com.grey.portfwd.ClientSession">
+								<loadbalancer class="com.grey.portfwd.balance.RoundRobin"/>
+								<niobuffers recvsize="4096" xmitsize="2048"/>
+								<services>
+									<service address="80"/>
+									<service address="trout:80"/>
+								</services>
+							</server>
+						</listener>
+						<listener name="portfwd-telnet" port="18002">
+							<server class="com.grey.portfwd.ClientSession">
+								<services timeout="10s">
+									<service address="halibut:23"/>
+									<service address="trout:23"/>
+								</services>
+							</server>
+						</listener>
+					</listeners>
+				</naflet>
+			</naflets>
+		</dispatcher>
+	</dispatchers>
+</naf>
