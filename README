@@ -1,3 +1,25 @@
-See ./ossnaf for Readme and licencing info.
+NAF is an open-source Java NIO Framework that is designed to stick to the basics of switching I/O and be easy to use.
 
+It supports:
+- Non-blocking reads: Instruct it to to call your code back after either receiving a specified
+  marker byte (eg. a Newline, for
+  Internet-style text-oriented protocols) or a specified number of bytes.
+- Non-blocking writes: NAF will complete the write for you without further intervention, if it
+  would have blocked.
+- Millisecond Timers: You can have any number of timers outstanding, each of which will call
+  back the nominated handler on expiry.
+- Non-blocking DNS Requests: Issue A/CNAME, PTR or MX requests, and your code will be called
+  back when the answer is available.
+- Config-driven application setup: The naf.xml config file lets you easily specify which tasks
+  and classes to invoke, without having to rebuild your code every time.
+- Interrogation of the running process to obtain various stats and state dumps.
+
+It does all this within the context of the single-threaded Reactor pattern. Obviously the average NAF application will contain multiple threads, but the idea is that each thread would constitute an independent Reactor-style event-dispatcher running within one thread, with all the potential for optimisations that this presents.
+
+See the NAF home page at http://www.greyware.co.uk/naf for more info.
+Non-trivial sample applications are also included in the NAF source tree.
+
+==================================
+
+See ./ossnaf for Readme and licencing info.
 Note that ossnaf/README.txt also appears in the binary release of NAF and is worded accordingly, but obviously this is the full source tree, right here on GitHub.
