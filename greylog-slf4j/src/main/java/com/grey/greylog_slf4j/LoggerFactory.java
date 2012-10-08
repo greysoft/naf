@@ -21,7 +21,7 @@ public class LoggerFactory
 				return null;
 			}
 			return new LoggerAdapter(name, logger);
-		} catch (Exception ex) {
+		} catch (Throwable ex) {
 			throw new RuntimeException("GreyLog-SLF4J factory failed to create logger="+name+" - "+ex);
 		}
 	}

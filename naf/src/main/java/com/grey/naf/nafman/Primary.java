@@ -16,10 +16,11 @@ public final class Primary
 	private final java.util.ArrayList<Secondary> secondaries = new java.util.ArrayList<Secondary>();
 	private final java.util.ArrayList<Command> activecmds = new java.util.ArrayList<Command>();
 	private final com.grey.naf.reactor.Producer<Object> events;
-	protected final com.grey.naf.BufferSpec bufspec;
-	protected final com.grey.base.utils.ObjectWell<com.grey.base.utils.ByteChars> bcstore
-				= new com.grey.base.utils.ObjectWell<com.grey.base.utils.ByteChars>(com.grey.base.utils.ByteChars.class);
-	protected final com.grey.base.utils.ObjectWell<Command> cmdstore;
+
+	final com.grey.naf.BufferSpec bufspec;
+	final com.grey.base.utils.ObjectWell<com.grey.base.utils.ByteChars> bcstore;
+	final com.grey.base.utils.ObjectWell<Command> cmdstore;
+	final long tmt_idle;
 
 	private final java.util.ArrayList<Agent> tmpagents = new java.util.ArrayList<Agent>();
 	private final java.util.ArrayList<Command> tmpcmds = new java.util.ArrayList<Command>();
@@ -44,11 +45,13 @@ public final class Primary
 	{
 		super(d, cfg);
 		bufspec = new com.grey.naf.BufferSpec(cfg, "niobuffers", 128, 4096, true);
+		tmt_idle = cfg.getTime("timeout", com.grey.base.utils.TimeOps.parseMilliTime("10s"));
 
 		events = new com.grey.naf.reactor.Producer<Object>(Object.class, dsptch, this);
 
 		Command.Factory fact = new Command.Factory(this);
-		cmdstore = new com.grey.base.utils.ObjectWell<Command>(fact);
+		cmdstore = new com.grey.base.utils.ObjectWell<Command>(fact, "NAFMAN_Cmds_"+dsptch.name);
+		bcstore = new com.grey.base.utils.ObjectWell<com.grey.base.utils.ByteChars>(com.grey.base.utils.ByteChars.class, "NAFMAN_BC_"+dsptch.name);
 
 		int lstnport = d.nafcfg.assignPort(com.grey.naf.Config.RSVPORT_NAFMAN);
 		com.grey.base.config.XmlConfig lstncfg = new com.grey.base.config.XmlConfig(cfg, "listener");
@@ -102,7 +105,7 @@ public final class Primary
 
 		//NB: This synchronises on cmd, before we pass it to secondaries
 		cmd.getAttachedAgents(tmpagents);
-		dsptch.logger.info("NAFMAN Primary fielding command="+cmd.getDescription()+" for Agents="+tmpagents.size()+"/"+(secondaries.size()+1)
+		dsptch.logger.trace("NAFMAN Primary fielding command="+cmd.getDescription()+" for Agents="+tmpagents.size()+"/"+(secondaries.size()+1)
 				+" - ActiveCmds="+activecmds.size());
 		activecmds.add(cmd);
 		boolean completed = (tmpagents.size() == 0);

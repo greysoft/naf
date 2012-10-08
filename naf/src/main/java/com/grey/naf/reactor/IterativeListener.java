@@ -4,6 +4,8 @@
  */
 package com.grey.naf.reactor;
 
+import com.grey.logging.Logger.LEVEL;
+
 public final class IterativeListener
 	extends Listener
 {
@@ -36,7 +38,7 @@ public final class IterativeListener
 		try {
 			enableListen();
 		} catch (Throwable ex) {
-			log.error("Listener="+name+" failed to resume listening", ex);
+			log.log(LEVEL.ERR, ex, true, "Listener="+name+" failed to resume listening");
 			stop(true);
 		}
 	}
@@ -49,16 +51,16 @@ public final class IterativeListener
 
 		if (connsock != null) {
 			try {
-				try {
-					disableListen();
-				} catch (Throwable ex) {
-					log.error("Listener="+name+" failed to suspend listening", ex);
-					stop(true);
-					return;
-				}
+				disableListen();
+			} catch (Throwable ex) {
+				log.log(LEVEL.ERR, ex, true, "Listener="+name+" failed to suspend listening");
+				stop(true);
+				return;
+			}
+			try {
 				cnxhandler.accepted(connsock, this);
 			} catch (Throwable ex) {
-				log.info("Listener="+name+": Error fielding connection", ex);
+				log.log(LEVEL.TRC, ex, true, "Listener="+name+": Error fielding connection");
 			}
 		}
 	}

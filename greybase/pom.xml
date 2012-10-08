@@ -9,19 +9,12 @@
 	<artifactId>greybase</artifactId>
 	<version>${grey.version.greybase}</version>
 	<name>GreyBase</name>
-	<properties>
-		<grey.manifest.name>com/grey/base/</grey.manifest.name>
-	</properties>
 	<parent>
 		<groupId>com.grey.naf</groupId>
 		<artifactId>build-common</artifactId>
 		<version>1.0.0</version>
 	</parent>
-	<dependencies>
-		<dependency>
-			<groupId>org.slf4j</groupId>
-			<artifactId>slf4j-api</artifactId>
-			<version>1.6.2</version>
-		</dependency>
-	</dependencies>
+	<properties>
+		<grey.manifest.name>com/grey/base/</grey.manifest.name>
+	</properties>
 </project>

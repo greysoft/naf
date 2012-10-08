@@ -4,7 +4,6 @@
  */
 package com.grey.naf.nafman;
 
-import com.grey.base.ConfigException;
 import com.grey.naf.reactor.Dispatcher;
 
 public abstract class Agent
@@ -28,17 +27,18 @@ public abstract class Agent
 		handlers = new com.grey.base.utils.HashedMapIntKey<Registry.CommandHandler>();
 		registerHandler(Registry.CMD_STOP, this);
 		registerHandler(Registry.CMD_DSHOW, this);
-		registerHandler(Registry.CMD_FLUSH, this);
 		registerHandler(Registry.CMD_SHOWCMDS, this);
+		registerHandler(Registry.CMD_FLUSH, this);
+		registerHandler(Registry.CMD_LOGLVL, this);
 	}
 
 	// If there are multiple handlers for a command, the latest registrant supercedes the rest
 	public void registerHandler(int cmdcode, Registry.CommandHandler handler) throws com.grey.base.ConfigException
 	{
 		Command.Def cmd = Registry.get().getCommand(cmdcode);
-		if (cmd == null) throw new ConfigException("Handler="+handler.getClass().getName()+" trying to load unregistered cmd="+cmdcode);
+		if (cmd == null) throw new com.grey.base.ConfigException("Handler="+handler.getClass().getName()+" trying to load unregistered cmd="+cmdcode);
 		handlers.put(cmd.code, handler);
-		dsptch.logger.debug("NAFMAN="+dsptch.name+" has registered Handler="+handler.getClass().getName()+" for Command="
+		dsptch.logger.trace("NAFMAN="+dsptch.name+" has registered Handler="+handler.getClass().getName()+" for Command="
 				+cmd.code+"/"+cmd.name);
 	}
 
@@ -55,13 +55,16 @@ public abstract class Agent
 	protected void processCommand(Command cmd) throws com.grey.base.FaultException, java.io.IOException
 	{
 		Registry.CommandHandler handler = handlers.get(cmd.def.code);
-		String logmsg = "NAFMAN="+dsptch.name+" received command="+cmd.getDescription()+" - Handler="+handler;
+		sbtmp.setLength(0);
+		sbtmp.append("NAFMAN=").append(dsptch.name).append(" received command=").append(cmd.getDescription());
 		if (handler == null) {
-			dsptch.logger.debug(logmsg);
+			sbtmp.append(" - no Handler");
+			dsptch.logger.trace(sbtmp);
 		} else {
-			dsptch.logger.info(logmsg);
+			sbtmp.append(" - Handler=").append(handler);
+			dsptch.logger.info(sbtmp);
+			handler.handleNAFManCommand(cmd);
 		}
-		if (handler != null) handler.handleNAFManCommand(cmd);
 	}
 
 	@Override
@@ -74,6 +77,7 @@ public abstract class Agent
 		case Registry.CMD_STOP:
 			stopDispatcher();
 			break;
+
 		case Registry.CMD_DLIST:
 			Dispatcher[] dlist = Dispatcher.getDispatchers();
 			sbtmp.append("Dispatchers=").append(dlist.length).append(':');
@@ -84,12 +88,27 @@ public abstract class Agent
 				sbtmp.append(nafman);
 			}
 			break;
+
 		case Registry.CMD_DSHOW:
 			dsptch.dumpState(sbtmp);
 			break;
+
 		case Registry.CMD_FLUSH:
 			dsptch.flusher.flushAll();
 			break;
+
+		case Registry.CMD_LOGLVL:
+			if (cmd.getArgCount() > 1 && !cmd.getArg(1).toString().toUpperCase().equals(dsptch.name.toUpperCase())) break;
+			com.grey.logging.Logger.LEVEL lvl = null;
+			try {
+				lvl = com.grey.logging.Logger.LEVEL.valueOf(cmd.getArg(0).toString().toUpperCase());
+			} catch (Exception ex) {
+				dsptch.logger.info("NAFMAN discarding "+cmd.def.name+" command for bad level="+cmd.getArg(0));
+				break;
+			}
+			dsptch.logger.setLevel(lvl);
+			break;
+
 		case Registry.CMD_SHOWCMDS:
 			sbtmp.append("Handlers=").append(handlers.size()).append(':');
 			com.grey.base.utils.IteratorInt iter = handlers.keysIterator();
@@ -100,6 +119,7 @@ public abstract class Agent
 				sbtmp.append(": Handler=").append(handler.getClass().getName());
 			}
 			break;
+
 		case Registry.CMD_APPSTOP:
 			String dname = cmd.getArg(0).toString();
 			Dispatcher d = Dispatcher.getDispatcher(dname);
@@ -110,6 +130,7 @@ public abstract class Agent
 			String naflet = cmd.getArg(1).toString();
 			d.unloadNaflet(naflet, dsptch);
 			break;
+
 		default:
 			// we've obviously registered for this command, so we must be missing a Case label - clearly a bug
 			dsptch.logger.error("NAFMAN="+dsptch.name+": Missing case for cmd="+cmd.def.code);
@@ -123,5 +144,10 @@ public abstract class Agent
 	{
 		if (in_shutdown) return;  //Dispatcher has already told us to stop
 		dsptch.stop(dsptch);
+	}
+
+	public String submitCommand(Command.Def def, String[] args) throws java.io.IOException
+	{
+		return Client.submitCommand("localhost", getPort(), def, null, dsptch.logger);
 	}
 }

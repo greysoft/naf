@@ -46,6 +46,22 @@ public final class IP
 		return pfx;
 	}
 
+	public static int prefixToNetSize(int prefix)
+	{
+		switch (prefix)
+		{
+		case 0:
+			// the correct answer is 0x100000000 which can't be expressed as an Int, but this is a nonsense case anyway
+			return -1;
+		case 1:
+			return 0x80000000;
+		case 32:
+			return 0;
+		default:
+			return (int)Math.pow(2, 32 - prefix);
+		}
+	}
+
 	// Param is tested to see if it's a valid dotted IP string, and we return the binary IP address value if so
 	// We return IP_INVALID if address is invalid, so beware of confusing that with 0.0.0.0, which is NOT invalid. The isValidDottedIP() procedure
 	// is provided to clear up any ambiguity.

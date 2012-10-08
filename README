@@ -17,7 +17,7 @@ It supports:
 It does all this within the context of the single-threaded Reactor pattern. Obviously the average NAF application will contain multiple threads, but the idea is that each thread would constitute an independent Reactor-style event-dispatcher running within one thread, with all the potential for optimisations that this presents.
 
 See the NAF home page at http://www.greyware.co.uk/naf for more info.
-Non-trivial sample applications are also included in the NAF source tree.
+Non-trivial sample applications are also included in the NAF source tree, to illustrate NAF's features.
 
 ==================================
 

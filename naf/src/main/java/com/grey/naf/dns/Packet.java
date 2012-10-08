@@ -4,6 +4,8 @@
  */
 package com.grey.naf.dns;
 
+import com.grey.logging.Logger.LEVEL;
+
 // DNS protocol definitions and utility methods
 // RFC-1035 is the main authority - See also http://www.iana.org/assignments/dns-parameters
 public final class Packet
@@ -362,7 +364,7 @@ public final class Packet
 
 				if ((msglen == 0) || (pktlen > bufsiz))
 				{
-					if (srvr.dsptch.logger.isDebugEnabled()) srvr.dsptch.logger.debug("Bad DNS/TCP msglen="+msglen+" (nbytes="+nbytes+") - max="+bufsiz);
+					if (srvr.dsptch.logger.isActive(LEVEL.TRC)) srvr.dsptch.logger.trace("Bad DNS/TCP msglen="+msglen+" (nbytes="+nbytes+") - max="+bufsiz);
 					return -1;
 				}
 				pktniobuf.limit(pktlen);
@@ -410,8 +412,9 @@ public final class Packet
 		}
 
 		if (errmsg != null) {
-			org.slf4j.Logger log = srvr.dsptch.logger;
-			if (log.isDebugEnabled()) log.debug("DNS send: pktlen="+pktlen+" failed on proto="+(isTCP?"TCP":"UDP")+" - "+errmsg);
+			if (srvr.dsptch.logger.isActive(LEVEL.TRC)) {
+				srvr.dsptch.logger.trace("DNS send: pktlen="+pktlen+" failed on proto="+(isTCP?"TCP":"UDP")+" - "+errmsg);
+			}
 			errcod = 1;
 		}
 		return errcod;

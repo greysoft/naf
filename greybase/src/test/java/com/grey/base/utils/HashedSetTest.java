@@ -39,6 +39,7 @@ public class HashedSetTest
 	public void testRegular()
 	{
 		HashedSet<String> hset = new HashedSet<String>(1, 1);
+		org.junit.Assert.assertNotNull(hset.toString()); //for sake of code coverage
 		org.junit.Assert.assertTrue(hset.add("one"));
 		org.junit.Assert.assertFalse(hset.isEmpty());
 		org.junit.Assert.assertTrue(hset.add("two"));
@@ -46,14 +47,15 @@ public class HashedSetTest
 		org.junit.Assert.assertEquals(3, hset.size());
 		org.junit.Assert.assertFalse(hset.add("one"));
 		org.junit.Assert.assertEquals(3, hset.size());
-    	hset.toString(); //for sake of code coverage
+		org.junit.Assert.assertNotNull(hset.toString());
 
 		org.junit.Assert.assertTrue(hset.remove("one"));
 		org.junit.Assert.assertEquals(2, hset.size());
 		org.junit.Assert.assertFalse(hset.remove("one"));
 		org.junit.Assert.assertEquals(2, hset.size());
-		org.junit.Assert.assertTrue(hset.contains("two"));
 		org.junit.Assert.assertFalse(hset.contains("one"));
+		org.junit.Assert.assertTrue(hset.contains("two"));
+		org.junit.Assert.assertTrue(hset.contains("three"));
 
 		java.util.Set<String> jset_orig = new java.util.HashSet<String>();
 		jset_orig.add("two");
@@ -94,11 +96,55 @@ public class HashedSetTest
 	@org.junit.Test
 	public void testNull()
 	{
+		//verify that GreyBase and JDK Sets behave in same way
+		verifyNull(new HashedSet<String>());
+		verifyNull(new java.util.HashSet<String>());
+	}
+
+	@org.junit.Test
+	public void testCollections()
+	{
+		java.util.Set<String> jset_orig = new java.util.HashSet<String>();
+		jset_orig.add("one");
+		jset_orig.add("two");
+		jset_orig.add("three");
+
 		HashedSet<String> hset = new HashedSet<String>();
+		java.util.Set<String> jset = new java.util.HashSet<String>();
+		jset.addAll(jset_orig);
+		org.junit.Assert.assertTrue(hset.addAll(jset));
+		org.junit.Assert.assertEquals(3, hset.size());
+		org.junit.Assert.assertTrue(hset.containsAll(jset));
+		org.junit.Assert.assertFalse(hset.addAll(jset));
+		org.junit.Assert.assertEquals(3, hset.size());
+		org.junit.Assert.assertTrue(hset.containsAll(jset));
+
+		jset.remove("one");
+		org.junit.Assert.assertTrue(hset.retainAll(jset));
+		org.junit.Assert.assertEquals(2, hset.size());
+		org.junit.Assert.assertTrue(hset.containsAll(jset));
+		org.junit.Assert.assertFalse(hset.retainAll(jset));
+		org.junit.Assert.assertEquals(2, hset.size());
+		org.junit.Assert.assertTrue(hset.containsAll(jset));
+
+		hset.add("extra");
+		org.junit.Assert.assertTrue(hset.removeAll(jset));
+		org.junit.Assert.assertEquals(1, hset.size());
+		org.junit.Assert.assertTrue(hset.contains("extra"));
+		org.junit.Assert.assertFalse(hset.containsAll(jset));
+		org.junit.Assert.assertFalse(hset.removeAll(jset));
+		org.junit.Assert.assertEquals(1, hset.size());
+		org.junit.Assert.assertTrue(hset.contains("extra"));
+	}
+
+	private void verifyNull(java.util.Set<String> hset)
+	{
+		org.junit.Assert.assertTrue(hset.isEmpty());
 		org.junit.Assert.assertTrue(hset.add(null));
 		org.junit.Assert.assertFalse(hset.isEmpty());
 		org.junit.Assert.assertEquals(1, hset.size());
 		org.junit.Assert.assertTrue(hset.contains(null));
+		org.junit.Assert.assertNotNull(hset.toString());
 		org.junit.Assert.assertFalse(hset.add(null));
 		org.junit.Assert.assertEquals(1, hset.size());
 		org.junit.Assert.assertTrue(hset.contains(null));
@@ -146,41 +192,5 @@ public class HashedSetTest
 		hset.clear();
 		org.junit.Assert.assertTrue(hset.isEmpty());
 		org.junit.Assert.assertEquals(0, hset.size());
-	}
-
-	@org.junit.Test
-	public void testCollections()
-	{
-		java.util.Set<String> jset_orig = new java.util.HashSet<String>();
-		jset_orig.add("one");
-		jset_orig.add("two");
-		jset_orig.add("three");
-
-		HashedSet<String> hset = new HashedSet<String>();
-		java.util.Set<String> jset = new java.util.HashSet<String>();
-		jset.addAll(jset_orig);
-		org.junit.Assert.assertTrue(hset.addAll(jset));
-		org.junit.Assert.assertEquals(3, hset.size());
-		org.junit.Assert.assertTrue(hset.containsAll(jset));
-		org.junit.Assert.assertFalse(hset.addAll(jset));
-		org.junit.Assert.assertEquals(3, hset.size());
-		org.junit.Assert.assertTrue(hset.containsAll(jset));
-
-		jset.remove("one");
-		org.junit.Assert.assertTrue(hset.retainAll(jset));
-		org.junit.Assert.assertEquals(2, hset.size());
-		org.junit.Assert.assertTrue(hset.containsAll(jset));
-		org.junit.Assert.assertFalse(hset.retainAll(jset));
-		org.junit.Assert.assertEquals(2, hset.size());
-		org.junit.Assert.assertTrue(hset.containsAll(jset));
-
-		hset.add("extra");
-		org.junit.Assert.assertTrue(hset.removeAll(jset));
-		org.junit.Assert.assertEquals(1, hset.size());
-		org.junit.Assert.assertTrue(hset.contains("extra"));
-		org.junit.Assert.assertFalse(hset.containsAll(jset));
-		org.junit.Assert.assertFalse(hset.removeAll(jset));
-		org.junit.Assert.assertEquals(1, hset.size());
-		org.junit.Assert.assertTrue(hset.contains("extra"));
 	}
 }

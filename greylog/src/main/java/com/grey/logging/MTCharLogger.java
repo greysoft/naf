@@ -4,8 +4,6 @@
  */
 package com.grey.logging;
 
-import com.grey.logging.Interop.LEVEL;
-
 /** MT-safe wrapper around its non-MT parent.
  */
 public class MTCharLogger

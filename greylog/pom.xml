@@ -9,19 +9,25 @@
 	<artifactId>greylog</artifactId>
 	<version>${grey.version.greylog}</version>
 	<name>GreyLog Logging Framework</name>
-	<properties>
-		<grey.manifest.name>com/grey/logging/</grey.manifest.name>
-	</properties>
 	<parent>
 		<groupId>com.grey.naf</groupId>
 		<artifactId>build-common</artifactId>
 		<version>1.0.0</version>
 	</parent>
+	<properties>
+		<grey.manifest.name>com/grey/logging/</grey.manifest.name>
+	</properties>
 	<dependencies>
 		<dependency>
 			<groupId>com.grey.naf</groupId>
 			<artifactId>greybase</artifactId>
 			<version>${grey.version.greybase}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
+			<version>1.6.2</version>
+			<scope>provided</scope>
 		</dependency>
 		<dependency>
 			<groupId>commons-logging</groupId>

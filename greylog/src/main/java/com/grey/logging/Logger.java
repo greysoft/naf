@@ -4,7 +4,6 @@
  */
 package com.grey.logging;
 
-import com.grey.logging.Interop.LEVEL;
 import com.grey.base.config.SysProps;
 import com.grey.base.utils.FileOps;
 import com.grey.base.utils.TimeOps;
@@ -22,8 +21,10 @@ import com.grey.base.utils.ScheduledTime;
  * to make it fully MT-safe.
  */
 abstract public class Logger
-	implements Interop.SupportsLEVEL, java.io.Closeable, java.io.Flushable
+	implements java.io.Closeable, java.io.Flushable
 {
+	public enum LEVEL {OFF, ERR, WARN, INFO, TRC, TRC2, TRC3, TRC4, TRC5, ALL}
+
 	public static final String SYSPROP_DIAG = "grey.logger.diagnostics";
 	private static final boolean diagtrace = SysProps.get(SYSPROP_DIAG, false);
 	private static final boolean TIDplusName = SysProps.get(Parameters.SYSPROP_TIDPLUSNAME, true);
@@ -65,7 +66,7 @@ abstract public class Logger
 	@Override
 	public void flush() throws java.io.IOException {}
 
-	public final boolean isActive(LEVEL lvl) {return Interop.isActive(getLevel(), lvl);}
+	public final boolean isActive(LEVEL lvl) {return  Interop.isActive(getLevel(), lvl);}
 	public final String getName() {return name;}
 	public final String getPathTemplate() {return pthnam_tmpl;}
 	public final synchronized String getActivePath() {return fh_active == null ? null : fh_active.getAbsolutePath();}
@@ -121,7 +122,6 @@ abstract public class Logger
 		open(System.currentTimeMillis(), null);
 	}
 
-	@Override
 	public final LEVEL getLevel()
 	{
 		if (isMT) return maxLevel_MT;
@@ -129,7 +129,6 @@ abstract public class Logger
 	}
 
 	// even if we're not in MT mode, this is a rarely called method, so we can easily afford the cost of synchronising
-	@Override
 	public final LEVEL setLevel(LEVEL newlvl)
 	{
 		LEVEL oldlvl;
@@ -188,10 +187,10 @@ abstract public class Logger
 					public void run() {
 						if (!diagtrace) return;
 						Logger[] openlogs = loggers.toArray(new Logger[loggers.size()]);
-						System.out.println("GreyLogger: Open loggers="+openlogs.length+" (shutdown Thread=T"+Thread.currentThread().getId()+")");
+						System.out.println("GreyLogger: Shutdown Thread=T"+Thread.currentThread().getId()+" - Open loggers="+openlogs.length);
 						for (int idx = 0; idx != openlogs.length; idx++) {
 							Logger logger = openlogs[idx];
-							System.out.println("GreyLogger: Logger #"+(idx+1)+"/"+openlogs.length+": IsOwner="+logger.isOwner+" - "+logger);
+							System.out.println("- GreyLogger: Logger #"+(idx+1)+"/"+openlogs.length+": IsOwner="+logger.isOwner+" - "+logger);
 							logger.close();
 						}
 					}
@@ -244,7 +243,7 @@ abstract public class Logger
 		if (!isActive(lvl)) return;
 		if (ex == null) {log(lvl, msg); return;}
 		if (ex instanceof java.lang.NullPointerException) dumpStack = true;
-		String exmsg = "EXCEPTION: " + msg + " - " + com.grey.base.GreyException.summary(ex, dumpStack);
+		String exmsg = "EXCEPTION: "+msg+" - "+com.grey.base.GreyException.summary(ex, dumpStack);
 		log(lvl, exmsg);
 	}
 
@@ -302,4 +301,10 @@ abstract public class Logger
 		}
 		return pfxbuf;
 	}
+
+	// Convenenience methods to ease the transition from SLF4J to this logger
+	public final void error(CharSequence msg) {log(LEVEL.ERR, msg);}
+	public final void warn(CharSequence msg) {log(LEVEL.WARN, msg);}
+	public final void info(CharSequence msg) {log(LEVEL.INFO, msg);}
+	public final void trace(CharSequence msg) {log(LEVEL.TRC, msg);}
 }

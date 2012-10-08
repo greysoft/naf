@@ -4,8 +4,6 @@
  */
 package com.grey.logging;
 
-import com.grey.logging.Interop.LEVEL;
-
 /**
  * This logger optimises away some relatively expensive character handling by assuming the log messages are all 8-bit charsets,
  * and can be mapped to 1-to-1 to a byte stream.

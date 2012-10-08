@@ -4,7 +4,6 @@
  */
 package com.grey.logging;
 
-import com.grey.logging.Interop.LEVEL;
 import com.grey.base.config.SysProps;
 import com.grey.base.config.XmlConfig;
 import com.grey.base.utils.ByteOps;
@@ -14,6 +13,7 @@ import com.grey.base.utils.ScheduledTime;
 public class Parameters
 {
 	public static final String SYSPROP_LOGCLASS = "grey.logger.class";
+	public static final String SYSPROP_LOGSDIR = "grey.logger.dir";
 	public static final String SYSPROP_LOGFILE = "grey.logger.file";
 	public static final String SYSPROP_LOGLEVEL = "grey.logger.level";
 	public static final String SYSPROP_FLUSHINTERVAL = "grey.logger.flushinterval";
@@ -24,8 +24,10 @@ public class Parameters
 	public static final String SYSPROP_FORCE_STDOUT = "grey.logger.stdout";
 	public static final String SYSPROP_TIDPLUSNAME = "grey.logger.threadname";  //this one defaults to True
 
-	public static final String MODE_AUDIT = "AUDIT";
+	public static final String TOKEN_LOGSDIR = "%DIRLOG%";
 	public static final String TOKEN_TID = "%TID%";
+
+	public static final String MODE_AUDIT = "AUDIT";
 
 	public static final Class<?> DFLTCLASS = LatinLogger.class;
 	public static final java.io.OutputStream DFLT_STRM = System.out;
@@ -34,21 +36,21 @@ public class Parameters
 
 	public String logclass = DFLTCLASS.getName();
 	public java.io.OutputStream strm = DFLT_STRM;
-	public LEVEL loglevel = LEVEL.INFO;
+	public Logger.LEVEL loglevel = Logger.LEVEL.INFO;
 	public ScheduledTime.FREQ rotfreq = ScheduledTime.FREQ.NEVER;
-	public boolean withTID = true;
 	public int bufsiz = 8 * 1024;  // 8K
-	public long flush_interval;
-	public String pthnam;	// pathname template for logfile
+	public long flush_interval = 0;
+	public String pthnam = null;	// pathname template for logfile
 	public int maxsize;
-	public boolean withDelta;
+	public boolean withTID = true;
+	public boolean withDelta = false;
 	public String mode;
 
 	public Parameters()
 	{
 		pthnam = SysProps.get(SYSPROP_LOGFILE, pthnam);
 		logclass = SysProps.get(SYSPROP_LOGCLASS, logclass);
-		loglevel = LEVEL.valueOf(SysProps.get(SYSPROP_LOGLEVEL, loglevel.name()).toUpperCase());
+		loglevel = Logger.LEVEL.valueOf(SysProps.get(SYSPROP_LOGLEVEL, loglevel.name()).toUpperCase());
 		withTID = SysProps.get(SYSPROP_SHOWTID, withTID);
 		withDelta = SysProps.get(SYSPROP_SHOWDELTA, withDelta);
 		flush_interval = SysProps.getTime(SYSPROP_FLUSHINTERVAL, flush_interval);
@@ -64,7 +66,7 @@ public class Parameters
 		if (cfg == null) return;
 		pthnam = cfg.getValue(".", false, null);
 		logclass = cfg.getValue("@class", false, logclass);
-		loglevel = LEVEL.valueOf(cfg.getValue("@level", false, loglevel.name()).toUpperCase());
+		loglevel = Logger.LEVEL.valueOf(cfg.getValue("@level", false, loglevel.name()).toUpperCase());
 		withTID = cfg.getBool("@tid", withTID);
 		withDelta = cfg.getBool("@delta", withDelta);
 		flush_interval = cfg.getTime("@flush", flush_interval);
@@ -76,21 +78,21 @@ public class Parameters
 		rotfreq = ScheduledTime.FREQ.valueOf(str.toUpperCase());
 	}
 
-	public Parameters(LEVEL p_max, String p_pthnam)
+	public Parameters(Logger.LEVEL max, String path)
 	{
 		this();
-		loglevel = p_max;
-		pthnam = p_pthnam;
+		loglevel = max;
+		pthnam = path;
 	}
 
-	public Parameters(LEVEL p_max, java.io.OutputStream p_strm)
+	public Parameters(Logger.LEVEL max, java.io.OutputStream s)
 	{
 		this();
-		loglevel = p_max;
-		strm = p_strm;
+		loglevel = max;
+		strm = s;
 	}
 
-	// NB: We deliberately don't take a static final reading of Interop.SYSPROP_LOGSDIR, to allow callers
+	// NB: We deliberately don't take a static final reading of SYSPROP_LOGSDIR, in order to allow callers
 	// to set it even if this logging framework was initialised before them.
 	public void reconcile()
 	{
@@ -123,8 +125,8 @@ public class Parameters
 				if (maxsize != 0) rotfreq = ScheduledTime.FREQ.NEVER;;
 				pthnam = ScheduledTime.embedTimeToken(pthnam, '.');
 			}
-			String tokenval = SysProps.get(Interop.SYSPROP_LOGSDIR);
-			if (tokenval != null) pthnam = pthnam.replace(Interop.TOKEN_LOGSDIR, tokenval);
+			String tokenval = SysProps.get(SYSPROP_LOGSDIR);
+			if (tokenval != null) pthnam = pthnam.replace(TOKEN_LOGSDIR, tokenval);
 			pthnam = pthnam.replace(SysProps.DIRTOKEN_TMP, SysProps.TMPDIR);
 			pthnam = pthnam.replaceAll(TOKEN_TID, String.valueOf(Thread.currentThread().getId()));
 			try {

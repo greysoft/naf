@@ -3,6 +3,9 @@
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns;
+
+import com.grey.logging.Logger.LEVEL;
+
 /*
  * NB: We never expect TCP channels to block, since we only write out one puny little DNS request packet per connection. So no IOExecWriter.
  * We also prefer to do raw I/O handling for our reads, so no IOExecReader either.
@@ -142,7 +145,9 @@ public final class QueryHandle
 	protected void connected(boolean success, Throwable ex) throws java.io.IOException
 	{
 		if (!success) {
-			if (dsptch.logger.isDebugEnabled()) dsptch.logger.debug("Resolver: TCP connect failed - "+dnsserver.address()+"/TCP="+isTCP(), ex);
+			if (dsptch.logger.isActive(LEVEL.TRC)) {
+				dsptch.logger.log(LEVEL.TRC, ex, false, "Resolver: TCP connect failed - "+dnsserver.address()+"/TCP="+isTCP());
+			}
 			rslvr.endQuery(this, Answer.STATUS.ERROR);
 			return;
 		}
@@ -197,7 +202,7 @@ public final class QueryHandle
 			try {
 				callers.get(idx).dnsResolved(dsptch, answer, callerparams.get(idx));
 			} catch (Throwable ex) {
-				dsptch.logger.info("Resolver: Client error - " + answer, ex);
+				dsptch.logger.log(LEVEL.INFO, ex, true, "Resolver: Client error - " + answer);
 			}
 		}		
 	}

@@ -7,13 +7,9 @@ package com.grey.base;
 import com.grey.base.config.SysProps;
 import com.grey.base.utils.DynLoader;
 import com.grey.base.utils.TimeOps;
-import com.grey.base.utils.FileOps;
 
 /* Example command-lines:
  *     java -cp greybase.jar com.grey.base.Exec showtime 1278443608419 gmt
- *     java -cp ".:greybase-1.2.1.jar:log4j-1.2.16.jar:slf4j-log4j12-1.6.2.jar" com.grey.base.Exec activelog
- *          Where: leading dot in classpath lets us find a Log4J config file in current dir
- *          	and slf4j-api-1.6.2.jar is already specified in greybase.jar Manifest classpath
  */
 public class Exec
 {
@@ -76,14 +72,6 @@ public class Exec
 		{
 			String ipdotted = argv[argc++];
 			System.out.println("IP = " + com.grey.base.utils.IP.convertDottedIP(ipdotted));
-		}
-		else if (cmd == "ACTIVELOG")
-		{
-			String name = "";
-			if (argv.length > argc) name = argv[argc++];
-			org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(name);
-			log.info("Sample message from Active Logger");
-			FileOps.close(log);
 		}
 		else if (cmd == "LOADCLASS")
 		{

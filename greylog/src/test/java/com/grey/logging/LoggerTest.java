@@ -4,7 +4,7 @@
  */
 package com.grey.logging;
 
-import com.grey.logging.Interop.LEVEL;
+import com.grey.logging.Logger.LEVEL;
 import com.grey.base.config.SysProps;
 import com.grey.base.utils.TimeOps;
 import com.grey.base.utils.ScheduledTime;
@@ -149,11 +149,35 @@ public class LoggerTest
 	@org.junit.Test
 	public void testSinkLogger() throws com.grey.base.ConfigException, java.io.IOException
 	{
+		Class<?> clss = SinkLogger.class;
 		Parameters params = new Parameters(LEVEL.INFO, (java.io.OutputStream)null);
-		params.logclass = SinkLogger.class.getName();
+		params.logclass = clss.getName();
 		Logger log = Factory.getLogger(params, null);
-		org.junit.Assert.assertEquals(SinkLogger.class, log.getClass());
+		org.junit.Assert.assertEquals(clss, log.getClass());
 		log.log(LEVEL.WARN, null, true, "This message should not come out");
+		log.close();
+	}
+
+	// All we're looking for here is proof it doesn't crash!
+	@org.junit.Test
+	public void testAdapters() throws com.grey.base.ConfigException, java.io.IOException
+	{
+		Class<?> clss = com.grey.logging.adapters.AdapterSLF4J.class;
+		Parameters params = new Parameters(LEVEL.INFO, (java.io.OutputStream)null);
+		params.logclass = clss.getName();
+		Logger log = Factory.getLogger(params, "logname-slf4j");
+		org.junit.Assert.assertEquals(clss, log.getClass());
+		StringBuilder sb = new StringBuilder("This won't come  out unless an SLF4J logger is on our classpath and is configured");
+		log.trace(sb);
+		log.close();
+
+		clss = com.grey.logging.adapters.AdapterJCL.class;
+		params = new Parameters(LEVEL.INFO, (java.io.OutputStream)null);
+		params.logclass = clss.getName();
+		log = Factory.getLogger(params, "logname-jcl");
+		org.junit.Assert.assertEquals(clss, log.getClass());
+		sb = new StringBuilder("This is the JCL adapter");
+		log.trace(sb);
 		log.close();
 	}
 }

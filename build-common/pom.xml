@@ -11,12 +11,13 @@
 	<name>Common Build Defs</name>
 	<packaging>pom</packaging>
 	<properties>
-		<grey.version.naf>2.0.0</grey.version.naf>
+		<grey.version.naf>2.1.0</grey.version.naf>
 		<grey.version.greybase>${grey.version.naf}</grey.version.greybase>
-		<grey.version.greylog>1.2.0</grey.version.greylog>
+		<grey.version.greylog>1.3.0</grey.version.greylog>
 		<grey.version.greylog-slf4j>${grey.version.greylog}</grey.version.greylog-slf4j>
-		<grey.version.mailismusmta>1.3.0</grey.version.mailismusmta>
-		<grey.version.liceman>1.2.1</grey.version.liceman>
+		<grey.version.mailismusmta>1.4.0</grey.version.mailismusmta>
+		<grey.version.liceman>1.2.2</grey.version.liceman>
+		<grey.manifest.builder>Build Manager</grey.manifest.builder>
 		<grey.manifest.vendor>Grey Software</grey.manifest.vendor>
 		<grey.javaver>1.6</grey.javaver>
 		<grey.buildid>${buildNumber}</grey.buildid>
@@ -62,7 +63,7 @@
 							<addClasspath>true</addClasspath>
 						</manifest>
 						<manifestEntries>
-							<Premain-Class>${grey.manifest.premainclass}</Premain-Class>
+							<Built-By>${grey.manifest.builder}</Built-By>
 						</manifestEntries>
 						<manifestSections>
 							<manifestSection>

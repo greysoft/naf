@@ -138,7 +138,7 @@ public class ChannelMonitorTest
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
 		def.hasNafman = false;
 		def.surviveHandlers = false;
-		Dispatcher dsptch = Dispatcher.create(def, null, org.slf4j.LoggerFactory.getLogger("no-such-logger"));
+		Dispatcher dsptch = Dispatcher.create(def, null, com.grey.logging.Factory.getLogger("no-such-logger"));
 		CMR[] entities = new CMR[entitycnt];
 		byte[] xmtbuf = new byte[xmtsiz];
 		java.util.Arrays.fill(xmtbuf, (byte)1);

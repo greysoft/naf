@@ -59,7 +59,8 @@ public final class BufferSpec
 
 		if (withpool && xmtbufsiz != 0) {
 			com.grey.base.utils.NIOBuffers.BufferFactory factory = new com.grey.base.utils.NIOBuffers.BufferFactory(xmtbufsiz, directbufs);
-			xmtpool = new com.grey.base.utils.ObjectWell<java.nio.ByteBuffer>(java.nio.ByteBuffer.class, factory, 0, 0, 1);
+			xmtpool = new com.grey.base.utils.ObjectWell<java.nio.ByteBuffer>(java.nio.ByteBuffer.class, factory,
+					"BufferSpec_T"+Thread.currentThread().getId()+"_"+System.identityHashCode(this), 0, 0, 1);
 		} else {
 			xmtpool = null;
 		}

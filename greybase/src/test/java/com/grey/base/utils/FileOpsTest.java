@@ -7,6 +7,7 @@ package com.grey.base.utils;
 import com.grey.base.config.SysProps;
 
 public final class FileOpsTest
+	implements FileOps.LineReader
 {
 	private static class IndeterminateStream extends java.io.FileInputStream
 	{
@@ -335,5 +336,32 @@ public final class FileOpsTest
 		filename = "/path/to.somewhere/nofiletype";
 		sfx = FileOps.getFileType(filename);
 		org.junit.Assert.assertTrue(sfx == null);
+	}
+
+	@org.junit.Test
+	public void lineReader() throws java.io.IOException, java.net.URISyntaxException
+	{
+		int cnt = FileOps.readTextLines(getClass().getResource(RSRC_NAME), this, 0, null);
+		org.junit.Assert.assertEquals(2, cnt);
+
+		String pthnam = FileOps.getResourcePath(RSRC_NAME, getClass());
+		cnt = FileOps.readTextLines(new java.io.File(pthnam), this, 0, null);
+		org.junit.Assert.assertEquals(2, cnt);
+	}
+
+	@Override
+	public boolean processLine(String line, int lno, int mode, Object cbdata)
+	{
+		switch (lno) {
+		case 1:
+			org.junit.Assert.assertEquals(RSRC_TEXT, line);
+			break;
+		case 2:
+			org.junit.Assert.assertEquals(0, line.length());
+			break;
+		default:
+			org.junit.Assert.fail("Unexpected LineReader line-number="+lno);
+		}
+		return false;
 	}
 }

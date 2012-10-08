@@ -46,13 +46,13 @@ public abstract class Resolver
 	private static final Class<?> DFLTCLASS = com.grey.naf.dns.embedded.EmbeddedResolver.class;
 
 	abstract public void start() throws java.io.IOException;
-	abstract public boolean stop();
+	abstract public void stop();
 	abstract public int cancel(Client caller) throws java.io.IOException;
 	abstract protected Answer resolve(byte qtype, ByteChars qname, Client caller,
 			Object cbdata, int flags) throws java.io.IOException;
 	abstract protected Answer resolve(byte qtype, int qip, Client caller, Object cbdata, int flags) throws java.io.IOException;
 
-	protected final com.grey.naf.reactor.Dispatcher dsptch;
+	public final com.grey.naf.reactor.Dispatcher dsptch;
 
 	// these are just temporary work areas, pre-allocated for efficiency
 	private final Answer dnsAnswer = new Answer();

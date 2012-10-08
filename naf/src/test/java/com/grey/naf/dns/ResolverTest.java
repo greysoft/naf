@@ -13,6 +13,8 @@ import com.grey.naf.reactor.Dispatcher;
 public class ResolverTest
 	implements Resolver.Client
 {
+	private static final com.grey.logging.Logger junklogger = com.grey.logging.Factory.getLoggerNoEx("no-such-logger");
+
 	private static final String dnsservers = SysProps.get("greynaf.dns.test.servers");
 	private static final String queryTargetA = SysProps.get("greynaf.dns.test.targetA", "www.google.com");
 	private static final String queryTargetMX = SysProps.get("greynaf.dns.test.targetMX", "ibm.com"); //triggers QTYPE_A follow-on
@@ -44,11 +46,11 @@ public class ResolverTest
 		if (SysProps.get(SYSPROP_SKIP, false)) return;
 		com.grey.naf.Config nafcfg = setConfig(null, 0);
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
-		def.name = "Embedded";
+		def.name = "utest_Embedded";
 		def.hasDNS = true;
 		def.hasNafman = false;
 		def.surviveHandlers = false;
-		Dispatcher dsptch = Dispatcher.create(def, nafcfg, org.slf4j.LoggerFactory.getLogger("no-such-logger"));
+		Dispatcher dsptch = Dispatcher.create(def, nafcfg, junklogger);
 		org.junit.Assert.assertEquals(com.grey.naf.dns.embedded.EmbeddedResolver.class, dsptch.dnsresolv.getClass());
 		org.junit.Assert.assertNull(com.grey.naf.nafman.Primary.get());
 
@@ -105,15 +107,15 @@ public class ResolverTest
 		if (SysProps.get(SYSPROP_SKIP, false)) return;
 		com.grey.naf.Config nafcfg = setConfig("com.grey.naf.dns.distributedresolver.Client", 0);
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
-		def.name = "DistribLocal";
+		def.name = "utest_DistribLocal";
 		def.hasDNS = true;
 		def.hasNafman = true;
 		def.surviveHandlers = false;
 		def.surviveDownstream = false;
-		Dispatcher d1 = Dispatcher.create(def, nafcfg, org.slf4j.LoggerFactory.getLogger("no-such-logger"));
+		Dispatcher d1 = Dispatcher.create(def, nafcfg, junklogger);
 		org.junit.Assert.assertEquals(com.grey.naf.dns.distributedresolver.Client.class, d1.dnsresolv.getClass());
-		def.name = "DistribRemote";
-		Dispatcher d2 = Dispatcher.create(def, nafcfg, org.slf4j.LoggerFactory.getLogger("no-such-logger"));
+		def.name = "utest_DistribRemote";
+		Dispatcher d2 = Dispatcher.create(def, nafcfg, junklogger);
 		org.junit.Assert.assertEquals(com.grey.naf.dns.distributedresolver.Client.class, d2.dnsresolv.getClass());
 		exec(d1, "distributed-local", true, null, false);
 		exec(d2, "distributed-remote", false, d1, true);
@@ -125,11 +127,11 @@ public class ResolverTest
 		if (SysProps.get(SYSPROP_SKIP, false)) return;
 		com.grey.naf.Config nafcfg = setConfig(null, CFG_TCP);
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
-		def.name = "AlwaysTCP";
+		def.name = "utest_AlwaysTCP";
 		def.hasDNS = true;
 		def.hasNafman = false;
 		def.surviveHandlers = false;
-		Dispatcher dsptch = Dispatcher.create(def, nafcfg, org.slf4j.LoggerFactory.getLogger("no-such-logger"));
+		Dispatcher dsptch = Dispatcher.create(def, nafcfg, junklogger);
 		org.junit.Assert.assertEquals(com.grey.naf.dns.embedded.EmbeddedResolver.class, dsptch.dnsresolv.getClass());
 		exec(dsptch, "TCP", false, null, false);
 	}
@@ -141,11 +143,11 @@ public class ResolverTest
 		if (queryTargetMX.equals("-")) return;
 		com.grey.naf.Config nafcfg = setConfig(null, CFG_FALLBACKA);
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
-		def.name = "Fallback_A";
+		def.name = "utest_Fallback_A";
 		def.hasDNS = true;
 		def.hasNafman = false;
 		def.surviveHandlers = false;
-		Dispatcher dsptch = Dispatcher.create(def, nafcfg, org.slf4j.LoggerFactory.getLogger("no-such-logger"));
+		Dispatcher dsptch = Dispatcher.create(def, nafcfg, junklogger);
 		exec(dsptch, "fallbackA", false, null, true);
 	}
 
@@ -155,11 +157,11 @@ public class ResolverTest
 		if (SysProps.get(SYSPROP_SKIP, false)) return;
 		com.grey.naf.Config nafcfg = setConfig(null, 0);
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
-		def.name = "Cancel";
+		def.name = "utest_Cancel";
 		def.hasDNS = true;
 		def.hasNafman = false;
 		def.surviveHandlers = false;
-		Dispatcher dsptch = Dispatcher.create(def, nafcfg, org.slf4j.LoggerFactory.getLogger("no-such-logger"));
+		Dispatcher dsptch = Dispatcher.create(def, nafcfg, junklogger);
 		ByteChars bc = new ByteChars("any-old-name");
 		dsptch.dnsresolv.resolveHostname(bc, this, null, 0);
 		dsptch.dnsresolv.resolveHostname(bc, this, null, 0);
@@ -174,7 +176,10 @@ public class ResolverTest
 
 	private void exec(Dispatcher dsptch, String cbdata, boolean nowait, Dispatcher d2, boolean nopiggy) throws java.io.IOException
 	{
-		opencallbacks = 0;
+		synchronized (this) {
+			// we haven't launched our threads yet, but this keeps FindBugs happy
+			opencallbacks = 0;
+		}
 		if (cbdata.equals("fallbackA")) {
 			issueQuery(dsptch, "www."+queryTargetMX, Resolver.QTYPE_MX, cbdata, nopiggy);
 		} else {
@@ -194,8 +199,11 @@ public class ResolverTest
 		dsptch.start();
 		dsptch.waitStopped();
 		if (d2 != null) d2.waitStopped();
-		org.junit.Assert.assertEquals(dnsrequests, dnscallbacks);
-		org.junit.Assert.assertEquals(0, opencallbacks);
+		synchronized (this) {
+			// joining on Dispatcher thread will have synchronized our memory view, but this keeps FindBugs happy
+			org.junit.Assert.assertEquals(dnsrequests, dnscallbacks);
+			org.junit.Assert.assertEquals(0, opencallbacks);
+		}
 	}
 
 	// We issue an immediate repeat query to exercise the code for piggybacking on the earlier pending one.

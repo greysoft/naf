@@ -268,6 +268,30 @@ public class HashedMapIntKeyTest
 		org.junit.Assert.assertTrue(hmap.containsValue(Integer.toString(cnt - 1)));
     }
 
+    @org.junit.Test
+    final public void bulktest()
+    {
+    	final int cap = 10*1000; //ramp up to investigate manually
+        HashedMapIntKey<Integer> map = new HashedMapIntKey<Integer>(0, 5);
+        // general put-get
+        for (int v = 0; v != cap; v++) {
+        	Integer old = map.put(v, v);
+        	org.junit.Assert.assertNull(v+" held "+old, old);
+        }
+		org.junit.Assert.assertEquals(cap, map.size());
+        for (int v = 0; v != cap; v++) org.junit.Assert.assertEquals(v, map.get(v).intValue());
+        // iterators
+		java.util.HashSet<Integer> jset = new java.util.HashSet<Integer>();
+        IteratorInt it = map.keysIterator();
+		while (it.hasNext()) {
+			jset.add(it.next());
+			it.remove();
+		}
+		org.junit.Assert.assertEquals(0, map.size());
+		org.junit.Assert.assertEquals(cap, jset.size());
+        for (int v = 0; v != cap; v++) org.junit.Assert.assertTrue(jset.contains(v));
+    }
+
     private String addEntry(int key, String val, boolean isnew, String oldval_exp)
     {
     	int size = hmap.size();

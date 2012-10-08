@@ -4,7 +4,7 @@
  */
 package com.grey.logging;
 
-import com.grey.logging.Interop.LEVEL;
+import com.grey.base.utils.ScheduledTime;
 
 /**
  * Accumulates log messages as an in-memory string.
@@ -54,6 +54,8 @@ public class MemLogger
 	{
 		params.pthnam = null;
 		params.strm = null;
+		params.rotfreq = ScheduledTime.FREQ.NEVER;
+		params.maxsize = 0;
 		params.bufsiz = 0;
 		params.flush_interval = 0;
 		return params;

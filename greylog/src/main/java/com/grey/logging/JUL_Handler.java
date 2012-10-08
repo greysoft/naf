@@ -4,8 +4,6 @@
  */
 package com.grey.logging;
 
-import com.grey.logging.Interop.LEVEL;
-
 /**
  * This class wraps the Grey Logger in a JUL handler.
  */
@@ -34,7 +32,7 @@ public class JUL_Handler
 	{
 		this.log = log;
 		this.fullinfo = fullinfo;
-		log.setLevel(LEVEL.ALL);  //anything routed to this handler has already been approved, so make sure Grey Logger allows it
+		log.setLevel(Logger.LEVEL.ALL);  //anything routed to this handler has already been approved, so make sure Grey Logger allows it
 	}
 
 	@Override
@@ -49,14 +47,14 @@ public class JUL_Handler
 		try {
 			log.flush();
 		} catch (Exception ex) {
-			log.log(LEVEL.ERR, "Failed to flush JUL handler");
+			log.log(Logger.LEVEL.ERR, "Failed to flush JUL handler");
 		}
 	}
 
 	@Override
 	public void publish(java.util.logging.LogRecord rec)
 	{
-		String msg = rec.getMessage();
+		CharSequence msg = rec.getMessage();
 		Throwable ex = rec.getThrown();
 
 		if (fullinfo || ex != null)
@@ -76,12 +74,11 @@ public class JUL_Handler
 				}
 			}
 			if (ex != null) buf.append(com.grey.base.GreyException.summary(ex, true));
-			msg = buf.toString();
+			msg = buf;
 		}
-		LEVEL lvl = Interop.mapLevel(rec.getLevel());
+		Logger.LEVEL lvl = Interop.mapLevel(rec.getLevel());
 		log.log(lvl, msg);
 	}
-
 
 	// Note that the blank name retrieves the root logger, which has a single handler by default.
 	// The weird GLOBAL_LOGGER_NAME does not actually return the root logger, but rather one of its immediate children, with no handlers.

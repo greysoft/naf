@@ -267,17 +267,17 @@ public class XmlConfigTest
 		org.junit.Assert.assertEquals(3, str.length);
 
 		try {
-			str = cfg.getTuple("tuple1", "|", true, null, 4, 3);
+			cfg.getTuple("tuple1", "|", true, null, 4, 3);
 			org.junit.Assert.fail("Failed to detect min-tuple violations");
 		} catch (com.grey.base.ConfigException ex) {}
 
 		try {
-			str = cfg.getTuple("tuple1", "|", true, null, 3, 2);
+			cfg.getTuple("tuple1", "|", true, null, 3, 2);
 			org.junit.Assert.fail("Failed to detect max-tuple violations");
 		} catch (com.grey.base.ConfigException ex) {}
 
 		try {
-			str = cfg.getTuple("tuple3", "|", true, null);
+			cfg.getTuple("tuple3", "|", true, null);
 			org.junit.Assert.fail("Absent mandatory tuple not detected");
 		} catch (com.grey.base.ConfigException ex) {}
 

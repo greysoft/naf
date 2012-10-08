@@ -100,6 +100,7 @@ public class FactoryTest
 		log2 = Factory.getLogger(cfgpath, "log5");
 		org.junit.Assert.assertTrue(log2 != log);
 		org.junit.Assert.assertTrue(fh.exists() && fh.length() > prevlen);
+		log2.close();
 
 		dlog.close();
 		dlog_cfg.close();

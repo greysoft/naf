@@ -32,6 +32,19 @@ public class IPTest
 			org.junit.Assert.assertEquals(verified_masks[pfx], mask);
 			org.junit.Assert.assertEquals(pfx, IP.maskToPrefix(mask));
 		}
+		org.junit.Assert.assertEquals(0, IP.prefixToNetSize(32));
+		org.junit.Assert.assertEquals(2, IP.prefixToNetSize(31));
+		org.junit.Assert.assertEquals(4, IP.prefixToNetSize(30));
+		org.junit.Assert.assertEquals(8, IP.prefixToNetSize(29));
+		org.junit.Assert.assertEquals(16, IP.prefixToNetSize(28));
+		org.junit.Assert.assertEquals(256, IP.prefixToNetSize(24));
+		org.junit.Assert.assertEquals(256*256, IP.prefixToNetSize(16));
+		org.junit.Assert.assertEquals(256*256*256, IP.prefixToNetSize(8));
+		org.junit.Assert.assertEquals(256*256*256*16, IP.prefixToNetSize(4));
+		org.junit.Assert.assertEquals(256*256*256*32, IP.prefixToNetSize(3));
+		org.junit.Assert.assertEquals(256*256*256*64, IP.prefixToNetSize(2));
+		org.junit.Assert.assertEquals(256*256*256*128, IP.prefixToNetSize(1));
+		org.junit.Assert.assertEquals(-1, IP.prefixToNetSize(0));
 	}
 
 	@org.junit.Test

@@ -67,7 +67,7 @@ public class TimerTest
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
 		def.hasNafman = false;
 		def.surviveHandlers = false;
-		Dispatcher dsptch = Dispatcher.create(def, null, org.slf4j.LoggerFactory.getLogger("no-such-logger"));
+		Dispatcher dsptch = Dispatcher.create(def, null, com.grey.logging.Factory.getLogger("no-such-logger"));
 		Handler handler = new Handler();
 
 		dsptch.setTimer(0, 1, handler);

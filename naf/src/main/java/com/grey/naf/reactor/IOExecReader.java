@@ -4,6 +4,8 @@
  */
 package com.grey.naf.reactor;
 
+import com.grey.logging.Logger.LEVEL;
+
 public final class IOExecReader
 {
 	private static final int F_ARRBACK = 1 << 0; //rcvbuf has backing array
@@ -86,6 +88,7 @@ public final class IOExecReader
 			// assuming our code is error-free, an exception here typically means the remote party has closed the connection
 			if (!isFlagSet(F_ENABLED)) chanmon.enableRead();
 		} catch (Exception ex) {
+			chanmon.dsptch.logger.log(LEVEL.TRC2, ex, false, "IOExec: failed to enable Read");
 			chanmon.ioDisconnected();
 			return;
 		}
@@ -101,7 +104,11 @@ public final class IOExecReader
 		if (isFlagSet(F_ENABLED) && chanmon != null) {
 			// The I/O operation is already over, so just swallow any exceptions.
 			// They are probably due to a remote disconnect, and we can handle that later if/when we do any more I/O on this channel
-			try {chanmon.disableRead();} catch (Exception ex) {}
+			try {
+				chanmon.disableRead();
+			} catch (Exception ex) {
+				chanmon.dsptch.logger.log(LEVEL.TRC2, ex, false, "IOExec: failed to disable Read");
+			}
 		}
 		clearFlag(F_ENABLED);
 	}
@@ -130,8 +137,8 @@ public final class IOExecReader
 				nbytes = iochan.read(rcvbuf);
 			}
 		} catch (Exception ex) {
-			chanmon.dsptch.logger.debug("IOExec: read() threw - "+com.grey.base.GreyException.summary(ex));
 			if (ex instanceof java.net.PortUnreachableException) return;  //indicates we've just received associated ICMP packet - discard
+			chanmon.dsptch.logger.log(LEVEL.TRC3, ex, false, "IOExec: read() failed on "+chanmon.iochan);
 		}
 
 		if (nbytes == -1) {

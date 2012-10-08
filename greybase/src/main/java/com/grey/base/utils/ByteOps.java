@@ -114,13 +114,19 @@ public final class ByteOps
 		return true;
 	}
 
-	public static int indexOf(byte[] arr, int off, byte val)
+	public static int indexOf(byte[] arr, int off, int len, byte val)
 	{
-		for (int idx = off; idx != arr.length; idx++)
+		int lmt = off + len;
+		for (int idx = off; idx != lmt; idx++)
 		{
 			if (arr[idx] == val) return idx;
 		}
 		return -1;
+	}
+
+	public static int indexOf(byte[] arr, byte val)
+	{
+		return indexOf(arr, 0, arr.length, val);
 	}
 
 	// decode big-endian number

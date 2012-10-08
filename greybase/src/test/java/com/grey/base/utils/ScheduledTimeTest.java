@@ -7,7 +7,7 @@ package com.grey.base.utils;
 import java.util.Calendar;
 import com.grey.base.utils.ScheduledTime.FREQ;
 
-// These tests are not timezone dependent (referring to the grey.timezone value in grey.properties)
+// These tests are no longer timezone dependent (ie. dependent on the grey.timezone setting in grey.properties)
 // Have verified GB-Eire, GMT & UTC, Hongkong for somewhere way ahead of GMT, and PST (Pacific Standard Time) for somewhere way behind.
 public class ScheduledTimeTest
 {
@@ -190,8 +190,8 @@ public class ScheduledTimeTest
 		} else {
 			if (sched.frequency() == FREQ.MONTHLY) {
 				org.junit.Assert.assertTrue(systime - basetime < (dtcal_now.get(Calendar.DAY_OF_MONTH) * TimeOps.MSECS_PER_DAY));
-				org.junit.Assert.assertTrue(next1 - basetime >= 28L * TimeOps.MSECS_PER_DAY);
-				org.junit.Assert.assertTrue(next1 - basetime <= 31L * TimeOps.MSECS_PER_DAY);
+				org.junit.Assert.assertTrue(next1 - basetime >= 27L * TimeOps.MSECS_PER_DAY); //28-1 to allow for timezone diffs
+				org.junit.Assert.assertTrue(next1 - basetime <= 32L * TimeOps.MSECS_PER_DAY); //31+1 to allow for timezone diffs
 			} else if (sched.frequency() == FREQ.YEARLY) {
 				org.junit.Assert.assertTrue(systime - basetime < (dtcal_now.get(Calendar.DAY_OF_YEAR) * TimeOps.MSECS_PER_DAY));
 				org.junit.Assert.assertTrue(next1 - basetime >= 365L * TimeOps.MSECS_PER_DAY);

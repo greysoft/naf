@@ -6,7 +6,7 @@ package com.grey.base.utils;
 
 public class HashedSetIntTest
 {
-    private HashedSetInt hset = new HashedSetInt(3, 3);
+    private HashedSetInt hset = new HashedSetInt();
 
     @org.junit.Test
     final public void testConstructors()

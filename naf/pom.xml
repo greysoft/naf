@@ -9,15 +9,15 @@
 	<artifactId>greynaf</artifactId>
 	<version>${grey.version.naf}</version>
 	<name>Network Application Framework</name>
-	<properties>
-		<grey.manifest.name>com/grey/naf/</grey.manifest.name>
-		<grey.manifest.mainclass>com.grey.naf.Launcher</grey.manifest.mainclass>
-	</properties>
 	<parent>
 		<groupId>com.grey.naf</groupId>
 		<artifactId>build-common</artifactId>
 		<version>1.0.0</version>
 	</parent>
+	<properties>
+		<grey.manifest.name>com/grey/naf/</grey.manifest.name>
+		<grey.manifest.mainclass>com.grey.naf.Launcher</grey.manifest.mainclass>
+	</properties>
 	<dependencies>
 		<dependency>
 			<groupId>com.grey.naf</groupId>
@@ -26,8 +26,8 @@
 		</dependency>
 		<dependency>
 			<groupId>com.grey.naf</groupId>
-			<artifactId>greylog-slf4j</artifactId>
-			<version>${grey.version.greylog-slf4j}</version>
+			<artifactId>greylog</artifactId>
+			<version>${grey.version.greylog}</version>
 		</dependency>
 	</dependencies>
 </project>

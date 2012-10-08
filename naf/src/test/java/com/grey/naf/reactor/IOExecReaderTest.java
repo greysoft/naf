@@ -13,6 +13,7 @@ public class IOExecReaderTest
 	static {
 		SysProps.set(com.grey.naf.Config.SYSPROP_DIRPATH_VAR, SysProps.TMPDIR+"/utest/IOR");
 	}
+
 	private static class CMR extends ChannelMonitor
 	{
 		private final com.grey.naf.BufferSpec bufspec;
@@ -158,7 +159,7 @@ public class IOExecReaderTest
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
 		def.hasNafman = false;
 		def.surviveHandlers = false;
-		Dispatcher dsptch = Dispatcher.create(def, null, org.slf4j.LoggerFactory.getLogger("no-such-logger"));
+		Dispatcher dsptch = Dispatcher.create(def, null, com.grey.logging.Factory.getLogger("no-such-logger"));
 		java.nio.channels.Pipe pipe = java.nio.channels.Pipe.open();
 		java.nio.channels.Pipe.SourceChannel rep = pipe.source();
 		java.nio.channels.Pipe.SinkChannel wep = pipe.sink();

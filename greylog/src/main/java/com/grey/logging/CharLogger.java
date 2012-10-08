@@ -4,8 +4,6 @@
  */
 package com.grey.logging;
 
-import com.grey.logging.Interop.LEVEL;
-
 /**
  * This logger faithfully writes out the log message as is, preserving the character-set encoding.
  * <br/>

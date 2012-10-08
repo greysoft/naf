@@ -16,17 +16,17 @@ package com.grey.base.utils;
  * <p>
  * Beware that this class is single-threaded and non-reentrant.
  */
-public class HashedSet<E>
+public final class HashedSet<E>
 	implements java.util.Set<E>
 {
-	private final HashedMap<E, Object> map;
+	private final HashedMap<E, E> map;
 
 	public HashedSet() {this(0);}
 	public HashedSet(int initcap) {this(initcap, 0);}
 	
 	public HashedSet(int initcap, float factor)
 	{
-		map = new HashedMap<E, Object>(initcap, factor, true);
+		map = new HashedMap<E, E>(initcap, factor, true);
 	}
 
 	@Override
@@ -45,6 +45,12 @@ public class HashedSet<E>
 	public boolean contains(Object obj)
 	{
 		return map.containsKey(obj);
+	}
+
+	// This is useful for obtaining a unique interned instance of the given value
+	public E get(E obj)
+	{
+		return map.get(obj);
 	}
 
 	@Override

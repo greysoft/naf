@@ -20,7 +20,7 @@ public abstract class Listener
 	public final int srvport;
 	public final Object controller;
 
-	protected final org.slf4j.Logger log;
+	protected final com.grey.logging.Logger log;
 	protected boolean inShutdown;
 
 	private com.grey.naf.EntityReaper reaper;
@@ -51,7 +51,7 @@ public abstract class Listener
 		}
 		if (lname == null) lname = dsptch.name+":"+port;
 		name = lname;
-		log.debug("Dispatcher="+dsptch.name+" - Listener="+name+": Initialising on interface="+iface+", port="+port);
+		log.trace("Dispatcher="+dsptch.name+" - Listener="+name+": Initialising on interface="+iface+", port="+port);
 
 		// set up our listening socket
 		java.net.InetAddress ipaddr = null;
@@ -91,7 +91,7 @@ public abstract class Listener
 
 	protected void stopped(boolean notify)
 	{
-		log.debug("Listener="+name+" has stopped - notify="+notify);
+		log.trace("Listener="+name+" has stopped - notify="+notify);
 		listenerStopped();
 		if (notify && reaper != null) reaper.entityStopped(this);
 	}

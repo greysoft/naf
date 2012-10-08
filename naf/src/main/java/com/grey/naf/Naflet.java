@@ -20,8 +20,9 @@ abstract public class Naflet
 	public final String naflet_name;
 	public final java.util.Map<String,Object> cfgdflts = new java.util.HashMap<String,Object>();
 	protected final com.grey.naf.reactor.Dispatcher dsptch;
-	protected final org.slf4j.Logger log;
-	protected final com.grey.base.config.XmlConfig appcfg;
+	protected final com.grey.logging.Logger log;
+	protected final String cfgfile;
+	protected com.grey.base.config.XmlConfig appcfg;
 	private com.grey.naf.EntityReaper reaper;
 
 	abstract protected void startNaflet() throws java.io.IOException;
@@ -33,8 +34,8 @@ abstract public class Naflet
 		naflet_name = name;
 		dsptch = dsptch_p;
 		log = dsptch.logger;
-		log.info("Naflet="+naflet_name+": Initialising - "+getClass().getName());
-		String cfgfile = dsptch.nafcfg.getPath(cfg, "configfile", null, false, null, null);
+		cfgfile = dsptch.nafcfg.getPath(cfg, "configfile", null, false, null, null);
+		log.info("Naflet="+naflet_name+": Initialising "+getClass().getName()+" - config="+cfgfile);
 
 		if (cfgfile != null) {
 			String cfgroot = cfg.getValue("configfile/@root", false, null);
@@ -46,6 +47,7 @@ abstract public class Naflet
 
 	public final void start(com.grey.naf.EntityReaper rpr) throws java.io.IOException
 	{
+		appcfg = null; //hand memory back to the GC
 		reaper = rpr;
 		log.info("Naflet="+naflet_name+": Starting - reaper="+reaper);
 		startNaflet();

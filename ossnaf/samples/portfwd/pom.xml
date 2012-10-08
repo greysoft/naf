@@ -7,17 +7,17 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.grey.naf.samples</groupId>
 	<artifactId>portfwd</artifactId>
-	<version>1.0.0</version>
+	<version>1.0.1</version>
 	<name>Port Forwarder</name>
-	<properties>
-		<grey.manifest.name>com/grey/portfwd/</grey.manifest.name>
-		<grey.manifest.mainclass>com.grey.portfwd.Task</grey.manifest.mainclass>
-	</properties>
 	<parent>
 		<groupId>com.grey.naf.samples</groupId>
 		<artifactId>samples-agg</artifactId>
 		<version>1.0.0</version>
 	</parent>
+	<properties>
+		<grey.manifest.name>com/grey/portfwd/</grey.manifest.name>
+		<grey.manifest.mainclass>com.grey.portfwd.Task</grey.manifest.mainclass>
+	</properties>
 	<dependencies>
 		<dependency>
 			<groupId>com.grey.naf</groupId>

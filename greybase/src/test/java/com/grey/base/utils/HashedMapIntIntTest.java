@@ -219,6 +219,28 @@ public class HashedMapIntIntTest
 		org.junit.Assert.assertTrue(hmap.containsValue(cnt + 9));
     }
 
+    @org.junit.Test
+    final public void bulktest()
+    {
+    	final int cap = 10*1000; //ramp up to investigate manually
+    	final int incr = 1000;
+        HashedMapIntInt map = new HashedMapIntInt(0, 5);
+        // general put-get
+        for (int v = 0; v != cap; v++) org.junit.Assert.assertEquals(0, map.put(v, v+incr));
+		org.junit.Assert.assertEquals(cap, map.size());
+        for (int v = 0; v != cap; v++) org.junit.Assert.assertEquals(v+incr, map.get(v));
+        // iterators
+		java.util.HashSet<Integer> jset = new java.util.HashSet<Integer>();
+        IteratorInt it = map.keysIterator();
+		while (it.hasNext()) {
+			jset.add(it.next());
+			it.remove();
+		}
+		org.junit.Assert.assertEquals(0, map.size());
+		org.junit.Assert.assertEquals(cap, jset.size());
+        for (int v = 0; v != cap; v++) org.junit.Assert.assertTrue(jset.contains(v));
+    }
+
     private int addEntry(int key, int val, boolean isnew, int oldval_exp)
     {
     	int size = hmap.size();

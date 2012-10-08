@@ -128,14 +128,14 @@ public class App
 			if (options.srcvbuf > max) options.srcvbuf = max;
 			if (options.sxmtbuf > max) options.sxmtbuf = max;
 		}
-		final org.slf4j.Logger bootlog = org.slf4j.LoggerFactory.getLogger(baseOptions.logname);
+		com.grey.logging.Logger bootlog = com.grey.logging.Factory.getLogger(baseOptions.logname);
 		if (options.server_enabled && options.cgrpsiz == 0) options.server_solo = true;
-		final int dcnt = (options.server_solo ? options.cgrpcnt + 1 : options.cgrpcnt);
-		final DispatcherDef def = new DispatcherDef();
+		int dcnt = (options.server_solo ? options.cgrpcnt + 1 : options.cgrpcnt);
+		DispatcherDef def = new DispatcherDef();
 		def.hasNafman = false;
-		final Dispatcher[] cdispatchers = new Dispatcher[dcnt];
-		final ClientGroup[] cgroups = new ClientGroup[options.cgrpcnt];
-		final TSAP tsap = TSAP.build(hostport, 0);
+		Dispatcher[] cdispatchers = new Dispatcher[dcnt];
+		ClientGroup[] cgroups = new ClientGroup[options.cgrpcnt];
+		TSAP tsap = TSAP.build(hostport, 0);
 		sbufspec = (options.server_enabled ? new BufferSpec(options.srcvbuf, options.sxmtbuf, true) : null);
 		byte[] msgbuf = null;
 

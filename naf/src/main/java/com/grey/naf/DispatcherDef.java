@@ -6,13 +6,13 @@ package com.grey.naf;
 
 public class DispatcherDef
 {
-	public String name;
+	public String name = null;
 	public boolean hasNafman = true;
 	public boolean hasDNS = false;
 	public boolean zeroNaflets = true;
 	public boolean surviveDownstream = true;
 	public boolean surviveHandlers = true;
-	public long flush_interval;
+	public long flush_interval = 0;
 	public com.grey.base.config.XmlConfig[] naflets;
 
 	public DispatcherDef() {}

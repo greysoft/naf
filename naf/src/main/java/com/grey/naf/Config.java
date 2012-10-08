@@ -20,14 +20,14 @@ public class Config
 	public static final String SYSPROP_DIRPATH_CONF = "greynaf.paths.conf";
 	public static final String SYSPROP_DIRPATH_VAR = "greynaf.paths.var";
 	public static final String SYSPROP_DIRPATH_TMP = SysProps.SYSPROP_DIRPATH_TMP;
-	public static final String SYSPROP_DIRPATH_LOGS = com.grey.logging.Interop.SYSPROP_LOGSDIR;
+	public static final String SYSPROP_DIRPATH_LOGS = com.grey.logging.Parameters.SYSPROP_LOGSDIR;
 	public static final String SYSPROP_BASEPORT = "greynaf.baseport";
 
 	public static final String DIRTOKEN_ROOT = "%DIRTOP%";
 	public static final String DIRTOKEN_CONF = "%DIRCONF%";
 	public static final String DIRTOKEN_VAR = "%DIRVAR%";
 	public static final String DIRTOKEN_TMP = SysProps.DIRTOKEN_TMP;
-	public static final String DIRTOKEN_LOGS = com.grey.logging.Interop.TOKEN_LOGSDIR;
+	public static final String DIRTOKEN_LOGS = com.grey.logging.Parameters.TOKEN_LOGSDIR;
 
 	public static final String PFX_CLASSPATH = "cp:";
 
@@ -41,12 +41,10 @@ public class Config
 	public final String path_var;
 	public final String path_logs;
 	public final String path_tmp;  //NB: Diverges from SysProps.TMPDIR, unless SYSPROP_DIRPATH_TMP is set
+	public XmlConfig cfgroot;
 
-	private final XmlConfig cfgroot;
 	private final int baseport;  // base port
 	private int nextport;  // next port number to assign
-
-	public final boolean validateMode;
 
 	// The param is the naf.xml config filename
 	public static Config load(String cfgpath) throws com.grey.base.ConfigException, java.io.IOException
@@ -66,10 +64,9 @@ public class Config
 		return synthesise(cfgxml, 0);
 	}
 
-	private Config(XmlConfig cfgroot, int port) throws com.grey.base.ConfigException, java.io.IOException
+	private Config(XmlConfig cfg, int port) throws com.grey.base.ConfigException, java.io.IOException
 	{
-		this.cfgroot = cfgroot;
-		validateMode = cfgroot.getBool("configcheck", false);
+		cfgroot = cfg;
 
 		XmlConfig cfgpaths = new XmlConfig(cfgroot, "dirpaths");
 		path_root = getPath(cfgpaths, "root", SYSPROP_DIRPATH_ROOT, false, ".", null);
@@ -89,8 +86,8 @@ public class Config
 		if (cp != null) {
 			try {
 				java.util.ArrayList<java.net.URL> urls = DynLoader.load(cp);
-				System.out.println("Loaded URLs="+urls.size()+": "+urls);
-			} catch (Exception ex) {
+				System.out.println("Loaded URLs="+(urls==null ? "NULL" : (urls.size()+": "+urls)));
+			} catch (Throwable ex) {
 				throw new com.grey.base.ConfigException(ex, "Failed to load NAF classpath");
 			}
 		}
@@ -241,9 +238,8 @@ public class Config
 		return template;
 	}
 
-	public void announce(org.slf4j.Logger log)
+	public void announce(com.grey.logging.Logger log)
 	{
-		if (validateMode) log.info("NAF config is in validation-only mode");
 		log.info("NAF Paths - Root = "+path_root);
 		log.info("NAF Paths - Config = "+path_conf);
 		log.info("NAF Paths - Var = "+path_var);

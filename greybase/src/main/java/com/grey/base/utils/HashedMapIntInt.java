@@ -18,14 +18,15 @@ package com.grey.base.utils;
  * The equivalent functionality is provided by: iteratorInit(), iteratorHasNext(), iteratorNextEntry(), iteratorNextKey()<br/>
  * <p>
  * Beware that this class is single-threaded and non-reentrant.
+ * Also note that this class's iterators are not fail-fast, unlike HashedMap.
  */
 public final class HashedMapIntInt
 {
 	private static final int DFLT_CAP = 64;
-	private static final float DFLT_LOADFACTOR = 5;  // because key comparisons are so quick, try to save on storage space
-	private static final int BUCKETCAP_INIT = 5;  // initial bucket size
-	private static final int BUCKETCAP_INCR = 5;  // number of entries to increment a bucket by, when growing it
-	private static final byte BUCKETCAP_MAX = 127;  //physical byte-value limitation - should never actually reach this size
+	private static final float DFLT_LOADFACTOR = 5;  //because key comparisons are so quick, try to save on storage space
+	private static final int BUCKETCAP_INIT = 5;  //initial bucket size
+	private static final int BUCKETCAP_INCR = 5;  //number of entries to increment a bucket by, when growing it
+	private static final int BUCKETCAP_MAX = Short.MAX_VALUE;  //should never actually reach this size
 
 	private final boolean keyset_only; //if True, we're in Set mode, storing keys only
 	private final float loadfactor;
@@ -35,8 +36,12 @@ public final class HashedMapIntInt
 
 	private int[][] keytbl;
 	private int[][] valtbl;
-	private byte[] bucketsizes;
+	private short[] bucketsizes;
 	private int entrycnt;
+
+	// recycled operators
+	private KeysIterator keys_iterator;
+	private ValuesIterator values_iterator;
 
 	public HashedMapIntInt() {this(0);}
 	public HashedMapIntInt(int initcap) {this(initcap, 0);}
@@ -64,16 +69,17 @@ public final class HashedMapIntInt
 	// value-object references - these objects need to be marked as garbage now, if no other references exist
 	public void clear()
 	{
-		java.util.Arrays.fill(bucketsizes, (byte)0);
+		java.util.Arrays.fill(bucketsizes, (short)0);
 		entrycnt = 0;
 	}
 
 	public boolean containsKey(int key)
 	{
-		int idx = getBucket(key);
+		final int idx = getBucket(key);
+		final int[] bucket = keytbl[idx];
 
 		for (int idx2 = 0; idx2 != bucketsizes[idx]; idx2++) {
-			if (key == keytbl[idx][idx2]) return true;
+			if (key == bucket[idx2]) return true;
 		}
 		return false;
 	}
@@ -81,10 +87,11 @@ public final class HashedMapIntInt
 	// This is never called in keyset_only mode
 	public int get(int key)
 	{
-		int idx = getBucket(key);
+		final int idx = getBucket(key);
+		final int[] bucket = keytbl[idx];
 
 		for (int idx2 = 0; idx2 != bucketsizes[idx]; idx2++) {
-			if (key == keytbl[idx][idx2]) return valtbl[idx][idx2];
+			if (key == bucket[idx2]) return valtbl[idx][idx2];
 		}
 		return 0;
 	}
@@ -95,56 +102,59 @@ public final class HashedMapIntInt
 			capacity <<= 1;  // double the capacity
 			allocateBuckets();
 		}
-		int idx = getBucket(key);
+		final int idx = getBucket(key);
+		final int bktsiz = bucketsizes[idx];
+		int[] bucket = keytbl[idx];
 		int idx2 = 0;
 
-		if (keytbl[idx] == null) {
-			growBucket(idx);
+		if (bucket == null) {
+			bucket = growBucket(idx);
 		} else {
-			while (idx2 != bucketsizes[idx]) {
-				if (key == keytbl[idx][idx2]) break;
+			while (idx2 != bktsiz) {
+				if (key == bucket[idx2]) break;
 				idx2++;
 			}
 			
-			if (idx2 == keytbl[idx].length) {
+			if (idx2 == bucket.length) {
 				if (idx2 == BUCKETCAP_MAX) {
 					capacity <<= 1;
 					allocateBuckets();
 					return put(key, value);
 				}
-				growBucket(idx);
+				bucket = growBucket(idx);
 			}
 		}
 		int oldvalue = 0;
 
-		if (idx2 == bucketsizes[idx]) {
+		if (idx2 == bktsiz) {
+			bucket[idx2] = key;
 			entrycnt++;
 			bucketsizes[idx]++;
 		} else {
 			// This is never called in keyset_only mode - caller checks for existence first and does not make duplicate put() calls
 			oldvalue = valtbl[idx][idx2];
 		}
-		keytbl[idx][idx2] = key;
 		if (!keyset_only) valtbl[idx][idx2] = value;
 		return oldvalue;
 	}
 
 	public int remove(int key)
 	{
-		int idx = getBucket(key);
-		int bktsiz = bucketsizes[idx];
+		final int idx = getBucket(key);
+		final int[] bucket = keytbl[idx];
+		final int bktsiz = bucketsizes[idx];
 
 		for (int idx2 = 0; idx2 != bktsiz; idx2++) {
-			if (key == keytbl[idx][idx2]) {
-				int oldvalue = (keyset_only ? 0 : valtbl[idx][idx2]);
+			if (key == bucket[idx2]) {
+				int oldval = (keyset_only ? 0 : valtbl[idx][idx2]);
 
 				if (idx2 != bktsiz - 1) {
-					keytbl[idx][idx2] = keytbl[idx][bktsiz - 1];
+					bucket[idx2] = bucket[bktsiz - 1];
 					if (!keyset_only) valtbl[idx][idx2] = valtbl[idx][bktsiz - 1];
 				}
 				entrycnt--;
 				bucketsizes[idx]--;
-				return oldvalue;
+				return oldval;
 			}
 		}
 		return 0;
@@ -161,46 +171,9 @@ public final class HashedMapIntInt
 		return false;
 	}
 
-	public int[] toArrayKeys(int[] arr)
+	private int getBucket(int key)
 	{
-		if (arr == null || arr.length < entrycnt) arr = new int[entrycnt];
-		IteratorInt it = keysIterator();
-		int idx = 0;
-		while (it.hasNext()) {
-			arr[idx++] = it.next();
-		}
-		return arr;
-	}
-
-	@Override
-	public String toString()
-	{
-		StringBuilder sb = new StringBuilder(size() * 5);
-		sb.append(getClass().getName());
-		if (keyset_only) sb.append("/Set");
-		sb.append('=').append(size()).append(" {");
-		String dlm = "";
-		IteratorInt it = keysIterator();
-		while (it.hasNext()) {
-			int key = it.next();
-			sb.append(dlm).append(key);
-			if (!keyset_only) sb.append('=').append(get(key));
-			dlm = ", ";
-		}
-		sb.append("}");
-		return sb.toString();
-	}
-
-	public int trimToSize()
-	{
-		int newcap = 1;
-		while (((int)(newcap * loadfactor)) <= entrycnt) newcap <<= 1;
-	
-		if (newcap != capacity) {
-			capacity = newcap;
-			allocateBuckets();
-		}
-		return capacity;
+		return HashedMapIntKey.intHash(key) & hashmask;
 	}
 
 	private void allocateBuckets()
@@ -209,12 +182,12 @@ public final class HashedMapIntInt
 		hashmask = capacity - 1;
 		entrycnt = 0;
 
-		int[][] oldkeys = keytbl;
-		int[][] oldvals = valtbl;
-		byte[] oldsizes = bucketsizes;
+		final int[][] oldkeys = keytbl;
+		final int[][] oldvals = valtbl;
+		final short[] oldsizes = bucketsizes;
 		keytbl = new int[capacity][];
 		if (!keyset_only) valtbl = new int[capacity][];
-		bucketsizes = new byte[capacity];
+		bucketsizes = new short[capacity];
 
 		if (oldkeys != null) {
 			for (int idx = 0; idx != oldkeys.length; idx++) {
@@ -229,30 +202,69 @@ public final class HashedMapIntInt
 		}
 	}
 
-	private void growBucket(int idx)
+	private int[] growBucket(int bktid)
 	{
-		int[] oldkeys = keytbl[idx];
-		int[] oldvals = (keyset_only ? null : valtbl[idx]);
-		int newsiz = (keytbl[idx] == null ? BUCKETCAP_INIT : keytbl[idx].length + BUCKETCAP_INCR);
+		final int[] oldkeys = keytbl[bktid];
+		final int[] oldvals = (keyset_only ? null : valtbl[bktid]);
+		int newsiz = (keytbl[bktid] == null ? BUCKETCAP_INIT : keytbl[bktid].length + BUCKETCAP_INCR);
 		if (newsiz > BUCKETCAP_MAX) newsiz = BUCKETCAP_MAX;
 
-		keytbl[idx] = new int[newsiz];
-		if (!keyset_only) valtbl[idx] = new int[newsiz];
+		keytbl[bktid] = new int[newsiz];
+		if (!keyset_only) valtbl[bktid] = new int[newsiz];
 
 		if (oldkeys != null) {
-			System.arraycopy(oldkeys, 0, keytbl[idx], 0, oldkeys.length);
-			if (!keyset_only) System.arraycopy(oldvals, 0, valtbl[idx], 0, oldvals.length);
+			System.arraycopy(oldkeys, 0, keytbl[bktid], 0, oldkeys.length);
+			if (!keyset_only) System.arraycopy(oldvals, 0, valtbl[bktid], 0, oldvals.length);
 		}
+		return keytbl[bktid];
 	}
 
-	private int getBucket(int key)
+	public int trimToSize()
 	{
-		return HashedMapIntKey.intHash(key) & hashmask;
+		int newcap = 1;
+		while (((int)(newcap * loadfactor)) <= entrycnt) newcap <<= 1;
+	
+		if (newcap != capacity) {
+			capacity = newcap;
+			allocateBuckets();
+		}
+		return capacity;
 	}
 
-	public byte[] getBucketStats(boolean printstats, int mincolls)
+	public int[] toArrayKeys(int[] arr)
 	{
-		return HashedMap.getBucketStats(size(), bucketsizes, printstats, mincolls);  // NB: bucketsizes.length is equal to this.capacity
+		if (arr == null || arr.length < entrycnt) arr = new int[entrycnt];
+		int slot = 0;
+		for (int idx = 0; idx != keytbl.length; idx++) {
+			for (int idx2 = 0; idx2 != bucketsizes[idx]; idx2++) {
+				arr[slot++] = keytbl[idx][idx2];
+			}
+		}
+		return arr;
+	}
+
+	@Override
+	public String toString()
+	{
+		StringBuilder sb = new StringBuilder(size() * 5);
+		sb.append(getClass().getName());
+		if (keyset_only) sb.append("/Set");
+		sb.append('=').append(size()).append(" {");
+		String dlm = "";
+		for (int idx = 0; idx != keytbl.length; idx++) {
+			for (int idx2 = 0; idx2 != bucketsizes[idx]; idx2++) {
+				sb.append(dlm).append(keytbl[idx][idx2]);
+				if (!keyset_only) sb.append('=').append(valtbl[idx][idx2]);
+				dlm = ", ";
+			}
+		}
+		sb.append("}");
+		return sb.toString();
+	}
+
+	public String getBucketStats(boolean printstats, int mincolls)
+	{
+		return HashedMap.getStats(size(), bucketsizes);
 	}
 
 
@@ -263,6 +275,30 @@ public final class HashedMapIntInt
 	public IteratorInt keysIterator() {return new KeysIterator();}
 	public IteratorInt valuesIterator() {return new ValuesIterator();}
 
+	public IteratorInt recycledKeysIterator()
+	{
+		if (keys_iterator == null) {
+			keys_iterator = new KeysIterator();
+		} else {
+			keys_iterator.reset();
+		}
+		return keys_iterator;
+	}
+
+	public IteratorInt recycledValuesIterator()
+	{
+		if (values_iterator == null) {
+			values_iterator = new ValuesIterator();
+		} else {
+			values_iterator.reset();
+		}
+		return values_iterator;
+	}
+
+	// provide access to private members for the inner classes
+	int getMapKey(int id, int slot) {return keytbl[id][slot];}
+	int getMapValue(int id, int slot) {return valtbl[id][slot];}
+	short getBucketSize(int id) {return bucketsizes[id];}
 
 	/*
 	 * ===================================================================================================================
@@ -270,64 +306,69 @@ public final class HashedMapIntInt
 	 * ===================================================================================================================
 	 */
 	public final class KeysIterator
-		extends Iterator
+		extends MapIterator
 	{
 		@Override
-		public int next() {moveNext(); return keytbl[bktid][bktslot];}
+		public int getCurrentValue(int id, int slot) {return  getMapKey(id, slot);}
 	}
 
 	public final class ValuesIterator
-		extends Iterator
+		extends MapIterator
 	{
 		@Override
-		public int next() {moveNext(); return valtbl[bktid][bktslot];}
+		public int getCurrentValue(int id, int slot) {return getMapValue(id, slot);}
 	}
 
-	public abstract class Iterator
+	private abstract class MapIterator
 		implements IteratorInt
 	{
-		protected int bktid;  	// current index within bucket array
-		protected int bktslot;	// current index within current bucket
+		private int bktid;
+		private int bktslot;
 		private int next_bktid;
 		private int next_bktslot;
+		protected abstract int getCurrentValue(int bktid, int bktslot);
 
-		Iterator() {reset();}
-		final void reset() {bktid = -1; findNext();}
+		MapIterator() {reset();}
+
+		final void reset()
+		{
+			next_bktid = 0;
+			next_bktslot = -1;
+			bktid = -1;
+			moveNext();
+		}
 
 		@Override
 		public final boolean hasNext()
 		{
-			return (next_bktid < capacity);
+			return (next_bktid != bucketCount());
+		}
+
+		@Override
+		public final int next()
+		{
+			if (!hasNext()) throw new java.util.NoSuchElementException();
+			bktid = next_bktid;
+			bktslot = next_bktslot;
+			moveNext();
+			return getCurrentValue(bktid, bktslot);
 		}
 
 		@Override
 		public final void remove()
 		{
-			HashedMapIntInt.this.remove(keytbl[bktid][bktslot]);
-			if (next_bktid == bktid) next_bktslot = bktslot;  // the remove() will have shifted final entry into current slot, so stay where we are
-			bktslot = -1; // invalidate current position
+			if (bktid == -1) throw new IllegalStateException();
+			HashedMapIntInt.this.remove(getMapKey(bktid, bktslot));
+			if (next_bktid == bktid) next_bktslot = bktslot; //remove() shifted final entry into current slot, so stay where we are
+			bktid = -1;
 		}
 
-		final void moveNext()
+		private final void moveNext()
 		{
-			if (!hasNext()) throw new java.util.NoSuchElementException();
-			bktid = next_bktid;
-			bktslot = next_bktslot;
-			findNext();
-		}
-
-		private final void findNext()
-		{
-			if (bktid == -1) {
-				// at start of iteration
-				next_bktid = 0;
-				next_bktslot = 0;
-			} else {
-				next_bktslot++;	
-			}
-
-			while (next_bktslot >= bucketsizes[next_bktid]) {
-				if (++next_bktid == capacity) break;
+			if (++next_bktslot == getBucketSize(next_bktid)) {
+				while (++next_bktid != bucketCount()) {
+					if (getBucketSize(next_bktid) != 0) break;
+				}
 				next_bktslot = 0;
 			}
 		}

@@ -5,6 +5,7 @@
 package com.grey.naf.reactor;
 
 import com.grey.base.config.SysProps;
+import com.grey.logging.Logger.LEVEL;
 
 // Note that even if the Dispatcher supports full-duplex mode (ie. simultaneous monitoring of reads and writes), this object is still
 // implemented as being resolutely half-duplex, with Writes masking Reads.
@@ -61,7 +62,7 @@ public abstract class ChannelMonitor
 		dsptch = d;
 	}
 
-	protected final void initChannel(java.nio.channels.SelectableChannel chan, boolean takeOwnership, boolean isconn) throws java.io.IOException
+	public final void initChannel(java.nio.channels.SelectableChannel chan, boolean takeOwnership, boolean isconn) throws java.io.IOException
 	{
 		iochan = chan;
 		regkey = null;
@@ -76,27 +77,27 @@ public abstract class ChannelMonitor
 
 	public final boolean disconnect(boolean lingerOnClose)
 	{
-		if (lingerOnClose && chanwriter != null && chanwriter.isBlocked()) {
-			// Still waiting for a write to complete, so linger-on-close till it does
-			// This is irrespective of the S_WECLOSE setting
-			cmstate |= S_CLOSELINGER;
-			return false;
-		}
-		if (iochan == null) return true;
-		if (chanreader != null) chanreader.clearChannel();
-		if (chanwriter != null) chanwriter.clearChannel();
+		if (iochan != null) {
+			if (chanwriter != null) {
+				if (lingerOnClose && chanwriter.isBlocked()) {
+					// Still waiting for a write to complete, so linger-on-close till it does
+					// This is irrespective of the S_WECLOSE setting
+					cmstate |= S_CLOSELINGER;
+					return false;
+				}
+				chanwriter.clearChannel();
+			}
+			if (chanreader != null) chanreader.clearChannel();
 
-		if ((cmstate & S_WECLOSE) != 0) {
 			try {
 				dsptch.deregisterIO(this);
-				iochan.close();
+				if ((cmstate & S_WECLOSE) != 0) iochan.close();
 			} catch (Exception ex) {
-				dsptch.logger.error("Dispatcher="+dsptch.name+": Failed to close ChannelMonitor="+iochan+" in state="+Integer.toHexString(cmstate), ex);
+				dsptch.logger.log(LEVEL.ERR, ex, true, "Dispatcher="+dsptch.name+": Failed to close ChannelMonitor="+iochan+" in state="+Integer.toHexString(cmstate));
 			}
+			iochan = null;
 		}
-		iochan = null;
-		regOps = 0;
-		cmstate = 0;
+		cmstate = 0; //need to reset this, as isConnected() may subsequently get called
 
 		if (reaper != null) {
 			com.grey.naf.EntityReaper rpr = reaper;
@@ -116,6 +117,13 @@ public abstract class ChannelMonitor
 
 	public final void connect(java.net.InetSocketAddress remaddr) throws com.grey.base.FaultException, java.io.IOException
 	{
+		if (iochan != null) {
+			// We're being reused to make a new connection - probably means initial connection attempt failed
+			com.grey.naf.EntityReaper rpr = reaper;
+			reaper = null;
+			disconnect(false);
+			reaper = rpr;
+		}
 		java.nio.channels.SocketChannel sockchan = java.nio.channels.SocketChannel.open();
 		initChannel(sockchan, true, false);
 

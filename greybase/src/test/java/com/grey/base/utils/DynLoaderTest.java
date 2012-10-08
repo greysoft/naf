@@ -264,7 +264,7 @@ public final class DynLoaderTest
 			// verify that our own class resolver can access any class the above forName() calls can
 			org.junit.Assert.assertSame(clss, DynLoader.loadClass(targetclass));
 			success = expect;
-		} catch (Exception ex) {
+		} catch (Throwable ex) {
 			success = !expect;
 			diag = " - "+ex.toString();
 		}

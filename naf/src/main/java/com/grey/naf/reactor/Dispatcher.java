@@ -8,12 +8,16 @@ import com.grey.base.config.SysProps;
 import com.grey.base.config.XmlConfig;
 import com.grey.base.utils.FileOps;
 import com.grey.base.utils.TimeOps;
+import com.grey.logging.Logger.LEVEL;
 
 public final class Dispatcher
 	implements Runnable, com.grey.naf.EntityReaper, Producer.Consumer
 {
 	private static final String STOPCMD = "_STOP_";
 	private static final String SYSPROP_LOGNAME = "greynaf.dispatchers.logname";
+	private static final String SYSPROP_EXITDUMP = "greynaf.dispatchers.exitdump";
+	private static final String SYSPROP_HEAPWAIT = "greynaf.dispatchers.heapwait";
+
 	private static final java.util.concurrent.ConcurrentHashMap<String, Dispatcher> activedispatchers 
 			= new java.util.concurrent.ConcurrentHashMap<String, Dispatcher>();
 	private static final java.util.concurrent.atomic.AtomicInteger anoncnt = new java.util.concurrent.atomic.AtomicInteger();
@@ -36,7 +40,7 @@ public final class Dispatcher
 	public final com.grey.naf.nafman.Agent nafman;
 	public final com.grey.naf.dns.Resolver dnsresolv;
 	public final Flusher flusher;
-	public final org.slf4j.Logger logger;
+	public final com.grey.logging.Logger logger;
 	private long systime_msecs;
 
 	public final boolean surviveDownstream;  //survive the exit/death of downstream Dispatchers
@@ -45,7 +49,7 @@ public final class Dispatcher
 
 	public boolean isRunning() {return thrd_main.isAlive();}
 
-	private Dispatcher(com.grey.naf.Config ncfg, com.grey.naf.DispatcherDef def, org.slf4j.Logger initlog)
+	private Dispatcher(com.grey.naf.Config ncfg, com.grey.naf.DispatcherDef def, com.grey.logging.Logger initlog)
 			throws com.grey.base.GreyException, java.io.IOException
 	{
 		name = def.name;
@@ -62,18 +66,18 @@ public final class Dispatcher
 		slct = java.nio.channels.Selector.open();
 		activetimers = new com.grey.base.utils.Circulist<Timer>(Timer.class);
 		pendingtimers = new com.grey.base.utils.ObjectQueue<Timer>(Timer.class);
-		sparetimers = new com.grey.base.utils.ObjectWell<Timer>(Timer.class);
+		sparetimers = new com.grey.base.utils.ObjectWell<Timer>(Timer.class, "Dispatcher_Timers_"+name);
 		flusher = new Flusher(this, def.flush_interval);
 		apploader = new Producer<Object>(Object.class, this, this);
 
 		String logname = SysProps.get(SYSPROP_LOGNAME, name);
-		org.slf4j.Logger dlog = org.slf4j.LoggerFactory.getLogger(logname);
+		com.grey.logging.Logger dlog = com.grey.logging.Factory.getLogger(name);
 		initlog.info("Initialising Dispatcher="+name+" - Logger="+logname+" - "+dlog);
 		logger = (dlog == null ? initlog : dlog);
 		if (logger != initlog) flusher.register(logger);
 		logger.info("Dispatcher="+name+": survive_downstream="+surviveDownstream+", survive_handlers="+surviveHandlers
 				+", zero_naflets="+zeroNaflets+", flush="+TimeOps.expandMilliTime(def.flush_interval));
-		logger.debug("Dispatcher="+name+": Selector="+slct.getClass().getCanonicalName()+" - Provider="+slct.provider().getClass().getCanonicalName());
+		logger.trace("Dispatcher="+name+": Selector="+slct.getClass().getCanonicalName()+" - Provider="+slct.provider().getClass().getCanonicalName());
 
 		if (def.hasNafman) {
 			// We are constructed within a synchronised block, so no race condition checking Primary
@@ -137,11 +141,12 @@ public final class Dispatcher
 			activate();	
 		} catch (Throwable ex) {
 			String msg = "Dispatcher="+name+" has terminated abnormally";
-			logger.error(msg, ex);
+			logger.log(LEVEL.ERR, ex, true, msg);
 		}
 		shutdown(true);
+		logger.info("Dispatcher="+name+" has terminated");
 
-		if (SysProps.get("nafheapwait", false)) {
+		if (SysProps.get(SYSPROP_HEAPWAIT, false)) {
 			System.out.println("Dispatcher="+name+" has now terminated, and is suspended to provide a heap dump");
 			for (;;) try {Thread.sleep(5000);} catch (Exception ex) {}
 		}
@@ -170,7 +175,7 @@ public final class Dispatcher
 		for (int idx = 0; idx != arr.length; idx++) {
 			stopNaflet(arr[idx]);
 		}
-		logger.debug("Dispatcher="+name+": Issued Stop commands - naflets="+naflets.size());
+		logger.trace("Dispatcher="+name+": Issued Stop commands - naflets="+naflets.size());
 
 		if (thrd_main.isAlive()) {
 			// Dispatcher event loop is still active, and shutdown() will get called when it terminates
@@ -186,7 +191,7 @@ public final class Dispatcher
 		try {
 			slct.close();
 		} catch (Throwable ex) {
-			logger.info("Dispatcher="+name+": Failed to close NIO Selector", ex);
+			logger.log(LEVEL.INFO, ex, false, "Dispatcher="+name+": Failed to close NIO Selector");
 		}
 		if (dnsresolv != null)  dnsresolv.stop();
 		if (nafman != null) nafman.stop();
@@ -258,6 +263,8 @@ public final class Dispatcher
 		logger.info("Dispatcher="+name+": Activity ceased - Naflets="+naflets.size()
 				+", IO="+activechannels.size()+"/"+finalkeys
 				+", Timers="+activetimers.size()+" (spare="+sparetimers.size()+")");
+		if (SysProps.get(SYSPROP_EXITDUMP, false)) logger.info("Dumping final state - " +dumpState(null));
+		while (activetimers.size() != 0) activetimers.get(0).cancel();
 	}
 
 	private void fireTimers()
@@ -279,12 +286,12 @@ public final class Dispatcher
 			try {
 				tmr.fire(this);
 			} catch (Throwable ex) {
-				logger.error("Dispatcher="+name+": handler failed on Timer event - "+tmr.handler, ex);
+				logger.log(LEVEL.ERR, ex, true, "Dispatcher="+name+": handler failed on Timer event - "+tmr.handler);
 				try {
 					tmr.handler.eventError(tmr, this, ex);
 				} catch (Throwable ex2) {
-					logger.error("Dispatcher="+name+": Timer-handler failed to handle error - "
-							+tmr.handler+" - "+com.grey.base.GreyException.summary(ex), ex2);
+					logger.log(LEVEL.ERR, ex2, true, "Dispatcher="+name+": Timer-handler failed to handle error - "
+							+tmr.handler+" - "+com.grey.base.GreyException.summary(ex));
 				}
 				if (!surviveHandlers) {
 					logger.warn("Initiating Abort due to error in Timer Handler");
@@ -310,12 +317,12 @@ public final class Dispatcher
 			try {
 				cm.handleIO(key.readyOps());
 			} catch (Throwable ex) {
-				logger.error("Dispatcher="+name+": handler failed on IO event - "+cm, ex);
+				logger.log(LEVEL.ERR, ex, true, "Dispatcher="+name+": handler failed on IO event - "+cm);
 				try {
 					cm.eventError(cm, ex);
 				} catch (Throwable ex2) {
-					logger.error("Dispatcher="+name+": Channel-Monitor failed to handle error - "
-							+cm+" - "+com.grey.base.GreyException.summary(ex), ex2);
+					logger.log(LEVEL.ERR, ex2, true, "Dispatcher="+name+": Channel-Monitor failed to handle error - "
+							+cm+" - "+com.grey.base.GreyException.summary(ex));
 				}
 				if (!surviveHandlers) {
 					logger.warn("Initiating Abort due to error in IO Handler");
@@ -332,7 +339,7 @@ public final class Dispatcher
 	{
 		if (!activechannels.add(cm)) {
 			throw new java.io.IOException("Illegal registerIO on CM="+cm.getClass().getName()
-					+" - Ops=0x"+Integer.toHexString(cm.regkey.interestOps()));
+					+" - Ops="+(cm.regkey==null? "None" : "0x"+Integer.toHexString(cm.regkey.interestOps())));
 		}
 	}
 
@@ -340,7 +347,7 @@ public final class Dispatcher
 	{
 		if (!activechannels.remove(cm)) {
 			throw new java.io.IOException("Illegal deregisterIO on CM="+cm.getClass().getName()
-					+" - Ops=0x"+Integer.toHexString(cm.regkey.interestOps()));
+					+" - Ops="+(cm.regkey==null? "None" : "0x"+Integer.toHexString(cm.regkey.interestOps())));
 		}
 		if (cm.regkey != null) cm.regkey.cancel();
 		cm.regkey = null;
@@ -484,7 +491,7 @@ public final class Dispatcher
 		return null;
 	}
 
-	// NB: This is not a performance-critical method
+	// NB: This is not a performance-critical method, expected to be rarely called
 	public CharSequence dumpState(StringBuilder sb)
 	{
 		if (sb == null) sb = new StringBuilder();
@@ -510,7 +517,12 @@ public final class Dispatcher
 				sb.append(cm.getClass().getName());
 			}
 			sb.append(": ");
-			cm.dumpState(sb);
+			try {
+				cm.dumpState(sb);
+			} catch (Throwable ex) {
+				// have observed CancelledKeyException happening here during shutdown - not sure how
+				sb.append(com.grey.base.GreyException.summary(ex));
+			}
 		}
 
 		sb.append("\nTimers=").append(activetimers.size());
@@ -551,19 +563,19 @@ public final class Dispatcher
 		return activedispatchers.values().toArray(new Dispatcher[activedispatchers.size()]);
 	}
 
-	public static Dispatcher create(com.grey.naf.DispatcherDef def, com.grey.naf.Config nafcfg, org.slf4j.Logger log)
+	public static Dispatcher create(com.grey.naf.DispatcherDef def, com.grey.naf.Config nafcfg, com.grey.logging.Logger log)
 			throws com.grey.base.GreyException, java.io.IOException
 	{
 		return create(def, nafcfg, 0, log);
 	}
 
-	public static Dispatcher create(com.grey.naf.DispatcherDef def, int baseport, org.slf4j.Logger log)
+	public static Dispatcher create(com.grey.naf.DispatcherDef def, int baseport, com.grey.logging.Logger log)
 			throws com.grey.base.GreyException, java.io.IOException
 	{
 		return create(def, null, baseport, log);
 	}
 
-	private static Dispatcher create(com.grey.naf.DispatcherDef def, com.grey.naf.Config nafcfg, int baseport, org.slf4j.Logger log)
+	private static Dispatcher create(com.grey.naf.DispatcherDef def, com.grey.naf.Config nafcfg, int baseport, com.grey.logging.Logger log)
 			throws com.grey.base.GreyException, java.io.IOException
 	{
 		if (nafcfg == null) {
@@ -584,7 +596,7 @@ public final class Dispatcher
 		return d;
 	}
 
-	public static Dispatcher[] launchConfigured(com.grey.naf.Config nafcfg, org.slf4j.Logger log)
+	public static Dispatcher[] launchConfigured(com.grey.naf.Config nafcfg, com.grey.logging.Logger log)
 		throws com.grey.base.GreyException, java.io.IOException
 	{
 		XmlConfig[] cfgdispatchers = nafcfg.getDispatchers();
@@ -602,19 +614,20 @@ public final class Dispatcher
 		}
 		com.grey.naf.nafman.Registry.get().confirmCandidates();
 
-		// now starts the multi-threaded phase
+		// dump the sytem-properties
+		String txt = System.getProperties().size()+" entries:"+SysProps.EOL;
+		txt += System.getProperties().toString().replace(", ", SysProps.EOL+"\t");
+		FileOps.writeTextFile(nafcfg.path_var+"/sysprops.dump", txt+SysProps.EOL);
+
+		// Now starts the multi-threaded phase_bounces
+		nafcfg.cfgroot = null; //hand memory back to the GC
 		for (int idx = 0; idx < cfgdispatchers.length; idx++) {
-			if (nafcfg.validateMode) {
-				// ... or maybe not
-				dlst[idx].stop();
-				continue;
-			}
 			dlst[idx].start();
 		}
 		return dlst;
 	}
 
-	public static Dispatcher createConfigured(String name, com.grey.naf.Config nafcfg, org.slf4j.Logger log)
+	public static Dispatcher createConfigured(String name, com.grey.naf.Config nafcfg, com.grey.logging.Logger log)
 		throws com.grey.base.GreyException, java.io.IOException
 	{
 		XmlConfig cfg = nafcfg.getDispatcher(name);

@@ -23,9 +23,9 @@ public final class EmbeddedResolver
 	}
 
 	@Override
-	public boolean stop()
+	public void stop()
 	{
-		return rslvr.stop();
+		rslvr.stop();
 	}
 
 	@Override

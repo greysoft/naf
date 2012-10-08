@@ -5,6 +5,7 @@
 package com.grey.naf.dns.batchresolver;
 
 import com.grey.base.utils.TimeOps;
+import com.grey.logging.Logger.LEVEL;
 import com.grey.naf.dns.Answer;
 import com.grey.naf.dns.Resolver;
 
@@ -115,7 +116,7 @@ public final class BatchResolver
 			try {
 				dsptch.dnsresolv.cancel(this);
 			} catch (Exception ex) {
-				log.info("Failed to cancel DNS ops", ex);
+				log.log(LEVEL.INFO, ex, true, "Failed to cancel DNS ops");
 			}
 		}
 		return true;
@@ -135,8 +136,10 @@ public final class BatchResolver
 	@Override
 	public void dnsResolved(com.grey.naf.reactor.Dispatcher d, Answer answer, Object cbdata) throws java.io.IOException
 	{
-		if (log.isDebugEnabled()) log.debug("DNS-BatchResolver: enter dnsResolved() with reqcnt="+reqcnt+", EOF="+inputEOF+", waitcount="+waitcount
-				+" - Result="+answer.result+" for "+answer.qname+" - "+cbdata);
+		if (log.isActive(LEVEL.TRC)) {
+			log.trace("DNS-BatchResolver: enter dnsResolved() with reqcnt="+reqcnt+", EOF="+inputEOF+", waitcount="+waitcount
+					+" - Result="+answer.result+" for "+answer.qname+" - "+cbdata);
+		}
 		waitcount--;
 		printAnswer(answer, false, String.class.cast(cbdata));
 		suspend();
@@ -154,13 +157,15 @@ public final class BatchResolver
 		if (reqcnt == 0) {
 			systime_init = dsptch.systime();
 		}
-		if (log.isDebugEnabled()) log.debug("DNS-BatchResolver: enter issueRequests() with reqcnt="+reqcnt+", EOF="+inputEOF+", waitcount="+waitcount);
+		if (log.isActive(LEVEL.TRC)) {
+			log.trace("DNS-BatchResolver: enter issueRequests() with reqcnt="+reqcnt+", EOF="+inputEOF+", waitcount="+waitcount);
+		}
 		Answer answer;
 		int linecount = 0;
 		String inline;
 
 		while ((inline = istrm.readLine()) != null) {
-			if (log.isTraceEnabled()) log.trace("DNS-BatchResolver: read name="+reqcnt+" ["+inline+"]");
+			if (log.isActive(LEVEL.TRC2)) log.log(LEVEL.TRC2, "DNS-BatchResolver: read name="+reqcnt+" ["+inline+"]");
 			domnam.set(inline.trim().toLowerCase());
 
 			if (resolve_mode == Resolver.QTYPE_A) {
@@ -193,7 +198,9 @@ public final class BatchResolver
 
 	private void suspend()
 	{
-		if (log.isDebugEnabled()) log.debug("DNS-BatchResolver: suspending with EOF="+inputEOF+", waitcount="+waitcount+" - tmr="+tmr_batch);
+		if (log.isActive(LEVEL.TRC)) {
+			log.trace("DNS-BatchResolver: suspending with EOF="+inputEOF+", waitcount="+waitcount+" - tmr="+tmr_batch);
+		}
 		if (inputEOF) {
 			if (waitcount == 0) {
 				systime_term = dsptch.systime();

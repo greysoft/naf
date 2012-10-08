@@ -7,48 +7,87 @@ package com.grey.base.utils;
 public class CanonByteCharsTest
 {
 	@org.junit.Test
-	public void testSuite()
+	public void testBC()
 	{
-		CanonByteChars canon = new CanonByteChars();
+		CanonByteChars canon = new CanonByteChars("utest_bc", 1);
 		org.junit.Assert.assertEquals(0, canon.size());
 		canon.clear();
 		org.junit.Assert.assertEquals(0, canon.size());
+		ByteChars inpval = null;
+		ByteChars bc_out = canon.intern(inpval);
+		org.junit.Assert.assertNull(bc_out);
+		org.junit.Assert.assertEquals(0, canon.size());
 
-		ByteChars bc_in = new ByteChars("Item1");
-		ByteChars bc_out = canon.intern(bc_in);
+		inpval = new ByteChars("Item1");
+		bc_out = canon.intern(inpval);
 		org.junit.Assert.assertEquals(1, canon.size());
-		org.junit.Assert.assertFalse(bc_out == bc_in);
-		org.junit.Assert.assertFalse(canon.isCanon(bc_in));
-		org.junit.Assert.assertTrue(canon.isCanon(bc_out));
+		org.junit.Assert.assertFalse(bc_out == inpval);
+		org.junit.Assert.assertTrue(inpval.equals(bc_out));
 		ByteChars bc1 = bc_out;
 		bc_out = canon.intern(bc1);
 		org.junit.Assert.assertTrue(bc_out == bc1);
-		org.junit.Assert.assertTrue(canon.isCanon(bc_out));
+		org.junit.Assert.assertEquals(1, canon.size());
 
-		bc_in = new ByteChars("Item2");
-		bc_out = canon.intern(bc_in);
+		inpval = new ByteChars("Item2");
+		bc_out = canon.intern(inpval);
 		org.junit.Assert.assertEquals(2, canon.size());
-		org.junit.Assert.assertFalse(bc_out == bc_in);
-		org.junit.Assert.assertFalse(canon.isCanon(bc_in));
-		org.junit.Assert.assertTrue(canon.isCanon(bc_out));
+		org.junit.Assert.assertFalse(bc_out == inpval);
+		org.junit.Assert.assertTrue(inpval.equals(bc_out));
 		ByteChars bc2 = bc_out;
 		org.junit.Assert.assertFalse(bc1 == bc2);
 		bc_out = canon.intern(bc2);
 		org.junit.Assert.assertTrue(bc_out == bc2);
-		org.junit.Assert.assertTrue(canon.isCanon(bc_out));
-
-		bc_in = new ByteChars("Item1");
-		bc_out = canon.intern(bc_in);
 		org.junit.Assert.assertEquals(2, canon.size());
-		org.junit.Assert.assertFalse(bc_out == bc_in);
+
+		inpval = new ByteChars("Item1");
+		bc_out = canon.intern(inpval);
+		org.junit.Assert.assertEquals(2, canon.size());
+		org.junit.Assert.assertFalse(bc_out == inpval);
 		org.junit.Assert.assertTrue(bc_out == bc1);
-		org.junit.Assert.assertFalse(canon.isCanon(bc_in));
-		org.junit.Assert.assertTrue(canon.isCanon(bc_out));
 
 		canon.clear();
 		org.junit.Assert.assertEquals(0, canon.size());
-		org.junit.Assert.assertFalse(canon.isCanon(bc1));
-		org.junit.Assert.assertFalse(canon.isCanon(bc2));
+		canon.clear();
+		org.junit.Assert.assertEquals(0, canon.size());
+	}
+
+	@org.junit.Test
+	public void testCharSeq()
+	{
+		CanonByteChars canon = new CanonByteChars("utest_charseq", 0);
+		String inpval = null;
+		ByteChars bc_out = canon.intern(inpval);
+		org.junit.Assert.assertNull(bc_out);
+		org.junit.Assert.assertEquals(0, canon.size());
+
+		inpval = "Item1";
+		bc_out = canon.intern(inpval);
+		org.junit.Assert.assertEquals(1, canon.size());
+		org.junit.Assert.assertTrue(inpval.equals(bc_out.toString()));
+		org.junit.Assert.assertTrue(StringOps.sameSeq(inpval, bc_out));
+		ByteChars bc1 = bc_out;
+		bc_out = canon.intern(bc1);
+		org.junit.Assert.assertTrue(bc_out == bc1);
+		org.junit.Assert.assertEquals(1, canon.size());
+
+		inpval = "Item2";
+		bc_out = canon.intern(inpval);
+		org.junit.Assert.assertEquals(2, canon.size());
+		org.junit.Assert.assertTrue(inpval.equals(bc_out.toString()));
+		org.junit.Assert.assertTrue(StringOps.sameSeq(inpval, bc_out));
+		ByteChars bc2 = bc_out;
+		org.junit.Assert.assertFalse(bc1 == bc2);
+		bc_out = canon.intern(bc2);
+		org.junit.Assert.assertTrue(bc_out == bc2);
+		org.junit.Assert.assertEquals(2, canon.size());
+
+		inpval = "Item1";
+		bc_out = canon.intern(inpval);
+		org.junit.Assert.assertEquals(2, canon.size());
+		org.junit.Assert.assertTrue(bc_out == bc1);
+
+		canon.clear();
+		org.junit.Assert.assertEquals(0, canon.size());
 		canon.clear();
 		org.junit.Assert.assertEquals(0, canon.size());
 	}

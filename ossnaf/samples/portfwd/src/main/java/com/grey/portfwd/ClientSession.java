@@ -5,6 +5,7 @@
 package com.grey.portfwd;
 
 import com.grey.base.utils.TimeOps;
+import com.grey.logging.Logger.LEVEL;
 
 public class ClientSession
 	extends com.grey.naf.reactor.ConcurrentListener.Server
@@ -43,7 +44,7 @@ public class ClientSession
 
 		dsptch.logger.info("Server for "+lstnr.name+" has LoadBalancer="+loadbalancer.getClass().getName()
 				+", Controller="+lstnr.controller.getClass().getName()+", Timeout="+TimeOps.expandMilliTime(tmt_idle));
-		dsptch.logger.debug("NIO-Buffers: "+bufspec);
+		dsptch.logger.trace("NIO-Buffers: "+bufspec);
 	}
 
 	// This is (or will be) an active server object
@@ -110,7 +111,7 @@ public class ClientSession
 	public void timerIndication(com.grey.naf.reactor.Timer t, com.grey.naf.reactor.Dispatcher d)
 	{
 		tmr = null; //mark timer as expired
-		if (dsptch.logger.isDebugEnabled()) dsptch.logger.debug("Closing idle connection: "+iochan+" => "+relay.server.getServerAddress().sockaddr);
+		if (dsptch.logger.isActive(LEVEL.TRC)) dsptch.logger.trace("Closing idle connection: "+iochan+" => "+relay.server.getServerAddress().sockaddr);
 		ioDisconnected();
 	}
 

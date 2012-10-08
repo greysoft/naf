@@ -21,7 +21,7 @@ import com.grey.base.utils.StringOps;
  *
  * There is also an parallel synchronisation performed on the 'response' field. Callers synchronise on it to update
  * it, by calling sendResponse().
- * Back in the Primary thread once the command has completed, the Server synchronises on it to retrieve it, by
+ * Back in the Primary thread, once the command has completed, the Server synchronises on it to retrieve it, by
  * calling getResponse().
  * The 'processedBy' field is co-synchronised with 'response'.
  */

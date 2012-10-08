@@ -9,7 +9,7 @@
 <div class="menu">
 <p>
 Programmer's Guide<br/>
-NAF v2.0.0
+NAF v2.1.0
 </p>
 <hr class="mline"/>
 <p>
@@ -73,19 +73,19 @@ NAF (Network Application Framework) is a Java library that implements an API fra
 <br/>
 It provides an event-driven environment that lets programmers perform non-blocking (asynchronous) I/O operations without launching multiple threads, and it enables the support of extremely large numbers of concurrent connections and high data throughput levels.
 <br/> <br/>
-NAF is meant to be easy to use and does not provide gratuitous layers of abstraction (which force you to learn excessively large custom APIs) over JDK methods that already do what most people need.
+NAF is intended to be easy to use and does not provide gratuitous layers of abstraction (which force you to learn excessively large custom APIs) over JDK methods that already do what most people need.
 What it does, is turn the raw NIO Selector and Channel interfaces into a functioning multiplexor based on the Reactor comms pattern, that performs the I/O ops for you, calls your code with the received data, and then gets out of the way to let you handle the event.
 <br/>
-NAF transparently handles non-blocking writes as you would expect, lets you schedule an unlimited number of arbitrary timed ops (and easily cancel or reschedule them before they trigger) as you would hope and also provides the possibly unique feature of a non-blocking in-thread DNS resolver, which lets you perform hostname lookups, reverse-IP (PTR) lookups and MX (mailserver) lookups.
+NAF transparently handles non-blocking writes as you would expect, lets you schedule an unlimited number of arbitrary timed ops (and easily cancel or reschedule them before they trigger) as you would hope and also provides the possibly unique feature of a non-blocking DNS resolver, which lets you perform hostname lookups, reverse-IP (PTR) lookups and MX (mailserver) lookups.
 <br/> <br/>
-As you may have gathered from the <dfn>Reactor</dfn> reference above, a NAF application (more precisely termed a "NAFlet", or sometimes a "task") is a single-threaded one, consisting of fragments of callback user code which may or may not be related to each other (though not as far as NAF is concerned, or needs to know).
+As you may have gathered from the <dfn>Reactor</dfn> reference above, a NAF application (more precisely termed a "NAFlet", or sometimes a "task") executes in a single-threaded context.
 <br/>
-At its heart is an object called a <dfn>Dispatcher</dfn>, which as its name suggests is the NIO wrapper, and which invokes registered application code as necessary, in response to I/O, timer and DNS events.
+At its heart is an object called a <dfn>Dispatcher</dfn>, which as its name suggests is the NIO wrapper, and which invokes registered callbacks in your application, as triggered by I/O, timer and DNS events.
 Each Dispatcher resides in its own thread, and the terms Dispatcher and Thread are sometimes used synonymously in NAF.
 <br/>
-As well as simplifying the code, the single-threaded reactor mode of operation permits many optimisations, not least of which is pre-allocating all the temp objects, that various bits of code might require.
+As well as simplifying the code, the single-threaded reactor mode of operation permits many optimisations, not least of which is pre-allocating all the temp objects that various bits of code might require.
 <br/> <br/>
-As well as accommodating as much callback code as possible (effectively, as many connections as possible) in one thread, and minimising or eliminating buffer copies, one of the main design principles of NAF is to minimise memory churn by reusing objects wherever possible, thus drastically reducing the rate of garbage generation, and minimising expensive GC (Garbage Collector) runs.
+In addition to accommodating as much callback code as possible in one thread, and minimising or eliminating buffer copies, one of the main design principles of NAF is to minimise memory churn by reusing objects wherever possible, thus drastically reducing the rate of garbage generation, and minimising the need for expensive GC (Garbage Collector) runs.
 </p>
 
 <hr width="40%"/>
@@ -127,7 +127,6 @@ sample program and the DNS batch-resolver app embedded in NAF).
     &lt;/dirpaths&gt;
     &lt;baseport&gt;12000&lt;/baseport&gt;
     &lt;dependjars&gt;app1.jar : app2.jar&lt;/dependjars&gt;
-    &lt;configcheck&gt;N&lt;/configcheck&gt;
     &lt;dnsresolver&gt;
         ...
     &lt;/dnsresolver&gt;
@@ -227,7 +226,7 @@ It's up to the application which setting it wishes to abide by.
 If the 
 <span class="cfgname">grey.logger.dir</span> system property is not set, then NAF will set it to the resolved value of its
 <span class="cfgname">dirpaths/logs</span> config item, and this ought to propagate to the underlying
-<span class="softname">SLF4J</span> logger, if it is of type <span class="softname">greylog-slf4j</span>.
+<span class="softname">GreyLog</span> logger, so long as you loaded naf.xml before creating any loggers.
 </p>
 
 <p>
@@ -239,30 +238,21 @@ If this config item is absent, the setting is obtained from the <span class="cfg
 </p>
 
 <p> <span class="cfgtitle">dependjars</span><br/>
-A list of dependent JAR files to dynamically load.
+A colon-separated list of dependent JAR files to dynamically load.
 <br/>
 Some of the list items may be directory paths rather than a JAR pathname, and if so, then:<br/>
 - If directory spec ends in / (forward slash): NAF loads any .jar files found in that directory.<br/>
 - Else, the directory itself is placed on the live classpath.
-<br/>
-The list separator is colon for Unix and semi-colon for Windows.
-This may be overridden by the <span class="cfgname">grey.path.separator</span> system property.
 <br/> <br/>
-Note that the syntax and treatment of the
-<span class="cfgname">dependjars</span>
-config value is identical to the value of the
+Note that the
 <span class="cfgname">greynaf.cp</span>
-system property, which is evaluated a fraction earlier.
+system property can be used as an alternative to the
+<span class="cfgname">dependjars</span>
+config element.
+<br/>
+Their syntax and treatment is identical, but the system property is evaluated a fraction earlier during application startup.
+<br/>
 It is a matter of personal preference as to whether you would prefer to specify extra JARs in the naf.xml file or via system properties.
-</p>
-
-<p>
-<span class="cfgtitle">configcheck</span><br/>
-This is purely for debugging and assurance, and if True then the Java process will exit after loading the naf.xml file and completing the initialisation phase, so that you can examine the config values echoed back in the log files and verify that they are as expected (given the extensive use NAF and its apps make of auto-calculated defaults).
-<br/>
-Like all the boolean config settings, you may enter Yes, Y, True, T or 1 to specify True. It is not case-sensitive, and anything else will be taken to mean False.
-<br/>
-This setting defaults to False, if absent. 
 </p>
 
 <hr class="pline"/>
@@ -341,8 +331,13 @@ A boolean attribute which defaults to Yes, but can be set to No to disable a dis
 enabled is a time span, and indicates how often registered flushable objects should be flushed.<br/>
 The default is 0, meaning never.
 <br/>
-To cut through the carefully worded abstractions, this exists primarily to flush the log files if the GreyLog framework is active.
-A buffered log file might not get flushed for an indefinite period if no further log messages are written to it, so this attribute guarantees a maximum interval before the last log message is visible in the log file.
+A "flushable" object is any object which implements the
+<code>java.io.Flushable</code>
+interface and has been passed to the
+<code>Dispatcher.flusher.register()</code>
+method in order to be periodically flushed, and it is typically a logger or similiar.
+<br/>
+The rationale behind this facility is that a buffered log file might not get flushed for an indefinite period if no further log messages were written to it, so this attribute guarantees a maximum interval before the last log message is visible in the log file.
 </li>
 
 <li><span class="cfgtitle">nafman</span>:
@@ -353,7 +348,7 @@ Beware that turning NAFMAN off will (at the least) often leave you with no grace
 </li>
 
 <li><span class="cfgtitle">name</span>:
-An arbitrary tag, which often appears in log messages and which is also used to specify the name of the SLF4J logger this Dispatcher should log to.
+A unique per-Dispatcher tag, which used to specify the name of the GreyLog logger this Dispatcher should create.
 <br/>
 The <span class="cfgname">greynaf.dispatchers.logname</span> system property overrides that latter function, and specifies a universal logger name for all Dispatchers.
 This may be more convenient when the number of Dispatchers is very large (eg. an <span class="softname">EchoBot</span> bulk test).
@@ -385,9 +380,9 @@ The latter are termed dynamic (or programmatically created) Dispatchers, as oppo
 The distinction is in their startup mode, and once launched, there is no difference in the resulting Dispatchers.
 <br/>
 Dispatchers are dynamically created by either of these static methods:<br/>
-&bull; <code>com.grey.naf.Dispatcher.create(com.grey.naf.DispatcherDef, com.grey.naf.Config, org.slf4j.Logger)</code>
+&bull; <code>com.grey.naf.Dispatcher.create(com.grey.naf.DispatcherDef, com.grey.naf.Config, com.grey.logging.Logger)</code>
 <br/>
-&bull; <code>com.grey.naf.Dispatcher.create(com.grey.naf.DispatcherDef, int baseport, org.slf4j.Logger)</code>
+&bull; <code>com.grey.naf.Dispatcher.create(com.grey.naf.DispatcherDef, int baseport, com.grey.logging.Logger)</code>
 <br/>
 Once they have been created and set up, you simply call their
 <code>start()</code>
@@ -527,19 +522,54 @@ class for the full set of built-in NAFMAN commands and their calling syntax, eg.
 </h2>
 
 <p>
-The DNS Resolver offers a simple API to NAF components, and supports A (hostname), MX (email domain) and PTR (reverse lookup on IP addresses) lookups.
+The DNS Resolver offers a simple non-blocking API to NAF components, and supports A (hostname), MX (email domain) and PTR (reverse lookup on IP addresses) lookups.
 <br/>
-It issues DNS queries to the nominated DNS servers, and then caches the results so that future lookups on the same domain can be satisfied internally within NAF, without recourse to any more external queries.
+It issues DNS queries to the nominated DNS servers,and calls back to your application code with the answers.
+The resolver caches the results so that future lookups on the same domain can be satisfied internally within NAF, without recourse to any more external queries.
 It also caches negative answers (ie. domain name not found).
+
 <br/> <br/>
-Each dispatcher may contain its own asynchronous (non-blocking) DNS resolver, but they're all controlled by one
+NAF offers two alternative implementations of the DNS Resolver, namely the Embedded Resolver and the Distributed Resolver.
+</p>
+<ul>
+<li>
+The Embedded resolver effectively represents an independent resolver within each Dispatcher, each with its own results cache.
+<br/>
+DNS users within a Dispatcher enjoy direct lock-free I/O-free access to its DNS cache.
+</li><li>
+The Distributed resolver is implemented as master and secondary parts, where the master component resides in one DNS-enabled Dispatcher, and all other DNS-enabled Dispatchers take on the secondary role.
+<br/>
+What this means is that only one DNS cache exists and it is owned by the master resolver (which is essentially identical to the Embedded Resolver). The secondary resolvers incur a slight processing overhead in accessing it.
+<br/>
+For performance reasons therefore, if one of the Dispatchers is expected to be a heavier DNS user than the others, we recommend it takes on the master role, as it will have faster access to the DNS cache.
+<br/>
+The master and secondary roles in the distributed resolver are sometimes referred to as server and client, but they are all "clients" to the core resolver service.
+</li>
+</ul>
+<p>
+So the trade-off between the EmbeddedResolver and the distributed clients is one of speed versus memory consumption, though the secondary distributed resolvers are still likely to be more than fast enough for most uses, and we recommend the distributed resolver if the DNS cache is expected to grow to a significant size.
+<br/> <br/>
+Note that the difference between the embedded and distributed resolvers, as well as the division of responsibility between the roles of the distributed resolver is internal to the DNS resolver, and user code within each Dispatcher accesses the resolver via a single API, represented by the
+<code>com.grey.naf.dns.Resolver</code>
+class (see the
+<code>Dispatcher.dnsresolv</code>
+field) and its
+<code>Resolver.Client</code>
+callback interface.
+User code is unaware what underlying type of DNS resolver it is calling, and it has no effect on the final answer.
+
+<br/> <br/>
+Each dispatcher may contain its own asynchronous (non-blocking) DNS resolver
+(see their
+<span class="cfgname">dns</span>
+attribute), but they're all controlled by one
 <span class="cfgname">dnsresolver</span>
 config block at the top level of the naf.xml file.
 <br/>
-This config block consists entirely of optional parameters, and is typically absent from the config file, as there should be no need to modify the defaults, but its absence simply means that the defaults will be in effect, not that DNS lookup is disabled.
-A resolver will still be created in all dispatchers that don't have their
+This config block consists entirely of optional parameters, and may be absent from the config file if you don't want to modify its defaults, but its absence simply means that those defaults will be in effect, not that DNS lookup is disabled.
+A resolver will still be created in all dispatchers that have their
 <span class="cfgname">dns</span>
-attribute set to No.
+attribute set to Yes.
 <br/> <br/>
 Selected DNS config attributes are shown below.<br/>
 See the source of the <code>com.grey.naf.dns.ResolverService</code> class for the full list
@@ -548,7 +578,7 @@ See the source of the <code>com.grey.naf.dns.ResolverService</code> class for th
 <table class="cfgbox">
 <tr><td>
 <pre>
-&lt;dnsresolver class="com.grey.naf.dns.distributedresolver.Client" alwaystcp="N"&gt;
+&lt;dnsresolver class="com.grey.naf.dns.distributedresolver.Client" master="name" alwaystcp="N"&gt;
     &lt;servers&gt;192.168.1.1 | 192.168.1.2&lt;/servers&gt;
     &lt;query_mx fallback_a="N" maxrr="5"&gt;
     &lt;cache negttl="1h" exitdump="N"&gt;
@@ -563,12 +593,15 @@ NAF contains two alternative DNS resolvers.
 <br/>
 The default is
 <code>com.grey.naf.dns.embedded.EmbeddedResolver</code>,
-which creates and maintains an independent cache within each Dispatcher.
+for the embedded resolver, while the example above shows the class to use for the distributed resolver.
 <br/>
-The <code>distributedresolver</code> one shown above is implemented as client/server parts, where the sole server component resides in the first DNS-enabled Dispatcher, and the client components forward queries onto it.
+As explained above, these are plug-in alternatives which represent architectural choices, but are transparent to your code.
+</li>
+
+<li><span class="cfgtitle">master</span>:
+This optional attribute only applies to the distributed resolver, and specifies the name of the Dispatcher which will take on the master role.
 <br/>
-What this means is that only one cache exists, but the "client" resolvers incur a slight synchronisation overhead in accessing it.
-This is still likely to be more than fast enough, so though not currently the default, we recommend the distributed resolver if the cache is expected to grow to a significant size.
+If absent, the first DNS-enabled Dispatcher in the naf.xml config file becomes the master resolver.
 </li>
 
 <li><span class="cfgtitle">servers</span>:
@@ -742,26 +775,19 @@ on port 8080 to use the same server config as the first Listener on port 80.
 
 <p>
 NAF logging is based on the
-<span class="softname">SLF4J</span>
-interface, and developers are free to use whatever underlying logger they want, but NAF has a bias towards its own
 <span class="softname">GreyLog</span>
-logging framework, which it is bound to by default.
+logging framework, which is included in the NAF downloads (both source and binary).
 <br/>
-The NAF JAR includes a dependency on GreyLog and its SLF4J binding in its Manifest classpath, so if you want to use an alternative logging provider (eg. Log4j), you will need to include it in your classpath before the NAF JAR, or load it before referencing NAF.
-<br/> <br/>
-Note the warning in the GreyLog
-<a href="greylog.htm#overview">Overview</a>
-about how each SLF4J <code>getLogger()</code> call actually creates a new logfile I/O stream, if it is the underlying SLF4J logging framework.
-<br/>
-This is probably not what you want, so you should use the SLF4J logger instance that was created by each Dispatcher, and is exported via the public
-<code>Dispatcher.logger</code> field.
-<br/> <br/>
 See the GreyLog
 <a href="greylog.htm">Guide</a>
 for how to use it.
+<br/> <br/>
+Each Dispatcher has its own logger, which is made available to its call-out code via the public
+<code>Dispatcher.logger</code> field.
 <br/>
-As a developer of NAF applications, you don't have to worry about the GreyLog API, as NAF doesn't invoke it directly.
-You just need to provide GreyLog's <dfn>logging.xml</dfn> runtime config file.
+As a developer of NAF applications, your main concern is to provide GreyLog's
+<span class="pathname">logging.xml</span>
+runtime config file, and NAF will do the rest.
 
 <hr class="pline"/>
 <h2>
@@ -894,34 +920,54 @@ Run NAF directly with the -h option to see its built-in options.
 </p>
 <div>
 <span class="vt220">
-java -jar greynaf-2.0.0.jar -h
+java -jar greynaf-2.1.0.jar -h
 </span>
 </div>
 
 <p>
 As you can see, in addition to running as an application (ie. starting up the Dispatchers), the NAF Launcher also has two modes for sending NAFMAN commands (with or without a naf.xml file).
-<br/>
-When issuing NAFMAN commands, the naf.xml file is only used to look up the NAFMAN agent's server port, so you can specify that with the
+</p>
+<div>
+<span class="vt220">
+java -jar greynaf-2.1.0.jar -cmd showconns -c naf.xml
+</span>
+</div>
+
+<p>
+The naf.xml file is only used to look up the NAFMAN agent's server port, so you can specify that with the
 <span class="cfgvalue">-remote</span>
 option instead.
-<br/>
-Beware that if you issue a NAFMAN command by executing the NAF JAR, it would not recognise bespoke commands (such as the
+</p>
+<div>
+<span class="vt220">
+java -jar greynaf-2.1.0.jar -cmd showconns -remote host:port
+</span>
+</div>
+
+<p>
+Beware that if you issue a NAFMAN command by executing the NAF JAR, it would not recognise application-specific commands (such as the
 <dfn>showconns</dfn>
 command defined by the port-forwarder demo app) and would therefore reject it.
 <br/>
 To get around this, you can use the
 <span class="cfgvalue">-nocheck</span>
-option (which prevents client-side validation of NAFMAN commands) or send it using the application JAR, as shown below.
+option (which prevents client-side validation of NAFMAN commands)
 </p>
 <div>
 <span class="vt220">
-java -jar greynaf-2.0.0.jar -cmd showconns -nocheck
-&nbsp;<br/><br/>&nbsp;
+java -jar greynaf-2.1.0.jar -cmd showconns -nocheck
+</span>
+</div>
+<p>
+Or send it using the application JAR, as shown below, since it recognises the command.
+<div>
+<span class="vt220">
 java -jar portfwd-1.0.0.jar -cmd showconns
 </span>
 </div>
 
 <p>
+<br/>
 NAF would normally be loaded by your own application rather than executed directly, not least of the reasons being that the classpath you require will be set in your application's JAR (or enclosing framework), rather than NAF.
 <br/>
 As noted in the naf.xml section above though, you could specify all the JARs your application requires in the
@@ -937,7 +983,7 @@ Assuming you have downloaded and extracted the binary NAF distribution (or built
 </p>
 <div>
 <span class="vt220">
-java -jar lib/greynaf-2.0.0.jar -c conf/batchresolver.xml -logger dnsbatch &lt; infile
+java -jar lib/greynaf-2.1.0.jar -c conf/batchresolver.xml -logger dnsbatch &lt; infile
 </span>
 </div>
 <p>

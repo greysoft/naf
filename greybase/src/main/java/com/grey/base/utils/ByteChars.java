@@ -243,7 +243,7 @@ public final class ByteChars
 		{
 			if ((digit = Character.digit(buf[idx], radix)) == -1)
 			{
-				throw new NumberFormatException((char)buf[idx]+"@"+idx+" in "+off+"+"+len+" - "+this.toString(off, len));
+				throw new NumberFormatException((char)buf[idx]+"@"+idx+" in "+off+"+"+len+" - "+subSequence(off, off+len));
 			}
 			numval += (digit * power);
 			power *= radix;
@@ -286,12 +286,11 @@ public final class ByteChars
 	public int hashCode()
 	{
 		int hash = 0;
-		byte[] buf = ar_buf;
 		int off = ar_off;
-		int lmt = off + ar_len;
+		final byte[] buf = ar_buf;
+		final int lmt = off + ar_len;
 
-		while (off != lmt)
-		{
+		while (off != lmt) {
 			hash ^= ((hash << 5) + (hash >>> 2) + buf[off++]);
 		}
 		return hash;
@@ -306,14 +305,13 @@ public final class ByteChars
 		if (bc2.ar_len != ar_len) return false;
 
 		// This shaves 40% off the time to count up to arr.len and loop on bc2.arr.buf[bc2.arr.off + idx] != arr.buf[arr.off + idx]
-		byte[] buf = ar_buf;
-		byte[] buf2 = bc2.ar_buf;
 		int off = ar_off;
 		int off2 = bc2.ar_off;
-		int lmt = off + ar_len;
+		final byte[] buf = ar_buf;
+		final byte[] buf2 = bc2.ar_buf;
+		final int lmt = off + ar_len;
 
-		while (off != lmt)
-		{
+		while (off != lmt) {
 			if (buf2[off2++] != buf[off++]) return false;
 		}
 		return true;
@@ -323,14 +321,13 @@ public final class ByteChars
 	public int compareTo(ByteChars bc2)
 	{
 		if (bc2 == this) return 0;
-		byte[] buf = ar_buf;
-		byte[] buf2 = bc2.ar_buf;
 		int off = ar_off;
 		int off2 = bc2.ar_off;
-		int lmt = off + Math.min(ar_len, bc2.ar_len);
+		final byte[] buf = ar_buf;
+		final byte[] buf2 = bc2.ar_buf;
+		final int lmt = off + Math.min(ar_len, bc2.ar_len);
 
-		while (off != lmt)
-		{
+		while (off != lmt) {
 			byte b1 = buf[off++];
 			byte b2 = buf2[off2++];
 			if (b1 != b2) return b1 - b2;
@@ -341,19 +338,14 @@ public final class ByteChars
 	@Override
 	public String toString()
 	{
-		return toString(0, ar_len);
+		return toString(null);
 	}
 
-	public String toString(int off, int len)
+	public String toString(StringBuilder sb)
 	{
-		if (len == 0) return "";  // because String constructor below would otherwise throw
-		String str = null;
-		try {
-			str = new String(ar_buf, ar_off + off, len, "ISO-8859-1");  // just pick an 8-bit charset, which will hopefully decode faithfully
-		} catch (Exception ex) {
-			str = "ByteChars DECODE ERROR - " + com.grey.base.GreyException.summary(ex);
-		}
-		return str;
+		if (sb == null) sb = new StringBuilder();
+		sb.append(this);
+		return sb.toString();
 	}
 
 	@Override
@@ -366,8 +358,8 @@ public final class ByteChars
 	{
 		if (chbuf == null || chbuf.length < len) chbuf = new char[len];
 		off += ar_off;
-		int lmt = off + len;
-		byte[] buf = ar_buf;
+		final int lmt = off + len;
+		final byte[] buf = ar_buf;
 		int offch = 0;
 
 		for (int idx = off; idx != lmt; idx++)
@@ -397,7 +389,7 @@ public final class ByteChars
 			java.util.ArrayList<ByteChars> terms, ObjectWell<ByteChars> store)
 	{
 		if (terms == null) terms = new java.util.ArrayList<ByteChars>();
-		int lmt = off + len;
+		final int lmt = off + len;
 		int arg0 = off;
 		for (int idx = off; idx <= lmt; idx++)
 		{

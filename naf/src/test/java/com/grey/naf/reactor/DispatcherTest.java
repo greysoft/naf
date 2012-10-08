@@ -12,7 +12,7 @@ public class DispatcherTest
 	static {
 		SysProps.set(com.grey.naf.Config.SYSPROP_DIRPATH_VAR, SysProps.TMPDIR+"/utest/dispatcher");
 	}
-	private static final org.slf4j.Logger bootlog = org.slf4j.LoggerFactory.getLogger("");
+	private static final com.grey.logging.Logger bootlog = com.grey.logging.Factory.getLoggerNoEx("");
 
 	// Completion is enough to satisfy these tests
 	@org.junit.Test
@@ -55,7 +55,7 @@ public class DispatcherTest
 	@org.junit.Test
 	public void testDynamic() throws com.grey.base.GreyException, java.io.IOException, java.net.URISyntaxException
 	{
-		String dname = "dynamic1";
+		String dname = "utest_dynamic1";
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
 		def.name = dname;
 		def.hasDNS = true;
@@ -73,7 +73,7 @@ public class DispatcherTest
 	public void testBasePort() throws com.grey.base.GreyException, java.io.IOException, java.net.URISyntaxException
 	{
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
-		def.name = "testbaseport";
+		def.name = "utest_baseport";
 		Dispatcher dsptch = Dispatcher.create(def, null, bootlog);
 		int baseport = dsptch.nafcfg.getPort(0);
 		dsptch.stop(dsptch);

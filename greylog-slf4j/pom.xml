@@ -9,19 +9,25 @@
 	<artifactId>greylog-slf4j</artifactId>
 	<version>${grey.version.greylog-slf4j}</version>
 	<name>GreyLog SLF4J Binding</name>
-	<properties>
-		<grey.manifest.name>com/grey/greylog_slf4j/</grey.manifest.name>
-	</properties>
 	<parent>
 		<groupId>com.grey.naf</groupId>
 		<artifactId>build-common</artifactId>
 		<version>1.0.0</version>
 	</parent>
+	<properties>
+		<grey.manifest.name>com/grey/greylog_slf4j/</grey.manifest.name>
+	</properties>
 	<dependencies>
 		<dependency>
 			<groupId>com.grey.naf</groupId>
 			<artifactId>greylog</artifactId>
 			<version>${grey.version.greylog}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
+			<version>1.6.2</version>
+			<scope>provided</scope>
 		</dependency>
 	</dependencies>
 </project>

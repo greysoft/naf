@@ -30,7 +30,7 @@ public class ServerSession
 	protected void connected(boolean success, Throwable exconn) throws com.grey.base.FaultException, java.io.IOException
 	{
 		if (!success) {
-			dsptch.logger.debug("Failed to connect to "+svcaddr.sockaddr+" - "+com.grey.base.GreyException.summary(exconn));
+			dsptch.logger.trace("Failed to connect to "+svcaddr.sockaddr+" - "+com.grey.base.GreyException.summary(exconn));
 			ioDisconnected();
 			return;
 		}

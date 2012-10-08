@@ -19,6 +19,7 @@ public class HashedMapIntValueTest
     @org.junit.Test
     final public void testSize()
     {
+    	hmap = new HashedMapIntValue<String>();
     	String key = "testkey";
     	verifySize(0);
     	hmap.put(key, 11);
@@ -31,6 +32,9 @@ public class HashedMapIntValueTest
     @org.junit.Test
     final public void testAdd()
     {
+    	hmap = new HashedMapIntValue<String>();
+		org.junit.Assert.assertEquals(0, hmap.get("nosuchkey"));
+		org.junit.Assert.assertEquals(0, hmap.get(null));
     	int cap = hmap.bucketCount();
     	String key = "testkey";
     	String key2 = "key2";
@@ -57,10 +61,14 @@ public class HashedMapIntValueTest
     @org.junit.Test
     final public void testRemove()
     {
+    	hmap = new HashedMapIntValue<String>();
     	String key = "testkey";
     	int val = 11;
 		addEntry(key, val, true, 0);
 		addEntry("key2", val, true, 0);
+		org.junit.Assert.assertEquals(0, hmap.remove(null));
+		org.junit.Assert.assertEquals(0, hmap.remove("nosuchkey"));
+		org.junit.Assert.assertEquals(2, hmap.size());
 		deleteEntry(key, true, val);
 		deleteEntry("nosuchkey", false, 0);
 
@@ -75,6 +83,7 @@ public class HashedMapIntValueTest
     @org.junit.Test
     final public void testNullKey()
     {
+    	hmap = new HashedMapIntValue<String>();
     	int val = 11;
     	int val2 = 12;
 		addEntry(null, val, true, 0);
@@ -86,6 +95,7 @@ public class HashedMapIntValueTest
     @org.junit.Test
     final public void testClear()
     {
+    	hmap = new HashedMapIntValue<String>();
     	hmap.clear();
     	verifySize(0);
     	hmap.put("1", 1);
@@ -102,6 +112,7 @@ public class HashedMapIntValueTest
     @org.junit.Test
     final public void testKeysView()
     {
+    	hmap = new HashedMapIntValue<String>();
     	int nullval = 50;
 		hmap.put(null, nullval);
 		hmap.put("11", 11);
@@ -109,36 +120,47 @@ public class HashedMapIntValueTest
 		hmap.put("13", 13);
 		hmap.put("14", 14);
 		hmap.put("15", 15);
+		int sum_values = 11+12+13+14+15+50;
 		
 		int itercnt_exp = hmap.size();
 		int itercnt = 0;
-		boolean found_it = false;
+		int sum = 0;
+		boolean found_null = false;
 		java.util.Iterator<String> iter = hmap.keysIterator();
-		while (iter.hasNext())
-		{
+		while (iter.hasNext()) {
 			String str = iter.next();
-			if (str == "12") found_it = true;
+			sum += hmap.get(str);
+			if (str == null) found_null = true;
 			itercnt++;
 		}
 		try {iter.next(); org.junit.Assert.fail("Iterator out of bounds");} catch (java.util.NoSuchElementException ex) {}
+    	verifySize(itercnt_exp);
 		org.junit.Assert.assertEquals(itercnt, itercnt_exp);
-		org.junit.Assert.assertTrue(found_it);
+		org.junit.Assert.assertEquals(sum, sum_values);
+		org.junit.Assert.assertTrue(found_null);
 
-		iter = hmap.keysIterator();
 		itercnt = 0;
-		while (iter.hasNext())
-		{
+		sum = 0;
+		found_null = false;
+		iter = hmap.keysIterator();
+		while (iter.hasNext()) {
 			String str = iter.next();
+			int val = hmap.get(str);
 			if (str == null) {
-				org.junit.Assert.assertEquals(nullval, hmap.get(str));
+				org.junit.Assert.assertEquals(nullval, val);
+				found_null = true;
 			} else {
-				org.junit.Assert.assertEquals(Integer.parseInt(str), hmap.get(str));
+				org.junit.Assert.assertEquals(Integer.parseInt(str), val);
 			}
+			sum += val;
 			iter.remove();
 			itercnt++;
 		}
+		try {iter.next(); org.junit.Assert.fail("Iterator out of bounds");} catch (java.util.NoSuchElementException ex) {}
     	verifySize(0);
 		org.junit.Assert.assertEquals(itercnt, itercnt_exp);
+		org.junit.Assert.assertEquals(sum, sum_values);
+		org.junit.Assert.assertTrue(found_null);
    
     	iter = hmap.keysIterator();
 		org.junit.Assert.assertFalse(iter.hasNext());
@@ -147,39 +169,41 @@ public class HashedMapIntValueTest
     @org.junit.Test
     final public void testValuesView()
     {
+    	hmap = new HashedMapIntValue<String>();
 		hmap.put("11", 11);
 		hmap.put("12", 12);
 		hmap.put("13", 13);
 		hmap.put("14", 14);
 		hmap.put("15", 15);
+		int sum_values = 11+12+13+14+15;
 
 		int itercnt_exp = hmap.size();
 		int itercnt = 0;
-		boolean found_it = false;
+		int sum = 0;
 		com.grey.base.utils.IteratorInt iter = hmap.valuesIterator();
-		while (iter.hasNext())
-		{
+		while (iter.hasNext()) {
 			int num = iter.next();
-			if (num == 12) found_it = true;
+			sum += num;
 			itercnt++;
 		}
 		try {iter.next(); org.junit.Assert.fail("Iterator out of bounds");} catch (java.util.NoSuchElementException ex) {}
+    	verifySize(itercnt_exp);
 		org.junit.Assert.assertEquals(itercnt, itercnt_exp);
-		org.junit.Assert.assertTrue(found_it);
+		org.junit.Assert.assertEquals(sum, sum_values);
 
-		iter = hmap.valuesIterator();
 		itercnt = 0;
-		int sum = 0;
-		while (iter.hasNext())
-		{
+		sum = 0;
+		iter = hmap.valuesIterator();
+		while (iter.hasNext()) {
 			int num = iter.next();
 			sum += num;
 			iter.remove();
 			itercnt++;
 		}
     	verifySize(0);
+		try {iter.next(); org.junit.Assert.fail("Iterator out of bounds");} catch (java.util.NoSuchElementException ex) {}
 		org.junit.Assert.assertEquals(itercnt, itercnt_exp);
-		org.junit.Assert.assertEquals(sum, 11+12+13+14+15);
+		org.junit.Assert.assertEquals(sum, sum_values);
 
     	iter = hmap.valuesIterator();
 		org.junit.Assert.assertFalse(iter.hasNext());
@@ -188,6 +212,7 @@ public class HashedMapIntValueTest
     @org.junit.Test
     final public void testRecycledIterators()
     {
+    	hmap = new HashedMapIntValue<String>();
 		hmap.put("1", 1);
 		hmap.put("2", 2);
 		hmap.put("3", 3);
@@ -226,6 +251,7 @@ public class HashedMapIntValueTest
     @org.junit.Test
     final public void testGrow()
     {
+    	hmap = new HashedMapIntValue<String>();
     	int cap = hmap.bucketCount();
     	int cnt = 0;
     	int nullval = 37;
@@ -280,8 +306,7 @@ public class HashedMapIntValueTest
     {
     	hmap = new HashedMapIntValue<String>(2, 512);
     	int cnt = 512;
-    	for (int idx = 0; idx != cnt; idx++)
-    	{
+    	for (int idx = 0; idx != cnt; idx++) {
     		String str = Integer.toString(idx);
     		hmap.put(str, Integer.parseInt(str));
     	}
@@ -290,6 +315,35 @@ public class HashedMapIntValueTest
 		org.junit.Assert.assertTrue(hmap.containsKey(Integer.toString(cnt - 1)));
 		org.junit.Assert.assertTrue(hmap.containsValue(0));
 		org.junit.Assert.assertTrue(hmap.containsValue(cnt - 1));
+    }
+
+    @org.junit.Test
+    final public void bulktest()
+    {
+    	final int cap = 10*1000; //ramp up to investigate manually
+        HashedMapIntValue<Integer> map = new HashedMapIntValue<Integer>(0, 5);
+        // general put-get
+        for (int v = 0; v != cap; v++) org.junit.Assert.assertEquals(0, map.put(v, v));
+		org.junit.Assert.assertEquals(cap, map.size());
+		org.junit.Assert.assertEquals(0, map.remove(null));
+		org.junit.Assert.assertEquals(cap, map.size());
+		org.junit.Assert.assertEquals(0, map.remove("nosuchkey"));
+		org.junit.Assert.assertEquals(cap, map.size());
+		org.junit.Assert.assertEquals(0, map.put(null, -1));
+		org.junit.Assert.assertEquals(cap+1, map.size());
+        for (int v = 0; v != cap; v++) org.junit.Assert.assertEquals(v, map.get(v));
+        org.junit.Assert.assertEquals(-1, map.get(null));
+        // iterators
+		java.util.HashSet<Integer> jset = new java.util.HashSet<Integer>();
+		java.util.Iterator<Integer> it = map.keysIterator();
+		while (it.hasNext()) {
+			jset.add(it.next());
+			it.remove();
+		}
+		org.junit.Assert.assertEquals(0, map.size());
+		org.junit.Assert.assertEquals(cap+1, jset.size());
+        for (int v = 0; v != cap; v++) org.junit.Assert.assertTrue(jset.contains(v));
+        org.junit.Assert.assertTrue(jset.contains(null));
     }
 
     private int addEntry(String key, int val, boolean isnew, int oldval_exp)

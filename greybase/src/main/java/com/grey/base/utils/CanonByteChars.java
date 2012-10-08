@@ -9,35 +9,54 @@ package com.grey.base.utils;
  */
 public final class CanonByteChars
 {
-	private final HashedMap<ByteChars,ByteChars> canonset = new HashedMap<ByteChars,ByteChars>(0, 10f); //start small (might not be needed)
-	private final ObjectWell<ByteChars> bufpool = new ObjectWell<ByteChars>(ByteChars.class);
+	public final String name;
+	private final int hiwater; //soft limit for ObjectWell - it can get temporarily larger, but we prune it back
+	private final HashedSet<ByteChars> canonset = new HashedSet<ByteChars>(0, 10f); //start small (might not be needed)
+	private final ObjectWell<ByteChars> bufpool;
 
 	public int size() {return canonset.size();}
 
-	public boolean isCanon(ByteChars bc)
+	public CanonByteChars(String name, int hiwater)
 	{
-		ByteChars canonval = canonset.get(bc);
-		return (bc == canonval);
+		this.name = name;
+		this.hiwater = hiwater;
+		bufpool = new ObjectWell<ByteChars>(ByteChars.class, "CanonBC_"+name);
 	}
 
-	public ByteChars intern(ByteChars bc)
+	public ByteChars intern(ByteChars inpval)
 	{
-		ByteChars canonval = canonset.get(bc);
-		if (canonval != null) return canonval;
-		canonval = bufpool.extract();
-		canonval.set(bc);
-		canonset.put(canonval, canonval);
+		if (inpval == null) return null;
+		ByteChars canonval = canonset.get(inpval);
+		if (canonval == null) {
+			canonval = bufpool.extract().set(inpval);
+			canonset.add(canonval);
+		}
+		return canonval;
+	}
+
+	public ByteChars intern(CharSequence inpval)
+	{
+		if (inpval == null) return null;
+		ByteChars inpval_bc = bufpool.extract().set(inpval);
+		ByteChars canonval = canonset.get(inpval_bc);
+		if (canonval == null) {
+			canonval = inpval_bc;
+			canonset.add(canonval);
+		} else {
+			bufpool.store(inpval_bc);
+		}
 		return canonval;
 	}
 
 	public void clear()
 	{
-		java.util.Iterator<ByteChars> it = canonset.keysIterator();
+		java.util.Iterator<ByteChars> it = canonset.iterator();
 
 		while (it.hasNext()) {
 			ByteChars bc = it.next();
 			bufpool.store(bc);
 		}
 		canonset.clear();
+		if (hiwater != 0) bufpool.clear(hiwater);
 	}
 }

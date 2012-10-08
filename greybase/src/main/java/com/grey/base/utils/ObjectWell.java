@@ -22,7 +22,7 @@ import com.grey.base.config.SysProps;
  * the extract() method effectively hands objects out on loan, while the store() methods return them.
  * <br/>
  * When we talk below about the "extant population", we mean the total number of objects in existence, whether currently
- * stored inn the well or out on loan.
+ * stored in the well or out on loan.
  */
 public final class ObjectWell<T>
 	extends ObjectPile<T>
@@ -33,7 +33,9 @@ public final class ObjectWell<T>
 	}
 
 	private static final int DFLT_POPINCR = SysProps.get("grey.well.popincr", 16);
+	private static final ShutdownHook shutdown_hook = (SysProps.get("grey.well.shutdump", false) ? new ShutdownHook() : null);
 
+	public final String name;
 	private final Class<T> clss;
 	private final ObjectFactory factory;
 	private final int maxpop;  //upper limit on the extant population - zero means no limit
@@ -43,8 +45,8 @@ public final class ObjectWell<T>
 	public int population() {return totalpop;}
 	public int maxPopulation() {return maxpop;}
 
-	public ObjectWell(Class<?> clss) {this(clss, null, 0, 0);}
-	public ObjectWell(ObjectFactory fact) {this(null, fact, 0, 0);}
+	public ObjectWell(Class<?> c, String well_name) {this(c, null, well_name, 0, 0);}
+	public ObjectWell(ObjectFactory f, String well_name) {this(null, f, well_name, 0, 0);}
 	
 	/*
 	 * If the incr param is zero, it will be superceded by the default increment. If callers want to
@@ -55,20 +57,22 @@ public final class ObjectWell<T>
 	 * could pass in a 'clss' param that's genuinely incompatible with the template type T, but that's
 	 * their lookout.
 	 */
-	public ObjectWell(Class<?> clss, ObjectFactory factory, int initpop, int maxpop)
+	public ObjectWell(Class<?> c, ObjectFactory f, String well_name, int initpop, int max)
 	{
-		this(clss, factory, initpop, maxpop, 0);
+		this(c, f, well_name, initpop, max, 0);
 	}
 
-	public ObjectWell(Class<?> clss, ObjectFactory factory, int initpop, int maxpop, int incr)
+	public ObjectWell(Class<?> c, ObjectFactory f, String well_name, int initpop, int max, int incr)
 	{
 		@SuppressWarnings("unchecked")
-		Class<T> unchecked_clss = (Class<T>)clss;
-		this.clss = unchecked_clss;  //minimised scope of Suppress annotation
-		this.factory = factory;
-		this.maxpop = maxpop;
+		Class<T> unchecked_clss = (Class<T>)c;
+		clss = unchecked_clss;  //minimised scope of Suppress annotation
+		factory = f;
+		name = well_name;
+		maxpop = max;
 		popincr = (incr == 0 ? DFLT_POPINCR : incr);
 		populate(initpop);
+		if (shutdown_hook != null) shutdown_hook.add(this);
 	}
 
 	// Returns Null if the well is empty and the extant population has reached the specified max
@@ -120,7 +124,7 @@ public final class ObjectWell<T>
 				try {
 					obj = clss.newInstance();
 				} catch (Exception ex) {
-					throw new RuntimeException("Failed to populate ObjectWell at pop="+totalpop+"/"+maxpop, ex);
+					throw new RuntimeException("Failed to populate ObjectWell="+name+" at pop="+totalpop+"/"+maxpop, ex);
 				}
 			} else {
 				@SuppressWarnings("unchecked")
@@ -129,6 +133,39 @@ public final class ObjectWell<T>
 			}
 			store(obj);
 			totalpop++;
+		}
+	}
+
+
+	// This is purely a test-time debugging aid, to help detect leaks. It is absolutely unsuitable for production
+	// deployment, as it prevents objects being garbage-collected and probably prints spurious warnings.
+	private static class ShutdownHook extends Thread
+	{
+		private final java.util.concurrent.ConcurrentHashMap<String, ObjectWell<?>> wells
+				= new java.util.concurrent.ConcurrentHashMap<String, ObjectWell<?>>();
+
+		public ShutdownHook() {
+			Runtime.getRuntime().addShutdownHook(this);
+		}
+
+		public void add(ObjectWell<?> well) {
+			ObjectWell<?> dup = wells.putIfAbsent(well.name, well);
+			if (dup != null) {
+				// Can't throw, because unit tests in particular often recycle the same names, but worth commenting on
+				System.out.println("ObjectWell T"+Thread.currentThread().getId()+": Replacing Well="+dup.name
+						+" - alloc="+(dup.population() - dup.size())+", extant="+dup.population()+"/"+dup.maxPopulation());
+			}
+		}
+		@Override
+		public void run() {
+			java.util.ArrayList<String> names = new java.util.ArrayList<String>(wells.keySet());
+			java.util.Collections.sort(names);
+			System.out.println("ObjectWell: Shutdown Thread=T"+Thread.currentThread().getId()+" - Wells="+names.size());
+			for (int idx = 0; idx != names.size(); idx++) {
+				ObjectWell<?> well = wells.get(names.get(idx));
+				if (well == null) continue;
+				System.out.println(" - Well="+well.name+": alloc="+(well.population() - well.size())+", extant="+well.population()+"/"+well.maxPopulation());
+			}
 		}
 	}
 }

@@ -1,5 +1,41 @@
-This is the binary release of NAF (Network Application Framework).
-The extracted contents consists of:
+Building From Source
+=====================
+NAF (Network Application Framework) is an open-source framework and the full source
+code is available for download at:
+	http://www.greyware.co.uk/naf
+This includes the demo applications (without which their binaries are of limited
+value).
+
+If you have downloaded the binary distribution, skip to the next step
+
+You can build this binary release from the source as follows:
+
+1) Download and extract the source tree somewhere, which we'll call SRCROOT.
+You will need to have the Java JDK (SE 6) and the Maven build tool on your path.
+
+2) Run these commands from Unix shell. The DOS equivalent should be obvious.
+- cd SRCROOT/build-common
+- mvn install
+This is only required the first time you build NAF (or after you clear out your Maven
+repository), as it bootstraps the common POM defs into your Maven repository.
+
+3) Run these commands from Unix shell.
+- cd SRCROOT/ossnaf
+- mvn -Dgrey.logger.level=WARN clean install
+That's it! The system property setting shown is recommended to reduce the noise from the
+unit tests.
+The binary distributions will now be under SRCROOT/ossnaf/target, in both the ZIP and tar.gz
+formats.
+
+This corresponds to the pre-built binary distribution you could have downloaded, so continue
+to the next step ...
+
+     -------------------------------------------------------------
+
+Contents of Binary Distribution
+================================
+A binary release of NAF is available in both the ZIP format or as a compressed tar file.
+You "install" it simply by unpacking, and the extracted contents are:
 - ./lib: The NAF library JARs
 - ./samples: Pre-built binaries of the sample applications, along with
   suggested config files.
@@ -7,7 +43,7 @@ The extracted contents consists of:
   API reference.
 - These text files (README and licencing info)
 
-From now on, we'll refer to this root directory of the extracted distribution
+From now on, we'll refer to this root directory of the installed binary release
 as NAFHOME.
 
      -------------------------------------------------------------
@@ -39,31 +75,3 @@ with it, you can set the system property grey.logger.diagnostics=Y to get more
 information about what's going on.
 This can be done on the Java command-line, or put in the grey.properties file, to
 avoid having to continually type it.
-
-     -------------------------------------------------------------
-
-Building From Source
-======================
-NAF is an open-source framework and the full source code is available for download
-at http://www.greyware.co.uk.
-This includes the demo applications (without which their binaries are of limited
-value).
-
-You can build this binary release from the source as follows:
-
-1) Download and extract the source tree somewhere, which we'll call SRCROOT.
-You will need to have the Java JDK (SE 6) and the Maven build tool on your path.
-
-2) Run these commands from Unix shell. The DOS equivalent should be obvious.
-- cd SRCROOT/build-common
-- mvn install
-This is only required the first time you build NAF (or after you clear out your Maven
-repository), as it bootstraps the common POM defs into your Maven repository.
-
-3) Run these commands from Unix shell.
-- cd SRCROOT/ossnaf
-- mvn -Dgrey.logger.level=WARN clean install
-That's it! The system property setting shown is recommended to reduce the noise from the
-unit tests.
-The binary downloads will now be under SRCROOT/ossnaf/target, in both the ZIP and tar.gz
-formats.

@@ -91,8 +91,9 @@ public class Factory
 		try {
 			Class<?> clss = DynLoader.loadClass(params.logclass);
 			java.lang.reflect.Constructor<?> ctor = clss.getDeclaredConstructor(Parameters.class, String.class);
+			ctor.setAccessible(true);
 			log = Logger.class.cast(ctor.newInstance(params, name));
-		} catch (Exception ex) {
+		} catch (Throwable ex) {
 			throw new com.grey.base.ConfigException(ex, "Failed to create logger="+params.logclass+" - "+com.grey.base.GreyException.summary(ex));
 		}
 		log.init();
@@ -133,6 +134,7 @@ public class Factory
 			if (sinkstdio) {
 				if (diagtrace) System.out.println("GreyLogger: Logger="+tag+" has been directed to stdio - "+cfgpath);
 				params = new Parameters();
+				params.logclass = MTLatinLogger.class.getName();
 			} else {
 				if (diagtrace) System.out.println("GreyLogger: Logger="+tag+" has been directed to Sink - "+cfgpath);
 				return new SinkLogger(name);
@@ -197,6 +199,18 @@ public class Factory
 			String msg = "GreyLogger: Failed to canonise config="+pthnam+" - "+com.grey.base.GreyException.summary(ex);
 			System.out.println(msg);
 			throw new RuntimeException(msg, ex);
+		}
+	}
+
+	public static Logger getLoggerNoEx(String name)
+	{
+		if (leadingNameParts != 0 && name != null) {
+			name = StringOps.keepLeadingParts(name, delimiterNameParts, leadingNameParts);
+		}
+		try {
+			return getLogger(DFLT_CFGFILE, name);
+		} catch (Exception ex) {
+			throw new RuntimeException("GreyLog-Factory failed to create logger="+name+" - "+com.grey.base.GreyException.summary(ex));
 		}
 	}
 }

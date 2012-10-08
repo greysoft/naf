@@ -28,8 +28,13 @@ public class EmailAddressTest
 		EmailAddress emaddr = new com.grey.base.utils.EmailAddress(FULLADDR);
 		emaddr.decompose();
 		verifyAddress(emaddr, true);
+		emaddr.decompose();
+		verifyAddress(emaddr, true);
 
 		emaddr = new com.grey.base.utils.EmailAddress(MBXPART);
+		emaddr.decompose();
+		org.junit.Assert.assertEquals(emaddr.mailbox, new com.grey.base.utils.ByteChars(MBXPART));
+		org.junit.Assert.assertEquals(0, emaddr.domain.length());
 		emaddr.decompose();
 		org.junit.Assert.assertEquals(emaddr.mailbox, new com.grey.base.utils.ByteChars(MBXPART));
 		org.junit.Assert.assertEquals(0, emaddr.domain.length());
@@ -57,52 +62,42 @@ public class EmailAddressTest
 		emaddr.parse(data);
 		verifyAddress(emaddr, false);
 
-		emaddr.reset();
 		data = setBytes(FULLADDR, 5);
 		emaddr.parse(data);
 		verifyAddress(emaddr, false);
 
-		emaddr.reset();
 		data = setBytes("  "+FULLADDR+"   ", 5);
 		emaddr.parse(data);
 		verifyAddress(emaddr, false);
 
-		emaddr.reset();
 		data = setBytes("  ", 5);
 		emaddr.parse(data);
 		verifyEmpty(emaddr);
 
-		emaddr.reset();
 		data = setBytes("", 5);
 		emaddr.parse(data);
 		verifyEmpty(emaddr);
 
-		emaddr.reset();
 		data = setBytes(" \t "+FULLADDR+".\t ", 5);
 		emaddr.parse(data);
 		verifyAddress(emaddr, false);
 
-		emaddr.reset();
 		data = setBytes("<"+FULLADDR+">", 0);
 		emaddr.parse(data);
 		verifyAddress(emaddr, false);
 
-		emaddr.reset();
 		data = setBytes("  ["+FULLADDR+"]  ", 0);
 		emaddr.parse(data);
 		verifyAddress(emaddr, false);
 
-		emaddr.reset();
 		data = setBytes("<>", 0);
 		emaddr.parse(data);
 		verifyEmpty(emaddr);
 
-		emaddr.reset();
 		data = setBytes("        <>      ", 0);
 		emaddr.parse(data);
 		verifyEmpty(emaddr);
 
-		emaddr.reset();
 		int addrlen = emaddr.full.ar_buf.length + 5;
 		StringBuilder strbuf = new StringBuilder(addrlen + 10);
 		strbuf.append(FULLADDR).append('.');
@@ -112,22 +107,52 @@ public class EmailAddressTest
 		emaddr.parse(data);
 		org.junit.Assert.assertEquals(addrstr, emaddr.full.toString());
 
-		emaddr.reset();
 		data = setBytes(FULLADDR.toUpperCase(), 5);
 		emaddr.parse(data);
 		verifyAddress(emaddr, false);
 
-		emaddr.reset();
 		addrstr = "<randomtext]";
 		data = setBytes("  "+addrstr+"  ", 5);
 		emaddr.parse(data);
 		org.junit.Assert.assertEquals(addrstr, emaddr.full.toString());
 
-		emaddr.reset();
 		addrstr = "[randomtext>";
 		data = setBytes(addrstr, 0);
 		emaddr.parse(data);
 		org.junit.Assert.assertEquals(addrstr, emaddr.full.toString());
+
+		addrstr = "mailbox-only";
+		data = setBytes(addrstr, 0);
+		emaddr.parse(data);
+		org.junit.Assert.assertEquals(addrstr, emaddr.full.toString());
+		org.junit.Assert.assertEquals(0, emaddr.mailbox.length());
+		org.junit.Assert.assertEquals(0, emaddr.domain.length());
+		emaddr.decompose();
+		org.junit.Assert.assertEquals(addrstr, emaddr.full.toString());
+		org.junit.Assert.assertEquals(addrstr, emaddr.mailbox.toString());
+		org.junit.Assert.assertEquals(0, emaddr.domain.length());
+
+		addrstr = "@domain-only";
+		data = setBytes(addrstr, 0);
+		emaddr.parse(data);
+		org.junit.Assert.assertEquals(addrstr, emaddr.full.toString());
+		org.junit.Assert.assertEquals(0, emaddr.mailbox.length());
+		org.junit.Assert.assertEquals(0, emaddr.domain.length());
+		emaddr.decompose();
+		org.junit.Assert.assertEquals(addrstr, emaddr.full.toString());
+		org.junit.Assert.assertEquals(addrstr.substring(1), emaddr.domain.toString());
+		org.junit.Assert.assertEquals(0, emaddr.mailbox.length());
+
+		addrstr = "@";
+		data = setBytes(addrstr, 0);
+		emaddr.parse(data);
+		org.junit.Assert.assertEquals(addrstr, emaddr.full.toString());
+		org.junit.Assert.assertEquals(0, emaddr.mailbox.length());
+		org.junit.Assert.assertEquals(0, emaddr.domain.length());
+		emaddr.decompose();
+		org.junit.Assert.assertEquals(addrstr, emaddr.full.toString());
+		org.junit.Assert.assertEquals(0, emaddr.mailbox.length());
+		org.junit.Assert.assertEquals(0, emaddr.domain.length());
 	}
 
 	private void verifyEmpty(EmailAddress emaddr) {
@@ -138,13 +163,13 @@ public class EmailAddressTest
 
 	private void verifyAddress(EmailAddress emaddr, boolean decomposed) {
 		org.junit.Assert.assertEquals(emaddr.full, new com.grey.base.utils.ByteChars(FULLADDR));
-		if (decomposed) {
-			org.junit.Assert.assertEquals(emaddr.mailbox, new com.grey.base.utils.ByteChars(MBXPART));
-			org.junit.Assert.assertEquals(emaddr.domain, new com.grey.base.utils.ByteChars(DOMPART));
-		} else {
+		if (!decomposed) {
 			org.junit.Assert.assertEquals(0, emaddr.mailbox.length());
 			org.junit.Assert.assertEquals(0, emaddr.domain.length());
+			emaddr.decompose();
 		}
+		org.junit.Assert.assertEquals(emaddr.mailbox, new com.grey.base.utils.ByteChars(MBXPART));
+		org.junit.Assert.assertEquals(emaddr.domain, new com.grey.base.utils.ByteChars(DOMPART));
 	}
 	
 	private com.grey.base.utils.ArrayRef<byte[]> setBytes(String txt, int off)

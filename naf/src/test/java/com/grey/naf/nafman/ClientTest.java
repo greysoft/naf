@@ -13,7 +13,7 @@ public class ClientTest
 	private static final Command.Def fakecmd1 = new Command.Def(254, "fake-cmd-1", 2, 2, false, null);
 	private static final Command.Def fakecmd2 = new Command.Def(253, "fake-cmd-2", 0, 0, true, null);
 	private static final Command.Def stopcmd = Registry.get().getCommand(Registry.CMD_STOP);
-	private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger("");
+	private static final com.grey.logging.Logger logger = com.grey.logging.Factory.getLoggerNoEx("");
 
 	@org.junit.Test
 	public void testDefs() throws com.grey.base.ConfigException
@@ -78,12 +78,12 @@ public class ClientTest
 	public void testStopMulti() throws com.grey.base.GreyException, java.io.IOException
 	{
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
-		def.name = "d1";
+		def.name = "utest_d1";
 		def.surviveHandlers = false;
 		Dispatcher dp = Dispatcher.create(def, null, logger);
-		def.name = "d2";
+		def.name = "utest_d2";
 		Dispatcher ds1 = Dispatcher.create(def, null, logger);
-		def.name = "d3";
+		def.name = "utest_d3";
 		Dispatcher ds2 = Dispatcher.create(def, null, logger);
 		dp.start();
 		ds1.start();
@@ -107,6 +107,7 @@ public class ClientTest
 	public void testCommands() throws com.grey.base.GreyException, java.io.IOException
 	{
 		DispatcherDef def = new DispatcherDef();
+		def.name = "utest_allcmds";
 		def.hasDNS = true;
 		def.surviveHandlers = false;
 		Dispatcher dsptch = Dispatcher.create(def, null, logger);
@@ -122,6 +123,10 @@ public class ClientTest
 		Client.submitCommand(null, port, reg.getCommand(Registry.CMD_APPSTOP), null, dsptch.logger); //invalid args
 		Client.submitCommand(null, port, reg.getCommand(Registry.CMD_APPSTOP), new String[]{dsptch.name, "no-such-app"}, dsptch.logger);
 		Client.submitCommand(null, port, reg.getCommand(Registry.CMD_APPSTOP), new String[]{"no-such-dispatcher", "no-such-app"}, dsptch.logger);
+		Client.submitCommand(null, port, reg.getCommand(Registry.CMD_LOGLVL), new String[]{"info"}, dsptch.logger);
+		Client.submitCommand(null, port, reg.getCommand(Registry.CMD_LOGLVL), new String[]{"badlevel"}, dsptch.logger);
+		Client.submitCommand(null, port, reg.getCommand(Registry.CMD_LOGLVL), new String[]{"badlevel2", "nosuchdispatcher"}, dsptch.logger);
+		Client.submitCommand(null, port, reg.getCommand(Registry.CMD_LOGLVL), null, dsptch.logger);
 		org.junit.Assert.assertTrue(dsptch.isRunning());
 		Client.submitCommand(null, port, reg.getCommand(Registry.CMD_STOP), null, dsptch.logger);
 		dsptch.waitStopped();

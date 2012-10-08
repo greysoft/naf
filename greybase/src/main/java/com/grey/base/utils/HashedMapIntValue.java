@@ -17,16 +17,15 @@ package com.grey.base.utils;
  * than doing the complicated dance HashedMap does with multiple state variables.
  * <p>
  * Beware that this class is single-threaded and non-reentrant.
+ * Also note that this class's iterators are not fail-fast, unlike HashedMap.
  */
 public final class HashedMapIntValue<K>
 {
 	private static final int DFLT_CAP = 64;
 	private static final float DFLT_LOADFACTOR = 0.8f;
-	private static final int BUCKETCAP_INIT = 5;  // initial bucket size
-	private static final int BUCKETCAP_INCR = 5;  // number of entries to increment a bucket by, when growing it
-	private static final byte BUCKETCAP_MAX = 127;  //physical byte-value limitation - should never actually reach this size
-	@SuppressWarnings("unchecked")
-	private final K NULLKEY = (K)new Object();
+	private static final int BUCKETCAP_INIT = 5;  //initial bucket size
+	private static final int BUCKETCAP_INCR = 5;  //number of entries to increment a bucket by, when growing it
+	private static final int BUCKETCAP_MAX = Short.MAX_VALUE;  //should never actually reach this size
 
 	private final float loadfactor;
 	private int capacity;
@@ -35,7 +34,7 @@ public final class HashedMapIntValue<K>
 
 	private K[][] keytbl;
 	private int[][] valtbl;
-	private byte[] bucketsizes;
+	private short[] bucketsizes;
 	private int entrycnt;
 
 	// recycled operators
@@ -64,158 +63,147 @@ public final class HashedMapIntValue<K>
 
 	public void clear()
 	{
-		for (int idx = keytbl.length - 1; idx != -1; idx--)
-		{
-			if (keytbl[idx] == null) continue;
-			java.util.Arrays.fill(keytbl[idx], null);
+		for (int idx = keytbl.length - 1; idx != -1; idx--) {
+			if (keytbl[idx] != null) java.util.Arrays.fill(keytbl[idx], null);
 		}
-		java.util.Arrays.fill(bucketsizes, (byte)0);
+		java.util.Arrays.fill(bucketsizes, (short)0);
 		entrycnt = 0;
 	}
 
 	public boolean containsKey(Object key)
 	{
-		if (key == null) key = NULLKEY;
-		int idx = getBucket(key);
-
-		for (int idx2 = 0; idx2 != bucketsizes[idx]; idx2++)
-		{
-			// identity test has strong possibility of avoiding the cost of equals() call
-			if (key == keytbl[idx][idx2] || key.equals(keytbl[idx][idx2])) return true;
+		if (key == null) {
+			// Null key hashes to zero
+			final K[] bucket = keytbl[0];
+			for (int idx = 0; idx != bucketsizes[0]; idx++) {
+				if (bucket[idx] == null) return true;
+			}
+		} else {
+			final int bktid = getBucket(key);
+			final K[] bucket = keytbl[bktid];
+			for (int idx = 0; idx != bucketsizes[bktid]; idx++) {
+				if (key == bucket[idx] || key.equals(bucket[idx])) return true;
+			}
 		}
 		return false;
 	}
 
 	public int get(Object key)
 	{
-		if (key == null) key = NULLKEY;
-		int idx = getBucket(key);
-
-		// considered looping backwards from bucketsizes[idx]-1, but almost twice as slow!
-		for (int idx2 = 0; idx2 != bucketsizes[idx]; idx2++)
-		{
-			if (key == keytbl[idx][idx2] || key.equals(keytbl[idx][idx2])) return valtbl[idx][idx2];
+		if (key == null) {
+			final K[] bucket = keytbl[0];
+			for (int idx = 0; idx != bucketsizes[0]; idx++) {
+				if (bucket[idx] == null) return valtbl[0][idx];
+			}
+		} else {
+			final int bktid = getBucket(key);
+			final K[] bucket = keytbl[bktid];
+			for (int idx = 0; idx != bucketsizes[bktid]; idx++) {
+				if (key == bucket[idx] || key.equals(bucket[idx])) return valtbl[bktid][idx];
+			}
 		}
 		return 0;
 	}
 
 	public int put(K key, int value)
 	{
-		if (entrycnt == threshold)
-		{
+		if (entrycnt == threshold) {
 			// It may turn out that we're replacing an existing value rather than adding a new mapping, but even that means we're infinitesmally
 			// close to exceeding the threshold, so grow the hash table now anyway.
 			capacity <<= 1;  // double the capacity
 			allocateBuckets();
 		}
-		if (key == null) key = NULLKEY;
-		int idx = getBucket(key);
+		final int idx = (key == null ? 0 : getBucket(key));
+		final int bktsiz = bucketsizes[idx];
+		K[] bucket = keytbl[idx];
 		int idx2 = 0;
 
-		if (keytbl[idx] == null)
-		{
-			growBucket(idx);
-		}
-		else
-		{
-			while (idx2 != bucketsizes[idx])
-			{
-				if (key == keytbl[idx][idx2] || key.equals(keytbl[idx][idx2])) break;
-				idx2++;
+		if (bucket == null) {
+			bucket = growBucket(idx);
+		} else {
+			if (key == null) {
+				while (idx2 != bktsiz) {
+					if (bucket[idx2] == null) break;
+					idx2++;
+				}
+			} else {
+				while (idx2 != bktsiz) {
+					if (key.equals(bucket[idx2])) break;
+					idx2++;
+				}
 			}
 			
-			if (idx2 == keytbl[idx].length)
-			{
-				if (idx2 == BUCKETCAP_MAX)
-				{
+			if (idx2 == bucket.length) {
+				if (idx2 == BUCKETCAP_MAX) {
 					capacity <<= 1;
 					allocateBuckets();
 					return put(key, value);
 				}
-				growBucket(idx);
+				bucket = growBucket(idx);
 			}
 		}
 		int oldvalue = 0;
 
-		if (idx2 == bucketsizes[idx])
-		{
+		if (idx2 == bktsiz) {
+			bucket[idx2] = key;
 			entrycnt++;
 			bucketsizes[idx]++;
-		}
-		else
-		{
+		} else {
 			oldvalue = valtbl[idx][idx2];
 		}
-		keytbl[idx][idx2] = key;
 		valtbl[idx][idx2] = value;
 		return oldvalue;
 	}
 
 	public int remove(Object key)
 	{
-		if (key == null) key = NULLKEY;
-		int idx = getBucket(key);
-		int bktsiz = bucketsizes[idx];
+		final int idx = (key == null ? 0 : getBucket(key));
+		final K[] bucket = keytbl[idx];
+		final int bktsiz = bucketsizes[idx];
+		int slot = -1;
 
-		for (int idx2 = 0; idx2 != bktsiz; idx2++)
-		{
-			if (key == keytbl[idx][idx2] || key.equals(keytbl[idx][idx2]))
-			{
-				int oldvalue = valtbl[idx][idx2];
-
-				if (idx2 != bktsiz - 1)
-				{
-					keytbl[idx][idx2] = keytbl[idx][bktsiz - 1];
-					valtbl[idx][idx2] = valtbl[idx][bktsiz - 1];
+		if (key == null) {
+			for (int idx2 = 0; idx2 != bktsiz; idx2++) {
+				if (bucket[idx2] == null) {
+					slot = idx2;
+					break;
 				}
-				keytbl[idx][bktsiz - 1] = null;
-				bucketsizes[idx]--;
-				entrycnt--;
-				return oldvalue;
+			}
+		} else {
+			for (int idx2 = 0; idx2 != bktsiz; idx2++) {
+				if (key.equals(bucket[idx2])) {
+					slot = idx2;
+					break;
+				}
 			}
 		}
-		return 0;
+		if (slot == -1) return 0;
+
+		// Shorten this bucket by swapping final entry into the slot we're now vacating.
+		int oldval = valtbl[idx][slot];
+		if (slot != bktsiz - 1) {
+			bucket[slot] = bucket[bktsiz - 1];
+			valtbl[idx][slot] = valtbl[idx][bktsiz - 1];
+		}
+		bucket[bktsiz - 1] = null;
+		bucketsizes[idx]--;
+		entrycnt--;
+		return oldval;
 	}
 
 	public boolean containsValue(int val)
 	{
-		for (int idx = keytbl.length - 1; idx != -1; idx--)
-		{
-			for (int idx2 = bucketsizes[idx] - 1; idx2 != -1; idx2--)
-			{
+		for (int idx = keytbl.length - 1; idx != -1; idx--) {
+			for (int idx2 = bucketsizes[idx] - 1; idx2 != -1; idx2--) {
 				if (val == valtbl[idx][idx2]) return true;
 			}
 		}
 		return false;
 	}
 
-	@Override
-	public String toString()
+	private int getBucket(Object key)
 	{
-		StringBuilder sb = new StringBuilder(size() * 5);
-		sb.append(getClass().getName()).append('=').append(size()).append(" {");
-		String dlm = "";
-		java.util.Iterator<K> it = keysIterator();
-		while (it.hasNext()) {
-			K key = it.next();
-			sb.append(dlm).append(key).append('=').append(get(key));
-			dlm = ", ";
-		}
-		sb.append("}");
-		return sb.toString();
-	}
-	
-	public int trimToSize()
-	{
-		int newcap = 1;
-		while (((int)(newcap * loadfactor)) <= entrycnt) newcap <<= 1;
-	
-		if (newcap != capacity)
-		{
-			capacity = newcap;
-			allocateBuckets();
-		}
-		return capacity;
+		return key.hashCode() & hashmask;
 	}
 
 	private void allocateBuckets()
@@ -224,60 +212,74 @@ public final class HashedMapIntValue<K>
 		hashmask = capacity - 1;
 		entrycnt = 0;
 
-		K[][] oldkeys = keytbl;
-		int[][] oldvals = valtbl;
-		byte[] oldsizes = bucketsizes;
-		bucketsizes = new byte[capacity];
-		valtbl = new int[capacity][];
+		final K[][] oldkeys = keytbl;
+		final int[][] oldvals = valtbl;
+		final short[] oldsizes = bucketsizes;
 		@SuppressWarnings("unchecked")
-		K[][] uncheckedbuf = (K[][])new Object[capacity][];
+		final K[][] uncheckedbuf = (K[][])new Object[capacity][];
 		keytbl = uncheckedbuf;
+		valtbl = new int[capacity][];
+		bucketsizes = new short[capacity];
 
-		if (oldkeys != null)
-		{
-			for (int idx = 0; idx != oldkeys.length; idx++)
-			{
-				for (int idx2 = 0; idx2 != oldsizes[idx]; idx2++)
-				{
+		if (oldkeys != null) {
+			for (int idx = 0; idx != oldkeys.length; idx++) {
+				for (int idx2 = 0; idx2 != oldsizes[idx]; idx2++) {
 					put(oldkeys[idx][idx2], oldvals[idx][idx2]);
 				}
 			}
 		}
 	}
 
-	private void growBucket(int idx)
+	private K[] growBucket(int bktid)
 	{
-		K[] oldkeys = keytbl[idx];
-		int[] oldvals = valtbl[idx];
-		int newsiz = (keytbl[idx] == null ? BUCKETCAP_INIT : keytbl[idx].length + BUCKETCAP_INCR);
+		final K[] oldkeys = keytbl[bktid];
+		final int[] oldvals = valtbl[bktid];
+		int newsiz = (keytbl[bktid] == null ? BUCKETCAP_INIT : keytbl[bktid].length + BUCKETCAP_INCR);
 		if (newsiz > BUCKETCAP_MAX) newsiz = BUCKETCAP_MAX;
 
-		valtbl[idx] = new int[newsiz];
+		valtbl[bktid] = new int[newsiz];
 		@SuppressWarnings("unchecked")
-		K[] uncheckedbuf = (K[])new Object[newsiz];
-		keytbl[idx] = uncheckedbuf;
+		final K[] uncheckedbuf = (K[])new Object[newsiz];
+		keytbl[bktid] = uncheckedbuf;
 
-		if (oldkeys != null)
-		{
-			System.arraycopy(oldkeys, 0, keytbl[idx], 0, oldkeys.length);
-			System.arraycopy(oldvals, 0, valtbl[idx], 0, oldvals.length);
+		if (oldkeys != null) {
+			System.arraycopy(oldkeys, 0, keytbl[bktid], 0, oldkeys.length);
+			System.arraycopy(oldvals, 0, valtbl[bktid], 0, oldvals.length);
 		}
+		return keytbl[bktid];
+	}
+	
+	public int trimToSize()
+	{
+		int newcap = 1;
+		while (((int)(newcap * loadfactor)) <= entrycnt) newcap <<= 1;
+	
+		if (newcap != capacity) {
+			capacity = newcap;
+			allocateBuckets();
+		}
+		return capacity;
 	}
 
-	private int getBucket(Object key)
+	@Override
+	public String toString()
 	{
-		return key.hashCode() & hashmask;
+		StringBuilder sb = new StringBuilder(size() * 5);
+		sb.append(getClass().getName()).append('=').append(size()).append(" {");
+		String dlm = "";
+		for (int idx = 0; idx != keytbl.length; idx++) {
+			for (int idx2 = 0; idx2 != bucketsizes[idx]; idx2++) {
+				sb.append(dlm).append(keytbl[idx][idx2]).append('=').append(valtbl[idx][idx2]);
+				dlm = ", ";
+			}
+		}
+		sb.append("}");
+		return sb.toString();
 	}
 
-	private K mapNullKey(K key)
+	public String getBucketStats(boolean printstats, int mincolls)
 	{
-		if (key == NULLKEY) return null;
-		return key;
-	}
-
-	public byte[] getBucketStats(boolean printstats, int mincolls)
-	{
-		return HashedMap.getBucketStats(size(), bucketsizes, printstats, mincolls);  // NB: bucketsizes.length is equal to this.capacity
+		return HashedMap.getStats(size(), bucketsizes);
 	}
 
 
@@ -308,6 +310,11 @@ public final class HashedMapIntValue<K>
 		return values_iterator;
 	}
 
+	// provide access to private members for the inner classes
+	K getMapKey(int id, int slot) {return keytbl[id][slot];}
+	int getMapValue(int id, int slot) {return valtbl[id][slot];}
+	short getBucketSize(int id) {return bucketsizes[id];};
+
 	/*
 	 * ===================================================================================================================
 	 * These inner classes all exist purely to support the required Collections views of this map.
@@ -315,73 +322,65 @@ public final class HashedMapIntValue<K>
 	 */
 
 	private final class KeysIterator
-		extends CollectionIterator
+		extends MapIterator
 		implements java.util.Iterator<K>
 	{
 		@Override
-		public K next() {moveNext(); return mapNullKey(keytbl[bktid][bktslot]);}
+		public K next() {setNext(); return getMapKey(bktid, bktslot);}
 	}
 
 	private final class ValuesIterator
-		extends CollectionIterator
+		extends MapIterator
 		implements IteratorInt
 	{
 		@Override
-		public int next() {moveNext(); return valtbl[bktid][bktslot];}
+		public int next() {setNext(); return getMapValue(bktid, bktslot);}
 	}
 
-
-	private class CollectionIterator
+	private abstract class MapIterator
 	{
-		int bktid = -1;  	// current index within bucket array
-		int bktslot;	// current index within current bucket
+		protected int bktid;
+		protected int bktslot;
 		private int next_bktid;
 		private int next_bktslot;
 
-		public CollectionIterator() {reset();}
+		MapIterator() {reset();}
 
 		final void reset()
 		{
+			next_bktid = 0;
+			next_bktslot = -1;
 			bktid = -1;
-			findNext();
+			moveNext();
 		}
 
 		public final boolean hasNext()
 		{
-			return (next_bktid < capacity);
+			return (next_bktid != bucketCount());
 		}
 
-		public final void remove()
-		{
-			HashedMapIntValue.this.remove(keytbl[bktid][bktslot]);
-			if (next_bktid == bktid) next_bktslot = bktslot;  // the remove() will have shifted final entry into current slot, so stay where we are
-			bktslot = -1; // invalidate current position
-		}
-
-		final void moveNext()
+		public void setNext()
 		{
 			if (!hasNext()) throw new java.util.NoSuchElementException();
 			bktid = next_bktid;
 			bktslot = next_bktslot;
-			findNext();
+			moveNext();
 		}
 
-		private final void findNext()
+		public final void remove()
 		{
-			if (bktid == -1)
-			{
-				// at start of iteration
-				next_bktid = 0;
-				next_bktslot = 0;
-			}
-			else
-			{
-				next_bktslot++;	
-			}
+			if (bktid == -1) throw new IllegalStateException();
+			HashedMapIntValue.this.remove(getMapKey(bktid, bktslot));
+			if (next_bktid == bktid) next_bktslot = bktslot; //remove() shifted final entry into current slot, so stay where we are
+			bktid = -1;
+		}
 
-			while (next_bktslot >= bucketsizes[next_bktid])
-			{
-				if (++next_bktid == capacity) break;
+		private final void moveNext()
+		{
+			if (++next_bktslot == getBucketSize(next_bktid)) {
+				while (++next_bktid != bucketCount()) {
+					if (getBucketSize(next_bktid) != 0) break;
+				}
 				next_bktslot = 0;
 			}
 		}

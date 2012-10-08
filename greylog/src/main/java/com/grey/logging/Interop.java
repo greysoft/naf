@@ -4,28 +4,10 @@
  */
 package com.grey.logging;
 
+import com.grey.logging.Logger.LEVEL;
+
 public class Interop
 {
-	public enum LEVEL {OFF, ERR, WARN, INFO, TRC, TRC2, TRC3, TRC4, TRC5, ALL}
-
-	public static final String SYSPROP_LOGSDIR = "grey.logger.dir";
-	public static final String TOKEN_LOGSDIR = "%DIRLOG%";
-
-	// invent 2 extra JUL levels to support mapLevel(LEVEL)
-	public static class LevelJUL extends java.util.logging.Level
-	{
-		private static final long serialVersionUID = 1L;
-		public LevelJUL(String name, int val) {super(name, val);}
-	}
-	public static final java.util.logging.Level JULTRC4 = new LevelJUL("GREYTRC4", java.util.logging.Level.FINEST.intValue()-1);
-	public static final java.util.logging.Level JULTRC5 = new LevelJUL("GREYTRC5", java.util.logging.Level.ALL.intValue()+1);
-
-	public interface SupportsLEVEL
-	{
-		public LEVEL getLevel();
-		public LEVEL setLevel(LEVEL newlvl);
-	}
-
 	public static boolean isActive(LEVEL logger, LEVEL msg)
 	{
 		if (logger == LEVEL.OFF || msg == LEVEL.OFF) return false;
@@ -64,12 +46,6 @@ public class Interop
 		return LEVEL.OFF;
 	}
 
-	public static LEVEL getLevel(Object log)
-	{
-		if (log instanceof SupportsLEVEL) return ((SupportsLEVEL)log).getLevel();
-		throw new UnsupportedOperationException("Object="+log.getClass()+" does not support GreyLog levels");
-	}
-
 	public static LEVEL mapLevel(java.util.logging.Level jul_lvl)
 	{
 		int lvl = jul_lvl.intValue();
@@ -81,8 +57,7 @@ public class Interop
 		if (lvl >= java.util.logging.Level.FINE.intValue()) return LEVEL.TRC;
 		if (lvl >= java.util.logging.Level.FINER.intValue()) return LEVEL.TRC2;
 		if (lvl >= java.util.logging.Level.FINEST.intValue()) return LEVEL.TRC3;
-		if (lvl >= JULTRC4.intValue()) return LEVEL.TRC4;
-		return LEVEL.TRC5;
+		return LEVEL.TRC4;
 	}
 
 	public static java.util.logging.Level mapLevel(LEVEL lvl)
@@ -96,12 +71,8 @@ public class Interop
 			case INFO: return java.util.logging.Level.INFO;
 			case TRC: return java.util.logging.Level.FINE;
 			case TRC2: return java.util.logging.Level.FINER;
-			case TRC3: return java.util.logging.Level.FINEST;
-			case TRC4: return JULTRC4;
-			case TRC5: return JULTRC5;
+			default: return java.util.logging.Level.FINEST;
 		}
-		// it's clearly not the lvl argument that's invalid, it's this method that's missing a case
-		throw new RuntimeException("Missing handler for GreyLog Level="+lvl);
 	}
 
 	// there will be a Level set somewhere up the Logger hierarchy

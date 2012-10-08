@@ -112,7 +112,12 @@ public class PkgInfo
 		java.security.CodeSource codesrc = protdom.getCodeSource();
 		strm.println("CodeLocation:"+codesrc.getLocation()+"\n\t"+clssld.getResource(clss.getCanonicalName()));
 		strm.println("AbsDir: "+new java.io.File(".").getAbsolutePath());
-		try {strm.println("CanonPath: "+new java.io.File(".").getCanonicalPath());} catch (java.io.IOException ex)  {}
+		try {
+			String path = new java.io.File(".").getCanonicalPath();
+			strm.println("CanonPath: "+path);
+		} catch (Exception ex) {
+			strm.println("Failed to obtain CanonicalPath of current dir - "+com.grey.base.GreyException.summary(ex));
+		}
 		strm.println("java.class.path: "+System.getProperty("java.class.path"));
 		strm.println("user.home: "+System.getProperty("user.home"));
 		strm.println("Directory: "+new java.io.File(".").getAbsolutePath());

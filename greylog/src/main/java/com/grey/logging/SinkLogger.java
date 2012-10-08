@@ -4,8 +4,6 @@
  */
 package com.grey.logging;
 
-import com.grey.logging.Interop.LEVEL;
-
 /** Null logger which discards all the messages passed to it.
  */
 public class SinkLogger

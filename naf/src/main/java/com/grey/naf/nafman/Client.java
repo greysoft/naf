@@ -10,7 +10,7 @@ import com.grey.base.utils.StringOps;
 public final class Client
 {
 	// Null host arg means localhost
-	public static String submitCommand(String host, int port, Command.Def def, String[] args, org.slf4j.Logger log) throws java.io.IOException
+	public static String submitCommand(String host, int port, Command.Def def, String[] args, com.grey.logging.Logger log) throws java.io.IOException
 	{
 		//serialise the args - if any
 		StringBuilder xmit_args = new StringBuilder();
@@ -45,7 +45,7 @@ public final class Client
 		return response.toString(StringOps.DFLT_CHARSET);
 	}
 
-	public static String submitCommand(String hostport, Command.Def def, String[] args, org.slf4j.Logger log) throws java.io.IOException
+	public static String submitCommand(String hostport, Command.Def def, String[] args, com.grey.logging.Logger log) throws java.io.IOException
 	{
 		int pos = hostport.indexOf(':');
 		String host = (pos == -1 ? null : hostport.substring(0, pos));
@@ -53,7 +53,7 @@ public final class Client
 		return submitCommand(host, Integer.parseInt(port), def, args, log);
 	}
 
-	public static String submitLocalCommand(String cfgfile, Command.Def def, String[] args, org.slf4j.Logger log)
+	public static String submitLocalCommand(String cfgfile, Command.Def def, String[] args, com.grey.logging.Logger log)
 			throws com.grey.base.ConfigException, java.io.IOException
 	{
 		com.grey.naf.Config nafcfg = com.grey.naf.Config.load(cfgfile);
@@ -61,7 +61,7 @@ public final class Client
 		return submitCommand(null, port, def, args, log);
 	}
 
-	public static Command.Def parseCommand(String cmdname, int argc, boolean lenient, org.slf4j.Logger log)
+	public static Command.Def parseCommand(String cmdname, int argc, boolean lenient, com.grey.logging.Logger log)
 	{
 		StringBuilder sb = new StringBuilder();
 		Command.Def def = Registry.get().getCommand(cmdname, sb);
@@ -71,12 +71,12 @@ public final class Client
 				int code = 0;
 				try {
 					code = Integer.parseInt(cmdname);
-				} catch (Exception ex) {
-					//code=0 will fail, but it allows us to test the NAFMAN agent's error-handling
+				} catch (NumberFormatException ex) {
+					//code=0 will fail, but it allows us to probe the NAFMAN agent's error-handling
 				}
 				def = new Command.Def(code, cmdname, 0, 100, false, null);
 			} else {
-				log(log, "ERROR:\n"+sb.toString());
+				log(log, "ERROR:\n"+sb);
 			}
 			return def;
 		}
@@ -85,12 +85,12 @@ public final class Client
 
 		if (sb != null && !lenient) {
 			def = null;
-			log(log, sb.toString());
+			log(log, sb);
 		}
 		return def;
 	}
 
-	private static void log(org.slf4j.Logger logger, String msg)
+	private static void log(com.grey.logging.Logger logger, CharSequence msg)
 	{
 		if (logger == null) {
 			System.out.println(msg);

@@ -361,7 +361,8 @@ public class ByteCharsTest
 		String src = "ABCDE";
 		CharSequence src_seq1 = src.subSequence(0, src.length());
 		CharSequence src_seq2 = src.subSequence(1, src.length() - 1);
-		org.junit.Assert.assertEquals(src_seq1.toString(), src);
+		org.junit.Assert.assertEquals(src, src_seq1.toString());
+		org.junit.Assert.assertEquals(src.subSequence(1, src.length()-1), src_seq2.toString());
 		org.junit.Assert.assertEquals(src_seq1.length(), src_seq2.length() + 2);
 		ByteChars ah = new ByteChars(src);
 

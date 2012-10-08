@@ -28,7 +28,7 @@ public class Relay
 		try {
 			server.connect(remote_addr);
 		} catch (Exception ex) {
-			client.dsptch.logger.debug("Failed to connect to "+remote_addr.sockaddr+" - "+com.grey.base.GreyException.summary(ex));
+			client.dsptch.logger.trace("Failed to connect to "+remote_addr.sockaddr+" - "+com.grey.base.GreyException.summary(ex));
 			serverDisconnected();
 			return;
 		}

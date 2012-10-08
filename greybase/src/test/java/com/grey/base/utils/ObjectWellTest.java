@@ -27,7 +27,7 @@ public class ObjectWellTest
 	public void defaultWells()
 	{
 		createcnt = 0;
-		ObjectWell<WellObject> well = new ObjectWell<WellObject>(this);
+		ObjectWell<WellObject> well = new ObjectWell<WellObject>(this, "utest_defaults");
 		org.junit.Assert.assertEquals(0, well.size());
 		org.junit.Assert.assertEquals(0, well.population());
 		org.junit.Assert.assertEquals(0, well.maxPopulation());
@@ -66,8 +66,9 @@ public class ObjectWellTest
 		well.bulkStore(extracts);
 		org.junit.Assert.assertEquals(prevpop, well.population());
 		org.junit.Assert.assertEquals(well.population(), well.size());
-		well.extract();
-		well.extract();
+		extracts.clear();
+		extracts.add(well.extract());
+		extracts.add(well.extract());
 		org.junit.Assert.assertEquals(prevpop, well.population());
 		org.junit.Assert.assertEquals(prevpop-2, well.size());
 		int delta = well.clear(prevpop + 2);
@@ -96,10 +97,11 @@ public class ObjectWellTest
 		org.junit.Assert.assertEquals(0, delta);
 		org.junit.Assert.assertEquals(2, well.population());
 		org.junit.Assert.assertEquals(0, well.size());
+		well.bulkStore(extracts);
 
 		// Now test the other default ObjectWell constructor, which uses the template objects' default constructor
 		// rather than a factory
-		ObjectWell<String> well2 = new ObjectWell<String>(String.class);
+		ObjectWell<String> well2 = new ObjectWell<String>(String.class, "utest_defaults2");
 		org.junit.Assert.assertEquals(0, well2.size());
 		org.junit.Assert.assertEquals(0, well2.population());
 		org.junit.Assert.assertEquals(0, well2.maxPopulation());
@@ -108,6 +110,7 @@ public class ObjectWellTest
 		org.junit.Assert.assertEquals(well2.population() - 1, well2.size());
 		org.junit.Assert.assertEquals(0, well2.maxPopulation());
 		org.junit.Assert.assertEquals(0, str.length());
+		well2.store(str);
 	}
 
 	@org.junit.Test
@@ -117,7 +120,7 @@ public class ObjectWellTest
 		int initpop = 5;
 		int incr = 2;
 		int maxpop = 9;
-		ObjectWell<WellObject> well = new ObjectWell<WellObject>(null, this, initpop, maxpop, incr);
+		ObjectWell<WellObject> well = new ObjectWell<WellObject>(null, this, "utest_limits", initpop, maxpop, incr);
 		org.junit.Assert.assertEquals(initpop, createcnt);
 		org.junit.Assert.assertEquals(initpop, well.population());
 		org.junit.Assert.assertEquals(initpop, well.size());
@@ -165,7 +168,7 @@ public class ObjectWellTest
 		initpop = 7;
 		incr = 2;
 		maxpop = 8;
-		well = new ObjectWell<WellObject>(null, this, initpop, maxpop, incr);
+		well = new ObjectWell<WellObject>(null, this, "utest_limits2", initpop, maxpop, incr);
 		org.junit.Assert.assertEquals(initpop, createcnt);
 		org.junit.Assert.assertEquals(initpop, well.population());
 		org.junit.Assert.assertEquals(initpop, well.size());

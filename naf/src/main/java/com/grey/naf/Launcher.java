@@ -132,7 +132,7 @@ public class Launcher
 		}
 		System.out.println("Loading NAF config file: "+baseOptions.cfgpath+" => "+new java.io.File(baseOptions.cfgpath).getCanonicalPath());
 		com.grey.naf.Config nafcfg = com.grey.naf.Config.load(baseOptions.cfgpath);
-		org.slf4j.Logger bootlog = org.slf4j.LoggerFactory.getLogger(baseOptions.logname);
+		com.grey.logging.Logger bootlog = com.grey.logging.Factory.getLogger(baseOptions.logname);
 		bootlog.info("Created NAF Boot Logger");
 		nafcfg.announce(bootlog);
 		com.grey.naf.reactor.Dispatcher[] dispatchers;
@@ -164,7 +164,7 @@ public class Launcher
 		String[] cmdargs = new String[argc];
 		for (int idx = param1; idx != cmdlineArgs.length; idx++) cmdargs[idx - param1] = cmdlineArgs[idx];
 
-		org.slf4j.Logger log = (baseOptions.isFlagSet(F_QUIET) ? org.slf4j.LoggerFactory.getLogger("no-such-logger") : null);
+		com.grey.logging.Logger log = (baseOptions.isFlagSet(F_QUIET) ? com.grey.logging.Factory.getLogger("no-such-logger") : null);
 		String rsp;
 		if (baseOptions.hostport != null) {
 			rsp = com.grey.naf.nafman.Client.submitCommand(baseOptions.hostport, def, cmdargs, log);

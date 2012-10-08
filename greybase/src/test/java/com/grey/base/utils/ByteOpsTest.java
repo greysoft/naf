@@ -138,15 +138,15 @@ public class ByteOpsTest
 	public void index()
 	{
 		byte[] arr = new byte[]{1, 0, (byte)200};
-		org.junit.Assert.assertEquals(0, ByteOps.indexOf(arr, 0, (byte)1));
-		org.junit.Assert.assertEquals(1, ByteOps.indexOf(arr, 0, (byte)0));
-		org.junit.Assert.assertEquals(2, ByteOps.indexOf(arr, 0, (byte)200));
-		org.junit.Assert.assertEquals(-1, ByteOps.indexOf(arr, 0, (byte)3));
+		org.junit.Assert.assertEquals(0, ByteOps.indexOf(arr, (byte)1));
+		org.junit.Assert.assertEquals(1, ByteOps.indexOf(arr, (byte)0));
+		org.junit.Assert.assertEquals(2, ByteOps.indexOf(arr, (byte)200));
+		org.junit.Assert.assertEquals(-1, ByteOps.indexOf(arr, (byte)3));
 		// with offsets
-		org.junit.Assert.assertEquals(1, ByteOps.indexOf(arr, 1, (byte)0));
-		org.junit.Assert.assertEquals(-1, ByteOps.indexOf(arr, 2, (byte)0));
-		org.junit.Assert.assertEquals(2, ByteOps.indexOf(arr, 1, (byte)200));
-		org.junit.Assert.assertEquals(2, ByteOps.indexOf(arr, 2, (byte)200));
+		org.junit.Assert.assertEquals(1, ByteOps.indexOf(arr, 1, arr.length - 1, (byte)0));
+		org.junit.Assert.assertEquals(-1, ByteOps.indexOf(arr, 2, arr.length - 2, (byte)0));
+		org.junit.Assert.assertEquals(2, ByteOps.indexOf(arr, 1, arr.length - 1, (byte)200));
+		org.junit.Assert.assertEquals(2, ByteOps.indexOf(arr, 2, arr.length - 2, (byte)200));
 	}
 
 	@org.junit.Test

@@ -9,7 +9,7 @@ import com.grey.base.config.SysProps;
 public class DynLoader
 {
 	// classpath is delimited by standard OS separator, eg ":" on UNIX, "," on Windows
-	static public final String CPDLM = SysProps.get("grey.path.separator", SysProps.PathSep);
+	static public final String CPDLM = SysProps.get("grey.path.separator", ":");
 	static public final String SYSPROP_CLDHACK = "grey.classloader.hack";
 
 	// Note that the naive Class.forName(classname) uses the class loader that loaded the current class (probably the system classloader),

@@ -38,15 +38,17 @@ public final class Registry
 	public static final int CMD_APPSTOP = 6;
 	public static final int CMD_SHOWCMDS = 7;
 	public static final int CMD_FLUSH = 8;
+	public static final int CMD_LOGLVL = 9;
 	public static final int CMD_NAFRESERVED = 100; //commands 1-99 are reserved for NAF
 
 	private static final Command.Def[] nafcmds = new Command.Def[] {
 		new Command.Def(CMD_STOP, "stop", 0, 1, true, null),
 		new Command.Def(CMD_DLIST, "dsplist", 0, 0, false, null),
 		new Command.Def(CMD_DSHOW, "dspshow", 0, 1, true, null),
-		new Command.Def(CMD_FLUSH, "flush", 0, 1, true, null),
 		new Command.Def(CMD_SHOWCMDS, "showcmds", 0, 1, true, null),
 		new Command.Def(CMD_APPSTOP, "appstop", 2, 2, true, "naflet-name"),
+		new Command.Def(CMD_FLUSH, "flush", 0, 1, true, null),
+		new Command.Def(CMD_LOGLVL, "loglevel", 1, 2, false, "level [dispatcher-name]"),
 		new Command.Def(CMD_DNSDUMP, "dnsdump", 0, 1, true, null),
 		new Command.Def(CMD_DNSPRUNE, "dnsprune", 0, 1, true, null)
 	};

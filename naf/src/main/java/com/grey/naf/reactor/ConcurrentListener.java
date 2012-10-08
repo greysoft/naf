@@ -4,6 +4,8 @@
  */
 package com.grey.naf.reactor;
 
+import com.grey.logging.Logger.LEVEL;
+
 public final class ConcurrentListener
 	extends Listener
 {
@@ -26,7 +28,7 @@ public final class ConcurrentListener
 		public boolean stopServer() {return false;}
 	}
 
-	private final Server protoServer;  // connection handler spawned by this Listener (so Listener is responsible for it)
+	private final Server protoServer;  //prototype object used to create actual connection handlers
 	private final Class<?> serverType;
 	private final com.grey.base.utils.HashedSet<Server> activeservers = new com.grey.base.utils.HashedSet<Server>();
 	private final com.grey.base.utils.ObjectWell<Server> spareservers;
@@ -70,7 +72,8 @@ public final class ConcurrentListener
 			srvincr = cfg.getInt("@incrservers", false, srvincr);
 		}
 		com.grey.base.utils.PrototypeFactory fact = new com.grey.base.utils.PrototypeFactory(protoServer);
-		spareservers = new com.grey.base.utils.ObjectWell<Server>(protoServer.getClass(), fact, srvmin, srvmax, srvincr);
+		spareservers = new com.grey.base.utils.ObjectWell<Server>(protoServer.getClass(), fact,
+				"Listener_"+name+":"+srvport+"_Servers", srvmin, srvmax, srvincr);
 
 		log.info("Listener="+name+": Server is "+protoServer.getClass().getName()
 				+" - init/max/incr="+spareservers.size()+"/"+srvmax+"/"+srvincr);
@@ -93,7 +96,6 @@ public final class ConcurrentListener
 	protected void listenerStopped()
 	{
 		protoServer.stopServer();
-		spareservers.clear();
 	}
 
 	@Override
@@ -120,7 +122,7 @@ public final class ConcurrentListener
 			try {
 				handleConnection(connsock);
 			} catch (Throwable ex) {
-				log.info("Listener="+name+": Error fielding connection", ex);
+				log.log(LEVEL.TRC, ex, true, "Listener="+name+": Error fielding connection");
 			}
 		}
 	}

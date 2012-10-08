@@ -14,6 +14,11 @@ public class FileOps
 	public static final String URLPFX_FILE = "file:";
 	protected static final int RDBUFSIZ = SysProps.get("grey.fileio.rdbufsiz", 1024); //min buffer for unknown stream size
 
+	public interface LineReader
+	{
+		public boolean processLine(String line, int line_number, int mode, Object cbdata) throws Exception;
+	}
+
 	public static class Filter_EndsWith implements java.io.FileFilter
 	{
 		private final String sfx;
@@ -27,6 +32,7 @@ public class FileOps
 			allowdirs = dirs;
 		}
 
+		@Override
 		public boolean accept(java.io.File fh)
 		{
 			if (allowdirs && fh.isDirectory()) return true;
@@ -201,20 +207,51 @@ public class FileOps
 		}
 	}
 
+	public static int readTextLines(java.io.InputStream strm, LineReader consumer, int mode, Object cbdata) throws java.io.IOException
+	{
+		java.io.InputStreamReader cstrm = new java.io.InputStreamReader(strm);
+		java.io.BufferedReader bstrm = new java.io.BufferedReader(cstrm);
+		int lno = 0;
+		String line;
+		try {
+			while ((line = bstrm.readLine()) != null) {
+				try {
+					if (consumer.processLine(line, ++lno, mode, cbdata)) break;
+				} catch (Exception ex) {
+					throw new RuntimeException("LineReader callback failed on line="+lno+": "+line, ex);
+				}
+			}
+		} finally {
+			bstrm.close();
+		}
+		return lno;
+	}
+
+	public static int readTextLines(java.io.File fh, LineReader consumer, int mode, Object cbdata) throws java.io.IOException
+	{
+		java.io.InputStream strm = new java.io.FileInputStream(fh);
+		return readTextLines(strm, consumer, mode, cbdata);
+	}
+
+	public static int readTextLines(java.net.URL path, LineReader consumer, int mode, Object cbdata) throws java.io.IOException
+	{
+		java.io.InputStream strm = path.openStream();
+		return readTextLines(strm, consumer, mode, cbdata);
+	}
+
 	public static long copyFile(java.io.File srcfile, java.io.File dstfile) throws java.io.IOException
 	{
-		java.io.FileInputStream fin = null;
+		java.io.FileInputStream fin = new java.io.FileInputStream(srcfile);
 		java.io.FileOutputStream fout = null;
 		long nbytes = 0;
 
 		try {
-			fin = new java.io.FileInputStream(srcfile);
 			fout = new java.io.FileOutputStream(dstfile);
 			java.nio.channels.FileChannel inchan = fin.getChannel();
 			java.nio.channels.FileChannel outchan = fout.getChannel();
 			nbytes = outchan.transferFrom(inchan, 0, inchan.size());
 		} finally {
-			if (fin != null) try {fin.close();} catch (Exception ex) {}
+			try {fin.close();} catch (Exception ex) {}
 			if (fout != null) try {fout.close();} catch (Exception ex) {}
 		}
 		return nbytes;

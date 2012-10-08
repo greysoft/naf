@@ -9,7 +9,7 @@
 <div class="menu">
 <p>
 Programmer's Guide<br/>
-GreyLog v1.2.0
+GreyLog v1.3.0
 </p>
 <hr class="mline"/>
 <p>
@@ -19,7 +19,10 @@ GreyLog v1.2.0
 <a href="#config">2&nbsp;-&nbsp;Configuration</a>
 </p>
 <p>
-<a href="#slf4j">3&nbsp;-&nbsp;SLF4J&nbsp;Binding</a>
+<a href="#extmap">3&nbsp;-&nbsp;Foreign&nbsp;Mappings</a>
+</p>
+<p>
+<a href="#slf4j">4&nbsp;-&nbsp;Foreign&nbsp;Bindings</a>
 </p>
 <p>
 <a href="../../NOTICE.txt">COPYRIGHT</a>
@@ -58,20 +61,27 @@ Java package.
 <br/> <br/>
 GreyLog differs from
 <span class="softname">Log4j12</span>, <span class="softname">JUL</span> (<code>java.util.logging</code>)
-and other logging frameworks, in that its loggers really are logfile streams, and not merely formatting handlers which cascade into a single actual logger.
+and other logging frameworks, in that its loggers really are logfile streams, and not merely formatting handlers that cascade into a single actual logger.
 This means that care has to be taken when instantiating GreyLog loggers via
-<span class="softname">SLF4J</span>.
+external interfaces such as
+<span class="softname">SLF4J</span>
+or
+<span class="softname">JCL</span> (Apache Commons Logging).
 <br/>
-SLF4J and <span class="softname">JCL</span> (Apache Commons Logging)
-are biased towards Log4j12 and JUL, and developers typically expect to call
-<code>org.slf4j.LoggerFactory.getLogger(name)</code>
-(or the JCL equivalent) in every module, using a different name each time, without actually creating multiple I/O streams.
+SLF4J and JCL are biased towards Log4j12 and JUL, and developers typically expect to call
+<code>org.slf4j.LoggerFactory.getLogger()</code>
+or
+<code>org.apache.commons.logging.LogFactory.getLog()</code>
+in every module, using a different name each time, without actually creating multiple I/O streams.
 <br/>
-In the case of GreyLog, this would result in multiple logfile streams which is probably not what you intended, so the required loggers need to be created in one place and then made available.
+In the case of GreyLog, this would result in multiple logfile streams which is probably not what you intended, so the required loggers need to be created in one place and then made available (as is the case with the
+<code>Dispatcher.logger</code>
+field provided by NAF).
 <br/> <br/>
 GreyLog is part of the
 <span class="softname">NAF</span>
-suite, but it has no dependency on NAF's reactor core and is suitable for use by non-NAF applications - whether invoked directly or via its SLF4J adapter.
+suite, but it has no dependency on NAF's reactor core and is suitable for use by non-NAF applications,
+whether invoked directly or via facades like SLF4J or JCL.
 </p>
 
 <hr class="pline"/>
@@ -103,7 +113,7 @@ If you specify a named logger other than <span class="cfgvalue">default</span>, 
 <code>SinkLogger</code> instance is returned, which silently discards all messages written to it.
 
 <br/> <br/>
-The first time the GreyLog framework tries to access the default <dfn>logging.xml</dfn> config file, it looks for it on the following search path:<br/>
+The first time the GreyLog framework tries to access the default <dfn>logging.xml</dfn> config file, it looks for it on the following search path, stopping on the first match:<br/>
 &bull; If the <span class="cfgname">grey.logger.configfile</span> system property is set, then it specifies the pathname.
 <br/>
 &bull; <span class="pathname">./logging.xml</span> (ie. look in current directory)
@@ -112,7 +122,7 @@ The first time the GreyLog framework tries to access the default <dfn>logging.xm
 <br/>
 &bull; <span class="pathname">$HOME/logging.xml</span>
 <br/>
-&bull; Looks for it on the classpath as <span class="pathname">./logging.xml</span>.
+&bull; Look for it on the classpath as <span class="pathname">./logging.xml</span>.
 <br/>
 If still not found, then <code>getLogger()</code> calls will treat all requested loggers as non-existent, so as described above, any logger other than <span class="cfgvalue">default</span> will get mapped to the <code>SinkLogger</code>.
 
@@ -189,7 +199,8 @@ logger, as it may potentially be used by multiple threads.
 <br/>
 You can also nominate your own custom logger.
 It must be a subclass of
-<code>com.grey.logging.Logger</code>, and provide a constructor with the signature
+<code>com.grey.logging.Logger</code>, and provide a constructor with this signature:<br/>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
 <code>classname(Parameters, String logname)</code>.
 </li>
 
@@ -267,21 +278,56 @@ This can be useful if you don't want to lose any logging output regardless of yo
 
 <hr class="pline"/>
 <h2>
-<a name="slf4j">
-3 - SLF4J Binding
+<a name="extmap">
+3 - Foreign Mappings
 </a>
 </h2>
 
 <p>
+This section describes how GreyLog instances can be redirected to external facades, such as SLF4J, JCL and JUL.
+<br/> <br/>
+Redirection is based on the logging.xml
+<span class="cfgname">class</span>
+attribute described above:
+<br/>
+&bull;
+<span class="cfgvalue">class="com.grey.logging.adapters.AdapterSLF4J"</span>:
+Creates an SLF4J logger with the same name as the GreyLog logger.
+<br/>
+&bull;
+<span class="cfgvalue">class="com.grey.logging.adapters.AdapterJCL"</span>:
+Creates a JCL logger with the same name as the GreyLog logger.
+<br/> <br/>
+The net effect is that the calling code will still have a GreyLog logger instance
+(ie. of type <code>com.grey.logging.Logger</code>)
+but all log messages will be forwarded to the external logger.
+<br/>
+If you already manage and configure all your logging via another framework, this allows GreyLog users to tap into that without changing any Java code.
+Simply modify the logging.xml and the GreyLog logger joins the external logging framework.
+</p>
+
+<hr class="pline"/>
+<h2>
+<a name="slf4j">
+4 - Foreign Bindings
+</a>
+</h2>
+
+<p>
+This section is the reverse of the above, and describes how external facades such as SLF4J, JCL and JUL can be redirected to GreyLog.
+<br/>
+As such, this is not relevant to NAF, which invokes the GreyLog framework directly, but it allows GreyLog to be transparently plugged into non-NAF code, or any code which doesn't have static (compile-time) bindings to GreyLog.
+
+<br/> <br/>
 While the GreyLog framework itself has nothing to do with
 <span class="softname">SLF4J</span>,
-it contains an adapter library
+it includes an adapter library
 (see the
 <span class="softname">greylog-slf4j</span>
 Maven project)
 which enables it to act as underlying logger for SLF4J.
 <br/>
-So long as the greylog-slf4j JAR is on your classpath, instantiations of SLF4J loggers will be redirected to GreyLog.
+Simply put the greylog-slf4j JAR on your classpath ahead of any other SLF4J bindings, and all instantiations of SLF4J loggers will be redirected to the GreyLog framework.
 <br/>
 That is, calls to
 <code>org.slf4j.LoggerFactory.getLogger(name)</code>
@@ -303,7 +349,7 @@ JAR.
 <br/><br/>
 Applications based on the JDK's built-in JUL
 (<code>java.util.logging</code>)
-logging can bind to the GreyLog framework by including the
+framework can bind to the GreyLog framework by including the
 <span class="softname">jul-to-slf4j</span>
 and
 <span class="softname">slf4j-api</span>

@@ -4,6 +4,8 @@
  */
 package com.grey.naf.reactor;
 
+import com.grey.logging.Logger.LEVEL;
+
 public final class IOExecWriter
 {
 	private final com.grey.naf.BufferSpec bufspec;
@@ -99,14 +101,14 @@ public final class IOExecWriter
 			enqueue(xmtbuf, initpos, xmtbuf.limit());
 			return false;
 		}
-		writemark = write(xmtbuf);
+		writemark = sendBuffer(xmtbuf);
 		if (writemark == -1) return false;
 		int remainbytes = xmtbuf.remaining();
 		if (remainbytes == 0) return true;
 		
 		// the partially written (potentially completely unwritten) buffer becomes the head of the queue - writemark is already set
-		if (chanmon.dsptch.logger.isTraceEnabled()) {
-			chanmon.dsptch.logger.trace("Send blocked with "+writemark+"/"+remainbytes+" - "+chanmon.iochan);
+		if (chanmon.dsptch.logger.isActive(LEVEL.TRC2)) {
+			chanmon.dsptch.logger.log(LEVEL.TRC2, "IOExec: Send blocked with "+writemark+"/"+remainbytes+" - "+chanmon.iochan);
 		}
 		writemark += initpos;
 		enqueue(xmtbuf, writemark, remainbytes);
@@ -158,7 +160,11 @@ public final class IOExecWriter
 		{
 			// The I/O operation is already over, so just swallow any exceptions.
 			// They are probably due to a remote disconnect, and we can handle that later if/when we do any more I/O on this channel
-			try {chanmon.disableWrite();} catch (Exception ex) {}
+			try {
+				chanmon.disableWrite();
+			} catch (Exception ex) {
+				chanmon.dsptch.logger.log(LEVEL.TRC2, ex, false, "IOExec: failed to disable Write");
+			}
 			chanmon.transmitCompleted();
 		}
 	}
@@ -171,7 +177,7 @@ public final class IOExecWriter
 			int nbytes;
 			java.nio.ByteBuffer xmtbuf = xmtq.peek();
 			xmtbuf.position(writemark);
-			if ((nbytes = write(xmtbuf)) == -1) return false;
+			if ((nbytes = sendBuffer(xmtbuf)) == -1) return false;
 
 			if (xmtbuf.remaining() != 0)
 			{
@@ -249,7 +255,7 @@ public final class IOExecWriter
 				// this throws on closed channel (java.io.IOException) or other error, so we can't be sure it's closed, but it might as well be
 				nbytes = fchan.transferTo(file_pos, cnt, iochan);
 			} catch (Exception ex) {
-				chanmon.dsptch.logger.debug("IOExecWrite: write(file) threw", ex);
+				chanmon.dsptch.logger.log(LEVEL.TRC3, ex, false, "IOExec: file-send failed on "+iochan);
 				chanmon.ioDisconnected();
 				return true;
 			}
@@ -259,16 +265,15 @@ public final class IOExecWriter
 		return true;
 	}
 
-	private int write(java.nio.ByteBuffer xmtbuf) throws java.io.IOException
+	private int sendBuffer(java.nio.ByteBuffer xmtbuf) throws java.io.IOException
 	{
 		int nbytes = -1;
-
+		java.nio.channels.WritableByteChannel iochan = (java.nio.channels.WritableByteChannel)chanmon.iochan;
 		try {
 			// this throws on closed channel (java.io.IOException) or other error, so we can't be sure it's closed, but it might as well be
-			java.nio.channels.WritableByteChannel iochan = (java.nio.channels.WritableByteChannel)chanmon.iochan;
 			nbytes = iochan.write(xmtbuf);
 		} catch (Exception ex) {
-			chanmon.dsptch.logger.debug("IOExecWrite: write(buf) threw", ex);
+			chanmon.dsptch.logger.log(LEVEL.TRC3, ex, false, "IOExec: buffer-send failed on "+iochan);
 			chanmon.ioDisconnected();
 		}
 		return nbytes;
@@ -281,7 +286,7 @@ public final class IOExecWriter
 			// Assuming our code is error-free, an exception here typically means the remote party has closed the connection.
 			chanmon.enableWrite();
 		} catch (Exception ex) {
-			chanmon.dsptch.logger.debug("IOExecWrite: enable-write threw", ex);
+			chanmon.dsptch.logger.log(LEVEL.TRC2, ex, false, "IOExec: failed to enable Write");
 			chanmon.ioDisconnected();
 		}
 	}

@@ -7,17 +7,17 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.grey.naf.samples</groupId>
 	<artifactId>echobot</artifactId>
-	<version>1.0.0</version>
+	<version>1.0.1</version>
 	<name>Echo Bot</name>
-	<properties>
-		<grey.manifest.name>com/grey/echobot/</grey.manifest.name>
-		<grey.manifest.mainclass>com.grey.echobot.App</grey.manifest.mainclass>
-	</properties>
 	<parent>
 		<groupId>com.grey.naf.samples</groupId>
 		<artifactId>samples-agg</artifactId>
 		<version>1.0.0</version>
 	</parent>
+	<properties>
+		<grey.manifest.name>com/grey/echobot/</grey.manifest.name>
+		<grey.manifest.mainclass>com.grey.echobot.App</grey.manifest.mainclass>
+	</properties>
 	<dependencies>
 		<dependency>
 			<groupId>com.grey.naf</groupId>

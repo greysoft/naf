@@ -17,7 +17,7 @@ public class ProducerTest
 	}
 	private Dispatcher dsptch;
 
-	private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger("");
+	private static final com.grey.logging.Logger logger = com.grey.logging.Factory.getLoggerNoEx("");
 	private static final String[] items_to_produce = new String[]{"Item1", "Item2a", "Item2b", "Item2c", "Item3a", "Item3b"};
 	private java.util.ArrayList<String> produced_items = new java.util.ArrayList<String>();
 	private Thread dthrd;

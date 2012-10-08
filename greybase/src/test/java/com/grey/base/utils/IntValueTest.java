@@ -99,7 +99,7 @@ public class IntValueTest
 
 		try {
 			char[] arr = new char[]{'1', '0'-1, '3'};
-			num = IntValue.parseHex(new String(arr));
+			IntValue.parseHex(new String(arr));
 			org.junit.Assert.fail("Failed to trap bad Hex digit - below Dec: "+new String(arr));
 		} catch (NumberFormatException ex) {}
 		try {

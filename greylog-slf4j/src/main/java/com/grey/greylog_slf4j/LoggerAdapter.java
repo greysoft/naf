@@ -4,13 +4,12 @@
  */
 package com.grey.greylog_slf4j;
 
-import com.grey.logging.Interop.LEVEL;
+import com.grey.logging.Logger.LEVEL;
 
 //NB: This class is of type org.slf4j.Logger, as its MarkerIgnoringBase superclass implements the interface
 public class LoggerAdapter
 	extends org.slf4j.helpers.MarkerIgnoringBase
-	implements com.grey.logging.Interop.SupportsLEVEL,
-		java.io.Closeable, java.io.Flushable
+	implements java.io.Closeable, java.io.Flushable
 {
 	private static final long serialVersionUID = 1L;
 	private static final boolean dumpStack = com.grey.base.config.SysProps.get("grey.logging.slf4j.dumpstack", true);
@@ -234,18 +233,6 @@ public class LoggerAdapter
 	public void close()
 	{
 		logger.close();
-	}
-
-	@Override
-	public LEVEL getLevel()
-	{
-		return logger.getLevel();
-	}
-
-	@Override
-	public LEVEL setLevel(LEVEL newlvl)
-	{
-		return logger.setLevel(newlvl);
 	}
 
 	@Override

@@ -7,9 +7,11 @@ package com.grey.naf.nafman;
 import com.grey.base.utils.ByteChars;
 import com.grey.base.utils.ByteOps;
 import com.grey.base.utils.PrototypeFactory.PrototypeObject;
+import com.grey.logging.Logger.LEVEL;
 
 public class Server
 	extends com.grey.naf.reactor.ConcurrentListener.Server
+	implements com.grey.naf.reactor.Timer.Handler
 {
 	private static final int S_RCV = 1;  //initial state, where we're waiting to receive the command from the client
 	private static final int S_PROC = 2; //command has been accepted and is being processed
@@ -17,6 +19,7 @@ public class Server
 
 	private final Primary primary;
 	private Command cmd;
+	private com.grey.naf.reactor.Timer tmr_idle;
 	private int state;
 
 	//pre-allocated purely for efficiency
@@ -58,6 +61,7 @@ public class Server
 	{
 		cmd = null;
 		state = S_RCV;
+		tmr_idle = dsptch.setTimer(primary.tmt_idle, 0, this);
 		chanreader.receive(Command.HDRLEN, true);
 	}
 
@@ -92,7 +96,7 @@ public class Server
 			Command.Def def = Registry.get().getCommand(cmdcode, sbtmp);
 
 			if (def == null) {
-				primary.dsptch.logger.debug("NAFMAN="+primary.dsptch.name+" discarding unrecogised command="+cmdcode);
+				primary.dsptch.logger.trace("NAFMAN="+primary.dsptch.name+" discarding unrecogised command="+cmdcode);
 				endConnection(bctmp.set(sbtmp));
 				return;
 			}
@@ -100,6 +104,7 @@ public class Server
 			cmd.set(def, this);
 
 			if (argslen != 0) {
+				// there are parameters to follow, so wait for them to arrive
 				chanreader.receive(argslen, true);
 				return;
 			}
@@ -107,6 +112,11 @@ public class Server
 				endConnection(bctmp.set("Command rejected - no parameters"));
 				return;
 			}
+		}
+
+		if (tmr_idle != null) {
+			tmr_idle.cancel();
+			tmr_idle = null;
 		}
 		state = S_PROC;
 		primary.forwardCommand(cmd);
@@ -129,7 +139,7 @@ public class Server
 			try {
 				chanwriter.transmit(response.ar_buf, response.ar_off, response.ar_len);
 			} catch (Exception ex) {
-				primary.dsptch.logger.info("NAFMAN="+primary.dsptch.name+" failed to send response="+response.ar_len, ex);
+				primary.dsptch.logger.log(LEVEL.INFO, ex, false, "NAFMAN="+primary.dsptch.name+" failed to send response="+response.ar_len);
 			}
 		}
 
@@ -137,6 +147,7 @@ public class Server
 			cmd.clear();
 			primary.cmdstore.store(cmd);
 		}
+		if (tmr_idle != null) tmr_idle.cancel();
 		disconnect();
 	}
 
@@ -145,4 +156,16 @@ public class Server
 	{
 		ioDisconnected();
 	}
+
+	@Override
+	public void timerIndication(com.grey.naf.reactor.Timer tmr, com.grey.naf.reactor.Dispatcher d)
+	{
+		tmr_idle = null;
+		bctmp.set("Timed out idle client\n");
+		endConnection(bctmp);
+	}
+
+	// already logged by Dispatcher, we have nothing more to add
+	@Override
+	public void eventError(com.grey.naf.reactor.Timer tmr, com.grey.naf.reactor.Dispatcher d, Throwable ex) {}
 }

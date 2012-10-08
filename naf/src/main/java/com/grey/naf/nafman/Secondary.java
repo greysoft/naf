@@ -36,7 +36,7 @@ public class Secondary
 			primary.secondaryUnsubscribed(this);
 		} catch (Exception ex) {
 			// probably due to Primary shutting down in tandem
-			dsptch.logger.debug("NAFMAN="+dsptch.name+" failed to send Unsubscribe to Primary="+primary.dsptch.name);
+			dsptch.logger.trace("NAFMAN="+dsptch.name+" failed to send Unsubscribe to Primary="+primary.dsptch.name);
 		}
 	}
 
