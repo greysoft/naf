@@ -1,6 +1,7 @@
-NAF is an open-source Java NIO Framework that is designed to stick to the basics of switching I/O and be easy to use.
+NAF (Network Application Framework) is an open-source Java NIO framework that is designed to stick to the basics of switching I/O and be easy to use.
 
 It supports:
+- TCP or UDP based clients and servers.
 - Non-blocking reads: Instruct it to to call your code back after either receiving a specified
   marker byte (eg. a Newline, for
   Internet-style text-oriented protocols) or a specified number of bytes.
