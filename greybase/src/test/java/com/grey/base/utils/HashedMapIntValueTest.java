@@ -297,7 +297,7 @@ public class HashedMapIntValueTest
 		org.junit.Assert.assertEquals(newcap, cap);
 
 		// call this just for the sake of code coverage
-		hmap.getBucketStats(false, 0);
+		hmap.getBucketStats();
     }
 
     // This is a code-coverage test, to test growth of a bucket, rather than growth in the number of buckets

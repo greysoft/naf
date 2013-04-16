@@ -216,7 +216,7 @@ public class Producer<T>
 
 			// enable event notifications on the read (consumer) endpoint of our pipe
 			com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(64, 0, false);
-			chanreader = new com.grey.naf.reactor.IOExecReader(bufspec);
+			chanreader = new IOExecReader(bufspec);
 			initChannel(rep, true, true);
 			chanreader.receive(0, true);
 		}

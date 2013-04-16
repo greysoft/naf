@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -15,7 +15,7 @@ public final class ByteChars
 	extends ArrayRef<byte[]>
 	implements CharSequence, Comparable<ByteChars>
 {
-	private static final int INCR = 64;
+	private static final int INCR = 16;
 
 	@Override
 	public int length() {return ar_len;}
@@ -33,10 +33,14 @@ public final class ByteChars
 	public ByteChars set(CharSequence str, int off, int len) {return clear().append(str, off, len);}
 	public ByteChars set(byte[] barr) {return set(barr, 0, barr == null ? 0 : barr.length);}
 	public ByteChars set(byte[] barr, int off, int len) {return clear().append(barr, off, len);}
+	public ByteChars append(char c) {if (c > 255) throw new IllegalArgumentException("Invalid ByteChar="+c); return append((byte)c);}
 	public ByteChars append(byte[] barr) {return append(barr, 0, barr == null ? 0 : barr.length);}
+	public ByteChars append(char[] carr) {return append(carr, 0, carr == null ? 0 : carr.length);}
+	public ByteChars appendRange(CharSequence cs, int start, int end) {return append(cs, start, end - start);}
 	public ByteChars pointAt(ByteChars src, int off) {return pointAt(src, off, src.ar_len - off);}
 	public ByteChars pointAt(ByteChars src) {return pointAt(src, 0, src.ar_len);}
 	public ByteChars pointAt(ByteChars src, int off, int len) {return pointAt(src.ar_buf, src.ar_off + off, len);}
+	public ByteChars pointAt(byte[] buf) {return pointAt(buf, 0, buf.length);}
 	public int indexOf(CharSequence cs) {return indexOf(0, cs, 0, cs.length());}
 	public int indexOf(int bcoff, CharSequence cs) {return indexOf(bcoff, cs, 0, cs.length());}
 	public int indexOf(byte val) {return indexOf(0, val);}
@@ -51,6 +55,7 @@ public final class ByteChars
 	public ByteChars(byte[] src) {this(src, false);}
 	public ByteChars(byte[] src, boolean copy) {this(src, 0, src.length, copy);}
 	public ByteChars(byte[] src, int off, int len, boolean copy) {super(src, off, len, copy);}
+	public ByteChars(ArrayRef<byte[]> src) {this(src.ar_buf, src.ar_off, src.ar_len, false);}
 	public ByteChars(ByteChars src) {this(src, false);}
 	public ByteChars(ByteChars src, boolean copy) {this(src, 0, src.ar_len, copy);}
 	public ByteChars(ByteChars src, int off, int len, boolean copy) {super(src, off, len, copy);}
@@ -79,19 +84,35 @@ public final class ByteChars
 		return dst;
 	}
 
-	public ByteChars append(byte[] barr, int boff, int blen)
+	public ByteChars append(byte[] barr, int off, int len)
 	{
-		if (blen == 0) return this;
-		if (ar_len + blen > ar_buf.length - ar_off) grow(ar_len + blen);
-		System.arraycopy(barr, boff, ar_buf, ar_off + ar_len, blen);
-		ar_len += blen;
+		if (len == 0) return this;
+		if (ar_len + len > ar_buf.length - ar_off) grow(ar_len + len);
+		System.arraycopy(barr, off, ar_buf, ar_off + ar_len, len);
+		ar_len += len;
+		return this;
+	}
+
+	public ByteChars append(char[] carr, int off, int len)
+	{
+		if (len == 0) return this;
+		if (ar_len + len > ar_buf.length - ar_off) grow(ar_len + len);
+		int lmt = off + len;
+		int boff = ar_off + ar_len;
+		for (int idx = off; idx != lmt; idx++) {
+			ar_buf[boff++] = (byte)carr[idx];
+		}
+		ar_len += len;
 		return this;
 	}
 
 	public ByteChars append(byte bval)
 	{
 		int slot = ar_off + ar_len;
-		if (slot == ar_buf.length)  grow(ar_len + 1);
+		if (slot == ar_buf.length) {
+			grow(ar_len + INCR);
+			slot = ar_off + ar_len;
+		}
 		ar_buf[slot] = bval;
 		ar_len++;
 		return this;
@@ -153,7 +174,7 @@ public final class ByteChars
 
 	private void grow(int mincap)
 	{
-		byte[] newbuf = new byte[mincap + INCR];
+		byte[] newbuf = new byte[mincap];
 		System.arraycopy(ar_buf, ar_off, newbuf, 0, ar_len);
 		ar_buf = newbuf;
 		ar_off = 0;
@@ -162,8 +183,7 @@ public final class ByteChars
 	public boolean ensureCapacity(int cap)
 	{
 		if (ar_buf.length - ar_off >= cap) return false;
-		ar_buf = new byte[cap];
-		ar_off = 0;
+		grow(cap);
 		return true;
 	}
 
@@ -173,8 +193,7 @@ public final class ByteChars
 		off = ar_off + off - 1;
 		byte[] buf = ar_buf;
 
-		while (++off != limit)
-		{
+		while (++off < limit) {
 			if (buf[off] == val) return off - ar_off;
 		}
 		return -1;
@@ -183,11 +202,9 @@ public final class ByteChars
 	public int lastIndexOf(int off, byte val)
 	{
 		off += ar_off + 1;
-		int limit = ar_off - 1;
 		byte[] buf = ar_buf;
 
-		while (--off != limit)
-		{
+		while (--off >= ar_off) {
 			if (buf[off] == val) return off - ar_off;
 		}
 		return -1;
@@ -228,21 +245,16 @@ public final class ByteChars
 		long power = 1;
 		long digit;
 
-		if (buf[base] == '-' && radix == 10)
-		{
+		if (buf[base] == '-' && radix == 10) {
 			// only really makes sense for decimal
 			len--;
 			sign = -1;
-		}
-		else
-		{
+		} else {
 			base--;
 		}
 
-		for (int idx = base + len; idx != base; idx--)
-		{
-			if ((digit = Character.digit(buf[idx], radix)) == -1)
-			{
+		for (int idx = base + len; idx != base; idx--) {
+			if ((digit = Character.digit(buf[idx], radix)) == -1) {
 				throw new NumberFormatException((char)buf[idx]+"@"+idx+" in "+off+"+"+len+" - "+subSequence(off, off+len));
 			}
 			numval += (digit * power);
@@ -300,7 +312,9 @@ public final class ByteChars
 	public boolean equals(Object obj)
 	{
 		if (obj == this) return true;
-		if (!(obj instanceof ByteChars)) return false;
+		if (obj instanceof byte[]) return equals((byte[])obj, 0, ((byte[])obj).length);
+		if (obj instanceof char[]) return equals((char[])obj, 0, ((char[])obj).length);
+		if (obj == null || !obj.getClass().equals(getClass())) return false;
 		ByteChars bc2 = (ByteChars)obj;
 		if (bc2.ar_len != ar_len) return false;
 
@@ -313,6 +327,47 @@ public final class ByteChars
 
 		while (off != lmt) {
 			if (buf2[off2++] != buf[off++]) return false;
+		}
+		return true;
+	}
+
+	public boolean equals(byte[] barr, int boff, int blen)
+	{
+		if (blen != ar_len) return false;
+		final byte[] buf = ar_buf;
+		int off = ar_off;
+		final int lmt = off + ar_len;
+
+		while (off != lmt) {
+			if (barr[boff++] != buf[off++]) return false;
+		}
+		return true;
+	}
+
+	// Obviously this will truncate char values larger than a byte
+	public boolean equals(char[] carr, int coff, int clen)
+	{
+		if (clen != ar_len) return false;
+		final byte[] buf = ar_buf;
+		int off = ar_off;
+		final int lmt = off + ar_len;
+
+		while (off != lmt) {
+			if (carr[coff++] != buf[off++]) return false;
+		}
+		return true;
+	}
+
+	public boolean equalsIgnoreCase(CharSequence str)
+	{
+		if (str.length() != ar_len) return false;
+		final byte[] buf = ar_buf;
+		int off = ar_off;
+		final int lmt = off + ar_len;
+		int coff = 0;
+
+		while (off != lmt) {
+			if (Character.toUpperCase(buf[off++]) != Character.toUpperCase(str.charAt(coff++))) return false;
 		}
 		return true;
 	}
@@ -376,6 +431,14 @@ public final class ByteChars
 		byte[] newbuf = new byte[len];
 		System.arraycopy(ar_buf, ar_off + off, newbuf, 0, len);
 		return newbuf;
+	}
+
+	public ByteChars digest(java.security.MessageDigest digestproc)
+	{
+		digestproc.reset();
+		digestproc.update(ar_buf, ar_off, ar_len);
+		byte[] digest = digestproc.digest();
+		return new ByteChars(digest);
 	}
 
 	public static ByteChars convertCharSequence(CharSequence src, ByteChars buf)

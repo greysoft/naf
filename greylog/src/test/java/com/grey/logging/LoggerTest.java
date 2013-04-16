@@ -1,24 +1,30 @@
 /*
- * Copyright 2011-2012 Yusef Badri - All rights reserved.
+ * Copyright 2011-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.logging;
 
 import com.grey.logging.Logger.LEVEL;
 import com.grey.base.config.SysProps;
+import com.grey.base.utils.FileOps;
 import com.grey.base.utils.TimeOps;
 import com.grey.base.utils.ScheduledTime;
 
 public class LoggerTest
 {
+	private final String rootpath = SysProps.TMPDIR+"/utest/greylog/"+getClass().getName();
 	static {
 		SysProps.set(Logger.SYSPROP_DIAG, true);
+	}
+
+	public LoggerTest() throws java.io.IOException {
+		FileOps.deleteDirectory(rootpath);
 	}
 
 	@org.junit.Test
 	public void testGeneral() throws com.grey.base.ConfigException, java.io.IOException
 	{
-		String logfile = "./gen_utest.log";
+		String logfile = rootpath+"gen_utest.log";
 		Class<?> clss = MTCharLogger.class;
 		Parameters params = new Parameters(LEVEL.INFO, logfile);
 		params.logclass = clss.getName();
@@ -54,7 +60,7 @@ public class LoggerTest
 		org.junit.Assert.assertEquals(prevlen, fh.length());
 		log.close();
 		org.junit.Assert.assertEquals(prevlen, fh.length());
-		fh.delete();
+		org.junit.Assert.assertTrue(fh.delete());
 		org.junit.Assert.assertFalse(fh.exists());
 	}
 
@@ -62,8 +68,8 @@ public class LoggerTest
 	public void testFilenames() throws com.grey.base.ConfigException, java.io.IOException
 	{
 		String mainpart = "AAA"+ScheduledTime.TOKEN_YEAR+"BBB"+ScheduledTime.TOKEN_MONTH+"CCC";
-		String template = mainpart+".log";
-		Class<?> clss = MTLatinLogger.class;
+		String template = rootpath+"/"+mainpart+".log";
+		Class<?> clss = MTCharLogger.class;
 		String logname = "myname1";
 		Parameters params = new Parameters(LEVEL.INFO, template);
 		params.logclass = clss.getName();
@@ -88,10 +94,10 @@ public class LoggerTest
 		org.junit.Assert.assertTrue(fh.length() > prevlen);
 		// clean up
 		log.close();
-		fh.delete();
+		org.junit.Assert.assertTrue(fh.delete());
 		org.junit.Assert.assertFalse(fh.exists());
 
-		params.pthnam = template;
+		params.pthnam = template.replace("CCC.log", "CCC-"+ScheduledTime.TOKEN_DT+".log");
 		params.rotfreq = ScheduledTime.FREQ.HOURLY;
 		params.reconcile();
 		log = Factory.getLogger(params, logname);
@@ -112,7 +118,7 @@ public class LoggerTest
 		log.flush();
 		org.junit.Assert.assertTrue(fh.length() > prevlen);
 		log.close();
-		fh.delete();
+		org.junit.Assert.assertTrue(fh.delete());
 		org.junit.Assert.assertFalse(fh.exists());
 	}
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf;
@@ -66,9 +66,13 @@ public final class BufferSpec
 		}
 	}
 
-	public java.nio.ByteBuffer encode(CharSequence content, java.nio.ByteBuffer buf)
+	public java.nio.ByteBuffer encode(CharSequence content, java.nio.ByteBuffer bybuf)
 	{
-		return com.grey.base.utils.NIOBuffers.encode(content, chenc, null, null, buf, directbufs);
+		if (content instanceof com.grey.base.utils.ByteChars) {
+			com.grey.base.utils.ByteChars bc = com.grey.base.utils.ByteChars.class.cast(content);
+			return com.grey.base.utils.NIOBuffers.encode(bc.ar_buf, bc.ar_off, bc.ar_len, bybuf, directbufs);
+		}
+		return com.grey.base.utils.NIOBuffers.encode(content, chenc, null, null, bybuf, directbufs);
 	}
 
 	//convenience method which supports creating ByteBuffers with 8-bit string values

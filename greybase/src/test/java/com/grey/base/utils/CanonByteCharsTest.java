@@ -13,12 +13,11 @@ public class CanonByteCharsTest
 		org.junit.Assert.assertEquals(0, canon.size());
 		canon.clear();
 		org.junit.Assert.assertEquals(0, canon.size());
-		ByteChars inpval = null;
-		ByteChars bc_out = canon.intern(inpval);
+		ByteChars bc_out = canon.intern(null);
 		org.junit.Assert.assertNull(bc_out);
 		org.junit.Assert.assertEquals(0, canon.size());
 
-		inpval = new ByteChars("Item1");
+		ByteChars inpval = new ByteChars("Item1");
 		bc_out = canon.intern(inpval);
 		org.junit.Assert.assertEquals(1, canon.size());
 		org.junit.Assert.assertFalse(bc_out == inpval);
@@ -55,12 +54,11 @@ public class CanonByteCharsTest
 	public void testCharSeq()
 	{
 		CanonByteChars canon = new CanonByteChars("utest_charseq", 0);
-		String inpval = null;
-		ByteChars bc_out = canon.intern(inpval);
+		ByteChars bc_out = canon.intern(null);
 		org.junit.Assert.assertNull(bc_out);
 		org.junit.Assert.assertEquals(0, canon.size());
 
-		inpval = "Item1";
+		String inpval = "Item1";
 		bc_out = canon.intern(inpval);
 		org.junit.Assert.assertEquals(1, canon.size());
 		org.junit.Assert.assertTrue(inpval.equals(bc_out.toString()));

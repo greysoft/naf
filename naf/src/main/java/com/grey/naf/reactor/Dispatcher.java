@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -14,7 +14,6 @@ public final class Dispatcher
 	implements Runnable, com.grey.naf.EntityReaper, Producer.Consumer
 {
 	private static final String STOPCMD = "_STOP_";
-	private static final String SYSPROP_LOGNAME = "greynaf.dispatchers.logname";
 	private static final String SYSPROP_EXITDUMP = "greynaf.dispatchers.exitdump";
 	private static final String SYSPROP_HEAPWAIT = "greynaf.dispatchers.heapwait";
 
@@ -45,7 +44,11 @@ public final class Dispatcher
 
 	public final boolean surviveDownstream;  //survive the exit/death of downstream Dispatchers
 	private final boolean surviveHandlers; //survive error in event handlers
-	private final boolean zeroNaflets;  //true means ok if no Naflets running, else exit when count falls to zero
+	private final boolean zeroNafletsOK;  //true means ok if no Naflets running, else exit when count falls to zero
+
+	// temp working buffers, preallocated (on demand) for efficiency
+	private byte[] xferbuf;
+	private java.nio.ByteBuffer tmpniobuf;
 
 	public boolean isRunning() {return thrd_main.isAlive();}
 
@@ -53,7 +56,7 @@ public final class Dispatcher
 			throws com.grey.base.GreyException, java.io.IOException
 	{
 		name = def.name;
-		zeroNaflets = def.zeroNaflets;
+		zeroNafletsOK = def.zeroNafletsOK;
 		surviveDownstream = def.surviveDownstream;
 		surviveHandlers = def.surviveHandlers;
 		nafcfg = ncfg;
@@ -70,13 +73,12 @@ public final class Dispatcher
 		flusher = new Flusher(this, def.flush_interval);
 		apploader = new Producer<Object>(Object.class, this, this);
 
-		String logname = SysProps.get(SYSPROP_LOGNAME, name);
-		com.grey.logging.Logger dlog = com.grey.logging.Factory.getLogger(name);
-		initlog.info("Initialising Dispatcher="+name+" - Logger="+logname+" - "+dlog);
+		com.grey.logging.Logger dlog = com.grey.logging.Factory.getLogger(def.logname);
+		initlog.info("Initialising Dispatcher="+name+" - Logger="+def.logname+" - "+dlog);
 		logger = (dlog == null ? initlog : dlog);
 		if (logger != initlog) flusher.register(logger);
 		logger.info("Dispatcher="+name+": survive_downstream="+surviveDownstream+", survive_handlers="+surviveHandlers
-				+", zero_naflets="+zeroNaflets+", flush="+TimeOps.expandMilliTime(def.flush_interval));
+				+", zero_naflets="+zeroNafletsOK+", flush="+TimeOps.expandMilliTime(def.flush_interval));
 		logger.trace("Dispatcher="+name+": Selector="+slct.getClass().getCanonicalName()+" - Provider="+slct.provider().getClass().getCanonicalName());
 
 		if (def.hasNafman) {
@@ -103,7 +105,7 @@ public final class Dispatcher
 			for (int idx = 0; idx != def.naflets.length; idx++) {
 				XmlConfig appcfg = def.naflets[idx];
 				Object obj = nafcfg.createEntity(appcfg, null, com.grey.naf.Naflet.class, true,
-						new Class<?>[]{String.class, com.grey.naf.reactor.Dispatcher.class, com.grey.base.config.XmlConfig.class},
+						new Class<?>[]{String.class, getClass(), appcfg.getClass()},
 						new Object[]{null, this, appcfg});
 				com.grey.naf.Naflet app = com.grey.naf.Naflet.class.cast(obj);
 				if (app.naflet_name.charAt(0) == '_') {
@@ -148,7 +150,7 @@ public final class Dispatcher
 
 		if (SysProps.get(SYSPROP_HEAPWAIT, false)) {
 			System.out.println("Dispatcher="+name+" has now terminated, and is suspended to provide a heap dump");
-			for (;;) try {Thread.sleep(5000);} catch (Exception ex) {}
+			for (;;) Timer.sleep(5000);
 		}
 	}
 
@@ -168,14 +170,17 @@ public final class Dispatcher
 		if (shutdownPerformed) {
 			return true;
 		}
-		logger.info("Dispatcher="+name+": Received Stop request - naflets="+naflets.size());
-		shutdownRequested = true;
+		logger.info("Dispatcher="+name+": Received Stop request - naflets="+naflets.size()+", shutdownreq="+shutdownRequested);
 
-		com.grey.naf.Naflet[] arr = listNaflets();
-		for (int idx = 0; idx != arr.length; idx++) {
-			stopNaflet(arr[idx]);
+		if (!shutdownRequested) {
+			com.grey.naf.Naflet[] arr = listNaflets();
+			for (int idx = 0; idx != arr.length; idx++) {
+				stopNaflet(arr[idx]);
+			}
+			logger.trace("Dispatcher="+name+": Issued Stop commands - naflets="+naflets.size());
+			shutdownRequested = true;
+
 		}
-		logger.trace("Dispatcher="+name+": Issued Stop commands - naflets="+naflets.size());
 
 		if (thrd_main.isAlive()) {
 			// Dispatcher event loop is still active, and shutdown() will get called when it terminates
@@ -189,7 +194,7 @@ public final class Dispatcher
 	{
 		if (shutdownPerformed) return;
 		try {
-			slct.close();
+			if (slct.isOpen()) slct.close();
 		} catch (Throwable ex) {
 			logger.log(LEVEL.INFO, ex, false, "Dispatcher="+name+": Failed to close NIO Selector");
 		}
@@ -229,7 +234,7 @@ public final class Dispatcher
 
 		while (!shutdownRequested && (activechannels.size() + activetimers.size() != 0))
 		{
-			if (!zeroNaflets && naflets.size() == 0) break;
+			if (!zeroNafletsOK && naflets.size() == 0) break;
 			long iotmt = 0;
 
 			if (activetimers.size() != 0) {
@@ -256,9 +261,8 @@ public final class Dispatcher
 
 		int finalkeys = -1;
 		if (!shutdownPerformed) {
-			//do 1-millisecond poll simply to flush the SelectionKeys, as they're always 1 interval in arrears
-			slct.select(1);
-			finalkeys = slct.keys().size();
+			//do a final Select to flush the SelectionKeys, as they're always 1 interval in arrears
+			finalkeys = slct.selectNow();
 		}
 		logger.info("Dispatcher="+name+": Activity ceased - Naflets="+naflets.size()
 				+", IO="+activechannels.size()+"/"+finalkeys
@@ -286,17 +290,7 @@ public final class Dispatcher
 			try {
 				tmr.fire(this);
 			} catch (Throwable ex) {
-				logger.log(LEVEL.ERR, ex, true, "Dispatcher="+name+": handler failed on Timer event - "+tmr.handler);
-				try {
-					tmr.handler.eventError(tmr, this, ex);
-				} catch (Throwable ex2) {
-					logger.log(LEVEL.ERR, ex2, true, "Dispatcher="+name+": Timer-handler failed to handle error - "
-							+tmr.handler+" - "+com.grey.base.GreyException.summary(ex));
-				}
-				if (!surviveHandlers) {
-					logger.warn("Initiating Abort due to error in Timer Handler");
-					stop();
-				}
+				eventHandlerFailed(null, tmr, ex);
 			}
 			sparetimers.store(tmr.clear());
 		}
@@ -317,20 +311,43 @@ public final class Dispatcher
 			try {
 				cm.handleIO(key.readyOps());
 			} catch (Throwable ex) {
-				logger.log(LEVEL.ERR, ex, true, "Dispatcher="+name+": handler failed on IO event - "+cm);
-				try {
-					cm.eventError(cm, ex);
-				} catch (Throwable ex2) {
-					logger.log(LEVEL.ERR, ex2, true, "Dispatcher="+name+": Channel-Monitor failed to handle error - "
-							+cm+" - "+com.grey.base.GreyException.summary(ex));
-				}
-				if (!surviveHandlers) {
-					logger.warn("Initiating Abort due to error in IO Handler");
-					stop();
-				}
+				eventHandlerFailed(cm, null, ex);
 			}
 		}
 		keys.clear(); //this clears the NIO Ready set - NIO would hang otherwise
+	}
+
+	private void eventHandlerFailed(ChannelMonitor cm, Timer tmr, Throwable ex)
+	{
+		boolean bpex = (ex instanceof ChannelMonitor.BrokenPipeException);
+		if (!bpex) {
+			if (cm == null) {
+				logger.log(LEVEL.ERR, ex, true, "Dispatcher="+name+": Error on Timer handler="+tmr.handler);
+			} else {
+				logger.log(LEVEL.ERR, ex, true, "Dispatcher="+name+": Error on IO handler="+cm);
+			}
+		}
+		try {
+			ChannelMonitor cmdisc = (bpex ?
+					(cm == null ? (tmr.handler instanceof ChannelMonitor ? (ChannelMonitor)tmr.handler : null) : cm)
+					: null);
+			if (cmdisc != null) {
+				cmdisc.ioDisconnected(ex.getMessage());
+			} else {
+				if (cm == null) {
+					tmr.handler.eventError(tmr, this, ex);
+				} else {
+					cm.eventError(cm, ex);
+				}
+			}
+		} catch (Throwable ex2) {
+			logger.log(LEVEL.ERR, ex2, true, "Dispatcher="+name+": Error Handler failed - "+(cm==null?tmr.handler:cm)
+					+" - "+com.grey.base.GreyException.summary(ex));
+		}
+		if (!surviveHandlers) {
+			logger.warn("Initiating Abort due to error in "+(cm==null?"Timer":"I/O")+" Handler");
+			stop();
+		}
 	}
 
 	// ChannelMonitors must bookend all their activity on each channel between this call and deregisterlIO().
@@ -349,8 +366,10 @@ public final class Dispatcher
 			throw new java.io.IOException("Illegal deregisterIO on CM="+cm.getClass().getName()
 					+" - Ops="+(cm.regkey==null? "None" : "0x"+Integer.toHexString(cm.regkey.interestOps())));
 		}
-		if (cm.regkey != null) cm.regkey.cancel();
-		cm.regkey = null;
+		if (cm.regkey != null) {
+			cm.regkey.cancel();
+			cm.regkey = null;
+		}
 	}
 
 	// If remote party disconnects before we enter here, the chan.register() call will throw, so callers have to be prepared to handle
@@ -358,7 +377,12 @@ public final class Dispatcher
 	protected void monitorIO(ChannelMonitor cm, int ops) throws java.nio.channels.ClosedChannelException
 	{
 		if (shutdownPerformed) return;
-		cm.regkey = cm.iochan.register(slct, ops, cm);  // 3rd register() arg has same effect as calling attach(handler) on returned SelectionKey
+		if (cm.iochan.isRegistered()) {
+			cm.regkey.interestOps(ops);
+		} else {
+			//3rd arg has same effect as calling attach(handler) on returned SelectionKey
+			cm.regkey = cm.iochan.register(slct, ops, cm);
+		}
 	}
 
 	public Timer setTimer(long interval, int type, Timer.Handler handler)
@@ -385,7 +409,7 @@ public final class Dispatcher
 			// Either way, it is not currently on active list, and so needs to be inserted into it.
 			pendingtimers.withdraw(tmr);
 		} else {
-			// The timer is already scheduled, so check if this reset (which has pushed its expiry time baclk)
+			// The timer is already scheduled, so check if this reset (which has pushed its expiry time back)
 			// means it is no longer in the correct slot in the active queue.
 			if (idx == activetimers.size() - 1 || tmr.expiry <= activetimers.get(idx+1).expiry) {
 				return prev_remaining;  // queue position is unchanged, so we're already done
@@ -478,9 +502,7 @@ public final class Dispatcher
 
 	private void stopNaflet(com.grey.naf.Naflet app)
 	{
-		if (app.stop()) {
-			entityStopped(app);
-		}
+		app.stop();
 	}
 
 	private com.grey.naf.Naflet getNaflet(String naflet_name)
@@ -552,6 +574,28 @@ public final class Dispatcher
 		return naflets.toArray(new com.grey.naf.Naflet[naflets.size()]);
 	}
 
+	// convenience method which leverages a single pre-allocated transfer buffer for this thread
+	public int transfer(java.nio.ByteBuffer src, java.nio.ByteBuffer dst)
+	{
+		int nbytes = com.grey.base.utils.NIOBuffers.transfer(src, dst, xferbuf);
+		if (nbytes < 0) {
+			xferbuf = new byte[-nbytes];
+			nbytes = com.grey.base.utils.NIOBuffers.transfer(src, dst, xferbuf);
+		}
+		return nbytes;
+	}
+
+	// This returns a temp buffer which must be used immediately, as the next call to
+	// this method will probably return the same buffer.
+	public java.nio.ByteBuffer allocBuffer(int cap)
+	{
+		if (tmpniobuf == null || tmpniobuf.capacity() < cap) {
+			tmpniobuf = com.grey.base.utils.NIOBuffers.create(cap, false);
+		}
+		tmpniobuf.clear();
+		return tmpniobuf;
+	}
+
 
 	public static Dispatcher getDispatcher(String dispatcher_name)
 	{
@@ -614,8 +658,10 @@ public final class Dispatcher
 		}
 		com.grey.naf.nafman.Registry.get().confirmCandidates();
 
-		// dump the sytem-properties
-		String txt = System.getProperties().size()+" entries:"+SysProps.EOL;
+		// log the initial config and dump the sytem-properties
+		String txt = dumpConfig();
+		log.info("Initialisation of the configured NAF context is now complete\n"+txt);
+		txt = System.getProperties().size()+" entries:"+SysProps.EOL;
 		txt += System.getProperties().toString().replace(", ", SysProps.EOL+"\t");
 		FileOps.writeTextFile(nafcfg.path_var+"/sysprops.dump", txt+SysProps.EOL);
 
@@ -634,5 +680,28 @@ public final class Dispatcher
 		if (cfg == null) return null;
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef(cfg);
 		return create(def, nafcfg, log);
+	}
+
+	private static String dumpConfig()
+	{
+		String txt = "Dispatchers="+activedispatchers.size()+":";
+		java.util.Iterator<String> it = activedispatchers.keySet().iterator();
+		while (it.hasNext()) {
+			String name = it.next();
+			Dispatcher d = activedispatchers.get(name);
+			txt += "\n- "+name+": NAFlets="+d.naflets.size();
+			String dlm = " - ";
+			for (int idx = 0; idx != d.naflets.size(); idx++) {
+				txt += dlm + d.naflets.get(idx).naflet_name;
+				dlm = ", ";
+			}
+		}
+		String[] lnames = Listener.getNames();
+		txt += "\nListeners="+lnames.length;
+		for (int idx = 0; idx != lnames.length; idx++) {
+			Listener l = Listener.getByName(lnames[idx]);
+			txt += "\n- "+lnames[idx]+": Port="+l.getLocalPort()+", Server="+l.getServerType().getName()+" (Dispatcher="+l.dsptch.name+")";
+		}
+		return txt;
 	}
 }

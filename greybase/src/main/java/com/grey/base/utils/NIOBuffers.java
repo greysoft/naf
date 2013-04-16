@@ -176,8 +176,47 @@ public class NIOBuffers
 		chbuf.flip();
 		return chbuf;
 	}
-	
-	
+
+	/*
+	 * srcbuf is in a non-flipped format, containing data in the range range position() to limit()
+	 * On return, its position() is incremented by the number of bytes transferred.
+	 * Same for dstbuf.
+	 */
+	public static int transfer(java.nio.ByteBuffer srcbuf, java.nio.ByteBuffer dstbuf, byte[] xferbuf)
+	{
+		int off_src = srcbuf.position();
+		int off_dst = dstbuf.position();
+		int datalen = srcbuf.limit() - off_src;
+		int nbytes = Math.min(dstbuf.limit() - off_dst, datalen);
+
+		if (srcbuf.hasArray()) {
+			if (dstbuf.hasArray()) {
+				System.arraycopy(srcbuf.array(), srcbuf.arrayOffset() + off_src, dstbuf.array(), dstbuf.arrayOffset() + off_dst, nbytes);
+				dstbuf.position(off_dst + nbytes);
+			} else {
+				dstbuf.put(srcbuf.array(), srcbuf.arrayOffset() + off_src, nbytes);
+			}
+			srcbuf.position(off_src + nbytes);
+		} else if (dstbuf.hasArray()) {
+			srcbuf.get(dstbuf.array(), dstbuf.arrayOffset() + off_dst, nbytes);
+			dstbuf.position(off_dst + nbytes);
+		} else {
+			// neither buffer exposes its backing array - need to copy via intermediate array, to avail of bulk get/put
+			if (xferbuf == null || xferbuf.length < nbytes) return -nbytes;
+			srcbuf.get(xferbuf, 0, nbytes);
+			dstbuf.put(xferbuf, 0, nbytes);
+		}
+		return nbytes;
+	}
+
+	public static int transfer(java.nio.ByteBuffer srcbuf, java.nio.ByteBuffer dstbuf)
+	{
+		if (srcbuf.hasArray() || dstbuf.hasArray()) return transfer(srcbuf, dstbuf, null);
+		int nbytes = srcbuf.remaining();
+		dstbuf.put(srcbuf);
+		return nbytes;
+	}
+
 	public static java.nio.charset.CharsetEncoder getEncoder(String charset)
 	{
 		return java.nio.charset.Charset.forName(charset).newEncoder();

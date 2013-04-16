@@ -145,7 +145,7 @@ public final class Registry
 	}
 
 	// Provisional registration, which will be finalised by confirmCandidates(). This method is used for
-	// commands which can only be handled by a single Dispatcher, as each higher-preference candidate replaces
+	// commands which can only be handled by a single Dispatcher, as each lower-preference candidate replaces
 	// the previous one.
 	// Therefore this method can only be used by Dispatchers that are created and launched by the wired naf.xml
 	// container. Any Dispatchers that are subsequently dynamically created can only call their their own NAFMAN's
@@ -157,9 +157,9 @@ public final class Registry
 	{
 		if (dsptch.nafman == null) return false;
 		CandidateHandler candidate = (pref == 0 ? null : candidates.get(cmd.code));
-		if (candidate != null && candidate.pref > pref) return false;
+		if (candidate != null && candidate.pref < pref) return false; //existing candidate is better
 		candidate = new CandidateHandler(dsptch, handler, cmd, pref);
-		candidates.put(cmd.code, candidate);
+		candidates.put(cmd.code, candidate); //replace previous candidate
 		return true;
 	}
 
@@ -198,10 +198,11 @@ public final class Registry
 		return sb;
 	}
 
-	private void showCommands(StringBuilder sb)
+	private CharSequence showCommands(StringBuilder sb)
 	{
+		if (sb == null) sb = new StringBuilder();
 		sb.append("Supported commands: ");
-		java.util.Collection<Command.Def> defs = com.grey.naf.nafman.Registry.get().getCommands();
+		java.util.Collection<Command.Def> defs = getCommands();
 		java.util.List<String> cmdnames = new java.util.ArrayList<String>();
 		java.util.Iterator<Command.Def> iter = defs.iterator();
 		while (iter.hasNext()) cmdnames.add(iter.next().name);
@@ -210,5 +211,6 @@ public final class Registry
 			if (idx != 0) sb.append(", ");
 			sb.append(cmdnames.get(idx)).append('/').append(getCommand(cmdnames.get(idx)).code);
 		}
+		return sb;
 	}
 }

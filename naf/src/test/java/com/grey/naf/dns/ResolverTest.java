@@ -6,6 +6,7 @@ package com.grey.naf.dns;
 
 import com.grey.base.config.SysProps;
 import com.grey.base.utils.ByteChars;
+import com.grey.base.utils.FileOps;
 import com.grey.base.utils.IP;
 import com.grey.base.utils.StringOps;
 import com.grey.naf.reactor.Dispatcher;
@@ -13,6 +14,7 @@ import com.grey.naf.reactor.Dispatcher;
 public class ResolverTest
 	implements Resolver.Client
 {
+	private static final String rootdir = com.grey.naf.reactor.DispatcherTest.initPaths(ResolverTest.class);
 	private static final com.grey.logging.Logger junklogger = com.grey.logging.Factory.getLoggerNoEx("no-such-logger");
 
 	private static final String dnsservers = SysProps.get("greynaf.dns.test.servers");
@@ -21,16 +23,16 @@ public class ResolverTest
 	private static final String queryTargetPTR = SysProps.get("greynaf.dns.test.targetPTR", "192.168.101.12");
 	private static final String NoSuchDom = "nonsuchdomain6812.com";
 	private static final String SYSPROP_SKIP = "greynaf.test.skipdns";
+	private static final boolean skiptests = SysProps.get(SYSPROP_SKIP, true); //test setup is too specific to my Dev environment
 
 	static {
-		if (SysProps.get(SYSPROP_SKIP, false)) {
+		if (skiptests) {
 			System.out.println("WARNING: Skipping all DNS tests due to sysprop "+SYSPROP_SKIP);
 		} else {
 			if (queryTargetA.equals("-")) System.out.println("WARNING: Skipping type-A lookup");
 			if (queryTargetMX.equals("-")) System.out.println("WARNING: Skipping type-MX lookup");
 			if (queryTargetPTR.equals("-")) System.out.println("WARNING: Skipping type-PTR lookup");
 		}
-		SysProps.set(com.grey.naf.Config.SYSPROP_DIRPATH_VAR, SysProps.TMPDIR+"/utest/dns");
 	}
 	private static final int CFG_TCP = 1 << 0;
 	private static final int CFG_FALLBACKA = 1 << 1;
@@ -43,7 +45,7 @@ public class ResolverTest
 	@org.junit.Test
 	public void testEmbedded() throws com.grey.base.GreyException, java.io.IOException
 	{
-		if (SysProps.get(SYSPROP_SKIP, false)) return;
+		if (skiptests) return;
 		com.grey.naf.Config nafcfg = setConfig(null, 0);
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
 		def.name = "utest_Embedded";
@@ -104,7 +106,7 @@ public class ResolverTest
 	@org.junit.Test
 	public void testDistributed() throws com.grey.base.GreyException, java.io.IOException
 	{
-		if (SysProps.get(SYSPROP_SKIP, false)) return;
+		if (skiptests) return;
 		com.grey.naf.Config nafcfg = setConfig("com.grey.naf.dns.distributedresolver.Client", 0);
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
 		def.name = "utest_DistribLocal";
@@ -124,7 +126,7 @@ public class ResolverTest
 	@org.junit.Test
 	public void testTCP() throws com.grey.base.GreyException, java.io.IOException
 	{
-		if (SysProps.get(SYSPROP_SKIP, false)) return;
+		if (skiptests) return;
 		com.grey.naf.Config nafcfg = setConfig(null, CFG_TCP);
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
 		def.name = "utest_AlwaysTCP";
@@ -139,7 +141,7 @@ public class ResolverTest
 	@org.junit.Test
 	public void testFallbackA() throws com.grey.base.GreyException, java.io.IOException
 	{
-		if (SysProps.get(SYSPROP_SKIP, false)) return;
+		if (skiptests) return;
 		if (queryTargetMX.equals("-")) return;
 		com.grey.naf.Config nafcfg = setConfig(null, CFG_FALLBACKA);
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
@@ -154,7 +156,7 @@ public class ResolverTest
 	@org.junit.Test
 	public void testCancel() throws com.grey.base.GreyException, java.io.IOException
 	{
-		if (SysProps.get(SYSPROP_SKIP, false)) return;
+		if (skiptests) return;
 		com.grey.naf.Config nafcfg = setConfig(null, 0);
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
 		def.name = "utest_Cancel";
@@ -176,6 +178,7 @@ public class ResolverTest
 
 	private void exec(Dispatcher dsptch, String cbdata, boolean nowait, Dispatcher d2, boolean nopiggy) throws java.io.IOException
 	{
+		FileOps.deleteDirectory(rootdir);
 		synchronized (this) {
 			// we haven't launched our threads yet, but this keeps FindBugs happy
 			opencallbacks = 0;

@@ -1,23 +1,26 @@
 /*
- * Copyright 2012 Yusef Badri - All rights reserved.
+ * Copyright 2012-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.nafman;
 
 import com.grey.base.utils.FileOps;
+import com.grey.logging.Logger;
 import com.grey.naf.DispatcherDef;
 import com.grey.naf.reactor.Dispatcher;
 
 public class ClientTest
 {
+	private static final String rootdir = com.grey.naf.reactor.DispatcherTest.initPaths(ClientTest.class);
 	private static final Command.Def fakecmd1 = new Command.Def(254, "fake-cmd-1", 2, 2, false, null);
 	private static final Command.Def fakecmd2 = new Command.Def(253, "fake-cmd-2", 0, 0, true, null);
 	private static final Command.Def stopcmd = Registry.get().getCommand(Registry.CMD_STOP);
 	private static final com.grey.logging.Logger logger = com.grey.logging.Factory.getLoggerNoEx("");
 
 	@org.junit.Test
-	public void testDefs() throws com.grey.base.ConfigException
+	public void testDefs() throws com.grey.base.ConfigException, java.io.IOException
 	{
+		FileOps.deleteDirectory(rootdir);
 		Registry.get().loadCommand(fakecmd1);
 		org.junit.Assert.assertSame(fakecmd1, Registry.get().getCommand(fakecmd1.code));
 		org.junit.Assert.assertEquals(Registry.CMD_STOP, stopcmd.code);
@@ -40,6 +43,7 @@ public class ClientTest
 	@org.junit.Test
 	public void testStopSolo() throws Exception
 	{
+		FileOps.deleteDirectory(rootdir);
 		String cfgpath = FileOps.getResourcePath("/naf.xml", getClass());
 		com.grey.naf.Config nafcfg = com.grey.naf.Config.load(cfgpath);
 		String dname = "testdispatcher1";
@@ -77,6 +81,7 @@ public class ClientTest
 	@org.junit.Test
 	public void testStopMulti() throws com.grey.base.GreyException, java.io.IOException
 	{
+		FileOps.deleteDirectory(rootdir);
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
 		def.name = "utest_d1";
 		def.surviveHandlers = false;
@@ -94,7 +99,7 @@ public class ClientTest
 		Client.submitCommand(null, ds1.nafman.getPort(), stopcmd, new String[]{ds2.name}, logger);
 		ds2.waitStopped();
 		org.junit.Assert.assertFalse(ds2.isRunning());
-		try {Thread.sleep(100);} catch (Exception ex) {}
+		com.grey.naf.reactor.Timer.sleep(100);
 		org.junit.Assert.assertTrue(dp.isRunning());
 		org.junit.Assert.assertTrue(ds1.isRunning());
 		Client.submitCommand(null, ds1.nafman.getPort(), stopcmd, null, logger);
@@ -106,6 +111,7 @@ public class ClientTest
 	@org.junit.Test
 	public void testCommands() throws com.grey.base.GreyException, java.io.IOException
 	{
+		FileOps.deleteDirectory(rootdir);
 		DispatcherDef def = new DispatcherDef();
 		def.name = "utest_allcmds";
 		def.hasDNS = true;
@@ -123,7 +129,9 @@ public class ClientTest
 		Client.submitCommand(null, port, reg.getCommand(Registry.CMD_APPSTOP), null, dsptch.logger); //invalid args
 		Client.submitCommand(null, port, reg.getCommand(Registry.CMD_APPSTOP), new String[]{dsptch.name, "no-such-app"}, dsptch.logger);
 		Client.submitCommand(null, port, reg.getCommand(Registry.CMD_APPSTOP), new String[]{"no-such-dispatcher", "no-such-app"}, dsptch.logger);
+		Logger.LEVEL lvl = dsptch.logger.getLevel();
 		Client.submitCommand(null, port, reg.getCommand(Registry.CMD_LOGLVL), new String[]{"info"}, dsptch.logger);
+		if (lvl != Logger.LEVEL.INFO) Client.submitCommand(null, port, reg.getCommand(Registry.CMD_LOGLVL), new String[]{lvl.toString()}, dsptch.logger);
 		Client.submitCommand(null, port, reg.getCommand(Registry.CMD_LOGLVL), new String[]{"badlevel"}, dsptch.logger);
 		Client.submitCommand(null, port, reg.getCommand(Registry.CMD_LOGLVL), new String[]{"badlevel2", "nosuchdispatcher"}, dsptch.logger);
 		Client.submitCommand(null, port, reg.getCommand(Registry.CMD_LOGLVL), null, dsptch.logger);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf;
@@ -24,9 +24,11 @@ abstract public class Naflet
 	protected final String cfgfile;
 	protected com.grey.base.config.XmlConfig appcfg;
 	private com.grey.naf.EntityReaper reaper;
+	private boolean aborted_startup;
 
 	abstract protected void startNaflet() throws java.io.IOException;
-	abstract protected boolean stopNaflet();
+	protected boolean stopNaflet() {return true;}
+	protected void abortOnStartup() {aborted_startup = true;}
 
 	public Naflet(String name, com.grey.naf.reactor.Dispatcher dsptch_p, com.grey.base.config.XmlConfig cfg)
 			throws com.grey.base.GreyException, java.io.IOException
@@ -49,6 +51,11 @@ abstract public class Naflet
 	{
 		appcfg = null; //hand memory back to the GC
 		reaper = rpr;
+		if (aborted_startup) {
+			log.info("Naflet="+naflet_name+": Aborting startup");
+			nafletStopped();
+			return;
+		}
 		log.info("Naflet="+naflet_name+": Starting - reaper="+reaper);
 		startNaflet();
 	}
@@ -56,7 +63,9 @@ abstract public class Naflet
 	public final boolean stop()
 	{
 		log.info("Naflet="+naflet_name+": Received Stop request");
-		return stopNaflet();
+		boolean done = stopNaflet();
+		if (done) nafletStopped();
+		return done;
 	}
 	
 	protected final void nafletStopped()

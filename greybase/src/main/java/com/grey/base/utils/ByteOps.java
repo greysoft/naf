@@ -10,6 +10,9 @@ public final class ByteOps
 	public static final long MEGA = 1024L * KILO;
 	public static final long GIGA = 1024L * MEGA;
 
+	public static final int LONGBYTES = Long.SIZE/8; //number of bytes required to hold a 64-bit long
+	public static final int INTBYTES = Integer.SIZE/8; //32-bit int
+
 	// only suitable for 8-bit characters that map to bytes 1-to-1
 	public static byte[] getBytes8(CharSequence str)
 	{

@@ -79,7 +79,7 @@ public class ClientSession
 	}
 
 	@Override
-	protected void ioDisconnected()
+	protected void ioDisconnected(CharSequence diag)
 	{
 		relay.clientDisconnected();
 		endConnection();
@@ -112,7 +112,7 @@ public class ClientSession
 	{
 		tmr = null; //mark timer as expired
 		if (dsptch.logger.isActive(LEVEL.TRC)) dsptch.logger.trace("Closing idle connection: "+iochan+" => "+relay.server.getServerAddress().sockaddr);
-		ioDisconnected();
+		ioDisconnected("Timeout");
 	}
 
 	// already logged by Dispatcher, no need to do anything else

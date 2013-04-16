@@ -26,6 +26,7 @@ body#contents li {margin-top:5px; margin-bottom:5px}
 .cfgtitle {color:#0000ff; font-family:arial; font-weight:bolder}
 .cfgname {color:#0000ff; font-family:arial}
 .cfgvalue {color:#0000cc; font-family:arial}
+.compcode {color:#660066; font-family:courier; font-weight:bolder}
 /*Superceded by &sect;  .sectref {color:#800000; font-weight:bolder} */
 
 .warning {color:#B22222; font-weight:bolder}

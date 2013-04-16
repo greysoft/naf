@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Yusef Badri - All rights reserved.
+ * Copyright 2012-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -128,6 +128,38 @@ public class TimeOpsTest
 		sb2 = TimeOps.expandMilliTime(msecs, sb, true);
 		org.junit.Assert.assertSame(sb, sb2);
 		org.junit.Assert.assertEquals("59m", sb.toString());
+	}
+
+	@org.junit.Test
+	public void testZeroPad()
+	{
+		// the min time which requires 13 digits to represent it (13 digits being enough for all Java times since that instant in 2001)
+		StringBuilder sb = new StringBuilder();
+		for (int loop = 0; loop != 12; loop++) sb.append('9');
+		long threshold_systime = Long.valueOf(sb.toString()).longValue() + 1;
+
+		long systime = 0;
+		sb.setLength(0);
+		TimeOps.zeroPad(systime, sb);
+		int len1 = sb.length();
+		org.junit.Assert.assertEquals(systime, Long.valueOf(sb.toString()).longValue());
+
+		long[] times = new long[]{1, System.currentTimeMillis(), threshold_systime, threshold_systime-1, threshold_systime+1};
+		for (int idx = 0; idx != times.length; idx++) {
+			systime = times[idx];
+			sb.setLength(0);
+			TimeOps.zeroPad(systime, sb);
+			org.junit.Assert.assertEquals(systime, Long.valueOf(sb.toString()).longValue());
+			org.junit.Assert.assertEquals(len1, sb.length());
+		}
+
+		systime = 42342;
+		sb.setLength(0);
+		sb.append("any text");
+		int len = sb.length();
+		TimeOps.zeroPad(systime, sb);
+		org.junit.Assert.assertEquals(len1+len, sb.length());
+		org.junit.Assert.assertEquals(systime, Long.valueOf(sb.subSequence(len, sb.length()).toString()).longValue());
 	}
 
 	private static void verifyParse(String str, long exptime)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2012 Yusef Badri - All rights reserved.
+ * Copyright 2011-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.logging;
@@ -8,13 +8,16 @@ import com.grey.base.config.SysProps;
 import com.grey.base.utils.FileOps;
 import com.grey.base.utils.ScheduledTime;
 
+/*
+ * Make sure grey.logger.configfile system property is not set, when running these tests.
+ */
 public class FactoryTest
 {
 	static {
 		SysProps.set(Logger.SYSPROP_DIAG, true);
 	}
 	private static final String RSRCFILE = "logging.xml";
-	private static final String PATH_LOG5 = SysProps.TMPDIR+"/utest/factorytest.log";  //must match log5 entry in RSRCFILE
+	private static final String PATH_LOG5 = SysProps.TMPDIR+"/utest/greylog/factorytest.log";  //must match log5 entry in RSRCFILE
 	private static final String NO_SUCH_LOG = "log99";  //must not match any entries in RSRCFILE
 
 	@org.junit.Test
@@ -28,10 +31,8 @@ public class FactoryTest
 		org.junit.Assert.assertEquals(Parameters.DFLTCLASS, dlog.getClass());
 		org.junit.Assert.assertEquals(Factory.DFLT_LOGNAME, dlog.getName());
 
-		// other ways of specifying the absolute default
+		// repeat call should get back same logger
 		Logger log = Factory.getLogger();
-		org.junit.Assert.assertTrue(log == dlog);
-		log = Factory.getLogger(Factory.DFLT_LOGNAME);
 		org.junit.Assert.assertTrue(log == dlog);
 
 		// default logger in a different factory-config
@@ -130,7 +131,7 @@ public class FactoryTest
 		params.reconcile();
 		org.junit.Assert.assertNull(params.pthnam);
 		org.junit.Assert.assertEquals(0, params.maxsize);
-		org.junit.Assert.assertEquals(ScheduledTime.FREQ.NEVER, params.rotfreq);
+		org.junit.Assert.assertEquals(ScheduledTime.FREQ.NEVER, params.rotfreq); //due to null pthnam
 
 		params.pthnam = "blah";
 		params.reconcile();
@@ -138,14 +139,12 @@ public class FactoryTest
 		org.junit.Assert.assertNull(params.strm);
 		org.junit.Assert.assertEquals(0, params.maxsize);
 		org.junit.Assert.assertEquals(ScheduledTime.FREQ.NEVER, params.rotfreq);
-		org.junit.Assert.assertFalse(params.pthnam.contains(ScheduledTime.TOKEN_DT));
 
 		params.maxsize = 1024;
 		params.rotfreq = ScheduledTime.FREQ.DAILY;
 		params.reconcile();
 		org.junit.Assert.assertEquals(1024, params.maxsize);
-		org.junit.Assert.assertEquals(ScheduledTime.FREQ.NEVER, params.rotfreq);
-		org.junit.Assert.assertTrue(params.pthnam.contains(ScheduledTime.TOKEN_DT));
+		org.junit.Assert.assertEquals(ScheduledTime.FREQ.NEVER, params.rotfreq); //due to maxsize
 
 		params.pthnam = "blah";
 		params.maxsize = 0;
@@ -153,7 +152,6 @@ public class FactoryTest
 		params.reconcile();
 		org.junit.Assert.assertEquals(0, params.maxsize);
 		org.junit.Assert.assertEquals(ScheduledTime.FREQ.DAILY, params.rotfreq);
-		org.junit.Assert.assertTrue(params.pthnam.contains(ScheduledTime.TOKEN_DT));
 		org.junit.Assert.assertFalse(params.bufsiz == 0);
 
 		params.bufsiz = 0;

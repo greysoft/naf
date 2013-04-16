@@ -4,16 +4,12 @@
  */
 package com.grey.naf.reactor;
 
-import com.grey.base.config.SysProps;
+import com.grey.base.utils.FileOps;
 import com.grey.base.utils.TimeOps;
-import com.grey.naf.reactor.ChannelMonitor;
-import com.grey.naf.reactor.Dispatcher;
 
 public class ChannelMonitorTest
 {
-	static {
-		SysProps.set(com.grey.naf.Config.SYSPROP_DIRPATH_VAR, SysProps.TMPDIR+"/utest/CM");
-	}
+	private static final String rootdir = DispatcherTest.initPaths(ChannelMonitorTest.class);
 	protected int cmcnt;
 	protected boolean completed;
 
@@ -34,7 +30,7 @@ public class ChannelMonitorTest
 			this.runner = runner;
 			this.xmtmax = xmtmax;
 			writer = new CMW(d, w, bufspec, runner);
-			chanreader = new com.grey.naf.reactor.IOExecReader(bufspec);
+			chanreader = new IOExecReader(bufspec);
 			initChannel(r, true, true);
 			chanreader.receive(0, true);
 			runner.cmcnt++;
@@ -84,7 +80,7 @@ public class ChannelMonitorTest
 				throws com.grey.base.ConfigException, com.grey.base.FaultException, java.io.IOException {
 			super(d);
 			this.runner = runner;
-			chanwriter = new com.grey.naf.reactor.IOExecWriter(bufspec);
+			chanwriter = new IOExecWriter(bufspec);
 			initChannel(w, true, true);
 			runner.cmcnt++;
 		}
@@ -126,6 +122,7 @@ public class ChannelMonitorTest
 
 	private void launch(boolean directbufs) throws com.grey.base.GreyException, java.io.IOException
 	{
+		FileOps.deleteDirectory(rootdir);
 		int entitycnt = 64;
 		int xmtmax = 5;  //only the write() calls from reader CM count towards this, not the calls below
 		int xmtsiz = 10 * 1024;

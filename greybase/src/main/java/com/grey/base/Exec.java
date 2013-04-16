@@ -34,8 +34,7 @@ public class Exec
 		String cmd = argv[argc++].toUpperCase().intern();
 		System.out.println();
 
-		if (cmd == "SHOWTIME")
-		{
+		if (cmd == "SHOWTIME") {
 			long systime_now = System.currentTimeMillis();
 			String tzarg = null;
 			long systime = Long.parseLong(argv[argc++]);
@@ -52,9 +51,7 @@ public class Exec
 			sb = com.grey.base.utils.TimeOps.makeTimeLogger(dtcal, null, true, true);
 			System.out.println("LogFormat: " + sb.toString());
 			System.out.println("Time Now="+systime_now+", Diff="+(systime_now - systime));
-		}
-		else if (cmd == "SHOWTIME64")
-		{
+		} else if (cmd == "ENCTIME") {
 			int yy = Integer.parseInt(argv[argc++]);
 			int mm = Integer.parseInt(argv[argc++]);
 			int dd = Integer.parseInt(argv[argc++]);
@@ -62,27 +59,41 @@ public class Exec
 			int min = Integer.parseInt(argv[argc++]);
 			long systime = TimeOps.getSystime(null, yy, mm, dd, hour, min);
 			System.out.println("Time = "+systime);
-		}
-		else if (cmd == "SHOWIP")
-		{
+		} else if (cmd == "SHOWIP") {
 			int ip = Integer.parseInt(argv[argc++]);
 			System.out.println("IP = " + com.grey.base.utils.IP.displayDottedIP(ip, null));
-		}
-		else if (cmd == "SHOWIP32")
-		{
+		} else if (cmd == "ENCIP") {
 			String ipdotted = argv[argc++];
 			System.out.println("IP = " + com.grey.base.utils.IP.convertDottedIP(ipdotted));
-		}
-		else if (cmd == "LOADCLASS")
-		{
+		} else if (cmd == "BASE64") {
+			String enctxt = argv[argc++];
+			char[] arrc = enctxt.toCharArray();
+			byte[] arrb = com.grey.base.crypto.Base64.decode(arrc, 0, arrc.length, null);
+			String plain = new String(arrb);
+			System.out.println("Plain="+plain.length()+" ["+plain+"]");
+		} else if (cmd == "ENCBASE64") {
+			String plaintxt = argv[argc++];
+			byte[] arrb = plaintxt.getBytes();
+			char[] arrc = com.grey.base.crypto.Base64.encode(arrb, 0, arrb.length, 0, null);
+			String enctxt = new String(arrc);
+			System.out.println("Base64="+enctxt.length()+" ["+enctxt+"]");
+		} else if (cmd == "HEX") {
+			String enctxt = argv[argc++];
+			byte[] arrb = com.grey.base.crypto.Ascii.hexDecode(enctxt.toCharArray());
+			String plaintxt = new String(arrb);
+			System.out.println("Plain="+plaintxt.length()+" ["+plaintxt+"]");
+		} else if (cmd == "ENCHEX") {
+			String plaintxt = argv[argc++];
+			char[] arrc = com.grey.base.crypto.Ascii.hexEncode(plaintxt.getBytes());
+			String enctxt = new String(arrc);
+			System.out.println("Hex="+enctxt.length()+" ["+enctxt+"]");
+		} else if (cmd == "LOADCLASS") {
 			String name = argv[argc++];
 			Class<?> clss = DynLoader.loadClass(name);
 			System.out.println("Loaded class="+clss.getName());
 			Object obj = clss.newInstance();
 			System.out.println("Created Object: "+obj);
-		}
-		else
-		{
+		} else {
 			System.out.println("Unrecognised command [" + cmd + "]");
 		}
 	}

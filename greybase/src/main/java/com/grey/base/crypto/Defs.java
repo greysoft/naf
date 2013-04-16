@@ -22,8 +22,8 @@ public interface Defs
 
 	public static final String ALG_DIGEST_MD5 = "MD5";
 	public static final String ALG_DIGEST_SHA1 = "SHA";
-	public static final String ALG_DIGEST_SHA256 = "SHA-256";
-	public static final String ALG_DIGEST_SHA512 = "SHA-512";
+	public static final String ALG_DIGEST_SHA256 = "SHA-256"; //part of SHA-2 family
+	public static final String ALG_DIGEST_SHA512 = "SHA-512"; //part of SHA-2 family
 
 	public static final String ALG_RNG_SHA1 = "SHA1PRNG";
 }

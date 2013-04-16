@@ -4,6 +4,7 @@
  */
 package com.grey.naf.nafman;
 
+import com.grey.logging.Logger.LEVEL;
 import com.grey.naf.reactor.Dispatcher;
 
 public abstract class Agent
@@ -59,7 +60,7 @@ public abstract class Agent
 		sbtmp.append("NAFMAN=").append(dsptch.name).append(" received command=").append(cmd.getDescription());
 		if (handler == null) {
 			sbtmp.append(" - no Handler");
-			dsptch.logger.trace(sbtmp);
+			dsptch.logger.log(LEVEL.TRC2, sbtmp);
 		} else {
 			sbtmp.append(" - Handler=").append(handler);
 			dsptch.logger.info(sbtmp);

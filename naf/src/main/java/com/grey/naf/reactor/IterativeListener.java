@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -15,18 +15,18 @@ public final class IterativeListener
 	@Override
 	public Class<?> getServerType() {return serverType;}
 
-	public IterativeListener(String lname, com.grey.naf.reactor.Dispatcher d,  ChannelMonitor handler,
+	public IterativeListener(String lname, Dispatcher d,  ChannelMonitor handler, com.grey.naf.EntityReaper rpr,
 			com.grey.base.config.XmlConfig cfg, String iface, int port)
 					throws com.grey.base.GreyException, java.io.IOException
 	{
-		this(lname, d, handler, cfg, makeDefaults(null, iface, port));
+		this(lname, d, handler, rpr, cfg, makeDefaults(null, iface, port));
 	}
 
-	public IterativeListener(String lname, com.grey.naf.reactor.Dispatcher d,  ChannelMonitor handler,
+	public IterativeListener(String lname, Dispatcher d,  ChannelMonitor handler, com.grey.naf.EntityReaper rpr,
 			com.grey.base.config.XmlConfig cfg, java.util.Map<String,Object> cfgdflts)
 					throws com.grey.base.GreyException, java.io.IOException
 	{
-		super(lname, d, handler, cfg, cfgdflts);
+		super(lname, d, handler, rpr, cfg, cfgdflts);
 		cnxhandler = handler;
 		serverType = cnxhandler.getClass();
 		log.info("Listener="+name+": Iterative handler is "+cnxhandler.getClass().getName());

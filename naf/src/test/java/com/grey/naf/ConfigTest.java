@@ -9,6 +9,10 @@ import com.grey.base.config.XmlConfig;
 
 public class ConfigTest
 {
+	static {
+		com.grey.naf.reactor.DispatcherTest.initPaths(ConfigTest.class);
+	}
+
 	@org.junit.Test
 	public void testSynthesise() throws com.grey.base.ConfigException, java.io.IOException
 	{
@@ -37,7 +41,7 @@ public class ConfigTest
 		org.junit.Assert.assertEquals(dname, def.name);
 		org.junit.Assert.assertFalse(def.hasNafman);
 		org.junit.Assert.assertTrue(def.hasDNS);
-		org.junit.Assert.assertTrue(def.zeroNaflets);
+		org.junit.Assert.assertTrue(def.zeroNafletsOK);
 		org.junit.Assert.assertTrue(def.surviveDownstream);
 		org.junit.Assert.assertTrue(def.surviveHandlers);
 		org.junit.Assert.assertEquals(2, def.naflets.length);
@@ -67,7 +71,7 @@ public class ConfigTest
 		org.junit.Assert.assertEquals(dname, def.name);
 		org.junit.Assert.assertTrue(def.hasNafman);
 		org.junit.Assert.assertFalse(def.hasDNS);
-		org.junit.Assert.assertTrue(def.zeroNaflets);
+		org.junit.Assert.assertTrue(def.zeroNafletsOK);
 		org.junit.Assert.assertTrue(def.surviveDownstream);
 		org.junit.Assert.assertFalse(def.surviveHandlers);
 		org.junit.Assert.assertNull(def.naflets);

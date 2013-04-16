@@ -31,16 +31,17 @@ public final class EmailAddress
 		return this;
 	}
 
-	public void set(CharSequence addr)
+	public EmailAddress set(CharSequence addr)
 	{
 		full.set(addr);
 		domain.ar_len = 0;
 		mailbox.ar_len = 0;
+		return this;
 	}
 
-	public void decompose()
+	public EmailAddress decompose()
 	{
-		if (mailbox.ar_len != 0) return; //already broken down
+		if (mailbox.ar_len != 0) return this; //already broken down
 		int off = full.lastIndexOf(DLM);
 
 		if (off == -1) {
@@ -50,6 +51,7 @@ public final class EmailAddress
 			mailbox.pointAt(full, 0, off);
 			domain.pointAt(full, off + 1);
 		}
+		return this;
 	}
 
 	public void parse(ArrayRef<byte[]> data)
@@ -85,8 +87,8 @@ public final class EmailAddress
 		}
 
 		// copy data to address buffer
+		if (len != 0) full.ensureCapacity(len + 10);  // margin of 10 to avoid growth increments smaller than that
 		if ((full.ar_len = len) == 0) return;
-		full.ensureCapacity(len + 10);  // margin of 10 to avoid growth increments smaller than that
 		System.arraycopy(dbuf, doff, full.ar_buf, full.ar_off, len);
 	}
 

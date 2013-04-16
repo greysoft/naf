@@ -38,7 +38,7 @@ public final class Primary
 	@Override
 	public boolean isPrimary() {return true;}
 	@Override
-	public int getPort() {return lstnr.getPort();}
+	public int getPort() {return lstnr.getLocalPort();}
 
 	public Primary(Dispatcher d, com.grey.base.config.XmlConfig cfg)
 			throws com.grey.base.GreyException, java.io.IOException
@@ -55,7 +55,7 @@ public final class Primary
 
 		int lstnport = d.nafcfg.assignPort(com.grey.naf.Config.RSVPORT_NAFMAN);
 		com.grey.base.config.XmlConfig lstncfg = new com.grey.base.config.XmlConfig(cfg, "listener");
-		lstnr = new com.grey.naf.reactor.ConcurrentListener("NAFMAN-"+dsptch.name, dsptch, this, lstncfg, Server.class, null, lstnport);
+		lstnr = new com.grey.naf.reactor.ConcurrentListener("NAFMAN-Primary", dsptch, this, null, lstncfg, Server.class, null, lstnport);
 
 		// these commands are only fielded by the Primary NAFMAN agent
 		registerHandler(Registry.CMD_DLIST, this);
@@ -65,7 +65,7 @@ public final class Primary
 	@Override
 	public void start() throws com.grey.base.FaultException, java.io.IOException
 	{
-		lstnr.start(null);
+		lstnr.start();
 	}
 
 	@Override
@@ -89,7 +89,7 @@ public final class Primary
 			// Give the secondaries time to shut down.
 			// This is not critical, but it allows them to shut down gracefully, without lots of ugly logging
 			// errors as they fail to contact the terminated Producer of a vanished Primary.
-			try {Thread.sleep(shutdown_delay);} catch (Exception ex) {}
+			com.grey.naf.reactor.Timer.sleep(shutdown_delay);
 		}
 		events.shutdown(true);
 		dsptch.logger.info("Primary shutdown completed - Secondaries="+secondaries.size()+", Commands="+activecmds.size());

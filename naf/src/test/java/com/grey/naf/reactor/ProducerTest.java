@@ -4,17 +4,13 @@
  */
 package com.grey.naf.reactor;
 
-import com.grey.base.config.SysProps;
+import com.grey.base.utils.FileOps;
 import com.grey.base.utils.TimeOps;
-import com.grey.naf.reactor.Dispatcher;
-import com.grey.naf.reactor.Producer;
 
 public class ProducerTest
 	implements Producer.Consumer
 {
-	static {
-		SysProps.set(com.grey.naf.Config.SYSPROP_DIRPATH_VAR, SysProps.TMPDIR+"/utest/producer");
-	}
+	private static final String rootdir = DispatcherTest.initPaths(ProducerTest.class);
 	private Dispatcher dsptch;
 
 	private static final com.grey.logging.Logger logger = com.grey.logging.Factory.getLoggerNoEx("");
@@ -28,6 +24,7 @@ public class ProducerTest
 	public void workflow()
 			throws com.grey.base.GreyException, java.io.IOException, InterruptedException
 	{
+		FileOps.deleteDirectory(rootdir);
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
 		def.name = "producertest-workflow";
 		def.hasNafman = false;
@@ -65,6 +62,35 @@ public class ProducerTest
 
 	}
 
+	// This runs in a very reasonable time, but larger values can be attempted for interactive testing
+	@org.junit.Test
+	public void bulktest()
+			throws com.grey.base.GreyException, java.io.IOException, InterruptedException
+	{
+		FileOps.deleteDirectory(rootdir);
+		int benchsize = 100 * 1000;
+		benchmark_mode = true;
+		consumed_cnt = 0;
+		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
+		def.name = "producertest-bulk";
+		def.hasNafman = false;
+		def.surviveHandlers = false;
+		Dispatcher d = Dispatcher.create(def, null, logger);
+		Producer<String> p = new Producer<String>(String.class, d, this);
+		d.start();
+		long systime1 = System.currentTimeMillis();
+		for (int idx = 0; idx != benchsize; idx++) {
+			p.produce("How fast can you go", null);
+		}
+		long systime2 = System.currentTimeMillis();
+		d.stop(null);
+		d.waitStopped();
+		p.shutdown(true);
+		System.out.println("BulkTest-"+benchsize+" = "+TimeOps.expandMilliTime(systime2 - systime1));
+		org.junit.Assert.assertEquals(benchsize, consumed_cnt);
+		benchmark_mode = false;
+	}
+
 	@Override
 	public void producerIndication(Producer<?> p) throws java.io.IOException
 	{
@@ -94,9 +120,9 @@ public class ProducerTest
 		items.add(produced_items.get(4));
 		items.add(produced_items.get(5));
 		p.produce(produced_items.get(0), d);
-		if (dthrd != null) try {Thread.sleep(100);} catch (Exception ex) {}
+		if (dthrd != null) Timer.sleep(100);
 		p.produce(new String[]{produced_items.get(1), produced_items.get(2), produced_items.get(3)}, d);
-		if (dthrd != null) try {Thread.sleep(100);} catch (Exception ex) {}
+		if (dthrd != null) Timer.sleep(100);
 		p.produce(items, d);
 	}
 
@@ -107,33 +133,5 @@ public class ProducerTest
 		for (int idx = 0; idx != items_to_produce.length; idx++) {
 			produced_items.add(phase+"-"+items_to_produce[idx]);
 		}
-	}
-
-	// This runs in a very reasonable time, but larger values can be attempted for interactive testing
-	@org.junit.Test
-	public void bulktest()
-			throws com.grey.base.GreyException, java.io.IOException, InterruptedException
-	{
-		int benchsize = 100 * 1000;
-		benchmark_mode = true;
-		consumed_cnt = 0;
-		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
-		def.name = "producertest-bulk";
-		def.hasNafman = false;
-		def.surviveHandlers = false;
-		Dispatcher d = Dispatcher.create(def, null, logger);
-		Producer<String> p = new Producer<String>(String.class, d, this);
-		d.start();
-		long systime1 = System.currentTimeMillis();
-		for (int idx = 0; idx != benchsize; idx++) {
-			p.produce("How fast can you go", null);
-		}
-		long systime2 = System.currentTimeMillis();
-		d.stop(null);
-		d.waitStopped();
-		p.shutdown(true);
-		System.out.println("BulkTest-"+benchsize+" = "+TimeOps.expandMilliTime(systime2 - systime1));
-		org.junit.Assert.assertEquals(benchsize, consumed_cnt);
-		benchmark_mode = false;
 	}
 }

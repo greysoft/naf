@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -15,12 +15,12 @@ public final class TimeOps
 	public static final int WDAY1 = SysProps.get("grey.weekday1", 2);
 
 	// these sequences have to start with SUN to align with java.util.Calendar.DAY_OF_WEEK
-	private static final String[] shortdays = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
-	//private static final String[] longdays = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+	public static final String[] shortdays = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+	public static final String[] longdays = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 
-	static final String[] shortmonths = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep",
+	public static final String[] shortmonths = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep",
 		"Oct", "Nov", "Dec"};
-	static final String[] longmonths = {"January", "February", "March", "April", "May", "June", "July",
+	public static final String[] longmonths = {"January", "February", "March", "April", "May", "June", "July",
 		"August", "September", "October", "November", "December"};
 
 	public static final long MSECS_PER_SECOND = 1000L;
@@ -28,6 +28,9 @@ public final class TimeOps
 	public static final long MSECS_PER_HOUR = 60L * MSECS_PER_MINUTE;
 	public static final long MSECS_PER_DAY = 24L * MSECS_PER_HOUR;
 
+	private static final int MAXTIME32DIGITS = Integer.toString(Integer.MAX_VALUE).length(); //gives max length of Unix 32-bit timestamp
+	private static final int MAXTIMEDIGITS = MAXTIME32DIGITS+3; //+3 for the milliseconds precision of the Java timestamp
+	private static final long THRESHOLD_TIME = thresholdPaddedTime();
 
 	public static StringBuilder makeTimeRFC822(long systime, StringBuilder buf)
 	{
@@ -57,9 +60,6 @@ public final class TimeOps
 	public static StringBuilder makeTimeRFC822(java.util.Calendar dtcal, StringBuilder buf)
 	{
 		if (buf == null) buf = new StringBuilder();
-		long gmtoff = dtcal.getTimeZone().getOffset(dtcal.getTimeInMillis()) / MSECS_PER_MINUTE;
-		long gmtdist = Math.abs(gmtoff);
-		char zonesign = (gmtoff == gmtdist ? '+' : '-');
 		buf.append(shortdays[dtcal.get(dtcal.DAY_OF_WEEK)-1]).append(", ");
 		StringOps.zeroPad(buf, dtcal.get(dtcal.DAY_OF_MONTH), 2).append(' ');
 		buf.append(shortmonths[dtcal.get(dtcal.MONTH)]).append(' ');
@@ -67,11 +67,8 @@ public final class TimeOps
 		StringOps.zeroPad(buf, dtcal.get(dtcal.HOUR_OF_DAY), 2).append(':');
 		StringOps.zeroPad(buf, dtcal.get(dtcal.MINUTE), 2).append(':');
 		StringOps.zeroPad(buf, dtcal.get(dtcal.SECOND), 2);
-		//append the timezone in differential form
-		buf.append(' ').append(zonesign);
-		StringOps.zeroPad(buf, (int)(gmtdist / 60), 2);  //whole hours
-		StringOps.zeroPad(buf, (int)(gmtdist % 60), 2);  //minutes - not all zones are 60 minutes apart
-		return buf;
+		buf.append(' ');
+		return withDiffZone(dtcal, buf);
 	}
 
 	@SuppressWarnings("static-access")
@@ -129,6 +126,18 @@ public final class TimeOps
 			buf.append('.');
 			StringOps.zeroPad(buf, dtcal.get(dtcal.MILLISECOND), 3);
 		}
+		return buf;
+	}
+
+	//appends the timezone in differential form
+	public static StringBuilder withDiffZone(java.util.Calendar dtcal, StringBuilder buf)
+	{
+		long gmtoff = dtcal.getTimeZone().getOffset(dtcal.getTimeInMillis()) / MSECS_PER_MINUTE;
+		long gmtdist = Math.abs(gmtoff);
+		char zonesign = (gmtoff == gmtdist ? '+' : '-');
+		buf.append(zonesign);
+		StringOps.zeroPad(buf, (int)(gmtdist / 60), 2);  //whole hours
+		StringOps.zeroPad(buf, (int)(gmtdist % 60), 2);  //minutes - not all zones are 60 minutes apart
 		return buf;
 	}
 
@@ -271,5 +280,32 @@ public final class TimeOps
 		}
 		sb.append(')');
 		return sb.toString();
+	}
+
+	public static final StringBuilder zeroPad(long systime, StringBuilder sb)
+	{
+		if (systime < THRESHOLD_TIME) {
+			int len = sb.length();
+			sb.append(systime);
+			int pad = MAXTIMEDIGITS - (sb.length() - len);
+			sb.setLength(len);
+			for (int loop = 0; loop != pad; loop++) sb.append('0');
+			sb.append(systime);
+		} else {
+			sb.append(systime);
+		}
+		return sb;
+	}
+
+	// Determine the minimum time which requires the max number of Unix-time digits to represent it.
+	// From Sep 9th 2001 till Jan 19th 2038 (when 32-bit Unix seconds-time wraps around) the Java milliseconds
+	// time will be a constant 13 digits in length, and so will not need zero padding.
+	// In fact, Java time won't exceed 13 digits till the year 2286!
+	private static long thresholdPaddedTime()
+	{
+		StringBuilder sb = new StringBuilder();
+		for (int loop = 0; loop < MAXTIMEDIGITS - 1; loop++) sb.append('9');
+		long systime = Long.valueOf(sb.toString()).longValue();
+		return systime + 1;
 	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -11,7 +11,6 @@ public final class IOExecReader
 	private static final int F_ARRBACK = 1 << 0; //rcvbuf has backing array
 	private static final int F_ENABLED = 1 << 1; //receive is currently enabled
 	private static final int F_HASDLM = 1 << 2;  //current receive phase is delimited by particular byte value (rcvdlm)
-	private static final int F_UDP = 1 << 3; //iochan is UDP socket and callback requires remote address
 
 	private final com.grey.naf.BufferSpec bufspec;
 	private final java.nio.ByteBuffer rcvbuf;
@@ -29,9 +28,9 @@ public final class IOExecReader
 	private void clearFlag(int f) {iostate &= ~f;}
 	private boolean isFlagSet(int f) {return ((iostate & f) != 0);}
 
-	public IOExecReader(com.grey.naf.BufferSpec spec) {this(spec, false);}
+	public int getBufferSize() {return bufspec.rcvbufsiz;}
 
-	public IOExecReader(com.grey.naf.BufferSpec spec, boolean udp)
+	public IOExecReader(com.grey.naf.BufferSpec spec)
 	{
 		bufspec = spec;
 		rcvbuf = com.grey.base.utils.NIOBuffers.create(bufspec.rcvbufsiz, bufspec.directbufs);
@@ -46,7 +45,6 @@ public final class IOExecReader
 			arrb = new byte[bufspec.rcvbufsiz];
 			rcvbuf0 = 0;
 		}
-		if (udp) setFlag(F_UDP);
 		userbuf = new com.grey.base.utils.ArrayRef<byte[]>(arrb);
 		userbuf.ar_len = 0;
 	}
@@ -75,6 +73,9 @@ public final class IOExecReader
 
 	public void receiveDelimited(byte dlm, boolean enableOnly) throws com.grey.base.FaultException, java.io.IOException
 	{
+		if (chanmon.isUDP()) {
+			throw new java.lang.IllegalArgumentException("IOExecReader: Delimited receives not allowed in UDP mode");
+		}
 		setFlag(F_HASDLM);
 		rcvdlm = dlm;
 		startReceive(0, enableOnly);
@@ -88,8 +89,7 @@ public final class IOExecReader
 			// assuming our code is error-free, an exception here typically means the remote party has closed the connection
 			if (!isFlagSet(F_ENABLED)) chanmon.enableRead();
 		} catch (Exception ex) {
-			chanmon.dsptch.logger.log(LEVEL.TRC2, ex, false, "IOExec: failed to enable Read");
-			chanmon.ioDisconnected();
+			chanmon.brokenPipe(LEVEL.TRC2, "I/O error on Receive registration", "IOExec: failed to enable Read", ex);
 			return;
 		}
 		setFlag(F_ENABLED);
@@ -116,16 +116,22 @@ public final class IOExecReader
 	// Could check Dispatcher.canRead(SelectionKey), but read() safely returns zero if no data, so we can save ourselves the method call.
 	protected void handleIO() throws com.grey.base.FaultException, java.io.IOException
 	{
+		handleIO(null);
+	}
+
+	protected void handleIO(java.nio.ByteBuffer srcbuf) throws com.grey.base.FaultException, java.io.IOException
+	{
 		int bufpos = 0;
 		int nbytes = -1;  //will remain -1 if channel-read throws
-		java.net.SocketAddress remaddr = null;
+		java.net.InetSocketAddress remaddr = null;
+		String discmsg = "Remote disconnect";
 
 		// Windows (or Java?) doesn't reliably report a lost connection by returning -1, so trap exceptions and interpret in same way
 		try {
-			if (isFlagSet(F_UDP)) {
+			if (chanmon.isUDP()) {
 				java.nio.channels.DatagramChannel iochan = (java.nio.channels.DatagramChannel)chanmon.iochan;
 				rcvbuf.clear();
-				remaddr = iochan.receive(rcvbuf);
+				remaddr = (java.net.InetSocketAddress)iochan.receive(rcvbuf);
 				nbytes = rcvbuf.position();
 			} else {
 				if (scanmark == bufspec.rcvbufsiz) {
@@ -133,20 +139,25 @@ public final class IOExecReader
 					compact();
 				}
 				if (!isFlagSet(F_ARRBACK)) bufpos = rcvbuf.position();
-				java.nio.channels.ReadableByteChannel iochan = (java.nio.channels.ReadableByteChannel)chanmon.iochan;
-				nbytes = iochan.read(rcvbuf);
+				if (srcbuf != null) {
+					nbytes = chanmon.dsptch.transfer(srcbuf, rcvbuf);
+				} else {
+					java.nio.channels.ReadableByteChannel iochan = (java.nio.channels.ReadableByteChannel)chanmon.iochan;
+					nbytes = iochan.read(rcvbuf);
+				}
 			}
 		} catch (Exception ex) {
 			if (ex instanceof java.net.PortUnreachableException) return;  //indicates we've just received associated ICMP packet - discard
-			chanmon.dsptch.logger.log(LEVEL.TRC3, ex, false, "IOExec: read() failed on "+chanmon.iochan);
+			discmsg = "Broken pipe on Receive";
+			LEVEL lvl = LEVEL.TRC3;
+			if (chanmon.dsptch.logger.isActive(lvl)) {
+				chanmon.dsptch.logger.log(lvl, ex, false, "IOExec: read() failed on "+chanmon.iochan);
+			}
 		}
+		if (nbytes == 0) return;
 
 		if (nbytes == -1) {
-			chanmon.ioDisconnected();
-			return;
-		}
-
-		if (nbytes == 0) {
+			chanmon.ioDisconnected(discmsg);
 			return;
 		}
 
@@ -156,14 +167,29 @@ public final class IOExecReader
 			rcvbuf.get(userbuf.ar_buf, bufpos, nbytes);  //rcvbuf is known to be zero in this case
 		}
 
-		if (isFlagSet(F_UDP)) {
+		if (chanmon.isUDP()) {
 			// All data is always passed up as soon as it arrives, so can optimise this case
 			userbuf.ar_off = rcvbuf0;
 			userbuf.ar_len = nbytes;
 			chanmon.ioReceived(userbuf, remaddr);
 			return;
 		}
-		while (receive() != 0);
+
+		while (receive() != 0) {
+			if (chanmon != null && chanmon.sslconn != null && srcbuf == null) {
+				// We've obviously switched to SSL mode while working through the contents of the last read, and
+				// the rest of it is part of the SSL phase. Hand it off to the SSL manager and our own handleIO()
+				// will not get called again to do a socket read.
+				rcvbuf.limit(rcvbuf.position());
+				rcvbuf.position(readmark);
+				scanmark = rcvbuf.position(); //guard against callbacks from sslconn.handleIO()
+				chanmon.sslconn.handleIO(rcvbuf);
+				rcvbuf.clear();
+				scanmark = 0;
+				readmark = 0;
+				break;
+			}
+		}
 	}
 
 	private int receive() throws com.grey.base.FaultException, java.io.IOException

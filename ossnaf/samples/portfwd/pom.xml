@@ -7,7 +7,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.grey.naf.samples</groupId>
 	<artifactId>portfwd</artifactId>
-	<version>1.0.1</version>
+	<version>${grey.version.naf}</version>
 	<name>Port Forwarder</name>
 	<parent>
 		<groupId>com.grey.naf.samples</groupId>

@@ -96,16 +96,16 @@ public class Base64Test
 		byte[] rawbuf = new byte[encbuf.length * 4];
 		com.grey.base.utils.ByteChars bc = new com.grey.base.utils.ByteChars(rawbuf, encoff + 2, 4, false);
 
-		char[] encdata = Base64.encode(plaindata, origoff, plainlen, linesize, cb);
-		byte[] plaindata2 = Base64.decode(encdata, cb.ar_off, cb.ar_len, bc);
+		char[] encdata = Base64.encode(plaindata, origoff, plainlen, linesize, cb.clear());
+		byte[] plaindata2 = Base64.decode(encdata, cb.ar_off, cb.ar_len, bc.clear());
 		String dstr = new String(plaindata2, bc.ar_off, bc.ar_len);
 		org.junit.Assert.assertEquals(origtxt, dstr);
 
 		bc = new ByteChars(1);
-		byte[] encbdata = Base64.encodeBytes(plaindata, 0, plaindata.length, linesize, bc);
+		byte[] encbdata = Base64.encodeBytes(plaindata, 0, plaindata.length, linesize, bc.clear());
 		org.junit.Assert.assertSame(encbdata, bc.ar_buf);
 		bc = new ByteChars(1);
-		plaindata2 = Base64.decodeBytes(encbdata, 0, encbdata.length, bc);
+		plaindata2 = Base64.decodeBytes(encbdata, 0, encbdata.length, bc.clear());
 		org.junit.Assert.assertSame(plaindata2, bc.ar_buf);
 		org.junit.Assert.assertArrayEquals(plaindata, plaindata2);
 	}

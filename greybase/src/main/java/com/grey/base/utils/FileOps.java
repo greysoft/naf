@@ -46,6 +46,7 @@ public class FileOps
 	public static void writeTextFile(String pthnam, String txt) throws java.io.IOException {writeTextFile(new java.io.File(pthnam), txt, false);}
 	public static int deleteDirectory(String pthnam) throws java.io.IOException {return deleteDirectory(new java.io.File(pthnam));}
 	public static boolean ensureDirExists(String pthnam) throws java.io.IOException  {return ensureDirExists(new java.io.File(pthnam));}
+	public static void deleteFile(java.io.File fh) throws java.io.IOException {deleteFile(fh, "");}
 
 
 	// Read requested number of bytes from stream, and return as byte array.
@@ -207,10 +208,10 @@ public class FileOps
 		}
 	}
 
-	public static int readTextLines(java.io.InputStream strm, LineReader consumer, int mode, Object cbdata) throws java.io.IOException
+	public static int readTextLines(java.io.InputStream strm, LineReader consumer, int mode, Object cbdata, int bufsiz) throws java.io.IOException
 	{
 		java.io.InputStreamReader cstrm = new java.io.InputStreamReader(strm);
-		java.io.BufferedReader bstrm = new java.io.BufferedReader(cstrm);
+		java.io.BufferedReader bstrm = new java.io.BufferedReader(cstrm, bufsiz);
 		int lno = 0;
 		String line;
 		try {
@@ -227,16 +228,16 @@ public class FileOps
 		return lno;
 	}
 
-	public static int readTextLines(java.io.File fh, LineReader consumer, int mode, Object cbdata) throws java.io.IOException
+	public static int readTextLines(java.io.File fh, LineReader consumer, int mode, Object cbdata, int bufsiz) throws java.io.IOException
 	{
 		java.io.InputStream strm = new java.io.FileInputStream(fh);
-		return readTextLines(strm, consumer, mode, cbdata);
+		return readTextLines(strm, consumer, mode, cbdata, bufsiz);
 	}
 
-	public static int readTextLines(java.net.URL path, LineReader consumer, int mode, Object cbdata) throws java.io.IOException
+	public static int readTextLines(java.net.URL path, LineReader consumer, int mode, Object cbdata, int bufsiz) throws java.io.IOException
 	{
 		java.io.InputStream strm = path.openStream();
-		return readTextLines(strm, consumer, mode, cbdata);
+		return readTextLines(strm, consumer, mode, cbdata, bufsiz);
 	}
 
 	public static long copyFile(java.io.File srcfile, java.io.File dstfile) throws java.io.IOException
@@ -274,11 +275,7 @@ public class FileOps
 			return;
 		}
 		copyFile(srcfile, dstfile);
-
-		if (!srcfile.delete()) {
-			throw new java.io.IOException("MoveFile: Failed to delete srcfile="+srcfile.getAbsolutePath()
-					+" - already copied to "+dstfile.getAbsolutePath());
-		}
+		deleteFile(srcfile, "MoveFile: ");
 	}
 
 	public static void moveFile(CharSequence srcpath, CharSequence dstpath) throws java.io.IOException
@@ -286,6 +283,17 @@ public class FileOps
 		java.io.File srcfile = new java.io.File(srcpath.toString());
 		java.io.File dstfile = new java.io.File(dstpath.toString());
 		moveFile(srcfile, dstfile);
+	}
+
+	private static void deleteFile(java.io.File fh, String tag) throws java.io.IOException
+	{
+		if (!fh.delete()) {
+			//we didn't delete the file - but maybe that's because another thread or process got there first
+			if (fh.exists()) {
+				//... no, it's definitely the case that we have failed to delete this file
+				throw new java.io.IOException(tag+"Failed to delete "+(fh.isDirectory()?"directory":"file")+"="+fh.getAbsolutePath());
+			}
+		}
 	}
 
 	public static int copyStream(java.io.InputStream istrm, java.io.OutputStream ostrm) throws java.io.IOException
@@ -365,14 +373,10 @@ public class FileOps
 		int dirsize = (files == null ? 0 : files.length);
 		int cnt = 0;
 
-		for (int idx = 0; idx != dirsize; idx++)
-		{
-			if (files[idx].isDirectory())
-			{
+		for (int idx = 0; idx != dirsize; idx++) {
+			if (files[idx].isDirectory()) {
 				if (recursive) cnt += countFiles(files[idx], filter, stopOnFirst, true);
-			}
-			else
-			{
+			} else {
 				cnt++;
 			}
 			if (stopOnFirst && cnt != 0) return cnt;
@@ -389,14 +393,10 @@ public class FileOps
 		int dirsize = (files == null ? 0 : files.length);
 		int cnt = 0;
 
-		for (int idx = 0; idx != dirsize; idx++)
-		{
-			if (files[idx].isDirectory())
-			{
+		for (int idx = 0; idx != dirsize; idx++) {
+			if (files[idx].isDirectory()) {
 				if (recursive) cnt += countFiles(files[idx], filter, stopOnFirst, true);
-			}
-			else
-			{
+			} else {
 				cnt++;
 			}
 			if (stopOnFirst && cnt != 0) return cnt;
@@ -417,33 +417,26 @@ public class FileOps
 		int dirsize = (files == null ? 0 : files.length);
 		int cnt = 0;
 
-		for (int idx = 0; idx != dirsize; idx++)
-		{
-			if (files[idx].isDirectory())
-			{
+		for (int idx = 0; idx != dirsize; idx++) {
+			if (files[idx].isDirectory()) {
 				if (recursive) cnt += deleteOlderThan(files[idx], min_age, filter, true);
-			}
-			else
-			{
-				if (min_age == -1 || files[idx].lastModified() < min_age)
-				{
-					if (!files[idx].delete()) throw new java.io.IOException("Failed to delete file="+files[idx].getAbsolutePath());
+			} else {
+				if (min_age == -1 || files[idx].lastModified() < min_age) {
+					deleteFile(files[idx]);
 					cnt++;
 				}
 			}
 		}
-
-		if (min_age == -1)
-		{
-			if (!dirh.delete()) throw new java.io.IOException("Failed to delete directory="+dirh.getAbsolutePath());
-		}
+		if (min_age == -1) deleteFile(dirh);
 		return cnt;
 	}
 
 	public static boolean ensureDirExists(java.io.File dirh) throws java.io.IOException
 	{
 		if (dirh.exists()) return false;
-		if (!dirh.mkdirs()) throw new java.io.IOException("Failed to create directory: "+dirh.getAbsoluteFile());
+		if (!dirh.mkdirs()) {
+			if (!dirh.exists() || !dirh.isDirectory()) throw new java.io.IOException("Failed to create directory: "+dirh.getAbsoluteFile());
+		}
 		return true;
 	}
 
@@ -471,14 +464,10 @@ public class FileOps
 	{
 		byte[] buf = null;
 
-		if (bufh == null)
-		{
+		if (bufh == null) {
 			if (size != 0) buf = new byte[size];
-		}
-		else
-		{
-			if (bufh.ar_buf.length - bufh.ar_off < size)
-			{
+		} else {
+			if (bufh.ar_buf.length - bufh.ar_off < size) {
 				bufh.ar_buf = new byte[size];
 				bufh.ar_off = 0;
 			}

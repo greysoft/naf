@@ -4,18 +4,14 @@
  */
 package com.grey.naf.reactor;
 
-import com.grey.base.config.SysProps;
-import com.grey.naf.reactor.Dispatcher;
-import com.grey.naf.reactor.Timer;
-
 public class TimerTest
 {
 	static {
-		SysProps.set(com.grey.naf.Config.SYSPROP_DIRPATH_VAR, SysProps.TMPDIR+"/utest/timer");
+		DispatcherTest.initPaths(TimerTest.class);
 	}
 
 	private static class Handler
-		implements com.grey.naf.reactor.Timer.Handler
+		implements Timer.Handler
 	{
 		Timer tmr2;
 		Timer tmr3;
@@ -55,7 +51,7 @@ public class TimerTest
 		}
 
 		@Override
-		public void eventError(Timer tmr, com.grey.naf.reactor.Dispatcher d, Throwable ex)
+		public void eventError(Timer tmr, Dispatcher d, Throwable ex)
 		{
 			throw new RuntimeException("Throwing fatal error to halt Dispatcher");
 		}

@@ -44,7 +44,7 @@ public class GreyException extends Exception
 		return strbuf.toString();
 	}
 
-	public GreyException() {}
+	public GreyException() {super();}
 	public GreyException(String msg) {super(msg);}
 	public GreyException(Throwable ex, String msg) {super(msg, ex);}
 }

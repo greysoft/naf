@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -8,20 +8,19 @@ import com.grey.logging.Logger.LEVEL;
 
 public final class IOExecWriter
 {
-	private final com.grey.naf.BufferSpec bufspec;
+	public final com.grey.naf.BufferSpec bufspec;
 	private final com.grey.base.utils.ObjectQueue<java.nio.ByteBuffer> xmtq;
 	private ChannelMonitor chanmon;
-	private int writemark;  // current position in buffer at head of queue
+	private int writemark;  //current position in buffer at head of xmtq queue
 
 	private java.nio.channels.FileChannel file_chan;
 	private long file_bufsiz;
 	private long file_limit;
 	private long file_pos;
 
-	// temp working buffer, preallocated (on demand) for efficiency
-	private byte[] transferbuf;
-
 	public boolean isBlocked() {return (xmtq.size() != 0 || file_chan != null);}
+	public boolean transmit(java.nio.channels.FileChannel fchan) throws java.io.IOException {return transmit(fchan, 0, 0, 0);}
+	public boolean transmit(CharSequence data) throws java.io.IOException {return transmit(data, 0, data.length());}
 
 	public IOExecWriter(com.grey.naf.BufferSpec spec)
 	{
@@ -47,12 +46,12 @@ public final class IOExecWriter
 		boolean sent = false;
 		while (len != 0) {
 			int chunk = (len > bufspec.xmtbufsiz ? bufspec.xmtbufsiz : len);
-			java.nio.ByteBuffer niobuf = bufspec.xmtpool.extract();
+			java.nio.ByteBuffer niobuf = allocBuffer();
 			try {
 				com.grey.base.utils.NIOBuffers.encode(data, off, chunk, niobuf, bufspec.directbufs);
 				sent = transmit(niobuf);
 			} finally {
-				bufspec.xmtpool.store(niobuf);
+				releaseBuffer(niobuf);
 			}
 			off += chunk;
 			len -= chunk;
@@ -63,12 +62,12 @@ public final class IOExecWriter
 	// NB: The caller is responsible for ensuring that this writer's buffer-size can take the encoded string
 	public boolean transmit(java.nio.CharBuffer data, java.nio.charset.CharsetEncoder chenc) throws java.io.IOException
 	{
-		java.nio.ByteBuffer niobuf = bufspec.xmtpool.extract();
+		java.nio.ByteBuffer niobuf = allocBuffer();
 		try {
 			com.grey.base.utils.NIOBuffers.encode(data, niobuf, chenc, bufspec.directbufs);
 			return transmit(niobuf);
 		} finally {
-			bufspec.xmtpool.store(niobuf);
+			releaseBuffer(niobuf);
 		}
 	}
 
@@ -79,12 +78,12 @@ public final class IOExecWriter
 		boolean sent = false;
 		while (len != 0) {
 			int chunk = (len > bufspec.xmtbufsiz ? bufspec.xmtbufsiz : len);
-			java.nio.ByteBuffer niobuf = bufspec.xmtpool.extract();
+			java.nio.ByteBuffer niobuf = allocBuffer();
 			try {
 				com.grey.base.utils.NIOBuffers.encode(data, off, chunk, niobuf, bufspec.directbufs);
 				sent = transmit(niobuf);
 			} finally {
-				bufspec.xmtpool.store(niobuf);
+				releaseBuffer(niobuf);
 			}
 			off += chunk;
 			len -= chunk;
@@ -92,72 +91,92 @@ public final class IOExecWriter
 		return sent;
 	}
 
-	// It's up to all callers to set position and limit as appropriate before calling into here.
-	// All the calls from within this class guarantee that position=0.
+	// This method writes data in the range position() to limit() and on return position() is advanced by the
+	// number of bytes written.
+	// It's up to all callers to set position and limit as appropriate before calling into here. All the calls
+	// from within this class guarantee that position=0.
 	public boolean transmit(java.nio.ByteBuffer xmtbuf) throws java.io.IOException
+	{
+		if (chanmon.sslconn != null) {
+			boolean done = chanmon.sslconn.transmit(xmtbuf);
+			return (done && !isBlocked());
+		}
+		return write(xmtbuf);
+	}
+
+	protected boolean write(java.nio.ByteBuffer xmtbuf) throws java.io.IOException
 	{
 		int initpos = xmtbuf.position();
 		if (isBlocked()) {
-			enqueue(xmtbuf, initpos, xmtbuf.limit());
+			if (file_chan != null) throw new IllegalStateException("Sending ByteBuffer before previous send-file completes");
+			enqueue(xmtbuf, initpos, xmtbuf.remaining());
 			return false;
 		}
-		writemark = sendBuffer(xmtbuf);
-		if (writemark == -1) return false;
+		int nbytes = sendBuffer(xmtbuf);
+		if (nbytes == -1) return false;
 		int remainbytes = xmtbuf.remaining();
 		if (remainbytes == 0) return true;
-		
-		// the partially written (potentially completely unwritten) buffer becomes the head of the queue - writemark is already set
-		if (chanmon.dsptch.logger.isActive(LEVEL.TRC2)) {
-			chanmon.dsptch.logger.log(LEVEL.TRC2, "IOExec: Send blocked with "+writemark+"/"+remainbytes+" - "+chanmon.iochan);
+
+		// the partially written (or completely unwritten) buffer becomes the head of the queue
+		LEVEL lvl = LEVEL.TRC3;
+		if (chanmon.dsptch.logger.isActive(lvl)) {
+			chanmon.dsptch.logger.log(lvl, "IOExec: Send blocked with "+nbytes+"/"+remainbytes+"/xmtq="+xmtq.size()+" - "+chanmon.iochan);
 		}
-		writemark += initpos;
+		writemark = initpos + nbytes;
 		enqueue(xmtbuf, writemark, remainbytes);
 		enableWrite();
 		return false;
 	}
 
+	/**
+	 * This may be called if the channel is still blocked by a backlog of ByteBuffer writes, but nothing (including another
+	 * file) should be sent if the channel is still blocked on a previous file-send.
+	 */
 	public boolean transmit(java.nio.channels.FileChannel fchan, long bufsiz, long pos, long limit) throws java.io.IOException
 	{
-		if (isBlocked()) throw new IllegalStateException("Cannot transmit FileChannel on blocked I/O channel");
-		file_pos = pos;
-		if ((file_limit = limit) == 0) file_limit = fchan.size();
-		if ((file_bufsiz = bufsiz) == 0) file_bufsiz = file_limit - file_pos;
+		if (limit == 0) limit = fchan.size();
+		if (bufsiz == 0) bufsiz = limit - pos;
 
+		if (chanmon.sslconn != null) {
+			boolean done = chanmon.sslconn.transmit(fchan, pos, limit);
+			return (done && !isBlocked());
+		}
+		file_pos = pos;
+		file_limit = limit;
+		file_bufsiz = bufsiz;
+
+		if (isBlocked()) {
+			// mark file to be sent once channel is unblocked.
+			if (file_chan != null) throw new IllegalStateException("Sending file before previous send-file completes");
+			file_chan = fchan;
+			return false;
+		}
 		if (sendFile(fchan)) return true;
 		enableWrite();
 		file_chan = fchan;
 		return false;
 	}
 
+	// Recall that a file-send can be initiated while previous ByteBuffer sends are still backlogged, so
+	// this method makes sure all pending ByteBuffers have been sent before checking for a file-send.
 	protected void handleIO() throws com.grey.base.FaultException, java.io.IOException
 	{
-		boolean done = false;
+		boolean done = drainQueue();
 
-		if (file_chan != null)
-		{
-			java.nio.channels.FileChannel fchan = file_chan;
-			file_chan = null;
-			done = sendFile(fchan);
-			file_chan = fchan;
-		}
-		else
-		{
-			done = drainQueue();	
+		if (done && file_chan != null) {
+			done = sendFile(file_chan);
 		}
 
-		if (done)
-		{
+		if (done) {
 			// we've drained the write backlog, so reset Dispatcher registration
+			file_chan = null;
 			endTransmit();
 		}
 	}
 
 	private void endTransmit() throws com.grey.base.FaultException, java.io.IOException
 	{
-		file_chan = null;
-
-		if (chanmon != null)
-		{
+		if (chanmon != null) {
 			// The I/O operation is already over, so just swallow any exceptions.
 			// They are probably due to a remote disconnect, and we can handle that later if/when we do any more I/O on this channel
 			try {
@@ -171,16 +190,14 @@ public final class IOExecWriter
 
 	private boolean drainQueue() throws java.io.IOException
 	{
-		while (xmtq.size() != 0)
-		{
+		while (xmtq.size() != 0) {
 			if (chanmon == null) break;
 			int nbytes;
 			java.nio.ByteBuffer xmtbuf = xmtq.peek();
 			xmtbuf.position(writemark);
 			if ((nbytes = sendBuffer(xmtbuf)) == -1) return false;
 
-			if (xmtbuf.remaining() != 0)
-			{
+			if (xmtbuf.remaining() != 0) {
 				writemark += nbytes;
 				return false;
 			}
@@ -192,39 +209,19 @@ public final class IOExecWriter
 	
 	private void enqueue(java.nio.ByteBuffer xmtbuf, int xmtoff, int xmtbytes)
 	{
-		if (xmtbuf.isReadOnly())
-		{
+		if (xmtbuf.isReadOnly()) {
 			// no need to take a copy of buffer, as its contents are guaranteed to be preserved while it's on the transmit queue
 			xmtq.add(xmtbuf);
 			return;
 		}
 		writemark = 0; // we will be copying into start of allocated queue buffer
 
-		while (xmtbytes != 0)
-		{
-			java.nio.ByteBuffer buf = bufspec.xmtpool.extract();
-			int nbytes = (xmtbytes > bufspec.xmtbufsiz ? bufspec.xmtbufsiz : xmtbytes);
+		while (xmtbytes != 0) {
+			java.nio.ByteBuffer buf = allocBuffer();
+			xmtbuf.position(xmtoff);
+			xmtbuf.limit(xmtoff + xmtbytes);
+			int nbytes = chanmon.dsptch.transfer(xmtbuf, buf);
 			buf.limit(nbytes);
-
-			if (xmtbuf.hasArray())
-			{
-				buf.position(0);
-				buf.put(xmtbuf.array(), xmtbuf.arrayOffset() + xmtoff, nbytes);
-			}
-			else if (buf.hasArray())
-			{
-				xmtbuf.position(xmtoff);
-				xmtbuf.get(buf.array(), buf.arrayOffset(), nbytes);
-			}
-			else
-			{
-				// neither buffer exposes its backing array - need to copy via intermediate primitive buffer, to avail of bulk get/put
-				if (transferbuf == null || transferbuf.length < nbytes) transferbuf = new byte[nbytes];
-				xmtbuf.position(xmtoff);
-				xmtbuf.get(transferbuf, 0, nbytes);
-				buf.position(0);
-				buf.put(transferbuf, 0, nbytes);
-			}
 			xmtq.add(buf);
 			xmtbytes -= nbytes;
 			xmtoff += nbytes;
@@ -235,7 +232,7 @@ public final class IOExecWriter
 	private void dequeue()
 	{
 		java.nio.ByteBuffer buf = xmtq.remove();
-		if (!buf.isReadOnly()) bufspec.xmtpool.store(buf);
+		if (!buf.isReadOnly()) releaseBuffer(buf);
 	}
 
 	// It turns out that the first FileChannel.transferTo() on an unblocked connection succeeds whatever its size,
@@ -245,8 +242,7 @@ public final class IOExecWriter
 	private boolean sendFile(java.nio.channels.FileChannel fchan) throws java.io.IOException
 	{
 		java.nio.channels.WritableByteChannel iochan = (java.nio.channels.WritableByteChannel)chanmon.iochan;
-		while (file_pos != file_limit)
-		{
+		while (file_pos != file_limit) {
 			long nbytes = 0;
 			long cnt = file_limit - file_pos;
 			if (cnt > file_bufsiz) cnt = file_bufsiz;
@@ -255,8 +251,10 @@ public final class IOExecWriter
 				// this throws on closed channel (java.io.IOException) or other error, so we can't be sure it's closed, but it might as well be
 				nbytes = fchan.transferTo(file_pos, cnt, iochan);
 			} catch (Exception ex) {
-				chanmon.dsptch.logger.log(LEVEL.TRC3, ex, false, "IOExec: file-send failed on "+iochan);
-				chanmon.ioDisconnected();
+				LEVEL lvl = LEVEL.TRC3;
+				String errmsg = "IOExec: file-send failed";
+				if (chanmon.dsptch.logger.isActive(lvl)) errmsg += " on "+iochan;
+				chanmon.brokenPipe(lvl, "Broken pipe on Send", errmsg, ex);
 				return true;
 			}
 			file_pos += nbytes;
@@ -273,8 +271,10 @@ public final class IOExecWriter
 			// this throws on closed channel (java.io.IOException) or other error, so we can't be sure it's closed, but it might as well be
 			nbytes = iochan.write(xmtbuf);
 		} catch (Exception ex) {
-			chanmon.dsptch.logger.log(LEVEL.TRC3, ex, false, "IOExec: buffer-send failed on "+iochan);
-			chanmon.ioDisconnected();
+			LEVEL lvl = LEVEL.TRC3;
+			String errmsg = "IOExec: buffer-send failed";
+			if (chanmon.dsptch.logger.isActive(lvl)) errmsg += " on "+iochan;
+			chanmon.brokenPipe(lvl, "Broken pipe on Send", errmsg, ex);
 		}
 		return nbytes;
 	}
@@ -286,8 +286,19 @@ public final class IOExecWriter
 			// Assuming our code is error-free, an exception here typically means the remote party has closed the connection.
 			chanmon.enableWrite();
 		} catch (Exception ex) {
-			chanmon.dsptch.logger.log(LEVEL.TRC2, ex, false, "IOExec: failed to enable Write");
-			chanmon.ioDisconnected();
+			chanmon.brokenPipe(LEVEL.TRC2, "I/O error on Send registration", "IOExec: failed to enable Write", ex);
 		}
+	}
+
+	private java.nio.ByteBuffer allocBuffer()
+	{
+		java.nio.ByteBuffer buf = bufspec.xmtpool.extract();
+		buf.clear();
+		return buf;
+	}
+
+	private void releaseBuffer(java.nio.ByteBuffer buf)
+	{
+		bufspec.xmtpool.store(buf);
 	}
 }

@@ -12,7 +12,7 @@ public class LoggerAdapter
 	implements java.io.Closeable, java.io.Flushable
 {
 	private static final long serialVersionUID = 1L;
-	private static final boolean dumpStack = com.grey.base.config.SysProps.get("grey.logging.slf4j.dumpstack", true);
+	private static final boolean dumpStack = com.grey.base.config.SysProps.get("grey.logger.slf4j.dumpstack", true);
 
 	private com.grey.logging.Logger logger;
 	private String name;

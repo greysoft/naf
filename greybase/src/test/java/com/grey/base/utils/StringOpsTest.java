@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -55,6 +55,26 @@ public class StringOpsTest
 		org.junit.Assert.assertTrue("Equal StringBuilders", StringOps.sameSeq(sb1, sb2));
 		sb2 = new StringBuilder("xyz");
 		org.junit.Assert.assertFalse("Variant StringBuilders", StringOps.sameSeq(sb1, sb2));
+
+		String pfx = "Now I know my ";
+		String seq = "A Bee See";
+		org.junit.Assert.assertTrue(StringOps.sameSeq(pfx+seq+" so there", pfx.length(), seq.length(), seq));
+		String seq2 = String.valueOf(seq.charAt(0)).toLowerCase()+seq.substring(1);
+		org.junit.Assert.assertFalse(StringOps.sameSeq(pfx+seq+" so there", pfx.length(), seq.length(), seq2));
+		org.junit.Assert.assertTrue(StringOps.sameSeqNoCase(pfx+seq+" so there", pfx.length(), seq.length(), seq2));
+		seq2 = String.valueOf(seq.charAt(0)+1)+seq.substring(1);
+		org.junit.Assert.assertFalse(StringOps.sameSeqNoCase(pfx+seq+" so there", pfx.length(), seq.length(), seq2));
+
+		org.junit.Assert.assertTrue(StringOps.sameSeqNoCase(null, null));
+		org.junit.Assert.assertFalse(StringOps.sameSeqNoCase(null, "a"));
+		org.junit.Assert.assertFalse(StringOps.sameSeqNoCase("a", null));
+		org.junit.Assert.assertTrue(StringOps.sameSeqNoCase("AbC", "abc"));
+		org.junit.Assert.assertFalse(StringOps.sameSeqNoCase("AbC", "axc"));
+
+		org.junit.Assert.assertTrue(StringOps.sameSeq("AbC", 0, 0, null));
+		org.junit.Assert.assertFalse(StringOps.sameSeq("AbC", 0, 1, null));
+		org.junit.Assert.assertTrue(StringOps.sameSeqNoCase("AbC", 0, 0, null));
+		org.junit.Assert.assertFalse(StringOps.sameSeqNoCase("AbC", 0, 1, null));
 	}
 
     @org.junit.Test
@@ -119,6 +139,21 @@ public class StringOpsTest
 		org.junit.Assert.assertEquals(0, cnt);
 		cnt = StringOps.occurrences("", "_");
 		org.junit.Assert.assertEquals(0, cnt);
+
+		StringBuilder sb = new StringBuilder("z before zz and one at the endz");
+		cnt = StringOps.occurrences(sb, 0, sb.length(), 'z');
+		org.junit.Assert.assertEquals(4, cnt);
+		cnt = StringOps.occurrences(sb, 1, sb.length()-1, 'z');
+		org.junit.Assert.assertEquals(3, cnt);
+		cnt = StringOps.occurrences(sb.toString(), 1, sb.length()-1, 'z');
+		org.junit.Assert.assertEquals(3, cnt);
+
+		int pos = StringOps.indexOf(sb, 'z');
+		org.junit.Assert.assertEquals(0, pos);
+		pos = StringOps.indexOf(sb, sb.length()-2, 2, 'z');
+		org.junit.Assert.assertEquals(sb.length()-1, pos);
+		pos = StringOps.indexOf(sb, 'Z');
+		org.junit.Assert.assertEquals(-1, pos);
 	}
 
     @org.junit.Test
@@ -463,4 +498,40 @@ public class StringOpsTest
 		org.junit.Assert.assertEquals(10, StringOps.digits(1000000000));
 		org.junit.Assert.assertEquals(10, StringOps.digits(Integer.MAX_VALUE));
     }
+
+	@org.junit.Test
+	public void testNumbers()
+	{
+		long numval = 37;
+		StringBuilder sb = new StringBuilder();
+
+		// positive decimal
+		String str = String.valueOf(numval);
+		int numval2 = (int)StringOps.parseNumber(str, 10);
+		org.junit.Assert.assertEquals(numval, numval2);
+
+		// with surrounding text
+		sb.setLength(0);
+		sb.append("blah");
+		int off = sb.length();
+		sb.append(numval);
+		int off2 = sb.length();
+		sb.append("more text");
+		numval2 = (int)StringOps.parseNumber(sb, off, off2 - off, 10);
+
+		// hex number
+		sb.setLength(0);
+		sb.append(Long.toHexString(numval));
+		numval2 = (int)StringOps.parseNumber(sb, 16);
+		org.junit.Assert.assertEquals(numval, numval2);
+
+		// invalid number
+		str = "9a";
+		try {
+			numval2 = (int)StringOps.parseNumber(str, 10);
+			org.junit.Assert.fail("parseNumber failed to reject invalid number: -"+str+" - returned "+numval2);
+		} catch (NumberFormatException ex) {
+			// expected error - gets thrown for any invalid char
+		}
+	}
 }

@@ -504,9 +504,8 @@ public class HashedMapTest
     @org.junit.Test
     final public void testGrowBucket()
     {
-        HashedMap<String,String> hmap = new HashedMap<String,String>(3, 3);
     	int cnt = 512;
-    	hmap = new HashedMap<String,String>(2, cnt);
+        HashedMap<String,String> hmap = new HashedMap<String,String>(2, cnt);
     	for (int idx = 0; idx != cnt; idx++) {
     		String str = Integer.toString(idx);
     		hmap.put(str, str+"v");

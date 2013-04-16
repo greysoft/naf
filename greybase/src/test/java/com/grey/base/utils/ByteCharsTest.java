@@ -199,6 +199,16 @@ public class ByteCharsTest
 		org.junit.Assert.assertEquals(barr.length, ah1.size());
 		org.junit.Assert.assertEquals(barr[0], ah1.byteAt(0));
 		org.junit.Assert.assertEquals(barr[barr.length - 1], ah1.byteAt(barr.length - 1));
+
+		char[] carr = "123".toCharArray();
+		ah1.set("a");
+		ah1.append(carr);
+		org.junit.Assert.assertEquals(carr.length+1, ah1.size());
+		org.junit.Assert.assertEquals("a"+new String(carr), ah1.toString());
+		int prevlen = ah1.size();
+		carr = new char[0];
+		ah1.append(carr);
+		org.junit.Assert.assertEquals(prevlen, ah1.size());
 	}
 
 	// Note that in general, we can't guarantee that hashcodes will ever be unequal, but we can guarantee when they are equal.
@@ -213,6 +223,11 @@ public class ByteCharsTest
 		org.junit.Assert.assertFalse(ah1.ar_buf == ah2.ar_buf);
 		org.junit.Assert.assertTrue(ah1.equals(ah2));
 		org.junit.Assert.assertTrue(ah1.hashCode() == ah2.hashCode());
+
+		org.junit.Assert.assertTrue(ah1.equals(ah2.toByteArray()));
+		org.junit.Assert.assertFalse(ah1.equals(ah2.toByteArray(), 0, ah1.ar_len-1));
+		org.junit.Assert.assertTrue(ah1.equals(str.toCharArray()));
+		org.junit.Assert.assertFalse(ah1.equals(ah2.toCharArray(), 0, ah1.ar_len-1));
 
 		ah2.ar_buf[ah2.ar_off + ah2.ar_len - 1]++;
 		org.junit.Assert.assertFalse(ah1.equals(ah2));
@@ -344,7 +359,7 @@ public class ByteCharsTest
 		org.junit.Assert.assertEquals(numval, numval2);
 		// with minus sign - not allowed for hex digits, so treated as any other invalid char
 		ah.truncateTo(off);
-		ah.append((byte)'-');
+		ah.append('-');
 		ah.append(Long.toHexString(numval));
 		off2 = ah.size();
 		try {

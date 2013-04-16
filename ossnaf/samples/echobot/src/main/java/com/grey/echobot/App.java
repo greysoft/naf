@@ -55,7 +55,7 @@ public class App
 			} else if (opt.equals("verify")) {
 				verify = true;
 			} else {
-				throw new RuntimeException("Missing case for bool-option="+opt);
+				super.setOption(opt);
 			}
 		}
 
@@ -85,7 +85,7 @@ public class App
 			} else if (opt.equals("sockbuf")) {
 				sockbufsiz = Integer.parseInt(val);
 			} else {
-				throw new RuntimeException("Missing case for value-option="+opt);
+				super.setOption(opt, val);
 			}
 		}
 
@@ -178,8 +178,8 @@ public class App
 						settings.put(Listener.CFGMAP_IFACE, tsap.dotted_ip.toString());
 						settings.put(Listener.CFGMAP_PORT, tsap.port);
 						settings.put(Listener.CFGMAP_BACKLOG, options.cgrpcnt * options.cgrpsiz);
-						ConcurrentListener lstnr = new ConcurrentListener("EchoBot-"+dsptch.name, dsptch, this, null, settings);
-						lstnr.start(null);
+						ConcurrentListener lstnr = new ConcurrentListener("EchoBot-"+dsptch.name, dsptch, this, null, null, settings);
+						lstnr.start();
 					}
 					if (options.server_solo) continue;
 				}

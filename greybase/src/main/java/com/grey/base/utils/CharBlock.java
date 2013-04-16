@@ -23,6 +23,7 @@ public final class CharBlock
 	public CharBlock(CharBlock src, boolean copy) {this(src, 0, src.ar_len, copy);}
 	public CharBlock(CharBlock src, int off, int len, boolean copy) {super(src, off, len, copy);}
 	public CharBlock(CharSequence src) {this(src, 0, src.length());}
+	public CharBlock clear() {ar_len = 0; return this;}
 
 	public CharBlock(CharSequence src, int off, int len)
 	{

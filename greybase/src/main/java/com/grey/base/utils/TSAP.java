@@ -17,9 +17,9 @@ public final class TSAP
 	private String host;  //records the host as originally supplied, if any
 	private final byte[] ipbytes = new byte[IP.IPADDR_OCTETS];
 
-	// hostport is of the form "hostname:portnumber", where one (but not both) of those components is optional.
-	// port==0 means the hostname part is optional and defaults to localhost
-	// Else the portnumber part is optional, and the port param is the default to apply if that is so
+	// hostport is of the form "hostname:portnumber", where one (but not both) of those components is optional (unless hostport null).
+	// The port paramter is a default, which is overridden by any port component embedded in hostport.
+	// port==0 means the hostname part is optional and defaults to localhost. Else the portnumber part of hostpart is the optional bit.
 	// Null hostport is interpreted as "localhost" regardless of port parameter.
 	public static TSAP build(String hostport, int port) throws java.net.UnknownHostException
 	{
@@ -39,32 +39,49 @@ public final class TSAP
 		TSAP tsap = new TSAP();
 		tsap.host = host;
 		tsap.port = port;
-		java.net.InetAddress jdkip = IP.getHostByName(tsap.host);
-		tsap.sockaddr =  new java.net.InetSocketAddress(jdkip, tsap.port);
-		byte[] ipbytes = tsap.sockaddr.getAddress().getAddress();
+		java.net.InetAddress jdkip = IP.getHostByName(host);
+		tsap.sockaddr =  new java.net.InetSocketAddress(jdkip, port);
+		byte[] ipbytes = jdkip.getAddress();
 		tsap.ip = IP.net2ip(ipbytes, 0);
 		IP.displayDottedIP(tsap.ip, tsap.dotted_ip);
 		return tsap;
 	}
 
+	public static TSAP get(java.net.InetAddress jdkip, int port, TSAP tsap, boolean with_dotted, boolean with_sockaddr)
+	{
+		if (tsap == null) {
+			tsap = new TSAP();
+		} else {
+			tsap.clear();
+		}
+		tsap.sockaddr = (with_sockaddr ? new java.net.InetSocketAddress(jdkip, port) : null);
+		tsap.port = port;
+		setIP(tsap, jdkip, with_dotted);
+		return tsap;
+	}
+
 	public static TSAP get(java.net.Socket sock, boolean local, TSAP tsap, boolean with_dotted)
 	{
-		java.net.InetAddress jdkip = (local ? sock.getLocalAddress() : sock.getInetAddress());
-		if (jdkip == null) return null;
+		java.net.InetSocketAddress sockaddr = (java.net.InetSocketAddress)(local ? sock.getLocalSocketAddress() : sock.getRemoteSocketAddress());
+		if (sockaddr == null) return null;
 
 		if (tsap == null) {
 			tsap = new TSAP();
 		} else {
 			tsap.clear();
 		}
-		tsap.sockaddr = (java.net.InetSocketAddress)(local ? sock.getLocalSocketAddress() : sock.getRemoteSocketAddress());
-		tsap.port = (local ? sock.getLocalPort() : sock.getPort());
+		tsap.sockaddr = sockaddr;
+		tsap.port = sockaddr.getPort();
+		setIP(tsap, sockaddr.getAddress(), with_dotted);
+		return tsap;
+	}
 
+	private static void setIP(TSAP tsap, java.net.InetAddress jdkip, boolean with_dotted)
+	{
 		byte[] ipbytes = jdkip.getAddress();
 		tsap.ip = IP.net2ip(ipbytes, 0);
 
 		if (with_dotted) IP.displayDottedIP(tsap.ip, tsap.dotted_ip);
-		return tsap;
 	}
 
 	// Unlike build(), this method is expected to do everything in-situ, with no new memory being allocated - apart from the sockaddr object,

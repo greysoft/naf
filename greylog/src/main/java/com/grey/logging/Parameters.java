@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2012 Yusef Badri - All rights reserved.
+ * Copyright 2011-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.logging;
@@ -29,7 +29,7 @@ public class Parameters
 
 	public static final String MODE_AUDIT = "AUDIT";
 
-	public static final Class<?> DFLTCLASS = LatinLogger.class;
+	public static final Class<?> DFLTCLASS = MTLatinLogger.class;  //safe option for naive/unaware apps
 	public static final java.io.OutputStream DFLT_STRM = System.out;
 	public static final String PTHNAM_STDOUT = "%stdout%";
 	public static final String PTHNAM_STDERR = "%stderr%";
@@ -122,8 +122,7 @@ public class Parameters
 				pthnam = ScheduledTime.embedTimestamp(null, null, pthnam, null);
 			} else {
 				// rotation of some form is in effect - size limit takes precedence
-				if (maxsize != 0) rotfreq = ScheduledTime.FREQ.NEVER;;
-				pthnam = ScheduledTime.embedTimeToken(pthnam, '.');
+				if (maxsize != 0) rotfreq = ScheduledTime.FREQ.NEVER;
 			}
 			String tokenval = SysProps.get(SYSPROP_LOGSDIR);
 			if (tokenval != null) pthnam = pthnam.replace(TOKEN_LOGSDIR, tokenval);

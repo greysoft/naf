@@ -88,7 +88,7 @@ public class Launcher
 
 	public Launcher(String[] args)
 	{
-		this.cmdlineArgs = args;
+		cmdlineArgs = args;
 		cmdParser = new com.grey.base.utils.CommandParser(baseOptions);
 	}
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -10,37 +10,56 @@ public abstract class Listener
 {
 	public static final String CFGMAP_IFACE = "interface";
 	public static final String CFGMAP_PORT = "port";
+	public static final String CFGMAP_SSLPORT = "sslport";
 	public static final String CFGMAP_CLASS = "serverclass";
 	public static final String CFGMAP_BACKLOG = "backlog";
 	public static final String CFGMAP_INITSPAWN = "srvmin";
 	public static final String CFGMAP_MAXSPAWN = "srvmax";
 	public static final String CFGMAP_INCRSPAWN = "srvincr";
 
-	public final String name;
-	public final int srvport;
-	public final Object controller;
+	private static final java.util.concurrent.ConcurrentHashMap<String, Listener> idmap = new java.util.concurrent.ConcurrentHashMap<String, Listener>();
+	static final String[] getNames() {return idmap.keySet().toArray(new String[idmap.size()]);} //deliberately package-private
+	public static final Listener getByName(String id) {return idmap.get(id);}
 
+	public final String name;
+	public final Object controller;
+	public final com.grey.naf.SSLConfig sslconfig;
+	private final java.net.InetAddress srvip;
+	private final int srvport;
+	private final com.grey.naf.EntityReaper reaper;
 	protected final com.grey.logging.Logger log;
+
 	protected boolean inShutdown;
 
-	private com.grey.naf.EntityReaper reaper;
-
-	public int getPort() {return srvport;}
 	public abstract Class<?> getServerType();
+	@Override
+	public final int getLocalPort() {return srvport;}
+	@Override
+	public java.net.InetAddress getLocalIP() {return srvip;}
 
 	protected void listenerStopped() {}
 	protected boolean stopListener() {return true;}
 	protected abstract void connectionReceived() throws java.io.IOException;
 
-	public Listener(String lname, com.grey.naf.reactor.Dispatcher d, Object controller,
+	@Override
+	protected com.grey.naf.SSLConfig getSSLConfig() {return sslconfig;}
+
+	public Listener(String lname, Dispatcher d, Object controller, com.grey.naf.EntityReaper rpr,
 			com.grey.base.config.XmlConfig cfg, java.util.Map<String,Object> cfgdflts)
 					throws com.grey.base.GreyException, java.io.IOException
 	{
 		super(d);
 		this.controller = controller;
+		reaper = rpr;
 		log = dsptch.logger;
+		try {
+			com.grey.base.config.XmlConfig sslcfg = (cfg == null ? null : new com.grey.base.config.XmlConfig(cfg, "ssl"));
+			sslconfig = com.grey.naf.SSLConfig.create(sslcfg, dsptch.nafcfg, null, false);
+		} catch (java.security.GeneralSecurityException ex) {
+			throw new com.grey.base.FaultException(ex, "Failed to configure SSL - "+ex);
+		}
 		String iface = (cfgdflts==null ? null : String.class.cast(cfgdflts.get(CFGMAP_IFACE)));
-		int port = getInt(cfgdflts, CFGMAP_PORT, 0);
+		int port = getInt(cfgdflts, sslconfig == null || sslconfig.latent ? CFGMAP_PORT : CFGMAP_SSLPORT, 0);
 		int srvbacklog = getInt(cfgdflts, CFGMAP_BACKLOG, 1000);
 
 		if (cfg != null) {
@@ -54,22 +73,28 @@ public abstract class Listener
 		log.trace("Dispatcher="+dsptch.name+" - Listener="+name+": Initialising on interface="+iface+", port="+port);
 
 		// set up our listening socket
-		java.net.InetAddress ipaddr = null;
-		if (iface != null) ipaddr = com.grey.base.utils.IP.getHostByName(iface);
+		srvip = (iface == null ? null : com.grey.base.utils.IP.getHostByName(iface));
 		java.nio.channels.ServerSocketChannel srvchan = java.nio.channels.ServerSocketChannel.open();
 		java.net.ServerSocket srvsock = srvchan.socket();
-		srvsock.bind(new java.net.InetSocketAddress(ipaddr, port), srvbacklog);
+		srvsock.bind(new java.net.InetSocketAddress(srvip, port), srvbacklog);
 		srvport = srvsock.getLocalPort();  // if port had been zero, Listener will have bound to ephemeral port
-		this.initChannel(srvchan, true, false);
+		initChannel(srvchan, true, false);
+
+		if (name != null) {
+			Listener dup = idmap.putIfAbsent(name, this);
+			if (dup != null) {
+				throw new com.grey.base.GreyException("Duplicate listeners with name="+name+" on ports "+dup.getLocalPort()+" and "+getLocalPort());
+			}
+		}
 
 		log.info("Listener="+name+" bound to "+srvsock.getInetAddress()+":"+srvport
 				+(iface==null ? "" : " on interface="+iface)+"; Backlog="+srvbacklog);
+		if (sslconfig != null) sslconfig.declare("Listener="+name+": ", dsptch.logger);
 	}
 
-	public void start(com.grey.naf.EntityReaper rpr) throws java.io.IOException
+	public void start() throws java.io.IOException
 	{
 		log.info("Listener="+name+": Starting up");
-		reaper = rpr;
 		enableListen();
 	}
 
@@ -85,6 +110,7 @@ public abstract class Listener
 		inShutdown = true;
 		disconnect();
 		boolean done = stopListener();
+		if (name != null) idmap.remove(name);
 		if (done) stopped(notify);
 		return done;
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.crypto;
@@ -11,16 +11,19 @@ public class Ascii
 	private static final String EOL = "\r\n";  // Generate Windows/Internet linebreak, as Notepad will not properly copy/paste LineFeed breaks
 	private static final String EOL_ALT = "\n";
 	private static final String BEGINTEXT = "====== *****"+" Begin Grey Text "+"***** =======";
-	private static final String ENDTEXT = "====== *****"+" End Grey Text "+"***** =========";
-	private static final String ARMOUR_BEGIN = EOL+BEGINTEXT+EOL;
-	private static final String ARMOUR_END =   EOL+ENDTEXT+EOL;
-	private static final String ARMOUR_BEGIN_LF = EOL_ALT+BEGINTEXT+EOL_ALT;  // Tolerate Unix-style LineFeed breaks on incoming data
-	private static final String ARMOUR_END_LF =   EOL_ALT+ENDTEXT+EOL_ALT;
+	private static final String ENDTEXT = BEGINTEXT.replace("Begin", "End");
+	private static final String ARMOUR_BEGIN = BEGINTEXT+EOL;
+	private static final String ARMOUR_END =   EOL+ENDTEXT;
+	private static final String ARMOUR_BEGIN_LF = ARMOUR_BEGIN.replace(EOL, EOL_ALT);  // Tolerate Unix-style LineFeed breaks on incoming data
+	private static final String ARMOUR_END_LF =   ARMOUR_END.replace(EOL, EOL_ALT);
 	private static final char[] ARMOURSPC_BEGIN = (EOL+EOL+ARMOUR_BEGIN).toCharArray();  //add blank lines for easy visibility
 	private static final char[] ARMOURSPC_END = (ARMOUR_END+EOL+EOL+EOL).toCharArray();
 	private static final int ARMOUR_LINESIZE = 40;
 
-	private static final char[] hexchars = "0123456789ABCDEF".toCharArray();
+	/* There is no universal standard on what case the 6 hexadecimal letters should be, but lower-case makes
+	 * for compatibility with SASL-CRAM-MD5, among others.
+	 */
+	private static final char[] hexchars = "0123456789abcdef".toCharArray();
 
 
 	public static byte[] decrypt(String wrapdata, java.math.BigInteger kmod, java.math.BigInteger kpub, ARMOURTYPE atype)
@@ -35,7 +38,6 @@ public class Ascii
 	public static char[] armourWrap(byte[] rawdata, int off, int len, ARMOURTYPE atype)
 	{
 		char[] cdata;
-
 		switch (atype)
 		{
 		case BASE64:
@@ -93,8 +95,7 @@ public class Ascii
 		if (wrapdata == null) return null;
 		String begintxt = ARMOUR_BEGIN;
 		int off1 = wrapdata.indexOf(begintxt);
-		if (off1 == -1)
-		{
+		if (off1 == -1) {
 			// try LineFeed linebreaks
 			begintxt = ARMOUR_BEGIN_LF;
 			off1 = wrapdata.indexOf(begintxt);
@@ -102,8 +103,7 @@ public class Ascii
 		}
 		String endtxt = ARMOUR_END;
 		int off2 = wrapdata.lastIndexOf(endtxt);
-		if (off2 == -1)
-		{
+		if (off2 == -1) {
 			endtxt = ARMOUR_END_LF;
 			off2 = wrapdata.lastIndexOf(endtxt);
 			if (off2 == -1) return null;
@@ -112,6 +112,12 @@ public class Ascii
 		return rawdata;
 	}
 
+
+	public static char[] digest(com.grey.base.utils.ByteChars plain, java.security.MessageDigest proc)
+	{
+		com.grey.base.utils.ByteChars digest = plain.digest(proc);
+		return com.grey.base.crypto.Ascii.hexEncode(digest.ar_buf, digest.ar_off, digest.ar_len, null);
+	}
 
 	public static char[] hexEncode(byte[] barr)
 	{
@@ -125,13 +131,12 @@ public class Ascii
 
 	public static char[] hexEncode(byte[] barr, int boff, int blen, char[] carr)
 	{
-		int clen = blen << 1;  //fast multiply-by-2
+		int clen = hexEncodeLength(blen);
 		int blmt = boff + blen;
 		int coff = 0;
-		if (carr == null) carr = new char[clen];
+		if (carr == null || carr.length < clen) carr = new char[clen];
 
-		for (int idx = boff; idx != blmt; idx++)
-		{
+		for (int idx = boff; idx != blmt; idx++) {
 			carr[coff++] = hexchars[(barr[idx] >> 4) & 0xf];
 			carr[coff++] = hexchars[barr[idx] & 0xf];
 		}
@@ -140,27 +145,33 @@ public class Ascii
 
 	public static byte[] hexDecode(char[] carr, int coff, int clen, byte[] barr)
 	{
-		int blen = clen >> 1;  //fast divide-by-2
-		if (barr == null) barr = new byte[blen];
+		int blen = hexDecodeLength(clen);
+		if (barr == null || barr.length < blen) barr = new byte[blen];
 
-		for (int idx = 0; idx != blen; idx++)
-		{
+		for (int idx = 0; idx != blen; idx++) {
 			barr[idx] = (byte)(hexCharValue(carr[coff++]) << 4);
 			barr[idx] += hexCharValue(carr[coff++]);
 		}
 		return barr;
 	}
 
+	public static int hexEncodeLength(int blen)
+	{
+		return (blen << 1);  //fast multiply-by-2
+	}
+
+	public static int hexDecodeLength(int clen)
+	{
+		return (clen >> 1);  //fast divide-by-2
+	}
+
 	private static byte hexCharValue(char ch)
 	{
 		int bval;
 
-		if (ch > '9')
-		{
+		if (ch > '9') {
 			bval = Character.toUpperCase(ch) - 'A' + 10;
-		}
-		else
-		{
+		} else {
 			bval = ch - '0';
 		}
 		return (byte)bval;

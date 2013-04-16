@@ -277,7 +277,7 @@ public final class HashedMapIntValue<K>
 		return sb.toString();
 	}
 
-	public String getBucketStats(boolean printstats, int mincolls)
+	public String getBucketStats()
 	{
 		return HashedMap.getStats(size(), bucketsizes);
 	}

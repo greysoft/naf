@@ -27,11 +27,11 @@ public class ServerSession
 	}
 
 	@Override
-	protected void connected(boolean success, Throwable exconn) throws com.grey.base.FaultException, java.io.IOException
+	protected void connected(boolean success, CharSequence diag, Throwable exconn) throws com.grey.base.FaultException, java.io.IOException
 	{
 		if (!success) {
 			dsptch.logger.trace("Failed to connect to "+svcaddr.sockaddr+" - "+com.grey.base.GreyException.summary(exconn));
-			ioDisconnected();
+			ioDisconnected(diag);
 			return;
 		}
 		chanreader.receive(0, true);
@@ -39,7 +39,7 @@ public class ServerSession
 	}
 
 	@Override
-	protected void ioDisconnected()
+	protected void ioDisconnected(CharSequence diag)
 	{
 		disconnect();
 		relay.serverDisconnected();

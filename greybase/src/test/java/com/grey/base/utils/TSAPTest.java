@@ -11,7 +11,7 @@ public class TSAPTest
 	private static final byte[] iparr = new byte[IP.IPADDR_OCTETS];
 
 	@org.junit.Test
-	public void test() throws java.net.UnknownHostException
+	public void testBuild() throws java.net.UnknownHostException
 	{
 		String ipdotted = "1.2.3.4";
 		int port = 995;
@@ -47,6 +47,30 @@ public class TSAPTest
 		ipnum = IP.convertDottedIP(ipdotted);
 		tsap.set(ipnum, port, false);
 		verify(tsap, null, ipdotted, port, false);
+	}
+
+	@org.junit.Test
+	public void testGet() throws java.net.UnknownHostException
+	{
+		byte[] ipaddr = new byte[]{1,2,3,4};
+		StringBuilder sb = new StringBuilder();
+		sb.append((char)('0'+ipaddr[0])).append('.').append((char)('0'+ipaddr[1])).append('.').append((char)('0'+ipaddr[2])).append('.').append((char)('0'+ipaddr[3]));
+		String ipdotted = sb.toString();
+		int port = 995;
+		java.net.InetAddress jdkip = java.net.InetAddress.getByAddress(ipaddr);
+		TSAP tsap = TSAP.get(jdkip, port, null, true, true);
+		verify(tsap, ipdotted, ipdotted, port, true);
+
+		TSAP tsap2 = TSAP.get(jdkip, port+1, tsap, true, true);
+		org.junit.Assert.assertTrue(tsap2 == tsap);
+		verify(tsap, ipdotted, ipdotted, port+1, true);
+
+		tsap2 = TSAP.get(jdkip, port, tsap, false, false);
+		org.junit.Assert.assertTrue(tsap2 == tsap);
+		org.junit.Assert.assertEquals(0, tsap.dotted_ip.length());
+		org.junit.Assert.assertEquals(port, tsap.port);
+		org.junit.Assert.assertEquals(IP.net2ip(ipaddr, 0), tsap.ip);
+		org.junit.Assert.assertNull(tsap.sockaddr);
 	}
 
 	private void verify(TSAP tsap, String host, String ipdotted, int port, boolean hasdotted)

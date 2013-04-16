@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -35,19 +35,69 @@ public class StringOps
 		return new String(buf, charset == null ? DFLT_CHARSET : charset);
 	}
 
-	// NB: This doesn't work on all CharSequence classes, only on this whose equals() method genuinely compares their contents.
-	// Thus it wouldn't work on StringBuilder, because it falls back on the root Object.equals() method, ie. test for identity
 	public static boolean sameSeq(CharSequence str1, CharSequence str2)
 	{
 		if (str1 == null || str2 == null) return  (str1 == null && str2 == null);
-		int len = str1.length();
-		if (str2.length() != len) return false;
-		
-		for (int idx = 0; idx != len; idx++)
-		{
-			if (str1.charAt(idx) != str2.charAt(idx)) return false;
+		return sameSeq(str1, 0, str1.length(), str2, 0, str2.length());
+	}
+
+	public static boolean sameSeq(CharSequence str1, int off1, int len1, CharSequence str2, int off2, int len2)
+	{
+		if (len1 != len2) return false;
+		int lmt = off1 + len1;
+
+		while (off1 != lmt) {
+			if (str1.charAt(off1++) != str2.charAt(off2++)) return false;
 		}
 		return true;
+	}
+
+	public static boolean sameSeq(CharSequence str1, int off1, int len1, CharSequence str2)
+	{
+		if (str2 == null) return (len1 == 0);
+		return sameSeq(str1, off1, len1, str2, 0, str2.length());
+	}
+
+	public static boolean sameSeqNoCase(CharSequence str1, CharSequence str2)
+	{
+		if (str1 == null || str2 == null) return  (str1 == null && str2 == null);
+		return sameSeqNoCase(str1, 0, str1.length(), str2, 0, str2.length());
+	}
+
+	public static boolean sameSeqNoCase(CharSequence str1, int off1, int len1, CharSequence str2, int off2, int len2)
+	{
+		if (len1 != len2) return false;
+		int lmt = off1 + len1;
+
+		while (off1 != lmt) {
+			if (Character.toUpperCase(str1.charAt(off1++)) != Character.toUpperCase(str2.charAt(off2++))) return false;
+		}
+		return true;
+	}
+
+	public static boolean sameSeqNoCase(CharSequence str1, int off1, int len1, CharSequence str2)
+	{
+		if (str2 == null) return (len1 == 0);
+		return sameSeqNoCase(str1, off1, len1, str2, 0, str2.length());
+	}
+
+	public static int indexOf(CharSequence str, int off, int len, char ch)
+	{
+		int lmt = off + len;
+		for (int idx = off; idx != lmt; idx++) {
+			if (str.charAt(idx) == ch) return idx;
+		}
+		return -1;
+	}
+
+	public static int indexOf(CharSequence str, char ch)
+	{
+		return indexOf(str, 0, str.length(), ch);
+	}
+
+	public static int indexOf(CharSequence str, int off, char ch)
+	{
+		return indexOf(str, off, str.length() - off, ch);
 	}
 
 	// zero-pad numbers without generating any memory garbage
@@ -76,16 +126,45 @@ public class StringOps
 		return 10;
 	}
 
-	public static int occurrences(String main, String patt)
+	public static int occurrences(String main, String target)
 	{
 		int cnt = 0;
 		int idx = 0;
-		while ((idx = main.indexOf(patt, idx)) != -1)
-		{
+		while ((idx = main.indexOf(target, idx)) != -1) {
 			cnt++;
-			idx += patt.length();
+			idx += target.length();
 		}
 		return cnt;
+	}
+
+	public static int occurrences(CharSequence cs, int off, int len, char target)
+	{
+		int cnt = 0;
+		int lmt = off + len;
+		for (int idx = off; idx != lmt; idx++) {
+			if (cs.charAt(idx) == target) cnt++;
+		}
+		return cnt;
+	}
+
+	public static long parseNumber(CharSequence cs, int off, int len, int radix)
+	{
+		long numval = 0;
+		long power = 1;
+		for (int idx = off+len-1; idx >= off; idx--) {
+			long digit = Character.digit(cs.charAt(idx), radix);
+			if (digit == -1) {
+				throw new NumberFormatException(cs.charAt(idx)+"@"+idx+" in "+off+"+"+len+" - "+cs.subSequence(off, off+len));
+			}
+			numval += (digit * power);
+			power *= radix;
+		}
+		return numval;
+	}
+
+	public static long parseNumber(CharSequence cs, int radix)
+	{
+		return parseNumber(cs, 0, cs.length(), radix);
 	}
 
 	public static String leadingChars(String str, int cnt)
@@ -105,8 +184,7 @@ public class StringOps
 	public static String keepLeadingParts(String str, String dlm, int cnt)
 	{
 		int pos = 0;
-		for (int idx = 0; idx != cnt; idx++)
-		{
+		for (int idx = 0; idx != cnt; idx++) {
 			if ((pos = str.indexOf(dlm, pos)) == -1) return str;
 			pos++;
 		}
@@ -117,8 +195,7 @@ public class StringOps
 	public static String stripLeadingParts(String str, String dlm, int cnt)
 	{
 		int pos = 0;
-		for (int idx = 0; idx != cnt; idx++)
-		{
+		for (int idx = 0; idx != cnt; idx++) {
 			if ((pos = str.indexOf(dlm, pos)) == -1) return "";
 			pos++;
 		}
@@ -131,8 +208,7 @@ public class StringOps
 	{
 		int startpos = str.length();
 		int pos = startpos;
-		for (int idx = 0; idx != cnt; idx++)
-		{
+		for (int idx = 0; idx != cnt; idx++) {
 			if ((pos = str.lastIndexOf(dlm, --pos)) == -1) return str;
 		}
 		if (pos == startpos || pos == startpos - 1) return "";
@@ -143,8 +219,7 @@ public class StringOps
 	{
 		int startpos = str.length();
 		int pos = startpos;
-		for (int idx = 0; idx != cnt; idx++)
-		{
+		for (int idx = 0; idx != cnt; idx++) {
 			if ((pos = str.lastIndexOf(dlm, --pos)) == -1) return "";
 		}
 		if (pos == startpos) return str;

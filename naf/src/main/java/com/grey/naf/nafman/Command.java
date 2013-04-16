@@ -73,7 +73,7 @@ public class Command
 
 	public CharSequence getDescription() {return description;}
 	public int getArgCount() {return args.size();}
-	public CharSequence getArg(int idx) {return args.get(idx);}
+	public ByteChars getArg(int idx) {return args.get(idx);}
 
 	protected Command(Primary agent)
 	{
@@ -159,7 +159,7 @@ public class Command
 			if (msg != null && msg.length() != 0) {
 				response.append("\nDispatcher=").append(dsptch.name).append(" issued ");
 				response.append(String.valueOf(msg.length())).append("-byte response:\n");
-				response.append(msg).append((byte)'\n');
+				response.append(msg).append('\n');
 			}
 			processedBy.add(dsptch.name);
 		}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -26,6 +26,8 @@ public final class ConcurrentListener
 		public final ConcurrentListener lstnr;
 		public Server(ConcurrentListener l) {super(l.dsptch); lstnr=l;}
 		public boolean stopServer() {return false;}
+		@Override
+		protected com.grey.naf.SSLConfig getSSLConfig() {return lstnr.sslconfig;}
 	}
 
 	private final Server protoServer;  //prototype object used to create actual connection handlers
@@ -36,18 +38,18 @@ public final class ConcurrentListener
 	@Override
 	public Class<?> getServerType() {return serverType;}
 
-	public ConcurrentListener(String lname, com.grey.naf.reactor.Dispatcher d, Object controller,
+	public ConcurrentListener(String lname, Dispatcher d, Object controller, com.grey.naf.EntityReaper rpr,
 			com.grey.base.config.XmlConfig cfg, Class<?> srvclass, String iface, int port)
 					throws com.grey.base.GreyException, java.io.IOException
 	{
-		this(lname, d, controller, cfg, makeDefaults(srvclass, iface, port));
+		this(lname, d, controller, rpr, cfg, makeDefaults(srvclass, iface, port));
 	}
 
-	public ConcurrentListener(String lname, com.grey.naf.reactor.Dispatcher d, Object controller,
+	public ConcurrentListener(String lname, Dispatcher d, Object controller, com.grey.naf.EntityReaper rpr,
 			com.grey.base.config.XmlConfig cfg, java.util.Map<String,Object> cfgdflts)
 					throws com.grey.base.GreyException, java.io.IOException
 	{
-		super(lname, d, controller, cfg, cfgdflts);
+		super(lname, d, controller, rpr, cfg, cfgdflts);
 
 		// So far, we've only read attributes from the main config block. Check if this Listener's config is linked to another's, before
 		// delving into the contents of its Server config block.
@@ -73,7 +75,7 @@ public final class ConcurrentListener
 		}
 		com.grey.base.utils.PrototypeFactory fact = new com.grey.base.utils.PrototypeFactory(protoServer);
 		spareservers = new com.grey.base.utils.ObjectWell<Server>(protoServer.getClass(), fact,
-				"Listener_"+name+":"+srvport+"_Servers", srvmin, srvmax, srvincr);
+				"Listener_"+name+":"+getLocalPort()+"_Servers", srvmin, srvmax, srvincr);
 
 		log.info("Listener="+name+": Server is "+protoServer.getClass().getName()
 				+" - init/max/incr="+spareservers.size()+"/"+srvmax+"/"+srvincr);
@@ -86,7 +88,8 @@ public final class ConcurrentListener
 		java.util.Iterator<Server> it = activeservers.iterator();
 		while (it.hasNext()) {
 			Server cep = it.next();
-			if (cep.stopServer()) it.remove();
+			boolean stopped = cep.stopServer();
+			if (stopped || !dsptch.isRunning()) it.remove();
 		}
 		log.info("Listener="+name+" has stopped "+(cnt - activeservers.size())+"/"+cnt+" servers");
 		return (activeservers.size() == 0);
@@ -123,6 +126,7 @@ public final class ConcurrentListener
 				handleConnection(connsock);
 			} catch (Throwable ex) {
 				log.log(LEVEL.TRC, ex, true, "Listener="+name+": Error fielding connection");
+				connsock.close();
 			}
 		}
 	}
@@ -136,7 +140,13 @@ public final class ConcurrentListener
 			connsock.close();
 			return;
 		}
+		boolean ok = false;
 		activeservers.add((Server)srvr);
-		srvr.accepted(connsock, this);
+		try {
+			srvr.accepted(connsock, this);
+			ok = true;
+		} finally {
+			if (!ok) entityStopped(srvr);
+		}
 	}
 }

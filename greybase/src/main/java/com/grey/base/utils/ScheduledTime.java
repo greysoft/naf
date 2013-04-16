@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -15,7 +15,6 @@ public final class ScheduledTime
 	public static final String TOKEN_HOUR = "%h%";
 	public static final String TOKEN_MIN = "%m%";
 	public static final String TOKEN_SEC = "%s%";
-	public static final String TOKEN_NODT = "%DONT%";
 
 	private final FREQ schedfreq;
 	private final java.util.Calendar dtcal;  // this does not hold required global state (ie. across calls) - merely pre-allocated for efficiency
@@ -26,6 +25,7 @@ public final class ScheduledTime
 	public FREQ frequency() {return schedfreq;}
 	public int compare(FREQ freq) {return (freq.ordinal() - schedfreq.ordinal());}
 	public String getFormat() {return getFormat(schedfreq);}
+	public java.util.TimeZone timezone() {return dtcal.getTimeZone();}
 
 	public ScheduledTime(FREQ frq)
 	{
@@ -104,24 +104,6 @@ public final class ScheduledTime
 		template = template.replace(TOKEN_SEC, sb);
 
 		if (savetime != 0) dtcal.setTimeInMillis(savetime);
-		return template;
-	}
-
-	// if no token embedded in template string, then append it in front of optional suffix
-	public static String embedTimeToken(String template, int dlmsfx)
-	{
-		if (template.indexOf(TOKEN_DT) != -1) return template;
-		if (template.indexOf(TOKEN_NODT) != -1) return template.replace(TOKEN_NODT, "");
-
-		String sfx = "";
-		int idx = -1;
-		if (dlmsfx != 0) idx  = template.lastIndexOf(dlmsfx);
-
-		if (idx != -1 ) {
-			sfx = template.substring(idx);
-			template = template.substring(0, idx);
-		}
-		template += "-" + TOKEN_DT + sfx;
 		return template;
 	}
 

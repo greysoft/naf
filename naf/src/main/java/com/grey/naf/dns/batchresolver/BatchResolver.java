@@ -105,7 +105,7 @@ public final class BatchResolver
 	}
 
 	@Override
-	public boolean stopNaflet()
+	protected boolean stopNaflet()
 	{
 		try {
 			istrm.close();

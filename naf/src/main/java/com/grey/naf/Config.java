@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf;
@@ -154,10 +154,8 @@ public class Config
 		if (path != null && path.startsWith(PFX_CLASSPATH)) {
 			java.net.URL url = DynLoader.getResource(path.substring(PFX_CLASSPATH.length()), clss);
 			path = (url == null ? null : url.toString()); //url.getPath() doesn't let us reconstruct URL object, but this does
-		} else {
-			path = makePath(path);
 		}
-		return path;
+		return makePath(path);
 	}
 
 	public java.net.URL getURL(XmlConfig cfg, String xpath, String propname, boolean mdty, String dflt, Class<?> clss)
@@ -177,7 +175,7 @@ public class Config
 		try {
 			if (cfgclass != null) clss = DynLoader.loadClass(cfgclass);
 		} catch (Exception ex) {
-			throw new com.grey.base.ConfigException(ex, "Failed to load configured class="+cfgclass);
+			throw new com.grey.base.ConfigException(ex, "Failed to load configured class="+cfgclass+" - "+ex);
 		}
 		return clss;
 	}
@@ -191,11 +189,12 @@ public class Config
 		if (basetype != null && !basetype.isAssignableFrom(clss)) {
 			throw new com.grey.base.ConfigException("Configured class="+clss.getName()+" is not of type "+basetype.getName());
 		}
+		java.lang.reflect.Constructor<?> ctor = null;
 		try {
-			java.lang.reflect.Constructor<?> ctor = clss.getConstructor(ctorSig);
+			ctor = clss.getConstructor(ctorSig);
 			return ctor.newInstance(ctorArgs);
 		} catch (Exception ex) {
-			throw new com.grey.base.ConfigException(ex, "Failed to create configured entity="+clss.getName());
+			throw new com.grey.base.ConfigException(ex, "Failed to create configured entity="+clss.getName()+", ctor="+ctor+" - "+ex);
 		}
 	}
 
@@ -221,6 +220,7 @@ public class Config
 		path = tokenisePaths(path);
 
 		if (path != null && path.length() != 0) {
+			if (path.startsWith(FileOps.URLPFX_FILE+"/")) path = path.substring(FileOps.URLPFX_FILE.length());
 			java.io.File fh = new java.io.File(path);
 			path = fh.getCanonicalPath();
 		}

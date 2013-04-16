@@ -20,7 +20,7 @@ public class ClientTCP
 	}
 
 	@Override
-	protected void connected(boolean success, Throwable ex) throws com.grey.base.FaultException, java.io.IOException
+	protected void connected(boolean success, CharSequence diag, Throwable ex) throws com.grey.base.FaultException, java.io.IOException
 	{
 		if (!success) {
 			dsptch.logger.info(logpfx+" TCP connect failed - "+grp.tsap);
@@ -33,7 +33,7 @@ public class ClientTCP
 	}
 
 	@Override
-	public void ioDisconnected()
+	public void ioDisconnected(CharSequence diag)
 	{
 		dsptch.logger.info(logpfx+" Unsolicited disconnect - msgnum="+msgnum+"/"+grp.msgcnt+", msgbytes="+msgbytes+"/"+grp.msgbuf.length);
 		try {

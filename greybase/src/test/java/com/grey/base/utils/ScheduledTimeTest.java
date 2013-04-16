@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Yusef Badri - All rights reserved.
+ * Copyright 2012-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -7,13 +7,19 @@ package com.grey.base.utils;
 import java.util.Calendar;
 import com.grey.base.utils.ScheduledTime.FREQ;
 
-// These tests are no longer timezone dependent (ie. dependent on the grey.timezone setting in grey.properties)
-// Have verified GB-Eire, GMT & UTC, Hongkong for somewhere way ahead of GMT, and PST (Pacific Standard Time) for somewhere way behind.
+/*
+ * These tests need the "grey.timezone" system property to be set to "UTC", to work reliably.
+ * This can be set in grey.properties or on the JVM command line with the "-D" option.
+ * They will often work even if it's not set, but if you happen to run this at a time when
+ * the chosen timezone has a daylight shift in between some of the before/after times we're
+ * comparing, then they will fail.
+ */
 public class ScheduledTimeTest
 {
 	@org.junit.Test
 	public void testIntervals()
 	{
+		if (TimeOps.TZDFLT == null) return; //fails too often if not set
 		final long systime = System.currentTimeMillis();
 
 		ScheduledTime sched = new ScheduledTime(FREQ.HOURLY);
@@ -69,11 +75,8 @@ public class ScheduledTimeTest
 		dtcal.set(Calendar.YEAR, 2009);
 		long systime = dtcal.getTimeInMillis();
 
-		String template1 = ScheduledTime.embedTimeToken(template, '.');
-		String template2 = ScheduledTime.embedTimeToken(template, 0);
-		org.junit.Assert.assertEquals(template, template1);
-		org.junit.Assert.assertEquals(template, template2);
-
+		String template1 = template;
+		String template2 = template;
 		ScheduledTime sched = new ScheduledTime(FREQ.MINUTE);
 		String str = sched.embedTimestamp(systime, template1);
 		String str2 = sched.embedTimestamp(systime, template2);
@@ -116,21 +119,6 @@ public class ScheduledTimeTest
 		org.junit.Assert.assertEquals(min, dtcal.get(java.util.Calendar.MINUTE));
 		org.junit.Assert.assertEquals(hour, dtcal.get(java.util.Calendar.HOUR));
 
-		// now verify that TOKEN_DT is inserted if need be
-		template = "blah";
-		template1 = ScheduledTime.embedTimeToken(template, '.');
-		template2 = ScheduledTime.embedTimeToken(template, 0);
-		org.junit.Assert.assertEquals("blah-"+ScheduledTime.TOKEN_DT, template1);
-		org.junit.Assert.assertEquals(template1, template2);
-		template = "blah.ext";
-		template1 = ScheduledTime.embedTimeToken(template, '.');
-		template2 = ScheduledTime.embedTimeToken(template, 0);
-		org.junit.Assert.assertEquals("blah-"+ScheduledTime.TOKEN_DT+".ext", template1);
-		org.junit.Assert.assertEquals("blah.ext-"+ScheduledTime.TOKEN_DT, template2);
-		//verify redundant timetoken insertion does nothing
-		template2 = ScheduledTime.embedTimeToken(template1, '.');
-		org.junit.Assert.assertEquals(template1, template2);
-
 		// verify a string without any tokens is left unchanged
 		template = "blah";
 		str = ScheduledTime.embedTimestamp(null, dtcal, template, null);
@@ -141,11 +129,6 @@ public class ScheduledTimeTest
 		org.junit.Assert.assertEquals(sec, dtcal.get(java.util.Calendar.SECOND));
 		org.junit.Assert.assertEquals(min, dtcal.get(java.util.Calendar.MINUTE));
 		org.junit.Assert.assertEquals(hour, dtcal.get(java.util.Calendar.HOUR));
-
-		// verify inhibition of TOKEN_DT
-		template = "blah"+ScheduledTime.TOKEN_NODT;
-		template1 = ScheduledTime.embedTimeToken(template, 0);
-		org.junit.Assert.assertEquals("blah", template1);
 	}
 
 	private void verifyInterval(ScheduledTime sched, long systime, long interval, int dtfld, int dtmax, boolean fromzero)
@@ -190,8 +173,8 @@ public class ScheduledTimeTest
 		} else {
 			if (sched.frequency() == FREQ.MONTHLY) {
 				org.junit.Assert.assertTrue(systime - basetime < (dtcal_now.get(Calendar.DAY_OF_MONTH) * TimeOps.MSECS_PER_DAY));
-				org.junit.Assert.assertTrue(next1 - basetime >= 27L * TimeOps.MSECS_PER_DAY); //28-1 to allow for timezone diffs
-				org.junit.Assert.assertTrue(next1 - basetime <= 32L * TimeOps.MSECS_PER_DAY); //31+1 to allow for timezone diffs
+				org.junit.Assert.assertTrue(next1 - basetime >= 28L * TimeOps.MSECS_PER_DAY); //28-1 to allow for timezone diffs
+				org.junit.Assert.assertTrue(next1 - basetime <= 31L * TimeOps.MSECS_PER_DAY); //31+1 to allow for timezone diffs
 			} else if (sched.frequency() == FREQ.YEARLY) {
 				org.junit.Assert.assertTrue(systime - basetime < (dtcal_now.get(Calendar.DAY_OF_YEAR) * TimeOps.MSECS_PER_DAY));
 				org.junit.Assert.assertTrue(next1 - basetime >= 365L * TimeOps.MSECS_PER_DAY);

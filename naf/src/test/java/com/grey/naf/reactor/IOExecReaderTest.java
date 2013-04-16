@@ -4,15 +4,11 @@
  */
 package com.grey.naf.reactor;
 
-import com.grey.base.config.SysProps;
-import com.grey.naf.reactor.ChannelMonitor;
-import com.grey.naf.reactor.Dispatcher;
+import com.grey.base.utils.FileOps;
 
 public class IOExecReaderTest
 {
-	static {
-		SysProps.set(com.grey.naf.Config.SYSPROP_DIRPATH_VAR, SysProps.TMPDIR+"/utest/IOR");
-	}
+	private static final String rootdir = DispatcherTest.initPaths(IOExecReaderTest.class);
 
 	private static class CMR extends ChannelMonitor
 	{
@@ -31,7 +27,7 @@ public class IOExecReaderTest
 			super(d);
 			wchan = w;
 			this.bufspec = bufspec;
-			chanreader = new com.grey.naf.reactor.IOExecReader(bufspec);
+			chanreader = new IOExecReader(bufspec);
 			initChannel(r, true, true);
 			chanreader.receive(0, true);
 		}
@@ -155,6 +151,7 @@ public class IOExecReaderTest
 
 	private void launch(boolean direct) throws com.grey.base.GreyException, java.io.IOException
 	{
+		FileOps.deleteDirectory(rootdir);
 		com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(25, 0, false, direct);
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
 		def.hasNafman = false;

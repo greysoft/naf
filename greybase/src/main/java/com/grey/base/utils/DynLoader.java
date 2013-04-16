@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -157,6 +157,39 @@ public class DynLoader
 		return true;
 	}
 
+	public static String getClassLoaderPath(String rsrcname, Class<?> clss)
+	{
+		return clss.getPackage().getName().replace('.', '/')+"/"+rsrcname;
+	}
+
+	public static Object getField(Class<?> clss, String fldnam, Object obj)
+			throws NoSuchFieldException, IllegalAccessException
+	{
+		java.lang.reflect.Field fld = clss.getDeclaredField(fldnam);
+		fld.setAccessible(true);
+		return fld.get(obj);
+	}
+
+	public static void setField(Class<?> clss, String fldnam, Object fldval, Object obj)
+			throws NoSuchFieldException, IllegalAccessException
+	{
+		java.lang.reflect.Field fld = clss.getDeclaredField(fldnam);
+		fld.setAccessible(true);
+		fld.set(obj, fldval);
+	}
+
+	public static Object getField(Object obj, String fldnam)
+			throws NoSuchFieldException, IllegalAccessException
+	{
+		return getField(obj.getClass(), fldnam, obj);
+	}
+
+	public static void setField(Object obj, String fldnam, Object fldval)
+			throws NoSuchFieldException, IllegalAccessException
+	{
+		setField(obj.getClass(), fldnam, fldval, obj);
+	}
+
 	protected static ClassLoader getClassLoader()
 	{
 		ClassLoader cld = Thread.currentThread().getContextClassLoader(); // gets class loader for current environment
@@ -187,5 +220,26 @@ public class DynLoader
 		java.io.File[] jarfiles = dh.listFiles(filter);
 		if (jarfiles != null && jarfiles.length == 0) jarfiles = null;
 		return jarfiles;
+	}
+
+	public static byte[] readBytes(String path, Class<?> clss)
+	{
+		java.net.URL url = DynLoader.getResource(path, clss);
+		try {
+			java.io.File fh = new java.io.File(url.toURI());
+			return FileOps.read(fh, -1, null);
+		} catch (Exception ex) {
+			throw new RuntimeException("Failed to read resource="+path+" as class="+clss+" - "+ex, ex);
+		}
+	}
+
+	public static String readText(String path, Class<?> clss)
+	{
+		byte[] buf = readBytes(path, clss);
+		try {
+			return StringOps.convert(buf, null);
+		} catch (Exception ex) {
+			throw new RuntimeException("Failed to convert resource="+clss+"/"+path+" to text"+ex, ex);
+		}
 	}
 }

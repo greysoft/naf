@@ -18,8 +18,8 @@ public final class CommandParser
 		private final int min_params;
 		private final int max_params;
 
-		public abstract void setOption(String opt);
-		public abstract void setOption(String opt, String val);
+		public void setOption(String opt) {throw new RuntimeException("Missing handler for bool-option="+opt);}
+		public void setOption(String opt, String val) {throw new RuntimeException("Missing handler for option="+opt+"="+val);}
 		public String displayUsage() {return null;}
 
 		public OptionsHandler(String[] opts, int min, int max)

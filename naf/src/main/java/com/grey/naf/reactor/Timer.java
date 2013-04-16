@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -11,7 +11,7 @@ public final class Timer
 	public interface Handler
 	{
 		public void timerIndication(Timer tmr, Dispatcher d) throws com.grey.base.FaultException, java.io.IOException;
-		public void eventError(Timer tmr, Dispatcher d, Throwable ex);
+		public void eventError(Timer tmr, Dispatcher d, Throwable ex) throws com.grey.base.FaultException, java.io.IOException;
 	}
 
 	// dampens jitter - see reset() and nextExpiry() comments below
@@ -85,6 +85,11 @@ public final class Timer
 		isSuspended = true;
 		activated = 0;  // this ensures the next call to reset() will do something
 		expiry = 0;  // this tells the outside world that we're suspended
+	}
+
+	public static void sleep(long msecs)
+	{
+		try {Thread.sleep(msecs);} catch (InterruptedException ex) {} 
 	}
 
 	// This calculates the next time at which a recurring timer should go off, based on the current time and the timer interval,

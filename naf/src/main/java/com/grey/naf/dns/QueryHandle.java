@@ -142,11 +142,11 @@ public final class QueryHandle
 	}
 
 	@Override
-	protected void connected(boolean success, Throwable ex) throws java.io.IOException
+	protected void connected(boolean success, CharSequence diag, Throwable ex) throws java.io.IOException
 	{
 		if (!success) {
 			if (dsptch.logger.isActive(LEVEL.TRC)) {
-				dsptch.logger.log(LEVEL.TRC, ex, false, "Resolver: TCP connect failed - "+dnsserver.address()+"/TCP="+isTCP());
+				dsptch.logger.log(LEVEL.TRC, ex, false, "Resolver: TCP connect failed - "+(diag==null?"":diag+" - ")+dnsserver.address()+"/TCP="+isTCP());
 			}
 			rslvr.endQuery(this, Answer.STATUS.ERROR);
 			return;

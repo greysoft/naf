@@ -54,11 +54,11 @@ public class ArrayRef<T>
 	/**
 	 * Allocate the buffer, but leave it marked as empty (len=0).
 	 * <br/>
-	 * If size is -1 (or zero), we don't even allocate the buffer, and this is equivalent to the basic ArrayRef() constructor
+	 * If size is -1 we don't even allocate the buffer, and this is equivalent to the basic ArrayRef() constructor
 	 */
 	public ArrayRef(Class<?> clss, int cap)
 	{
-		if (cap != -1 && cap != 0) {
+		if (cap != -1) {
 			@SuppressWarnings("unchecked")
 			T uncheckedbuf = (T)java.lang.reflect.Array.newInstance(clss, cap);
 			ar_buf = uncheckedbuf;  //minimised scope of Suppress annotation

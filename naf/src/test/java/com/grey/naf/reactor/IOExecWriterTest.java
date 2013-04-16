@@ -1,23 +1,18 @@
 /*
- * Copyright 2012 Yusef Badri - All rights reserved.
+ * Copyright 2012-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
 
 import java.util.Arrays;
 
-import com.grey.base.config.SysProps;
 import com.grey.base.utils.ByteChars;
+import com.grey.base.utils.FileOps;
 import com.grey.base.utils.StringOps;
-import com.grey.naf.reactor.ChannelMonitor;
-import com.grey.naf.reactor.Dispatcher;
 
 public class IOExecWriterTest
 {
-	static {
-		SysProps.set(com.grey.naf.Config.SYSPROP_DIRPATH_VAR, SysProps.TMPDIR+"/utest/IOW");
-	}
-	private static String workdir = SysProps.TMPDIR+"/utest/iow";
+	private static final String rootdir = DispatcherTest.initPaths(IOExecWriterTest.class);
 
 	private static class CMW extends ChannelMonitor
 	{
@@ -26,7 +21,7 @@ public class IOExecWriterTest
 		public CMW(Dispatcher d, java.nio.channels.SelectableChannel w, com.grey.naf.BufferSpec bufspec)
 				throws com.grey.base.ConfigException, com.grey.base.FaultException, java.io.IOException {
 			super(d);
-			chanwriter = new com.grey.naf.reactor.IOExecWriter(bufspec);
+			chanwriter = new IOExecWriter(bufspec);
 			initChannel(w, true, true);
 		}
 
@@ -56,6 +51,7 @@ public class IOExecWriterTest
 	@org.junit.Test
 	public void testBlocking() throws com.grey.base.GreyException, java.io.IOException
 	{
+		FileOps.deleteDirectory(rootdir);
 		com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(0, 10, true);
 		String finalseq = "FinalSequence";  //deliberately larger than IOExecWriter's buffer-size
 
@@ -125,21 +121,25 @@ public class IOExecWriterTest
 	@org.junit.Test
 	public void testFile() throws com.grey.base.GreyException, java.io.IOException
 	{
+		FileOps.deleteDirectory(rootdir);
 		int filesize = 8 * 1024 * 1024;
 		int xmitbuf = 2 * 1024 * 1024;
 		com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(0, 0, false);
 
 		// create the file
-		String pthnam = workdir+"/sendfile";
+		String pthnam = rootdir+"/sendfile";
 		java.io.File fh = new java.io.File(pthnam);
 		com.grey.base.utils.FileOps.ensureDirExists(fh.getParentFile());
-		fh.delete();
 		org.junit.Assert.assertFalse(fh.exists());
 
 		byte[] filebody = new byte[filesize];
 		Arrays.fill(filebody, (byte)'A');
 		java.io.FileOutputStream ostrm = new java.io.FileOutputStream(fh);
-		ostrm.write(filebody);
+		try {
+			ostrm.write(filebody);
+		} finally {
+			ostrm.close();
+		}
 		org.junit.Assert.assertTrue(fh.exists());
 		org.junit.Assert.assertEquals(filebody.length, fh.length());
 

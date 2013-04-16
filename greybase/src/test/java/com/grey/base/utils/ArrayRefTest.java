@@ -69,6 +69,9 @@ public class ArrayRefTest
 		// exercise some final cases
 		ah = new ArrayRef<String[]>(String.class, 0);
 		verify(ah, 0, 0, 0);
+		org.junit.Assert.assertNotNull(ah.ar_buf);
+		ah = new ArrayRef<String[]>(String.class, -1);
+		verify(ah, 0, 0, 0);
 		org.junit.Assert.assertNull(ah.ar_buf);
 	}
 
@@ -134,7 +137,10 @@ public class ArrayRefTest
 		org.junit.Assert.assertNull(ah.ar_buf);
 
 		// exercise some final cases
-		ah = new ArrayRef<byte[]>(String.class, 0);
+		ah = new ArrayRef<byte[]>(byte.class, 0);
+		verify(ah, 0, 0, 0);
+		org.junit.Assert.assertNotNull(ah.ar_buf);
+		ah = new ArrayRef<byte[]>(byte.class, -1);
 		verify(ah, 0, 0, 0);
 		org.junit.Assert.assertNull(ah.ar_buf);
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Yusef Badri - All rights reserved.
+ * Copyright 2012-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.echobot;
@@ -23,7 +23,7 @@ public class ClientUDP
 
 		// We're not interested in the sender address of incoming messages, so we don't need to specify udp=true in
 		// IOExecReader, but it's worth doing so anyway because the code path for UDP sockets is more streamlined.
-		chanreader = new com.grey.naf.reactor.IOExecReader(bufspec, true);
+		chanreader = new com.grey.naf.reactor.IOExecReader(bufspec);
 		initChannel(udpchan, true, false);
 		chanreader.receive(0, true);
 
@@ -45,7 +45,7 @@ public class ClientUDP
 	}
 
 	@Override
-	public void ioReceived(com.grey.base.utils.ArrayRef<byte[]> data, java.net.SocketAddress remaddr)
+	public void ioReceived(com.grey.base.utils.ArrayRef<byte[]> data, java.net.InetSocketAddress remaddr)
 			throws com.grey.base.FaultException, java.io.IOException
 	{
 		ioReceived(data);

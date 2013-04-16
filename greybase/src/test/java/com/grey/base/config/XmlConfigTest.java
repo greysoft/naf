@@ -1,10 +1,8 @@
 /*
- * Copyright 2011-2012 Yusef Badri - All rights reserved.
+ * Copyright 2011-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.config;
-
-import java.io.IOException;
 
 import com.grey.base.ConfigException;
 
@@ -21,6 +19,7 @@ public class XmlConfigTest
 			+"<tag2>10</tag2>"
 			+"<tag3>N</tag3>"
 			+"<tag14>"+XmlConfig.NULLMARKER+"</tag14>"
+			+"<tag16>b</tag16>"
 			+"<blanktag></blanktag>"
 			+"<innernode>"
 				+"<tag1 attr1=\"attrval21\">tagval21</tag1>"
@@ -68,7 +67,7 @@ public class XmlConfigTest
 	// Just do one simple test to establish that we've been able to parse a valid config block from a file.
 	// Once read in, it's the same as one created from the literal string above, and we do all the other tests on that.
 	@org.junit.Test
-	public void testFile() throws IOException, ConfigException
+	public void testFile() throws java.io.IOException, ConfigException
 	{
 		java.io.File fh = new java.io.File("temptest_xmlconfig.xml");
 		String pthnam = fh.getAbsolutePath();
@@ -121,6 +120,25 @@ public class XmlConfigTest
 		boolval = cfg.getBool("tag13", false);
 		org.junit.Assert.assertFalse(boolval);
 
+		char chval = cfg.getChar("tag16", true, (char)0);
+		org.junit.Assert.assertEquals('b', chval);
+		chval = cfg.getChar("tag16", true, 'c');
+		org.junit.Assert.assertEquals('b', chval);
+		chval = cfg.getChar("tag16", false, 'c');
+		org.junit.Assert.assertEquals('b', chval);
+		chval = cfg.getChar("tag16b", true, 'c');
+		org.junit.Assert.assertEquals('c', chval);
+		chval = cfg.getChar("tag16b", false, 'c');
+		org.junit.Assert.assertEquals('c', chval);
+		chval = cfg.getChar("tag16b", false, (char)0);
+		org.junit.Assert.assertEquals(0, chval);
+		chval = cfg.getChar("tag16b", true, '-');
+		org.junit.Assert.assertEquals('-', chval);
+		chval = cfg.getChar("tag16b", true, '\u003a');
+		org.junit.Assert.assertEquals(':', chval);
+		chval = cfg.getChar("tag16b", true, '\uf03a');
+		org.junit.Assert.assertEquals('\uf03a', chval);
+
 		try {
 			cfg.getValue("tag11", true, null);
 			org.junit.Assert.fail("Absent mandatory string not detected");
@@ -129,6 +147,15 @@ public class XmlConfigTest
 		try {
 			cfg.getInt("tag12", true, 0);
 			org.junit.Assert.fail("Absent mandatory int not detected");
+		} catch (ConfigException ex) {}
+
+		try {
+			cfg.getChar("tag16b", true, (char)0);
+			org.junit.Assert.fail("Absent mandatory char not detected");
+		} catch (ConfigException ex) {}
+		try {
+			cfg.getChar("tag2", true, 'c');
+			org.junit.Assert.fail("Invalid char item not detected");
 		} catch (ConfigException ex) {}
 	}
 

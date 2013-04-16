@@ -66,10 +66,10 @@ public class Base64
 
 		if (arrh != null)
 		{
-			arrh.ensureCapacity(enclen);
-			arrh.ar_len = enclen;
+			arrh.ensureCapacity(arrh.ar_len + enclen);
 			encdata = arrh.ar_buf;
-			encoff = arrh.ar_off;
+			encoff = arrh.ar_off + arrh.ar_len;
+			arrh.ar_len += enclen;
 		}
 		else
 		{
@@ -147,10 +147,10 @@ public class Base64
 
 		if (arrh != null)
 		{
-			arrh.ensureCapacity(rawlen);
-			arrh.ar_len = rawlen;
+			arrh.ensureCapacity(arrh.ar_len + rawlen);
 			rawdata = arrh.ar_buf;
-			rawoff = arrh.ar_off;
+			rawoff = arrh.ar_off + arrh.ar_len;
+			arrh.ar_len += rawlen;
 		}
 		else
 		{
@@ -228,10 +228,10 @@ public class Base64
 
 		if (arrh != null)
 		{
-			arrh.ensureCapacity(enclen);
-			arrh.ar_len = enclen;
+			arrh.ensureCapacity(arrh.ar_len + enclen);
 			encdata = arrh.ar_buf;
-			encoff = arrh.ar_off;
+			encoff = arrh.ar_off + arrh.ar_len;
+			arrh.ar_len += enclen;
 		}
 		else
 		{
@@ -303,10 +303,10 @@ public class Base64
 
 		if (arrh != null)
 		{
-			arrh.ensureCapacity(rawlen);
-			arrh.ar_len = rawlen;
+			arrh.ensureCapacity(arrh.ar_len + rawlen);
 			rawdata = arrh.ar_buf;
-			rawoff = arrh.ar_off;
+			rawoff = arrh.ar_off + arrh.ar_len;
+			arrh.ar_len += rawlen;
 		}
 		else
 		{

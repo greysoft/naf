@@ -66,7 +66,7 @@ public class Server
 	}
 
 	@Override
-	public void ioDisconnected()
+	public void ioDisconnected(CharSequence diagnostic)
 	{
 		int prev_state = state;
 		state = S_DISCON;
@@ -129,7 +129,7 @@ public class Server
 		ByteChars finalrsp = (cmdrsp == null ? bctmp.clear() : cmdrsp);
 		finalrsp.append("\nNAFMAN has completed command=").append(cmd.getDescription());
 		finalrsp.append("\nCommand was processed by Dispatchers=").append(String.valueOf(processedBy.size()));
-		if (processedBy.size() != 0) finalrsp.append((byte)' ').append(processedBy.toString());
+		if (processedBy.size() != 0) finalrsp.append(' ').append(processedBy.toString());
 		endConnection(finalrsp);
 	}
 
@@ -154,7 +154,7 @@ public class Server
 	@Override
 	public void eventError(com.grey.naf.reactor.ChannelMonitor cm, Throwable ex)
 	{
-		ioDisconnected();
+		ioDisconnected(null);
 	}
 
 	@Override

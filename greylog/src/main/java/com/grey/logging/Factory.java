@@ -134,7 +134,6 @@ public class Factory
 			if (sinkstdio) {
 				if (diagtrace) System.out.println("GreyLogger: Logger="+tag+" has been directed to stdio - "+cfgpath);
 				params = new Parameters();
-				params.logclass = MTLatinLogger.class.getName();
 			} else {
 				if (diagtrace) System.out.println("GreyLogger: Logger="+tag+" has been directed to Sink - "+cfgpath);
 				return new SinkLogger(name);

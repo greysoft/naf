@@ -341,11 +341,11 @@ public final class FileOpsTest
 	@org.junit.Test
 	public void lineReader() throws java.io.IOException, java.net.URISyntaxException
 	{
-		int cnt = FileOps.readTextLines(getClass().getResource(RSRC_NAME), this, 0, null);
+		int cnt = FileOps.readTextLines(getClass().getResource(RSRC_NAME), this, 0, null, 8192);
 		org.junit.Assert.assertEquals(2, cnt);
 
 		String pthnam = FileOps.getResourcePath(RSRC_NAME, getClass());
-		cnt = FileOps.readTextLines(new java.io.File(pthnam), this, 0, null);
+		cnt = FileOps.readTextLines(new java.io.File(pthnam), this, 0, null, 8192);
 		org.junit.Assert.assertEquals(2, cnt);
 	}
 

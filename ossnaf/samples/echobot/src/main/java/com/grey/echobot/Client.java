@@ -63,7 +63,7 @@ public abstract class Client
 	}
 
 	@Override
-	public void ioDisconnected()
+	public void ioDisconnected(CharSequence diag)
 	{
 		dsptch.logger.info(logpfx+" Unsolicited disconnect - msgnum="+msgnum+"/"+grp.msgcnt+", msgbytes="+msgbytes+"/"+grp.msgbuf.length);
 		disconnect();

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -162,6 +162,11 @@ public final class IP
 	public static int parseIP(String host) throws java.net.UnknownHostException
 	{
 		java.net.InetAddress jdkip = getHostByName(host);
+		return convertIP(jdkip);
+	}
+
+	public static int convertIP(java.net.InetAddress jdkip) throws java.net.UnknownHostException
+	{
 		byte[] ipbytes = jdkip.getAddress();
 		return net2ip(ipbytes, 0);
 	}
@@ -211,31 +216,29 @@ public final class IP
 		java.util.List<String> maclist = new java.util.ArrayList<String>();
 		java.util.Enumeration<java.net.NetworkInterface> ifaces = java.net.NetworkInterface.getNetworkInterfaces();
 
-		while (ifaces != null && ifaces.hasMoreElements())
-		{
+		while (ifaces != null && ifaces.hasMoreElements()) {
+			// include this interface if it has at least one valid IP attached to it
+			boolean hasvalidIPs = false;
 			java.net.NetworkInterface nif = ifaces.nextElement();
-			byte[] mac = nif.getHardwareAddress();
-			if (mac == null || mac.length == 0) continue;
 			if ((flags & FLAG_IFUP) != 0 && !nif.isUp()) continue;
 			if ((flags & FLAG_IFREAL) != 0 && nif.isVirtual()) continue;
-
-			// include this interface if it has at least one valid IP
-			boolean hasvalidIPs = false;
 			java.util.Enumeration<java.net.InetAddress> ips = nif.getInetAddresses();
-			while (!hasvalidIPs && ips != null && ips.hasMoreElements())
-			{
+
+			while (!hasvalidIPs && ips != null && ips.hasMoreElements()) {
 				java.net.InetAddress ip = ips.nextElement();
 				if ((flags & FLAG_IFREAL) != 0 && (ip.isLoopbackAddress() || ip.isMulticastAddress())) continue;
 				if ((flags & FLAG_IFIP4) != 0 && !ip.getClass().equals(java.net.Inet4Address.class)) continue;
 				if ((flags & FLAG_IFIP6) != 0 && !ip.getClass().equals(java.net.Inet6Address.class)) continue;
 				hasvalidIPs = true;
 			}
-			if (hasvalidIPs) maclist.add(new String(com.grey.base.crypto.Ascii.hexEncode(mac)));
+			if (!hasvalidIPs) continue;
+			byte[] mac = nif.getHardwareAddress();
+			if (mac == null || mac.length == 0) continue;
+			maclist.add(new String(com.grey.base.crypto.Ascii.hexEncode(mac)));
 		}
 		String[] arr = (maclist.size() == 0 ? null : new String[maclist.size()]);
 
-		for (int idx = 0; idx != maclist.size(); idx++)
-		{
+		for (int idx = 0; idx != maclist.size(); idx++) {
 			arr[idx] = maclist.get(idx);
 		}
 		return arr;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.config;
@@ -28,7 +28,7 @@ public class XmlConfig
 		try {
 			_blank_cfg = makeSection("<x/>", XPATH_SEP+"x");
 		} catch (Exception ex) {
-			throw new RuntimeException("XmlConfig failed to initiaise", ex);
+			throw new RuntimeException("XmlConfig failed to initialise", ex);
 		}
 	}
 	public static final XmlConfig BLANKCFG = _blank_cfg;  // exists() returns True
@@ -164,11 +164,7 @@ public class XmlConfig
 	
 	public String getValue(String xpath, boolean mdty, String dflt) throws com.grey.base.ConfigException
 	{
-		if (cfgDefaults != null) dflt = cfgDefaults.getValue(xpath, false, dflt);
-		String cfgval = getValue(cfgsect, xpath, mdty, dflt);
-		if (cfgval != null) cfgval = cfgval.trim().intern();
-		if (trace_stdout) System.out.println("Config item [" + label + ELEM_SEP + xpath + " = " + cfgval + "]");
-		return cfgval;
+		return getValue(xpath, mdty, dflt, false);
 	}
 
 	// if mdty is true, then dflt=0 indicates the absence of a default
@@ -176,6 +172,16 @@ public class XmlConfig
 	{
 		String str = getValue(xpath, mdty, (mdty && dflt == 0) ? null : String.valueOf(dflt));
 		return Integer.parseInt(str);
+	}
+
+	// dflt=0 indicates the absence of a default
+	public char getChar(String xpath, boolean mdty, char dflt) throws com.grey.base.ConfigException
+	{
+		String str = getValue(xpath, mdty, dflt == 0 ? null : String.valueOf(dflt), true);
+		if (str == null) return 0;
+		if (str.charAt(0) == '/') return (char)Integer.valueOf(str.substring(1)).intValue();
+		if (str.length() != 1) configError(xpath, "Invalid character value - "+str);
+		return str.charAt(0);
 	}
 	
 	public boolean getBool(String xpath, boolean dflt) throws com.grey.base.ConfigException
@@ -212,30 +218,27 @@ public class XmlConfig
 		String str = getValue(xpath, mdty, dflt);
 		int pos;
 
-		if (str != null)
-		{
+		if (str != null) {
 			// strip leading and trailing delimiters
-			if ((pos = str.lastIndexOf(dlm)) != -1)
-			{
+			if ((pos = str.lastIndexOf(dlm)) != -1) {
 				if (str.length() - pos == dlm.length()) str = str.substring(0, pos).trim();
 			}
 			if (str.indexOf(dlm) == 0) str = str.substring(dlm.length()).trim();
 			if (dlm.equals("|")) dlm = "\\|";  // commonly used separator, so prevent regex interpreting it as a special character
 			arr = str.split(dlm);
+			java.util.ArrayList<String> lst = new java.util.ArrayList<String>();
 			
-			for (int idx = 0; idx != arr.length; idx++)
-			{
-				arr[idx] = arr[idx].trim().intern();
+			for (int idx = 0; idx != arr.length; idx++) {
+				arr[idx] = arr[idx].trim();
+				if (arr[idx].length() != 0) lst.add(arr[idx]);
 			}
 
 			// split() always returns at least one element, so make sure there was something
-			if (arr.length == 1 && arr[0].length() == 0)
-			{
+			if (lst.size() == 0) {
 				if (mdty) configError(xpath, "Missing mandatory tuple");
 				arr = null;
-			}
-			else
-			{
+			} else {
+				arr = lst.toArray(new String[lst.size()]);
 				if (min != 0 && arr.length < min) configError(xpath, "Insufficient tuple elements (" + arr.length + " vs " + min + ")");
 				if (max != 0 && arr.length > max) configError(xpath, "Excess tuple elements (" + arr.length + " vs " + max + ")");
 			}
@@ -248,13 +251,21 @@ public class XmlConfig
 		return getTuple(xpath, dlm, mdty, dflt, 0, 0);
 	}
 	
-	private String getValue(Object cfg, String xpath, boolean mdty, String dflt) throws com.grey.base.ConfigException
+	private String getValue(String xpath, boolean mdty, String dflt, boolean disable_nullmarker) throws com.grey.base.ConfigException
+	{
+		if (cfgDefaults != null) dflt = cfgDefaults.getValue(xpath, false, dflt);
+		String cfgval = getValue(cfgsect, xpath, mdty, dflt, disable_nullmarker);
+		if (cfgval != null) cfgval = cfgval.trim();
+		if (trace_stdout) System.out.println("Config item [" + label + ELEM_SEP + xpath + " = " + cfgval + "]");
+		return cfgval;
+	}
+	
+	private String getValue(Object cfg, String xpath, boolean mdty, String dflt, boolean disable_nullmarker) throws com.grey.base.ConfigException
 	{
 		org.w3c.dom.Node elem = null;
 		String cfgval = null;
 
-		if (cfg != null)
-		{
+		if (cfg != null) {
 			try {
 				elem = (org.w3c.dom.Node)xpathproc.evaluate(xpath, cfg, javax.xml.xpath.XPathConstants.NODE);
 			} catch (Exception ex) {
@@ -262,19 +273,15 @@ public class XmlConfig
 			}
 		}
 
-		if (elem != null)
-		{
+		if (elem != null) {
 			cfgval = elem.getTextContent();
 			if (cfgval != null) cfgval = cfgval.trim();
 		}
 
-		if (cfgval == null || cfgval.length() == 0)
-		{
+		if (cfgval == null || cfgval.length() == 0) {
 			cfgval = dflt;
-		}
-		else
-		{
-			if (cfgval.equals(NULLMARKER)) cfgval = null;
+		} else {
+			if (!disable_nullmarker && cfgval.equals(NULLMARKER)) cfgval = null;
 		}
 		if (mdty && (cfgval == null || cfgval.length() == 0)) configError(xpath, "Missing mandatory item");
 
