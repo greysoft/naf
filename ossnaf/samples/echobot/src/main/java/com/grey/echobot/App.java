@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Yusef Badri - All rights reserved.
+ * Copyright 2012-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.echobot;
@@ -132,7 +132,6 @@ public class App
 		if (options.server_enabled && options.cgrpsiz == 0) options.server_solo = true;
 		int dcnt = (options.server_solo ? options.cgrpcnt + 1 : options.cgrpcnt);
 		DispatcherDef def = new DispatcherDef();
-		def.hasNafman = false;
 		Dispatcher[] cdispatchers = new Dispatcher[dcnt];
 		ClientGroup[] cgroups = new ClientGroup[options.cgrpcnt];
 		TSAP tsap = TSAP.build(hostport, 0);
@@ -189,6 +188,7 @@ public class App
 					options.sockbufsiz, options.verify);
 		}
 		cgrpcnt = options.cgrpcnt;
+		System.out.println("EchoBot initialisation complete\n"+Dispatcher.dumpConfig());
 
 		// start the Dispatchers
 		for (int idx = 0; idx != dcnt; idx++) {
@@ -230,6 +230,8 @@ public class App
 		}
 	}
 
+	// This method can be called from multiple Dispatcher threads, but the values it updates were
+	// initially set in the non-MT initial-setup phase.
 	public synchronized void terminated(ClientGroup cg) throws java.io.IOException
 	{
 		if (cg.dsptch != dserver) cg.dsptch.stop(cg.dsptch);

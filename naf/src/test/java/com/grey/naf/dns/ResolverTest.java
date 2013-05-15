@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Yusef Badri - All rights reserved.
+ * Copyright 2012-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns;
@@ -17,13 +17,13 @@ public class ResolverTest
 	private static final String rootdir = com.grey.naf.reactor.DispatcherTest.initPaths(ResolverTest.class);
 	private static final com.grey.logging.Logger junklogger = com.grey.logging.Factory.getLoggerNoEx("no-such-logger");
 
+	private static final String SYSPROP_SKIP = "greynaf.test.skipdns";
+	private static final boolean skiptests = SysProps.get(SYSPROP_SKIP, true); //test setup is too specific to my Dev environment
 	private static final String dnsservers = SysProps.get("greynaf.dns.test.servers");
 	private static final String queryTargetA = SysProps.get("greynaf.dns.test.targetA", "www.google.com");
 	private static final String queryTargetMX = SysProps.get("greynaf.dns.test.targetMX", "ibm.com"); //triggers QTYPE_A follow-on
 	private static final String queryTargetPTR = SysProps.get("greynaf.dns.test.targetPTR", "192.168.101.12");
 	private static final String NoSuchDom = "nonsuchdomain6812.com";
-	private static final String SYSPROP_SKIP = "greynaf.test.skipdns";
-	private static final boolean skiptests = SysProps.get(SYSPROP_SKIP, true); //test setup is too specific to my Dev environment
 
 	static {
 		if (skiptests) {
@@ -272,8 +272,8 @@ public class ResolverTest
 		} else if (answer.qtype == Resolver.QTYPE_MX)  {
 			if (answer.result == Answer.STATUS.OK) org.junit.Assert.assertFalse(answer.rrdata.get(0).ipaddr == 0);
 			if (!cbflags.contains("piggyback") && !cbflags.contains("distributed-remote")) {
-				ByteChars bc = new ByteChars("mbox@"+answer.qname);
-				answer = dsptch.dnsresolv.resolveMailDomain(bc, this, null, Resolver.FLAG_NOQRY | Resolver.FLAG_ISMAILBOX);
+				ByteChars bc = new ByteChars(answer.qname);
+				answer = dsptch.dnsresolv.resolveMailDomain(bc, this, null, Resolver.FLAG_NOQRY);
 				assertAnswer(dsptch, answer.result, Resolver.QTYPE_MX, 0, answer);
 			}
 		} else {

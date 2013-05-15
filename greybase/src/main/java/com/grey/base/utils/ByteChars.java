@@ -393,14 +393,7 @@ public final class ByteChars
 	@Override
 	public String toString()
 	{
-		return toString(null);
-	}
-
-	public String toString(StringBuilder sb)
-	{
-		if (sb == null) sb = new StringBuilder();
-		sb.append(this);
-		return sb.toString();
+		return new StringBuilder().append(this).toString();
 	}
 
 	@Override

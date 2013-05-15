@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Yusef Badri - All rights reserved.
+ * Copyright 2012-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -32,7 +32,7 @@ public class ChannelMonitorTest
 			writer = new CMW(d, w, bufspec, runner);
 			chanreader = new IOExecReader(bufspec);
 			initChannel(r, true, true);
-			chanreader.receive(0, true);
+			chanreader.receive(0);
 			runner.cmcnt++;
 		}
 

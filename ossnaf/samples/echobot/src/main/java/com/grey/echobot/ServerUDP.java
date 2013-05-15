@@ -30,15 +30,14 @@ public class ServerUDP
 
 		chanreader = new com.grey.naf.reactor.IOExecReader(bufspec);
 		initChannel(udpchan, true, false);
-		chanreader.receive(0, true);
+		chanreader.receive(0);
 	}
 
 	@Override
 	public void ioReceived(com.grey.base.utils.ArrayRef<byte[]> data, java.net.InetSocketAddress remaddr)
 			throws com.grey.base.FaultException, java.io.IOException
 	{
-		niobuf = com.grey.base.utils.NIOBuffers.ensureCapacity(niobuf, data.ar_len, app.sbufspec.directbufs);
-		com.grey.base.utils.NIOBuffers.encode(data.ar_buf, data.ar_off, data.ar_len, niobuf, false);
+		niobuf = com.grey.base.utils.NIOBuffers.encode(data.ar_buf, data.ar_off, data.ar_len, niobuf, app.sbufspec.directbufs);
 		int nbytes = udpchan.send(niobuf, remaddr);
 		if (nbytes != data.ar_len) {
 			dsptch.logger.error("Server send failed - nbytes="+nbytes+"/"+data.ar_len);

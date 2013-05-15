@@ -1,21 +1,22 @@
 NAF (Network Application Framework) is an open-source Java NIO framework that is designed to stick to the basics of switching I/O and be easy to use.
 
-It supports:
-- TCP or UDP based clients and servers.
+It supports and provides:
+- TCP and UDP based clients and servers.
 - Non-blocking reads: Instruct it to to call your code back after either receiving a specified
-  marker byte (eg. a Newline, for
-  Internet-style text-oriented protocols) or a specified number of bytes.
+  marker byte (eg. a Newline, for Internet-style text-oriented protocols) or a specified number
+  of bytes.
 - Non-blocking writes: NAF will complete the write for you without further intervention, if it
   would have blocked.
 - Millisecond Timers: You can have any number of timers outstanding, each of which will call
   back the nominated handler on expiry.
+- Non-blocking SSL (as client, as server, with client certs, etc)
 - Non-blocking DNS Requests: Issue A/CNAME, PTR or MX requests, and your code will be called
   back when the answer is available.
+- A lock-free single-threaded execution environment based on the Reactor pattern - parallelism
+  can be provided by adding more Dispatcher threads.
+- A built-in management agent, which you can view and control via your web browser.
 - Config-driven application setup: The naf.xml config file lets you easily specify which tasks
-  and classes to invoke, without having to rebuild your code every time.
-- Interrogation of the running process to obtain various stats and state dumps.
-
-It does all this within the context of the single-threaded Reactor pattern. Obviously the average NAF application will contain multiple threads, but the idea is that each thread would constitute an independent Reactor-style event-dispatcher running within one thread, with all the potential for optimisations that this presents.
+  and classes to invoke, without having to rebuild your code.
 
 See the NAF home page at http://www.greyware.co.uk/naf for more info.
 Non-trivial sample applications are also included in the NAF source tree, to illustrate NAF's features.

@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2012 Yusef Badri - All rights reserved.
+ * Copyright 2011-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -54,8 +54,11 @@ public final class FileOpsTest
 		rtxt = FileOps.readAsText(new java.io.File(filepath1), null);
 		org.junit.Assert.assertTrue(origtxt.equals(rtxt));
 		java.io.FileInputStream strm = new java.io.FileInputStream(filepath1);
-		rtxt = FileOps.readAsText(strm, null);
-		strm.close();
+		try {
+			rtxt = FileOps.readAsText(strm, null);
+		} finally {
+			strm.close();
+		}
 		org.junit.Assert.assertTrue(origtxt.equals(rtxt));
 
 		// file copy
@@ -83,21 +86,29 @@ public final class FileOpsTest
 
 		// repeat for the other Copy variant
 		java.io.File fh3 = new java.io.File(filepath3);
+		java.io.FileOutputStream fout = null;
 		java.io.FileInputStream fin = new java.io.FileInputStream(filepath1);
-		java.io.FileOutputStream fout = new java.io.FileOutputStream(filepath3);
-		nbytes = FileOps.copyStream(fin, fout);
+		try {
+			fout = new java.io.FileOutputStream(filepath3);
+			nbytes = FileOps.copyStream(fin, fout);
+		} finally {
+			fin.close();
+			if (fout != null) fout.close();
+			fout = null;
+		}
 		org.junit.Assert.assertEquals(origtxt.length(), nbytes);
 		org.junit.Assert.assertEquals(fh3.length(), nbytes);
-		fin.close();
-		fout.close();
 		fin = new java.io.FileInputStream(filepath1);
-		fout = new java.io.FileOutputStream(filepath3);
-		nbytes = FileOps.copyStream(fin, fout);
-		org.junit.Assert.assertEquals(origtxt.length(), nbytes);
-		org.junit.Assert.assertEquals(fh3.length(), nbytes);
-		fin.close();
-		org.junit.Assert.assertTrue(FileOps.flush(fout));
-		org.junit.Assert.assertTrue(FileOps.close(fout));
+		try {
+			fout = new java.io.FileOutputStream(filepath3);
+			nbytes = FileOps.copyStream(fin, fout);
+			org.junit.Assert.assertEquals(origtxt.length(), nbytes);
+			org.junit.Assert.assertEquals(fh3.length(), nbytes);
+			org.junit.Assert.assertTrue(FileOps.flush(fout));
+		} finally {
+			fin.close();
+			if (fout != null) org.junit.Assert.assertTrue(FileOps.close(fout));
+		}
 		rtxt = FileOps.readAsText(fh3, null);
 		org.junit.Assert.assertTrue(origtxt.equals(rtxt));
 
@@ -170,8 +181,7 @@ public final class FileOpsTest
 	@org.junit.Test
 	public void readResource() throws java.io.IOException, java.net.URISyntaxException
 	{
-		String respath = FileOps.getResourcePath(RSRC_NAME, getClass());
-		java.io.File fh = new java.io.File(respath);
+		java.io.File fh = getResource(RSRC_NAME, getClass());
 
 		String rtxt = FileOps.readResourceAsText(RSRC_NAME, getClass(), null);
 		org.junit.Assert.assertEquals(fh.length(), rtxt.length());
@@ -192,21 +202,13 @@ public final class FileOpsTest
 		org.junit.Assert.assertNotNull(FileOps.makeURL(urlpath.replace(FileOps.URLPFX_FILE, FileOps.URLPFX_HTTP)));
 		org.junit.Assert.assertNotNull(FileOps.makeURL(urlpath.replace(FileOps.URLPFX_FILE, FileOps.URLPFX_HTTPS)));
 		org.junit.Assert.assertNotNull(FileOps.makeURL("jar:file:///name.jar!/path/to/resource"));
-		org.junit.Assert.assertNull(FileOps.makeURL(respath));
-
-		respath = FileOps.getResourcePath("badpath", getClass());
-		org.junit.Assert.assertNull(respath);
-		rtxt = FileOps.readResourceAsText("badpath", getClass(), null);
-		org.junit.Assert.assertNull(rtxt);
-		respath = FileOps.getResourcePath("badpath", null);
-		org.junit.Assert.assertNull(respath);
+		org.junit.Assert.assertNull(FileOps.makeURL(fh.getCanonicalPath()));
 	}
 
 	@org.junit.Test
 	public void readBuffer() throws java.io.IOException, java.net.URISyntaxException
 	{
-		String respath = FileOps.getResourcePath(RSRC_NAME, getClass());
-		java.io.File fh = new java.io.File(respath);
+		java.io.File fh = getResource(RSRC_NAME, getClass());
 
 		// test with a null ArrayRef param first
 		byte[] buf = FileOps.read(fh, -1, null);
@@ -268,17 +270,22 @@ public final class FileOpsTest
 		String filepath = workdir+"/binfile1";
 		fh = new java.io.File(filepath);
 		FileOps.ensureDirExists(workdir);
-		java.io.FileOutputStream ostrm = new java.io.FileOutputStream(filepath, false);
 		buf = new byte[256];
 		for (int bval = 0; bval != 256; bval++) buf[bval] = (byte)bval;
-		while (fh.length() < (FileOps.RDBUFSIZ * 2) + 1) ostrm.write(buf);
-		ostrm.close();
-
+		java.io.FileOutputStream ostrm = new java.io.FileOutputStream(filepath, false);
+		try {
+			while (fh.length() < (FileOps.RDBUFSIZ * 2) + 1) ostrm.write(buf);
+		} finally {
+			ostrm.close();
+		}
 		initcap = (int)fh.length();
 		ah = new ArrayRef<byte[]>(byte.class, initcap);
 		java.io.InputStream strm = new IndeterminateStream(fh, 0);
-		buf = FileOps.read(strm, -1, ah);
-		strm.close();
+		try {
+			buf = FileOps.read(strm, -1, ah);
+		} finally {
+			strm.close();
+		}
 		org.junit.Assert.assertEquals(fh.length(), ah.size());
 		org.junit.Assert.assertEquals(fh.length(), buf.length);
 		org.junit.Assert.assertEquals(1, buf[1]);
@@ -288,8 +295,11 @@ public final class FileOpsTest
 		initcap = (int)fh.length();
 		ah = new ArrayRef<byte[]>(byte.class, initcap);
 		strm = new IndeterminateStream(fh, initcap);
-		buf = FileOps.read(strm, -1, ah);
-		strm.close();
+		try {
+			buf = FileOps.read(strm, -1, ah);
+		} finally {
+			strm.close();
+		}
 		org.junit.Assert.assertEquals(fh.length(), ah.size());
 		org.junit.Assert.assertEquals(fh.length(), buf.length);
 		org.junit.Assert.assertEquals(1, buf[1]);
@@ -344,8 +354,8 @@ public final class FileOpsTest
 		int cnt = FileOps.readTextLines(getClass().getResource(RSRC_NAME), this, 0, null, 8192);
 		org.junit.Assert.assertEquals(2, cnt);
 
-		String pthnam = FileOps.getResourcePath(RSRC_NAME, getClass());
-		cnt = FileOps.readTextLines(new java.io.File(pthnam), this, 0, null, 8192);
+		java.io.File fh = getResource(RSRC_NAME, getClass());
+		cnt = FileOps.readTextLines(fh, this, 0, null, 8192);
 		org.junit.Assert.assertEquals(2, cnt);
 	}
 
@@ -363,5 +373,14 @@ public final class FileOpsTest
 			org.junit.Assert.fail("Unexpected LineReader line-number="+lno);
 		}
 		return false;
+	}
+
+	// NB: The concept of mapping a resource URL to a File is inherently flawed, but this utility works
+	// beecause the resources we're looking up are in the same build tree.
+	private static java.io.File getResource(String path, Class<?> clss) throws java.net.URISyntaxException
+	{
+		java.net.URL url = DynLoader.getResource(path, clss);
+		if (url == null) return null;
+		return new java.io.File(url.toURI());
 	}
 }

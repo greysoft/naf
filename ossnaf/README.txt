@@ -56,22 +56,22 @@ Then execute them from NAFHOME.
 
 The DNS Batch Resolver (which is technically a built-in NAFlet rather than a
 sample app) could be run by entering the following:
-    java -jar lib/greynaf-2.0.0.jar -c conf/batchresolver.xml -logger dnsbatch < infile
+    java -jar lib/greynaf-2.3.0.jar -c conf/batchresolver.xml -logger dnsbatch < infile
 This would write the results to stdout and log messages to ./dnsbatchresolver.log
 See the NAF Programmer's Guide for more info about how to run the Batch Resolver.
 
 The Port Forwarder sample app could be run as:
-    java -jar lib/portfwd-1.0.0.jar -c conf/portfwd.xml -logger portfwd &
+    java -jar lib/portfwd-2.3.0.jar -c conf/portfwd.xml -logger portfwd &
 The logfile will be under ./var/logs
 
 The Echo Bot could run a simple TCP test like this:
-    java -Dgreynaf.dispatchers.logname=echobot -jar lib/echobot-1.0.0.jar -logger echobot -server-solo -clients 10:2 18001
+    java -Dgreynaf.dispatchers.logname=echobot -jar lib/echobot-2.3.0.jar -logger echobot -server-solo -clients 10:2 18001
 Since this command creates multiple Dispatchers, which would normally use distinct
-loggers that are named after them, that system property setting directs them all
-to use the same GreyLog logger.
+loggers that are named after them, the above command sets a system property that
+directs them all to use the same GreyLog logger.
 
 All the above apps use GreyLog for their logging, and if you experience any issues
 with it, you can set the system property grey.logger.diagnostics=Y to get more
 information about what's going on.
-This can be done on the Java command-line, or put in the grey.properties file, to
+This can be done on the Java command-line, or put it in the grey.properties file, to
 avoid having to continually type it.

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -130,7 +130,13 @@ public class FileOps
 	public static byte[] read(java.io.File fh, int reqlen, ArrayRef<byte[]> bufh) throws java.io.IOException
 	{
 		if (reqlen == -1) reqlen = (int)fh.length();
-		return readAndClose(new java.io.FileInputStream(fh), reqlen, bufh);
+		return read(new java.io.FileInputStream(fh), reqlen, bufh);
+	}
+
+	public static byte[] read(java.io.FileInputStream strm, int reqlen, ArrayRef<byte[]> bufh) throws java.io.IOException
+	{
+		if (reqlen == -1) reqlen = strm.available();
+		return readAndClose(strm, reqlen, bufh);
 	}
 
 	public static byte[] read(java.net.URL url, int reqlen, ArrayRef<byte[]> bufh) throws java.io.IOException
@@ -159,19 +165,6 @@ public class FileOps
 		byte[] buf = readResource(path, clss);
 		if (buf == null) return null;
 		return StringOps.convert(buf, charset);
-	}
-
-	public static java.io.File getResource(String path, Class<?> clss) throws java.net.URISyntaxException
-	{
-		java.net.URL url = DynLoader.getResource(path, clss);
-		if (url == null) return null;
-		return new java.io.File(url.toURI());
-	}
-
-	public static String getResourcePath(String path, Class<?> clss) throws java.io.IOException, java.net.URISyntaxException
-	{
-		java.io.File fh = getResource(path, clss);
-		return (fh == null ? null : fh.getCanonicalPath());
 	}
 
 	public static String readAsText(java.io.InputStream strm, String charset) throws java.io.IOException

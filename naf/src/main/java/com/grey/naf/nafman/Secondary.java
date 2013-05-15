@@ -1,17 +1,19 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.nafman;
 
-public class Secondary
+public final class Secondary
 	extends Agent
 {
-	protected final com.grey.naf.reactor.Producer<Command> requests;
+	final com.grey.naf.reactor.Producer<Command> requests; //package-private
 	private final Primary primary;
 
 	@Override
 	public boolean isPrimary() {return false;}
+	@Override
+	public Primary getPrimary() {return primary;}
 	@Override
 	public int getPort() {return primary.getPort();}
 

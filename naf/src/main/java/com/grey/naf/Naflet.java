@@ -19,7 +19,7 @@ abstract public class Naflet
 {
 	public final String naflet_name;
 	public final java.util.Map<String,Object> cfgdflts = new java.util.HashMap<String,Object>();
-	protected final com.grey.naf.reactor.Dispatcher dsptch;
+	public final com.grey.naf.reactor.Dispatcher dsptch;
 	protected final com.grey.logging.Logger log;
 	protected final String cfgfile;
 	protected com.grey.base.config.XmlConfig appcfg;

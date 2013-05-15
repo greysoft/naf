@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Yusef Badri - All rights reserved.
+ * Copyright 2012-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.portfwd;
@@ -69,7 +69,7 @@ public class ClientSession
 	public void initiateIO() throws com.grey.base.FaultException, java.io.IOException
 	{
 		if (tmt_idle != 0) tmr = dsptch.setTimer(tmt_idle, 0, this);
-		chanreader.receive(0, true);
+		chanreader.receive(0);
 	}
 
 	@Override

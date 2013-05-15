@@ -1,11 +1,11 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.batchresolver;
 
-import com.grey.base.utils.TimeOps;
 import com.grey.logging.Logger.LEVEL;
+import com.grey.base.utils.TimeOps;
 import com.grey.naf.dns.Answer;
 import com.grey.naf.dns.Resolver;
 
@@ -31,7 +31,6 @@ public final class BatchResolver
 	private static final int TMRTYPE_TERM = 2;
 
 	private final byte resolve_mode;
-	private final int resolverflags;
 	private final int batchsize;
 	private final int maxrequests;
 	private final long delay_batch;
@@ -50,8 +49,9 @@ public final class BatchResolver
 	private long systime_paused;
 
 	// temp work areas, preallocated for efficiency
-	private final com.grey.base.utils.ByteChars domnam = new com.grey.base.utils.ByteChars(com.grey.naf.dns.Resolver.MAXDOMAIN);
-	private final StringBuilder strbuf = new StringBuilder(120);
+	private final com.grey.base.utils.ByteChars domnam = new com.grey.base.utils.ByteChars(Resolver.MAXDOMAIN);
+	private final com.grey.base.utils.ByteChars tmplightbc = new com.grey.base.utils.ByteChars(-1);  //lightweight object without own storage
+	private final StringBuilder tmpsb = new StringBuilder();
 
 	public BatchResolver(String name, com.grey.naf.reactor.Dispatcher dsptch, com.grey.base.config.XmlConfig cfg)
 			throws com.grey.base.GreyException, java.io.IOException
@@ -59,7 +59,6 @@ public final class BatchResolver
 		super(name, dsptch, cfg);
 		java.io.InputStream fin = System.in;
 		java.io.OutputStream fout = System.out;
-		boolean mailboxes = false;
 
 		String mode = appcfg.getValue("mode", false, "A").toUpperCase();
 		batchsize = appcfg.getInt("batchsize", false, 10);
@@ -79,14 +78,11 @@ public final class BatchResolver
 			resolve_mode = Resolver.QTYPE_A;
 		} else if (mode.equals("MX")) {
 			resolve_mode = Resolver.QTYPE_MX;
-			mailboxes = appcfg.getBool("mailbox", mailboxes);
 		} else if (mode.equals("PTR")) {
 			resolve_mode = Resolver.QTYPE_PTR;
 		} else {
 			throw new com.grey.base.ConfigException("Invalid resolve-mode="+mode);
 		}
-		resolverflags = (mailboxes ? com.grey.naf.dns.Resolver.FLAG_ISMAILBOX : 0);
-
 		String msg = "DNS-BatchResolver: Mode="+mode+", batchsize="+batchsize+", delay="+delay_batch;
         ostrm.println(msg);
 		log.info(msg);
@@ -169,12 +165,15 @@ public final class BatchResolver
 			domnam.set(inline.trim().toLowerCase());
 
 			if (resolve_mode == Resolver.QTYPE_A) {
-				answer = dsptch.dnsresolv.resolveHostname(domnam, this, inline, resolverflags);
+				answer = dsptch.dnsresolv.resolveHostname(domnam, this, inline, 0);
 			} else if (resolve_mode == Resolver.QTYPE_MX) {
-				answer = dsptch.dnsresolv.resolveMailDomain(domnam, this, inline, resolverflags);
+				int pos = domnam.indexOf(com.grey.base.utils.EmailAddress.DLM);
+				pos = (pos == -1 ? 0 : pos+1);
+				tmplightbc.pointAt(domnam, pos);
+				answer = dsptch.dnsresolv.resolveMailDomain(tmplightbc, this, inline, 0);
 			} else if (resolve_mode == Resolver.QTYPE_PTR) {
 				int ip = com.grey.base.utils.IP.convertDottedIP(inline);
-				answer = dsptch.dnsresolv.resolveIP(ip, this, inline, resolverflags);
+				answer = dsptch.dnsresolv.resolveIP(ip, this, inline, 0);
 			} else {
 				throw new RuntimeException("Missing case for resolve-mode="+resolve_mode);
 			}
@@ -218,14 +217,14 @@ public final class BatchResolver
 
 	private void printAnswer(Answer answer, boolean cached, String origname) throws java.io.IOException
 	{
-		strbuf.setLength(0);
-		strbuf.append(origname).append(" - ");
-		answer.toString(strbuf);
-		if (cached) strbuf.append(" (CACHED)");
-		ostrm.println(strbuf);
+		tmpsb.setLength(0);
+		tmpsb.append(origname).append(" - ");
+		answer.toString(tmpsb);
+		if (cached) tmpsb.append(" (CACHED)");
+		ostrm.println(tmpsb);
 		stats[answer.result.ordinal()]++;
 	}
-	
+
 	private void terminate() throws java.io.IOException
 	{
         ostrm.println();

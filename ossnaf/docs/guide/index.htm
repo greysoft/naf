@@ -9,7 +9,7 @@
 <div class="menu">
 <p>
 Programmer's Guide<br/>
-NAF v2.2.0
+NAF v2.3.0
 </p>
 <hr class="mline"/>
 <p>
@@ -87,10 +87,13 @@ You can set up your application in an entirely programmatic manner if you wish, 
 <span class="pathname">naf.xml</span>
 config file, in which you specify the key classes to be instantiated.
 </li><li>
+NAF provides an extensible web-based GUI, which lets you see snapshots of the registered I/O endpoints and timers in real time.
+You can even kill individual connections.
+</li><li>
 NAF provides object reuse and minimises memory churn (ie. garbage generation), thus minimising the need for expensive GC (Garbage Collector) runs.
 </li></ul>
 <p>
-NAF is intended to be easy to use and does not provide gratuitous layers of abstraction (which force you to learn excessively large custom APIs) over JDK methods that already do what most people need.
+NAF is intended to be easy to use and does not provide gratuitous layers of abstraction (which force you to learn excessively large custom APIs) over the familiar JDK interfaces that already do what most people need.
 <br/>
 What it does, is turn the raw NIO Selector and Channel interfaces into a functioning multiplexor based on the Reactor comms pattern, that performs the I/O ops for you, calls your code with the received data, and then gets out of the way to let your application handle the event.
 <br/> <br/>
@@ -140,14 +143,14 @@ sample program and the DNS batch-resolver app embedded in NAF).
         &lt;logs&gt;%DIRVAR%/logs&lt;logs&gt;
         &lt;tmp&gt;%DIRVAR%/tmp&lt;tmp&gt;
     &lt;/dirpaths&gt;
-    &lt;baseport&gt;12000&lt;/baseport&gt;
+    &lt;baseport&gt;13000&lt;/baseport&gt;
     &lt;dependjars&gt;app1.jar : app2.jar&lt;/dependjars&gt;
-    &lt;dnsresolver&gt;
-        ...
-    &lt;/dnsresolver&gt;
     &lt;nafman&gt;
         ...
     &lt;/nafman&gt;
+    &lt;dnsresolver&gt;
+        ...
+    &lt;/dnsresolver&gt;
     &lt;dispatchers&gt;
         ...
     &lt;/dispatchers&gt;
@@ -168,7 +171,9 @@ For each path, there is an associated system-property that is looked up if the c
 Thereafter, the value of the path is used to substitute token strings to generate a concrete path.
 <br/> <br/>
 The use of some replacement tokens is illustrated above.
-These substitutions are automatically performed on all naf.xml paths, and applications can also dynamically perform them on arbitrary strings by calling
+These substitutions are automatically performed on all
+<span class="pathname">naf.xml</span>
+paths, and applications can also dynamically perform them on arbitrary strings by calling
 <span class="compcode">com.grey.naf.Config.getPath(String path, Class<?> clss)</span>
 (the <span class="compcode">clss</span> param is typically null).
 <br/> <br/>
@@ -247,9 +252,11 @@ If the
 <p>
 <span class="cfgtitle">baseport</span><br/>
 This optional setting specifies the base port number above which NAF applications allocate the range of TCP ports they may use - whether purely internally or advertised externally.
-The actual number of reserved TCP ports depends on the NAF application.
+The actual number of reserved TCP ports depends on the NAF application, but it will be a contiguous block starting this base port.
 <br/>
-If this config item is absent, the setting is obtained from the <span class="cfgname">greynaf.baseport</span> system property, and if that is also absent, the absolute default is 12000.
+If this config item is absent, the setting is obtained from the
+<span class="cfgname">greynaf.baseport</span>
+system property, and if that is also absent, the ultimate default is 13000.
 </p>
 
 <p> <span class="cfgtitle">dependjars</span><br/>
@@ -281,7 +288,7 @@ It is a matter of personal preference as to whether you would prefer to specify 
 Dispatchers are the event multiplexers at the heart of the NAF framework, and each dispatcher resides in its own thread.
 Multiple Dispatchers can exist within one JVM process, and they are completely independent of each other.
 <br/>
-Users can simply regard Dispatchers as the abstract vehicles within which their applications execute.
+Users can simply regard a Dispatchers as a single-threaded execution context within which their applications reside.
 Dispatchers monitor all events (eg. I/O) in which their applications have registered an interest, and they also provide built-in services such as DNS resolution, NAFMAN and logging.
 <br/> <br/>
 An illustrative
@@ -290,7 +297,7 @@ config block is shown below, and as can be seen, each individual
 <span class="cfgname">dispatcher</span>
 section consists of nothing more than one or more NAFlets, and a set of attributes controlling the dispatcher's own behaviour.
 <br/>
-The top-level naf.xml outline in section 2 above shows where this block fits into the overall config file.
+The top-level config outlined in section &sect;2 above shows where this block fits into the overall naf.xml config file.
 </p>
 
 <table class="cfgbox">
@@ -323,7 +330,7 @@ The top-level naf.xml outline in section 2 above shows where this block fits int
 <p>
 The config block above illustrates the Dispatcher
 <span class="cfgtitle">name</span>
-attribute, and a description of all the other possible Dispatcher attributes (specified in same manner) follows.
+attribute, and a description of all the other Dispatcher attributes (specified in same manner) follows.
 <br/>
 The <span class="compcode">com.grey.naf.DispatcherDef</span> class is where these attributes are parsed, so refer to the source for the full details.
 </p>
@@ -354,10 +361,10 @@ The rationale behind this facility is that a buffered log file might not get flu
 </li>
 
 <li><span class="cfgtitle">nafman</span>:
-Boolean attribute which specifies whether a NAFMAN agent will be installed in this Dispatcher.
+Boolean attribute which specifies whether a NAFMAN agent will be activated in this Dispatcher.
 Default is Yes.
 <br/>
-Beware that turning NAFMAN off will (at the least) often leave you with no graceful way of shutting down a NAF application.
+Beware that turning NAFMAN off will (at the very least) often leave you with no graceful way of shutting down a NAF application.
 </li>
 
 <li><span class="cfgtitle">name</span>:
@@ -412,12 +419,13 @@ method.
 <p>
 Each NAF dispatcher executes one or more application entities, known as
 <dfn>NAFlets</dfn>.
-If dispatchers can be thought of as representing a generic processing mechanism, then NAFlets embody specific functionality.
+If dispatchers can be thought of as representing a generic processing mechanism which NAF provides for you, then NAFlets embody specific functionality which you have to code.
 <br/>
 Naflets are independent processing tasks which are unaware of other Naflets executing within the same dispatcher, and can be freely moved between dispatchers, according to performance-tuning considerations.
 <br/> <br/>
-When we say that NAF is a single-threaded framework, what we really mean is that individual NAFlets are single-threaded.
-However, real-world applications may comprise multiple NAFlets, which in turn may or may not be distributed over multiple Dispatchers. The important point is that the Dispatchers are independent of one another (as far as NAF is concerned), and don't incur synchronisation overhead (though that's also ultimately up to the developer, in that it depends how closely coupled the constituent NAFlets are). 
+When we say that NAF is a single-threaded framework, what we really mean is that individual NAFlets execute in a single-threaded context (ie. the Dispatcher).
+However, real-world applications may comprise multiple NAFlets, which in turn may or may not be distributed over multiple Dispatchers (ie. multiple threads).
+The important point is that the Dispatchers are independent of one another, and co-exist without incurring anyn synchronisation overhead, it's ultimately up to the developer how closely coupled their own bespoke NAFlets are, and whether they require synchronisation across multiple threads.
 </p>
 
 <p>
@@ -453,20 +461,22 @@ attribute specifies the relevant section within that config file, in XPath notat
 <br/>
 If the
 <span class="cfgname">configfile</span>
-element is present, then no bespoke elements are allowed (since they will be parsed from the indicated external file).
+element is present, then any other elements are ignored, as the configuration is redirected to the indicated external location.
 </li>
 </ul>
 
-<p>
 There are two ways a NAFlet can be loaded into a NAF process:
-<br/>
+<ul><li>
 One way is to define it in a naf.xml config file as described above, and that will take care of automatically instantiating and run them when NAF starts up.
-<br/>
+</li><li>
 The other way, is to programmatically create the NAFlet object, and then pass it to a running Dispatcher by calling its
 <span class="compcode">loadNaflet(com.grey.naf.Naflet, com.grey.naf.Dispatcher)</span>
 method.
-<br/>
-The Dispatcher will call the NAFlet's start() method from within its own thread (so it must not have been called already) and the NAFlet would then be live.
+</li></ul>
+<p>
+The Dispatcher will call the NAFlet's
+<span class="compcode">start()</span>
+method from within its own thread (so it must not have been called already) and the NAFlet would then be live.
 This method can be used to load new NAFlets whether the Dispatcher was originally launched from a naf.xml file or programmatically.
 <br/>
 The Dispatcher argument indicates which Dispatcher the calling code is associated with, and would be set to Null if it's not running within a Dispatcher.
@@ -485,8 +495,9 @@ method, which tells the Dispatcher to stop the NAFlet of that name, if it's runn
 </h2>
 
 <p>
-NAFMAN is a low-level NAF management agent, through which commands can be issued to a running NAF application.
-A NAFMAN agent is embedded in every dispatcher by default, and the first NAFMAN-enabled Dispatcher becomes the Primary agent, all the others (if any) becoming its Secondaries.
+NAFMAN is the NAF management agent. It is web-enabled, and enables you to issue commands to a running NAF application from your browser or the command line.
+<br/>
+A NAFMAN agent is embedded in every dispatcher by default, and the first NAFMAN-enabled Dispatcher becomes the Primary NAFMAN agent, all the others (if any) becoming its Secondaries.
 <br/> <br/>
 The
 <span class="cfgname">nafman</span>
@@ -494,37 +505,99 @@ config block is typically absent from the
 <span class="pathname">naf.xml</span>
 config file,
 but that does not mean NAFMAN is disabled, merely that it's operating with its default settings.
+NAFMAN can only be disabled on a per-Dispatcher basis, via the Dispatcher's
+<span class="cfgname">nafman</span>
+attribute.
 <br/>
-The default settings should never need to be modified, and are too arcane to be described in a guide of this level (being more low-level tuning), but see the source of the
-<span class="compcode">com.grey.naf.nafman.Primary</span>
-class to know more.
-<br/> <br/>
-NAFMAN is one of the subsystems that make use of TCP server ports in the range above
+The structure of the config block is illustrated below, but you should rarely need to modify it as they are more a case of low-level tuning than anything else.
+<br/>
+See the
+<span class="compcode">com.grey.naf.nafman.Server</span>
+source code for all the options - plus the usual Listener attributes.
+</p>
+<table class="cfgbox">
+<tr><td>
+<pre>
+&lt;nafman&gt;
+    &lt;listener&gt;
+        &lt;server&gt;
+            ... see NAFMAN source ...
+        &lt;/server&gt;
+    &lt;/listener&gt;
+&lt;/nafman&gt;
+</pre>
+</td></tr>
+</table>
+<p>
+The most likely option you would want to change is the TCP port on which the NAFMAN server listens, which by default is the same as the
+<span class="cfgname">baseport</span> (see &sect;2 above), ie. 13000.
+<br/>
+However, if you do want to change this port, it should be done via the
 <span class="cfgname">baseport</span>
-and it announces the selected port in the Dispatcher log files during startup.
-<br/>
-This is the one NAFMAN-related setting you are likely to need to change (if it clashes with anything else), but you change it via the
-<span class="cfgname">naf/baseport</span>
-config item, not from within NAFMAN's own config block.
+config setting, NOT the Listener's
+<span class="cfgname">port</span>
+attribute.
+That way, NAF continues to reserve a contiguous block of ports that is specified in one place.
 <br/> <br/>
-NAFMAN commands are issued from the command line, using the NAF launcher's
+The upshot of the above is that (notwithstanding any changes to the
+<span class="cfgname">baseport</span>)
+if you point your browser at port 13000, you will see the NAFMAN home page, where you can issue various NAFMAN commands and navigate to other screens.
+<br/>
+NAF contains a built-in NAFMAN home page called the
+<span class="softname">NAF Dashboard</span>,
+but this can be overridden by NAF-based applications (eg.
+<span class="softname">Mailismus</span>
+installs its own bespoke home page).
+<br/> <br/>
+NAFMAN's capabilities are best understood by viewing it on your browser, but the available control points include stopping NAF as a whole, or stopping individual Dispatchers or NAFlets, as well as monitoring the state of all the Dispatchers (you can view all current I/O channels/connections and timers - and even kill TCP connections).
+<br/>
+Assorted other NAF and application commands are also available, as well as the ability to inspect NAFMAN's own internal state, eg. which components have registered to handle which commands.
+<br/>
+Since NAFMAN command handlers are dynamically registered, the exact set of commands available will depend on your Dispatcher config and active NAFlets.
+
+<br/> <br/>
+NAFMAN commands can also issued from the command line, by entering the Path and Query-String part of the URL (ie. the URL mimnus the host-port part) as the argument to the NAF Launcher's
 <span class="cfgvalue">-cmd</span>
-option (see source code for <span class="compcode">com.grey.naf.Launcher</span> class).
+option
 <br/>
-NAF contains about a dozen in-build NAFMAN commands, most notably for stopping the NAF process
-(<span class="cfgvalue">stop</span>),
-listing all running Dispatchers
-(<span class="cfgvalue">dsplist</span>)
-and showing all registered timers and I/O channels
-(<span class="cfgvalue">dspshow</span>).
+For example, the following command-line invocations list all the available NAFMAN commands.
+The second form illustrates how to connect to an arbitrary instance of NAFMAN, rather than the one associated with a particular naf.xml file.
+</p>
+<div>
+<span class="vt220">
+java -jar lib/greynaf-2.3.0.jar -c conf/naf.xml -cmd showconns?nohttp=y&nbsp;
+<br/><br/><br/>
+&nbsp;java -jar lib/greynaf-2.3.0.jar -remote hostname:13000 -cmd showconns?nohttp=y
+</span>
+</div>
+<p>
+As a web-based agent, NAFMAN returns a standard HTTP response even when invoked from the command line (in fact internally, this issues a HTTP request and forwards the response) and the body of the response is in general an XML document (although even that depends on the particular handler for that command).
 <br/>
-NAFlet developers can define additional NAFMAN commands for their application, and the built-in
-<span class="cfgvalue">showcmds</span>
-command lists all the NAFMAN commands actually registered with a live NAF process.
-<br/> <br/>
-See the source code of the
-<span class="compcode">com.grey.naf.nafman.Registry</span>
-class for the full set of built-in NAFMAN commands and their calling syntax, eg. some of them take an optional dispatcher name, which tells them to operate only on that dispatcher.
+Some of the more common NAFMAN options are:
+</p>
+<ul>
+<li><span class="cfgname">d</span>: Dispatcher name - 
+This targets the command at a particular Dispatcher.
+Some commands are applicable to all Dispatchers, unless thus filtered.
+</li><li><span class="cfgname">n</span>: NAFlet name - 
+This targets the command at a particular NAFlet.
+</li><li><span class="cfgname">st</span>: Stylesheet name (this is a hard-coded auto-registered name)
+</li><li><span class="cfgname">nohttp</span>: Omit header from HTTP response<br/>
+This might be useful in command-line mode, if you want to pipe the XML response into your own XSL stylesheet.
+</li>
+</ul>
+<p>
+Putting it all together, the following command-line invocation can be used to terminate a named NAFlet within a named Dispatcher.
+<br/>
+(NB: On a Unix platform, you will need to escape the ampersand using the usual Shell syntax)
+</p>
+<div>
+<span class="vt220">
+java -jar lib/greynaf-2.3.0.jar -remote hostname:13000 -cmd appstop?d=dispname&amp;n=appname
+</span>
+</div>
+<p>
+See section &sect;12 below for more general info on command-line usage.
 </p>
 
 <hr class="pline"/>
@@ -1075,6 +1148,11 @@ The file itself is a standard Java properties file, consisting of
 lines.
 
 <br/> <br/>
+See the source code of the
+<span class="compcode">com.grey.naf.Launcher</span>
+class, for more detail on the startup processing and options.
+
+<br/> <br/>
 The
 <span class="softname">portfwd</span>
 demo app provides an example of how an application that is based on a <dfn>naf.xml</dfn> config file might pass its
@@ -1082,12 +1160,15 @@ demo app provides an example of how an application that is based on a <dfn>naf.x
 <br/>
 It's
 <span class="compcode">com.grey.portfwd.Task.main()</span>
-method does no more than load its own bespoke NAFMAN commands (which only applies if the
-<span class="cfgvalue">-cmd</span>
-option is used) before calling NAF's
-<span class="compcode">main()</span> method.
+method does no more than load its own bespoke NAFMAN command, and while this demo app is running, its NAFMAN commands can be accessed either by pointing your browser at the NAFMAN home page (see section &sect;5 above), where the commands are auto-published, or via the command-line as follows:
+</p>
+<div>
+<span class="vt220">
+java -jar portfwd-1.0.0.jar -cmd showconns
+</span>
+</div>
 
-<br/> <br/>
+<p>
 The
 <span class="softname">EchoBot</span>
 demo app illustrates the behaviour of an application that doesn't use a naf.xml file, but it still leverages NAF's command-line parsing facilities.
@@ -1113,86 +1194,44 @@ Run NAF directly with the -h option to see its built-in options.
 </p>
 <div>
 <span class="vt220">
-java -jar greynaf-2.2.0.jar -h
-</span>
-</div>
-
-<p>
-As you can see, in addition to running as an application (ie. starting up the Dispatchers), the NAF Launcher also has two modes for sending NAFMAN commands (with or without a naf.xml file).
-</p>
-<div>
-<span class="vt220">
-java -jar greynaf-2.2.0.jar -cmd showconns -c naf.xml
-</span>
-</div>
-
-<p>
-The naf.xml file is only used to look up the NAFMAN agent's server port, so you can specify that with the
-<span class="cfgvalue">-remote</span>
-option instead.
-</p>
-<div>
-<span class="vt220">
-java -jar greynaf-2.2.0.jar -cmd showconns -remote host:port
-</span>
-</div>
-
-<p>
-Beware that if you issue a NAFMAN command by executing the NAF JAR, it would not recognise application-specific commands (such as the
-<dfn>showconns</dfn>
-command defined by the port-forwarder demo app) and would therefore reject it.
-<br/>
-To get around this, you can use the
-<span class="cfgvalue">-nocheck</span>
-option (which prevents client-side validation of NAFMAN commands)
-</p>
-<div>
-<span class="vt220">
-java -jar greynaf-2.2.0.jar -cmd showconns -nocheck
-</span>
-</div>
-<p>
-Or send it using the application JAR, as shown below, since it recognises the command.
-<div>
-<span class="vt220">
-java -jar portfwd-1.0.0.jar -cmd showconns
+java -jar greynaf-2.3.0.jar -h
 </span>
 </div>
 
 <p>
 <br/>
-NAF would normally be loaded by your own application rather than executed directly, not least of the reasons being that the classpath you require will be set in your application's JAR (or enclosing framework), rather than NAF.
+NAF would normally be loaded by your own application rather than executed directly, not least of the reasons being that the application-specific classpath you require will be set in your application's JAR (or enclosing framework), rather than NAF.
 <br/>
-As noted in the naf.xml section above though, you could specify all the JARs your application requires in the
+As noted in section &sect;2 above though, you could specify all the JARs your application requires in the
 <span class="cfgname">dependjars</span>
 config item or the
 <span class="cfgname">greynaf.cp</span>
-system property, and if so, you could launch your application from greynaf.jar.
+system property, and if so, you could launch your application by directly executing
+<span class="pathname">greynaf.jar</span>
 
 <br/> <br/>
-One case where you would execute NAF from its own JAR (and without having to specify any extra JAR dependencies) is when running the DNS Batch Resolver, NAF's sole built-in NAFlet.
+One case where you would execute NAF from its own JAR (and without having to specify any extra JAR dependencies) is when running the
+<span class="softname">DNS Batch Resolver</span>,
+NAF's sole built-in NAFlet.
 <br/>
 Assuming you have downloaded and extracted the binary NAF distribution (or built your own and extracted the resulting ZIP/Tar file), you would run it as follows:
 </p>
 <div>
 <span class="vt220">
-java -jar lib/greynaf-2.2.0.jar -c conf/batchresolver.xml -logger dnsbatch &lt; infile
+java -jar lib/greynaf-2.3.0.jar -c conf/batchresolver.xml -logger dnsbatch &lt; infile
 </span>
 </div>
 <p>
 The input file should contain one record per line, but the type of the records depends on the batchresolver.xml settings.
-<br/>
-&bull; <span class="cfgvalue">mode=MX</span> and <span class="cfgvalue">mailbox=Y</span>:
-Simple email addresses, eg. <span class="compcode">somebody@nowhere.org</span>
-<br/>
-&bull; <span class="cfgvalue">mode=MX</span> and <span class="cfgvalue">mailbox=N</span>:
-Email domains without the mailbox part, eg. <span class="compcode">nowhere.org</span>
 <br/>
 &bull; <span class="cfgvalue">mode=A</span>:
 Hostnames in FQDN (Fully Qualified Domain Name) form
 <br/>
 &bull; <span class="cfgvalue">mode=PTR</span>:
 Dotted IP address
+<br/>
+&bull; <span class="cfgvalue">mode=MX</span>:
+Email domains (mailbox part will be stripped if present)
 <br/>
 The above command also assumes a
 <span class="pathname">logging.xml</span>

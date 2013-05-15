@@ -28,6 +28,7 @@ public final class GenericIterator<T>
 		dtype = TYPE_SINGLE;
 		single = data;
 		lmt = 1;
+		arr = null;
 		return reset(0);
 	}
 
@@ -44,6 +45,7 @@ public final class GenericIterator<T>
 		dtype = TYPE_COLLECTION;
 		stdcoll = data;
 		iter_coll = stdcoll.iterator();
+		arr = null;
 		return reset(0);
 	}
 
@@ -53,6 +55,7 @@ public final class GenericIterator<T>
 		dtype = TYPE_COLLECTION;
 		mapcoll = data;
 		iter_coll = mapcoll.keySet().iterator();
+		arr = null;
 		return reset(0);
 	}
 

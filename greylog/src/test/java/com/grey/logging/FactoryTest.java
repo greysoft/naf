@@ -5,7 +5,7 @@
 package com.grey.logging;
 
 import com.grey.base.config.SysProps;
-import com.grey.base.utils.FileOps;
+import com.grey.base.utils.DynLoader;
 import com.grey.base.utils.ScheduledTime;
 
 /*
@@ -23,7 +23,8 @@ public class FactoryTest
 	@org.junit.Test
 	public void testMappings() throws com.grey.base.ConfigException, java.io.IOException, java.net.URISyntaxException
 	{
-		String cfgpath = FileOps.getResourcePath(RSRCFILE, getClass());
+		java.net.URL url = DynLoader.getResource(RSRCFILE, getClass());
+		String cfgpath = new java.io.File(url.toURI()).getCanonicalPath();
 
 		// create the absolute default logger - ie. where no config exists and no params are specified at all
 		Logger dlog = Factory.getLogger();

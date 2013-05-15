@@ -30,6 +30,7 @@ public abstract class Listener
 	protected final com.grey.logging.Logger log;
 
 	protected boolean inShutdown;
+	private boolean has_stopped;
 
 	public abstract Class<?> getServerType();
 	@Override
@@ -80,13 +81,10 @@ public abstract class Listener
 		srvport = srvsock.getLocalPort();  // if port had been zero, Listener will have bound to ephemeral port
 		initChannel(srvchan, true, false);
 
-		if (name != null) {
-			Listener dup = idmap.putIfAbsent(name, this);
-			if (dup != null) {
-				throw new com.grey.base.GreyException("Duplicate listeners with name="+name+" on ports "+dup.getLocalPort()+" and "+getLocalPort());
-			}
+		Listener dup = idmap.putIfAbsent(name, this);
+		if (dup != null) {
+			throw new com.grey.base.GreyException("Duplicate listeners with name="+name+" on ports "+dup.getLocalPort()+" and "+getLocalPort());
 		}
-
 		log.info("Listener="+name+" bound to "+srvsock.getInetAddress()+":"+srvport
 				+(iface==null ? "" : " on interface="+iface)+"; Backlog="+srvbacklog);
 		if (sslconfig != null) sslconfig.declare("Listener="+name+": ", dsptch.logger);
@@ -110,15 +108,17 @@ public abstract class Listener
 		inShutdown = true;
 		disconnect();
 		boolean done = stopListener();
-		if (name != null) idmap.remove(name);
+		idmap.remove(name);
 		if (done) stopped(notify);
 		return done;
 	}
 
 	protected void stopped(boolean notify)
 	{
-		log.trace("Listener="+name+" has stopped - notify="+notify);
+		log.info("Listener="+name+" has stopped with notify="+notify+"/dup="+has_stopped+" - reaper="+reaper);
+		if (has_stopped) return;
 		listenerStopped();
+		has_stopped = true;
 		if (notify && reaper != null) reaper.entityStopped(this);
 	}
 

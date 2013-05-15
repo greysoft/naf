@@ -211,39 +211,54 @@ public final class TimeOps
 
 	public static StringBuilder expandMilliTime(long msecs, StringBuilder str, boolean reset)
 	{
+		return expandMilliTime(msecs, str, reset, "");
+	}
+
+	public static StringBuilder expandMilliTime(long msecs, StringBuilder str, boolean reset, String dlm_units)
+	{
 		if (str == null) {
 			str = new StringBuilder();
 		} else if (reset) {
 			str.setLength(0);
 		}
 		int origlen = str.length();
+		String dlm = "";
+
+		if (msecs < 0) {
+			msecs = Math.abs(msecs);
+			str.append("minus-");
+		}
 
 		long units = msecs / MSECS_PER_DAY;
 		if (units != 0) {
-			str.append(units).append('d');
+			str.append(dlm).append(units).append('d');
 			msecs = msecs % MSECS_PER_DAY;
+			dlm = dlm_units;
 		}
 
 		units = msecs / MSECS_PER_HOUR;
 		if (units != 0) {
-			str.append(units).append('h');
+			str.append(dlm).append(units).append('h');
 			msecs = msecs % MSECS_PER_HOUR;
+			dlm = dlm_units;
 		}
 
 		units = msecs / MSECS_PER_MINUTE;
 		if (units != 0) {
-			str.append(units).append('m');
+			str.append(dlm).append(units).append('m');
 			msecs = msecs % MSECS_PER_MINUTE;
+			dlm = dlm_units;
 		}
 
 		units = msecs / MSECS_PER_SECOND;
 		if (units != 0) {
-			str.append(units).append('s');
+			str.append(dlm).append(units).append('s');
 			msecs = msecs % MSECS_PER_SECOND;
+			dlm = dlm_units;
 		}
 
 		if (str.length() == origlen || msecs != 0) {
-			str.append(msecs);
+			str.append(dlm).append(msecs);
 		}
 		return str;
 	}

@@ -105,8 +105,9 @@ public class PkgInfo
 		strm.println("ProtDom:"+protdom);
 
 		java.security.Principal[] princips = protdom.getPrincipals();
-		strm.println("Principals="+(princips==null?-1:princips.length));
-	    for (int idx = 0; princips != null && idx != princips.length; idx++) {
+		int cnt = (princips == null ? -1 : princips.length);
+		strm.println("Principals="+cnt);
+	    for (int idx = 0; idx != cnt; idx++) {
 	    	strm.println("\tPrincipal="+princips[idx].getName()+" - "+princips[idx]);
 	    }
 		java.security.CodeSource codesrc = protdom.getCodeSource();

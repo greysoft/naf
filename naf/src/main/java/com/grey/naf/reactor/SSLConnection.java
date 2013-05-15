@@ -63,7 +63,7 @@ final class SSLConnection
 		logpfx = "SSL-"+(sslcfg.isClient ? "Client" : "Server")+": ";
 	}
 
-	protected void start() throws com.grey.base.FaultException, java.io.IOException
+	void start() throws com.grey.base.FaultException, java.io.IOException
 	{
 		if (cm.getSSLConfig().isClient) {
 			// Initiate handshake. The dummy transmit calls wrap(), which will start the handshake.
@@ -73,7 +73,7 @@ final class SSLConnection
 		if (tmt != 0) tmr_shake = cm.dsptch.setTimer(tmt, 0, this);
 	}
 
-	protected void close()
+	void close()
 	{
 		cancelTimer();
 		setFlag(S_CLOSING);
@@ -104,14 +104,14 @@ final class SSLConnection
 		cm.sslDisconnected(diag);
 	}
 
-	protected void handleIO(java.nio.ByteBuffer srcbuf) throws com.grey.base.FaultException, java.io.IOException
+	void handleIO(java.nio.ByteBuffer srcbuf) throws com.grey.base.FaultException, java.io.IOException
 	{
 		int nbytes = cm.dsptch.transfer(srcbuf, sslprotoRcvBuf);
 		if (nbytes == 0) return;
 		ioReceived();
 	}
 
-	protected void handleIO() throws com.grey.base.FaultException, java.io.IOException
+	void handleIO() throws com.grey.base.FaultException, java.io.IOException
 	{
 		int nbytes = -1;
 		try {

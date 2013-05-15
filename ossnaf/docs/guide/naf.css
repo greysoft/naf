@@ -18,15 +18,17 @@ div.menu a {text-decoration: none}
 div.menu p.cursect {color: #000000}
 div.menu p.version  {color: #660000}
 
-.contents {color:#000080; font-family:arial; font-weight:bolder; font-size:120%}
+li {margin-bottom: 5px}
+body#glossary li {margin-bottom: 10px}
 body#contents li {margin-top:5px; margin-bottom:5px}
+.contents {color:#000080; font-family:arial; font-weight:bolder; font-size:120%}
 
 .softname {color:#008080; font-family:arial; font-weight:bolder}
 .pathname {color:#800080; font-family:arial; font-weight:bolder}
 .cfgtitle {color:#0000ff; font-family:arial; font-weight:bolder}
 .cfgname {color:#0000ff; font-family:arial}
 .cfgvalue {color:#0000cc; font-family:arial}
-.compcode {color:#660066; font-family:courier; font-weight:bolder}
+.compcode {color:#660066; font-family:courier; font-weight:bolder; font-size:80%}
 /*Superceded by &sect;  .sectref {color:#800000; font-weight:bolder} */
 
 .warning {color:#B22222; font-weight:bolder}
@@ -38,13 +40,10 @@ table.chtitle {background-color:#C0C0C0;
 	font-family:arial; font-weight:bolder; font-size:180%;
 	margin-left:auto; margin-right:auto; padding:10px}
 
-.cfgbox {background-color:#00ffff; color:#000000 font-family:courier; font-weight:bolder; font-size:120%; padding-left:30px; padding-right:30px}
+.cfgbox {background-color:#00ffff; color:#000000; font-family:courier; font-weight:bolder; font-size:120%; padding-left:30px; padding-right:30px}
 
 .protocmd {color:#A52A2A; font-family:arial; font-weight:bolder}
 .protobox {background-color:#00ff00; color:#A52A2A; font-family:courier; font-weight:900; font-size:120%; padding-left:30px; padding-right:30px}
 
 .logbox {background-color:#000000; color:#ffffff; font-family:courier; font-weight:bolder; font-size:120%; padding-left:30px; padding-right:30px}
 .loghilite {background-color:#000000; color:#ff0000; font-family:courier; font-weight:bolder; padding-left:30px; padding-right:30px}
-
-li {margin-bottom: 5px}
-body#glossary li {margin-bottom: 10px}

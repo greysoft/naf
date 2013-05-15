@@ -312,7 +312,7 @@ public class SSLConnectionTest
 				org.junit.Assert.assertTrue(usingSSL());
 			}
 			action();
-			chanreader.receiveDelimited((byte)'\n', false);
+			chanreader.receiveDelimited((byte)'\n');
 
 			//for want of anywhere better to test these
 			org.junit.Assert.assertEquals(srvport, getRemotePort());
@@ -391,7 +391,7 @@ public class SSLConnectionTest
 			} else {
 				org.junit.Assert.assertTrue(usingSSL());
 			}
-			chanreader.receiveDelimited((byte)'\n', false);
+			chanreader.receiveDelimited((byte)'\n');
 
 			//for want of anywhere better to test these
 			org.junit.Assert.assertEquals(harness.srvport, getLocalPort());

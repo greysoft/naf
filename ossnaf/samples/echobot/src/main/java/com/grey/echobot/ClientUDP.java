@@ -25,7 +25,7 @@ public class ClientUDP
 		// IOExecReader, but it's worth doing so anyway because the code path for UDP sockets is more streamlined.
 		chanreader = new com.grey.naf.reactor.IOExecReader(bufspec);
 		initChannel(udpchan, true, false);
-		chanreader.receive(0, true);
+		chanreader.receive(0);
 
 		// kick off the network I/O
 		time_start = System.nanoTime();

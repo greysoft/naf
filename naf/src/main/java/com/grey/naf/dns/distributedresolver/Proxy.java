@@ -1,10 +1,10 @@
 /*
- * Copyright 2012 Yusef Badri - All rights reserved.
+ * Copyright 2012-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.distributedresolver;
 
-class Proxy
+final class Proxy
 	implements com.grey.naf.dns.Resolver.Client, com.grey.naf.reactor.Producer.Consumer
 {
 	private static Proxy instance;
@@ -14,6 +14,8 @@ class Proxy
 	private com.grey.naf.dns.ResolverService rslvr;
 	private com.grey.naf.reactor.Producer<Object> prod;
 	private com.grey.base.config.XmlConfig cfg;
+
+	public com.grey.naf.reactor.Dispatcher getMaster() {return dsptch;}
 
 	// Our users are long-lived objects who locate us in their constructor, so no need to be
 	// super-optimal about avoiding synchronisation here.

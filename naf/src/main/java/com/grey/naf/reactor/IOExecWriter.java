@@ -28,13 +28,13 @@ public final class IOExecWriter
 		xmtq = new com.grey.base.utils.ObjectQueue<java.nio.ByteBuffer>(java.nio.ByteBuffer.class, 5, 5);
 	}
 
-	protected void initChannel(ChannelMonitor cm)
+	void initChannel(ChannelMonitor cm)
 	{
 		clearChannel();
 		chanmon = cm;
 	}
 
-	protected void clearChannel()
+	void clearChannel()
 	{
 		while (xmtq.size() != 0) dequeue();
 		chanmon = null;
@@ -104,7 +104,7 @@ public final class IOExecWriter
 		return write(xmtbuf);
 	}
 
-	protected boolean write(java.nio.ByteBuffer xmtbuf) throws java.io.IOException
+	boolean write(java.nio.ByteBuffer xmtbuf) throws ChannelMonitor.BrokenPipeException
 	{
 		int initpos = xmtbuf.position();
 		if (isBlocked()) {
@@ -120,7 +120,7 @@ public final class IOExecWriter
 		// the partially written (or completely unwritten) buffer becomes the head of the queue
 		LEVEL lvl = LEVEL.TRC3;
 		if (chanmon.dsptch.logger.isActive(lvl)) {
-			chanmon.dsptch.logger.log(lvl, "IOExec: Send blocked with "+nbytes+"/"+remainbytes+"/xmtq="+xmtq.size()+" - "+chanmon.iochan);
+			chanmon.dsptch.logger.log(lvl, "IOExec: Send blocked with "+nbytes+"/"+remainbytes+"/xmtq="+xmtq.size()+" - E"+chanmon.cm_id+"/"+chanmon.iochan);
 		}
 		writemark = initpos + nbytes;
 		enqueue(xmtbuf, writemark, remainbytes);
@@ -159,7 +159,7 @@ public final class IOExecWriter
 
 	// Recall that a file-send can be initiated while previous ByteBuffer sends are still backlogged, so
 	// this method makes sure all pending ByteBuffers have been sent before checking for a file-send.
-	protected void handleIO() throws com.grey.base.FaultException, java.io.IOException
+	void handleIO() throws com.grey.base.FaultException, java.io.IOException
 	{
 		boolean done = drainQueue();
 
@@ -182,13 +182,16 @@ public final class IOExecWriter
 			try {
 				chanmon.disableWrite();
 			} catch (Exception ex) {
-				chanmon.dsptch.logger.log(LEVEL.TRC2, ex, false, "IOExec: failed to disable Write");
+				LEVEL lvl = LEVEL.TRC2;
+				if (chanmon.dsptch.logger.isActive(lvl)) {
+					chanmon.dsptch.logger.log(lvl, ex, false, "IOExec: failed to disable Write on E"+chanmon.cm_id+"/"+chanmon.iochan);
+				}
 			}
 			chanmon.transmitCompleted();
 		}
 	}
 
-	private boolean drainQueue() throws java.io.IOException
+	private boolean drainQueue() throws ChannelMonitor.BrokenPipeException
 	{
 		while (xmtq.size() != 0) {
 			if (chanmon == null) break;
@@ -239,7 +242,7 @@ public final class IOExecWriter
 	// and only the second one would block (if we've overwhelmed the connection).
 	// Eg. Even a million-byte write succeeds (returns nbytes == cnt) on an NIO pipe (which we know to be 8K) but
 	// the next one returns zero. The mega buffers still result in a successful eventual send.
-	private boolean sendFile(java.nio.channels.FileChannel fchan) throws java.io.IOException
+	private boolean sendFile(java.nio.channels.FileChannel fchan) throws ChannelMonitor.BrokenPipeException
 	{
 		java.nio.channels.WritableByteChannel iochan = (java.nio.channels.WritableByteChannel)chanmon.iochan;
 		while (file_pos != file_limit) {
@@ -263,23 +266,22 @@ public final class IOExecWriter
 		return true;
 	}
 
-	private int sendBuffer(java.nio.ByteBuffer xmtbuf) throws java.io.IOException
+	private int sendBuffer(java.nio.ByteBuffer xmtbuf) throws ChannelMonitor.BrokenPipeException
 	{
-		int nbytes = -1;
 		java.nio.channels.WritableByteChannel iochan = (java.nio.channels.WritableByteChannel)chanmon.iochan;
 		try {
 			// this throws on closed channel (java.io.IOException) or other error, so we can't be sure it's closed, but it might as well be
-			nbytes = iochan.write(xmtbuf);
+			return iochan.write(xmtbuf);
 		} catch (Exception ex) {
 			LEVEL lvl = LEVEL.TRC3;
 			String errmsg = "IOExec: buffer-send failed";
 			if (chanmon.dsptch.logger.isActive(lvl)) errmsg += " on "+iochan;
 			chanmon.brokenPipe(lvl, "Broken pipe on Send", errmsg, ex);
+			return -1;
 		}
-		return nbytes;
 	}
 
-	private void enableWrite() throws java.io.IOException
+	private void enableWrite() throws ChannelMonitor.BrokenPipeException
 	{
 		try {
 			// Register for Write notifications, replacing any existing Dispatcher notifications registered for this channel.

@@ -31,10 +31,10 @@ public class Config
 
 	public static final String PFX_CLASSPATH = "cp:";
 
-	private static final int DFLT_BASEPORT = SysProps.get(SYSPROP_BASEPORT, 12000);
-	public static final int RSVPORT_NAFMAN = 1;
+	private static final int DFLT_BASEPORT = SysProps.get(SYSPROP_BASEPORT, 13000);
+	public static final int RSVPORT_NAFMAN = 0;
 	private static final int RSVPORT_MAX = 5;
-	private static final int RSVPORT_ANON = 0;  // not reserved at all
+	public static final int RSVPORT_ANON = -1;  //not reserved at all
 
 	public final String path_root;
 	public final String path_conf;
@@ -217,13 +217,11 @@ public class Config
 	// NB: This is purely about constructing a path, not necessarily one that corresponds to an existing file
 	private String makePath(String path) throws java.io.IOException
 	{
+		if (path == null || path.length() == 0) return path;
 		path = tokenisePaths(path);
-
-		if (path != null && path.length() != 0) {
-			if (path.startsWith(FileOps.URLPFX_FILE+"/")) path = path.substring(FileOps.URLPFX_FILE.length());
-			java.io.File fh = new java.io.File(path);
-			path = fh.getCanonicalPath();
-		}
+		if (path.startsWith(FileOps.URLPFX_FILE+"/")) path = path.substring(FileOps.URLPFX_FILE.length());
+		java.io.File fh = new java.io.File(path);
+		path = fh.getCanonicalPath();
 		return path;
 	}
 

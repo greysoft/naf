@@ -5,6 +5,7 @@
 package com.grey.naf.reactor;
 
 import com.grey.base.config.SysProps;
+import com.grey.base.utils.DynLoader;
 import com.grey.base.utils.FileOps;
 
 public class DispatcherTest
@@ -34,7 +35,7 @@ public class DispatcherTest
 	{
 		FileOps.deleteDirectory(rootdir);
 		String dname = "testdispatcher1";
-		String cfgpath = com.grey.base.utils.FileOps.getResourcePath("/naf.xml", getClass());
+		String cfgpath = getResourcePath("/naf.xml", getClass());
 		com.grey.naf.Config nafcfg = com.grey.naf.Config.load(cfgpath);
 		Dispatcher.launchConfigured(nafcfg, bootlog);
 		org.junit.Assert.assertEquals(1, Dispatcher.getDispatchers().length);
@@ -52,7 +53,7 @@ public class DispatcherTest
 	{
 		FileOps.deleteDirectory(rootdir);
 		String dname = "testdispatcher1";
-		String cfgpath = com.grey.base.utils.FileOps.getResourcePath("/naf.xml", getClass());
+		String cfgpath = getResourcePath("/naf.xml", getClass());
 		com.grey.naf.Config nafcfg = com.grey.naf.Config.load(cfgpath);
 		Dispatcher dsptch = Dispatcher.createConfigured(dname, nafcfg, bootlog);
 		org.junit.Assert.assertEquals(dname, dsptch.name);
@@ -103,5 +104,14 @@ public class DispatcherTest
 		dsptch = Dispatcher.create(def, 0, bootlog);
 		org.junit.Assert.assertEquals(baseport, dsptch.nafcfg.getPort(0));
 		dsptch.stop(dsptch);
+	}
+
+	// NB: The concept of mapping a resource URL to a File is inherently flawed, but this utility works
+	// beecause the resources we're looking up are in the same build tree.
+	private static String getResourcePath(String path, Class<?> clss) throws java.io.IOException, java.net.URISyntaxException
+	{
+		java.net.URL url = DynLoader.getResource(path, clss);
+		if (url == null) return null;
+		return new java.io.File(url.toURI()).getCanonicalPath();
 	}
 }

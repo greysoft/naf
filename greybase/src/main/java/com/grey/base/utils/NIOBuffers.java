@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -38,14 +38,6 @@ public class NIOBuffers
 		return buf;
 	}
 
-	public static java.nio.ByteBuffer ensureCapacity(java.nio.ByteBuffer bybuf, int mincap, boolean directbuf)
-	{
-		if (bybuf == null || bybuf.capacity() < mincap) {
-			bybuf = create(mincap, directbuf);
-		}
-		return bybuf;
-	}
-
 	// This function potentially allocates the minimum ByteBuffer necessary to contain the given string. Caller must pre-allocate if they want larger.
 	// The ByteBuffer is returned in its "flipped" state, such that it is ready for relative-get operations (ie. ready for reading from).
 	//
@@ -75,12 +67,8 @@ public class NIOBuffers
 	public static java.nio.ByteBuffer encode(java.nio.CharBuffer chbuf, java.nio.ByteBuffer bybuf, java.nio.charset.CharsetEncoder chenc,
 			boolean directbuf)
 	{
-		if (bybuf == null) {
-			int bufsiz = (int)(chenc.maxBytesPerChar() * chbuf.capacity()) + 1;
-			bybuf = create(bufsiz, directbuf);
-		} else {
-			bybuf.clear();
-		}
+		int bufsiz = (int)(chenc.maxBytesPerChar() * chbuf.capacity()) + 1;
+		bybuf = prepareBuffer(bufsiz, bybuf, directbuf);
 		chenc.reset();
 		java.nio.charset.CoderResult sts = chenc.encode(chbuf, bybuf, true);
 		if (sts == java.nio.charset.CoderResult.UNDERFLOW) sts = chenc.flush(bybuf);
@@ -99,11 +87,7 @@ public class NIOBuffers
 	// direct manipulation of ByteBuffer to directly map bytes to chars without any charset encoding - assumes 8-bit chars
 	public static java.nio.ByteBuffer encode(CharSequence str, int off, int len, java.nio.ByteBuffer bybuf, boolean directbuf)
 	{
-		if (bybuf == null) {
-			bybuf = create(len, directbuf);
-		} else {
-			bybuf.clear();
-		}
+		bybuf = prepareBuffer(len, bybuf, directbuf);
 		int lmt = off + len;
 
 		if (bybuf.hasArray()) {
@@ -126,17 +110,19 @@ public class NIOBuffers
 	}
 
 	// direct manipulation of ByteBuffer to load a byte array into it
-	public static java.nio.ByteBuffer encode(byte[] buf, int off, int len, java.nio.ByteBuffer bybuf, boolean directbuf)
+	public static java.nio.ByteBuffer encode(byte[] databuf, int off, int len, java.nio.ByteBuffer bybuf, boolean directbuf)
 	{
-		if (bybuf == null) {
-			bybuf = create(len, directbuf);
-		} else {
-			bybuf.clear();
-		}
-		bybuf.put(buf, off, len);
+		bybuf = prepareBuffer(len, bybuf, directbuf);
+		bybuf.put(databuf, off, len);
 		bybuf.position(0);
 		bybuf.limit(len);
 		return bybuf;
+	}
+
+	// direct manipulation of ByteBuffer to load a byte array into it
+	public static java.nio.ByteBuffer encode(byte[] databuf, java.nio.ByteBuffer bybuf, boolean directbuf)
+	{
+		return encode(databuf, 0, databuf.length, bybuf, directbuf);
 	}
 	
 	
@@ -225,5 +211,15 @@ public class NIOBuffers
 	public static java.nio.charset.CharsetDecoder getDecoder(String charset)
 	{
 		return java.nio.charset.Charset.forName(charset).newDecoder();
+	}
+
+	private static java.nio.ByteBuffer prepareBuffer(int siz, java.nio.ByteBuffer buf, boolean directbuf)
+	{
+		if (buf == null || buf.capacity() < siz) {
+			buf = create(siz, directbuf);
+		} else {
+			buf.clear();
+		}
+		return buf;
 	}
 }

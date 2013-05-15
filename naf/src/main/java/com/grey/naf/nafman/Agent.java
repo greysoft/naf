@@ -1,46 +1,43 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.nafman;
 
-import com.grey.logging.Logger.LEVEL;
-import com.grey.naf.reactor.Dispatcher;
+import com.grey.base.utils.StringOps;
+import com.grey.logging.Logger;
 
 public abstract class Agent
-	implements Registry.CommandHandler,
+	implements Command.Handler,
 		com.grey.naf.reactor.Producer.Consumer
 {
-	public final Dispatcher dsptch;
-	protected final com.grey.base.utils.HashedMapIntKey<Registry.CommandHandler> handlers;
+	public final com.grey.naf.reactor.Dispatcher dsptch;
+	protected final com.grey.base.utils.HashedMap<String, Command.Handler> handlers;
 	protected boolean in_shutdown;
 	//temp objects pre-allocated merely for efficiency
 	private final StringBuilder sbtmp = new StringBuilder();
 
 	public abstract boolean isPrimary();
+	public abstract Primary getPrimary();
 	public abstract int getPort();
 	public abstract void stop();
-	public void start() throws com.grey.base.FaultException, java.io.IOException {}
 
-	protected Agent(Dispatcher d, com.grey.base.config.XmlConfig cfg) throws com.grey.base.ConfigException
+	protected Agent(com.grey.naf.reactor.Dispatcher d, com.grey.base.config.XmlConfig cfg) throws com.grey.base.ConfigException
 	{
 		dsptch = d;
-		handlers = new com.grey.base.utils.HashedMapIntKey<Registry.CommandHandler>();
-		registerHandler(Registry.CMD_STOP, this);
-		registerHandler(Registry.CMD_DSHOW, this);
-		registerHandler(Registry.CMD_SHOWCMDS, this);
-		registerHandler(Registry.CMD_FLUSH, this);
-		registerHandler(Registry.CMD_LOGLVL, this);
+		handlers = new com.grey.base.utils.HashedMap<String, Command.Handler>();
+		Registry reg = Registry.get();
+		reg.registerHandler(Registry.CMD_STOP, 0, this, dsptch);
+		reg.registerHandler(Registry.CMD_DSHOW, 0, this, dsptch);
+		reg.registerHandler(Registry.CMD_FLUSH, 0, this, dsptch);
+		reg.registerHandler(Registry.CMD_LOGLVL, 0, this, dsptch);
+		reg.registerHandler(Registry.CMD_KILLCONN, 0, this, dsptch);
 	}
 
-	// If there are multiple handlers for a command, the latest registrant supercedes the rest
-	public void registerHandler(int cmdcode, Registry.CommandHandler handler) throws com.grey.base.ConfigException
+	public void start() throws com.grey.base.FaultException, java.io.IOException
 	{
-		Command.Def cmd = Registry.get().getCommand(cmdcode);
-		if (cmd == null) throw new com.grey.base.ConfigException("Handler="+handler.getClass().getName()+" trying to load unregistered cmd="+cmdcode);
-		handlers.put(cmd.code, handler);
-		dsptch.logger.trace("NAFMAN="+dsptch.name+" has registered Handler="+handler.getClass().getName()+" for Command="
-				+cmd.code+"/"+cmd.name);
+		Registry.get().getHandlers(dsptch, handlers);
+		dsptch.logger.info("NAFMAN Agent="+dsptch.name+" registered handlers="+handlers.size()+": "+handlers.keySet());
 	}
 
 	protected void commandReceived(Command cmd) throws com.grey.base.FaultException, java.io.IOException
@@ -49,106 +46,115 @@ public abstract class Agent
 		try {
 			processCommand(cmd);
 		} finally {
-			if (cmd.detach(this) == 1) cmd.completed(dsptch);
+			if (cmd.detach(this) == Command.DETACH_FINAL) getPrimary().commandCompleted(cmd, dsptch);
 		}
 	}
 
 	protected void processCommand(Command cmd) throws com.grey.base.FaultException, java.io.IOException
 	{
-		Registry.CommandHandler handler = handlers.get(cmd.def.code);
+		Command.Handler handler = handlers.get(cmd.def.code);
 		sbtmp.setLength(0);
-		sbtmp.append("NAFMAN=").append(dsptch.name).append(" received command=").append(cmd.getDescription());
+		sbtmp.append("NAFMAN=").append(dsptch.name).append(" received command=").append(cmd.def.code);
 		if (handler == null) {
 			sbtmp.append(" - no Handler");
-			dsptch.logger.log(LEVEL.TRC2, sbtmp);
+			dsptch.logger.log(Logger.LEVEL.TRC3, sbtmp);
 		} else {
 			sbtmp.append(" - Handler=").append(handler);
-			dsptch.logger.info(sbtmp);
-			handler.handleNAFManCommand(cmd);
+			dsptch.logger.log(Logger.LEVEL.TRC2, sbtmp);
+			CharSequence rsp = handler.handleNAFManCommand(cmd);
+			if (rsp != null && rsp.length() != 0) cmd.addHandlerResponse(dsptch, rsp);
 		}
 	}
 
 	@Override
-	public void handleNAFManCommand(Command cmd) throws java.io.IOException
+	public CharSequence handleNAFManCommand(Command cmd) throws java.io.IOException
 	{
 		sbtmp.setLength(0);
 
-		switch (cmd.def.code)
-		{
-		case Registry.CMD_STOP:
-			stopDispatcher();
-			break;
-
-		case Registry.CMD_DLIST:
-			Dispatcher[] dlist = Dispatcher.getDispatchers();
-			sbtmp.append("Dispatchers=").append(dlist.length).append(':');
-			for (int idx = 0; idx != dlist.length; idx++) {
-				sbtmp.append("\n- ").append(dlist[idx].name).append(": NAFMAN=");
-				String nafman = "N";
-				if (dlist[idx].nafman != null) nafman = (dlist[idx].nafman.isPrimary() ? "Primary" : "Secondary");
-				sbtmp.append(nafman);
-			}
-			break;
-
-		case Registry.CMD_DSHOW:
-			dsptch.dumpState(sbtmp);
-			break;
-
-		case Registry.CMD_FLUSH:
+		if (cmd.def.code.equals(Registry.CMD_STOP)) {
+			boolean done = stopDispatcher();
+			sbtmp.append("Dispatcher is ").append(done ? "halted" : "halting");
+		} else if (cmd.def.code.equals(Registry.CMD_DLIST)) {
+			listDispatchers(sbtmp);
+		} else if (cmd.def.code.equals(Registry.CMD_DSHOW)) {
+			dsptch.dumpState(sbtmp, StringOps.stringAsBool(cmd.getArg(Command.ATTR_VERBOSE)));
+		} else if (cmd.def.code.equals(Registry.CMD_KILLCONN)) {
+			String val = cmd.getArg(Command.ATTR_TIME);
+			int id = Integer.parseInt(cmd.getArg(Command.ATTR_KEY));
+			long stime = (val == null ? 0 : Long.parseLong(val));
+			boolean done = dsptch.killConnection(id, stime, "Killed via NAFMAN");
+			sbtmp.append("Connection ID=").append(id).append(' ');
+			sbtmp.append(done ? "has been terminated" : "is no longer registered");
+		} else if (cmd.def.code.equals(Registry.CMD_FLUSH)) {
 			dsptch.flusher.flushAll();
-			break;
-
-		case Registry.CMD_LOGLVL:
-			if (cmd.getArgCount() > 1 && !cmd.getArg(1).toString().toUpperCase().equals(dsptch.name.toUpperCase())) break;
-			com.grey.logging.Logger.LEVEL lvl = null;
+			sbtmp.append("Logs have been flushed");
+		} else if (cmd.def.code.equals(Registry.CMD_LOGLVL)) {
+			String arg = cmd.getArg(Command.ATTR_LOGLVL);
+			Logger.LEVEL newlvl = null;
 			try {
-				lvl = com.grey.logging.Logger.LEVEL.valueOf(cmd.getArg(0).toString().toUpperCase());
+				newlvl = Logger.LEVEL.valueOf(arg.toUpperCase());
 			} catch (Exception ex) {
-				dsptch.logger.info("NAFMAN discarding "+cmd.def.name+" command for bad level="+cmd.getArg(0));
-				break;
+				dsptch.logger.info("NAFMAN discarding "+cmd.def.code+" command for bad level="+arg+" - "+ex);
+				return null;
 			}
-			dsptch.logger.setLevel(lvl);
-			break;
-
-		case Registry.CMD_SHOWCMDS:
-			sbtmp.append("Handlers=").append(handlers.size()).append(':');
-			com.grey.base.utils.IteratorInt iter = handlers.keysIterator();
-			while (iter.hasNext()) {
-				Command.Def def = Registry.get().getCommand(iter.next());
-				Registry.CommandHandler handler = handlers.get(def.code);
-				sbtmp.append("\n- ").append("Command=").append(def.code).append('/').append(def.name);
-				sbtmp.append(": Handler=").append(handler.getClass().getName());
-			}
-			break;
-
-		case Registry.CMD_APPSTOP:
-			String dname = cmd.getArg(0).toString();
-			Dispatcher d = Dispatcher.getDispatcher(dname);
+			Logger.LEVEL oldlvl = dsptch.logger.setLevel(newlvl);
+			sbtmp.append("Log level has been changed from ").append(oldlvl).append(" to ").append(newlvl);
+		} else if (cmd.def.code.equals(Registry.CMD_SHOWCMDS)) {
+			Registry.get().dumpState(sbtmp, true);
+		} else if (cmd.def.code.equals(Registry.CMD_APPSTOP)) {
+			String dname = cmd.getArg(Command.ATTR_DISPATCHER);
+			String naflet = cmd.getArg(Command.ATTR_NAFLET);
+			if (naflet == null ||  naflet.length() == 0 || naflet.equals("-")) return null;
+			com.grey.naf.reactor.Dispatcher d = (dname == null ? null : com.grey.naf.reactor.Dispatcher.getDispatcher(dname));
 			if (d == null) {
 				sbtmp.append("Unrecognised Dispatcher="+dname);
-				break;
+			} else {
+				d.unloadNaflet(naflet, dsptch);
+				sbtmp.append("NAFlet=").append(naflet).append(" has been told to stop");
 			}
-			String naflet = cmd.getArg(1).toString();
-			d.unloadNaflet(naflet, dsptch);
-			break;
-
-		default:
-			// we've obviously registered for this command, so we must be missing a Case label - clearly a bug
+		} else {
+			//we've obviously registered to handle this command, so missing If clause is a bug
 			dsptch.logger.error("NAFMAN="+dsptch.name+": Missing case for cmd="+cmd.def.code);
-			return;
+			return null;
 		}
-		cmd.sendResponse(dsptch, sbtmp);
+		return sbtmp;
+	}
+
+	public CharSequence listDispatchers()
+	{
+		sbtmp.setLength(0);
+		listDispatchers(sbtmp);
+		return sbtmp;
+	}
+
+	private void listDispatchers(StringBuilder sb)
+	{
+		com.grey.naf.reactor.Dispatcher[] lst = com.grey.naf.reactor.Dispatcher.getDispatchers();
+		sb.append("<dispatchers>");
+		for (int idx = 0; idx != lst.length; idx++) {
+			com.grey.naf.reactor.Dispatcher d = lst[idx];
+			com.grey.naf.Naflet[] apps = d.listNaflets();
+			String nafman = "No";
+			if (d.nafman != null) nafman = (d.nafman.isPrimary() ? "Primary" : "Secondary");
+			sb.append("<dispatcher name=\"").append(d.name);
+			sb.append("\" log=\"").append(d.logger.getLevel());
+			sb.append("\" nafman=\"").append(nafman);
+			sb.append("\" dns=\"").append(d.dnsresolv == null ? "No" : d.dnsresolv).append("\">");
+			sb.append("<naflets>");
+			for (int idx2 = 0; idx2 != apps.length; idx2++) {
+				com.grey.naf.Naflet app = apps[idx2];
+				sb.append("<naflet name=\"").append(app.naflet_name).append("\"/>");
+			}
+			sb.append("</naflets>");
+			sb.append("</dispatcher>");
+		}
+		sb.append("</dispatchers>");
 	}
 
 	// signal our Dispatcher to stop, and it will in turn stop us when it shuts down
-	protected void stopDispatcher() throws java.io.IOException
+	protected boolean stopDispatcher() throws java.io.IOException
 	{
-		if (in_shutdown) return;  //Dispatcher has already told us to stop
-		dsptch.stop(dsptch);
-	}
-
-	public String submitCommand(Command.Def def, String[] args) throws java.io.IOException
-	{
-		return Client.submitCommand("localhost", getPort(), def, null, dsptch.logger);
+		if (in_shutdown) return true;  //Dispatcher has already told us to stop
+		return dsptch.stop(dsptch);
 	}
 }

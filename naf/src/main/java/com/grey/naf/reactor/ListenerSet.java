@@ -85,7 +85,8 @@ public class ListenerSet
 				break;
 			}
 		}
-		dsptch.logger.info(name+": Listener="+lstnr.name+" has terminated - remaining="+listen_cnt);
+		String extra = (listen_cnt==0 ? " - reaper="+reaper : "");
+		dsptch.logger.info(name+": Listener="+lstnr.name+" has terminated - remaining="+listen_cnt+extra);
 		if (listen_cnt == 0 && reaper != null) reaper.entityStopped(this);
 	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Yusef Badri - All rights reserved.
+ * Copyright 2012-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -60,26 +60,6 @@ public class NIOBuffersTest
 		org.junit.Assert.assertEquals(barr.length, buf.capacity());
 		sb = NIOBuffers.decode(buf, 0, -1, null, false);
 		org.junit.Assert.assertEquals(ORIGTXT1, sb.toString());
-
-		// verify that buffers don't auto-grow
-		buf = NIOBuffers.create(barr.length - 1, false);
-		try {
-			NIOBuffers.encode(barr, 0, barr.length, buf, true);
-			org.junit.Assert.fail("Heap Buffer was supposed to overflow");
-		} catch (java.nio.BufferOverflowException ex) {}
-		buf = NIOBuffers.create(barr.length - 1, true);
-		try {
-			NIOBuffers.encode(barr, 0, barr.length, buf, true);
-			org.junit.Assert.fail("Direct Buffer was supposed to overflow");
-		} catch (java.nio.BufferOverflowException ex) {}
-
-		// now test deliberate growth (in fact, reallocation)
-		buf2 = NIOBuffers.ensureCapacity(buf, barr.length-1, false);
-		org.junit.Assert.assertSame(buf, buf2);
-		org.junit.Assert.assertEquals(barr.length-1, buf.capacity());
-		buf2 = NIOBuffers.ensureCapacity(buf, barr.length, false);
-		org.junit.Assert.assertNotSame(buf, buf2);
-		org.junit.Assert.assertEquals(barr.length, buf2.capacity());
 	}
 
 	@org.junit.Test

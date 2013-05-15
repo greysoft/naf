@@ -13,7 +13,6 @@
 					<infile>-</infile>
 					<outfile>-</outfile>
 					<mode>MX</mode>
-					<mailbox>Y</mailbox>
 				</naflet>
 			</naflets>
 		</dispatcher>

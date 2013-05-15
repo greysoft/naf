@@ -1,14 +1,14 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.nafman;
 
-import com.grey.base.utils.StringOps;
-
 /*
  * Application-wide registrations and defs.
  * Anything specific to one Dispatcher is held in the Agent class.
+ * Note that this class represents a singleton, and it must be initialised before the multi-threaded
+ * phase starts, ie. before any calls to Dispatcher.start(). No updates allowed after that.
  */
 public final class Registry
 {
@@ -16,41 +16,80 @@ public final class Registry
 		com.grey.naf.Launcher.announceNAF();
 	}
 
-	public interface CommandHandler
+	// the built-in NAF commands
+	public static final String CMD_STOP = "STOP";
+	public static final String CMD_APPSTOP = "APPSTOP";
+	public static final String CMD_DLIST = "DSPLIST";
+	public static final String CMD_DSHOW = "DSPSHOW";
+	public static final String CMD_SHOWCMDS = "SHOWCMDS";
+	public static final String CMD_KILLCONN = "KILLCONN";
+	public static final String CMD_DNSDUMP = "DNSDUMP";
+	public static final String CMD_DNSPRUNE = "DNSPRUNE";
+	public static final String CMD_DNSQUERY = "DNSQUERY";
+	public static final String CMD_FLUSH = "FLUSH";
+	public static final String CMD_LOGLVL = "LOGLEVEL";
+
+	//some of the built-in Resource names (those that get referenced from elsewhere)
+	public static final String RSRC_CMDSTATUS = "cmdstatus";
+	private static final String RSRC_CMDREG = "cmdreg";
+
+	public static class DefCommand
 	{
-		void handleNAFManCommand(Command cmd) throws com.grey.base.FaultException, java.io.IOException;
+		public final String code;
+		public final String family;
+		public final String descr;
+		public final String autopublish; //corresponds to a DefResources.path XSL file
+		public final boolean neutral; //alters nothing
+		public DefCommand(String c, String f, String d, String p, boolean rdonly) {
+			code=c; family=f; descr=d; autopublish=p; neutral=rdonly;
+		}
 	}
 
-	private static class CandidateHandler
+	private static class CommandHandlerReg
 	{
+		final Command.Handler handler;
 		final com.grey.naf.reactor.Dispatcher dsptch;
-		final CommandHandler handler;
-		final Command.Def cmd;
 		final int pref;
-		CandidateHandler(com.grey.naf.reactor.Dispatcher d, CommandHandler h, Command.Def c, int p) {dsptch=d; handler=h; cmd=c; pref=p;}
+		CommandHandlerReg(Command.Handler h, com.grey.naf.reactor.Dispatcher d, int p) {handler=h; dsptch=d; pref=p;}
 	}
 
-	public static final int CMD_STOP = 1;
-	public static final int CMD_DNSDUMP = 2;
-	public static final int CMD_DNSPRUNE = 3;
-	public static final int CMD_DLIST = 4;
-	public static final int CMD_DSHOW = 5;
-	public static final int CMD_APPSTOP = 6;
-	public static final int CMD_SHOWCMDS = 7;
-	public static final int CMD_FLUSH = 8;
-	public static final int CMD_LOGLVL = 9;
-	public static final int CMD_NAFRESERVED = 100; //commands 1-99 are reserved for NAF
+	private static final String FAMILY_NAFCORE = "NAF-Core";
+	private static final String FAMILY_NAFDNS = "NAF-DNS";
 
-	private static final Command.Def[] nafcmds = new Command.Def[] {
-		new Command.Def(CMD_STOP, "stop", 0, 1, true, null),
-		new Command.Def(CMD_DLIST, "dsplist", 0, 0, false, null),
-		new Command.Def(CMD_DSHOW, "dspshow", 0, 1, true, null),
-		new Command.Def(CMD_SHOWCMDS, "showcmds", 0, 1, true, null),
-		new Command.Def(CMD_APPSTOP, "appstop", 2, 2, true, "naflet-name"),
-		new Command.Def(CMD_FLUSH, "flush", 0, 1, true, null),
-		new Command.Def(CMD_LOGLVL, "loglevel", 1, 2, false, "level [dispatcher-name]"),
-		new Command.Def(CMD_DNSDUMP, "dnsdump", 0, 1, true, null),
-		new Command.Def(CMD_DNSPRUNE, "dnsprune", 0, 1, true, null)
+	private static final DefCommand[] nafcmds = new DefCommand[] {
+		new DefCommand(CMD_STOP, FAMILY_NAFCORE, "Stop specified Dispatcher - stop-all halts the entire NAF Context", null, false),
+		new DefCommand(CMD_APPSTOP, FAMILY_NAFCORE, "Stop specified NAFlet", null, false),
+		new DefCommand(CMD_DLIST, FAMILY_NAFCORE, "List all Dispatchers", null, true),
+		new DefCommand(CMD_DSHOW, FAMILY_NAFCORE, "Show internal Dispatcher details", null, true),
+		new DefCommand(CMD_SHOWCMDS, FAMILY_NAFCORE, "List all NAFMAN command registrations", RSRC_CMDREG, true),
+		new DefCommand(CMD_KILLCONN, FAMILY_NAFCORE, "Kill specified connection", null, false),
+		new DefCommand(CMD_FLUSH, FAMILY_NAFCORE, "Flush buffered logfiles to disk", RSRC_CMDSTATUS, true),
+		new DefCommand(CMD_LOGLVL, FAMILY_NAFCORE, "Dynamically alter the logging level", null, false),
+		new DefCommand(CMD_DNSDUMP, FAMILY_NAFDNS, "Dump DNS-Resolver cache and stats", RSRC_CMDSTATUS, true),
+		new DefCommand(CMD_DNSPRUNE, FAMILY_NAFDNS, "Prune aged entries from DNS cache", RSRC_CMDSTATUS, false),
+		new DefCommand(CMD_DNSQUERY, FAMILY_NAFDNS, "Do synchronous lookup on DNS cache (testing aid)", null, true)
+	};
+
+
+	public static class DefResource
+	{
+		public interface DataGenerator {
+			byte[] generateResourceData(DefResource def, com.grey.naf.reactor.Dispatcher d) throws java.io.IOException;
+		}
+		public final String name; //must not match any DefCommand.code values
+		public final String path;
+		public final String mimetype; //only applies to static resources, dynamic output is typed at runtime
+		public final DataGenerator gen;
+		public DefResource(String n, String p, String t, DataGenerator g) {name=n; path=p; mimetype=t; gen=g;}
+	}
+
+	private static final DefResource[] nafresources = new DefResource[] {
+		new DefResource("nafhome", "home.xsl", null, null), //must be first entry, subsequent order doesn't matter
+		new DefResource("favicon.ico", "favicon.png", HTTP.CTYPE_PNG, null),
+		new DefResource("nafman.css", "nafman.css", HTTP.CTYPE_CSS, null),
+		new DefResource(RSRC_CMDSTATUS, "cmdstatus.xsl", null, null),
+		new DefResource("dspdetails", "dspdetails.xsl", null, null),
+		new DefResource(RSRC_CMDREG, "cmdreg.xsl", null, null)
 	};
 
 
@@ -59,157 +98,166 @@ public final class Registry
 	}
 	public static Registry get() {return SingletonHolder.instance;}
 
-	private final java.util.concurrent.ConcurrentHashMap<Integer, Command.Def> commands
-								= new java.util.concurrent.ConcurrentHashMap<Integer, Command.Def>();
-	private com.grey.base.utils.HashedMapIntKey<CandidateHandler> candidates = new com.grey.base.utils.HashedMapIntKey<CandidateHandler>();
+	private final java.util.HashMap<String, java.util.ArrayList<CommandHandlerReg>> handlers
+								= new java.util.HashMap<String, java.util.ArrayList<CommandHandlerReg>>();
+	private java.util.HashSet<com.grey.naf.reactor.Dispatcher> inviolate_handlers
+								= new java.util.HashSet<com.grey.naf.reactor.Dispatcher>();
+	private final java.util.HashMap<String, DefCommand> commands = new java.util.HashMap<String, DefCommand>();
+	private final java.util.HashMap<String, DefResource> resources = new java.util.HashMap<String, DefResource>();
+	private String homepage;
+
+	synchronized public String getHomePage() {return homepage;}
+	synchronized public boolean isCommandRegistered(String code) {return isCommandRegistered(code, null);}
+	synchronized DefCommand getCommand(String code) {return commands.get(code);}
+	synchronized DefResource getResource(String name) {return resources.get(name);}
+	synchronized java.util.Collection<DefCommand> getCommands() {return commands.values();}
+	synchronized java.util.Set<String> getResourceNames() {return resources.keySet();}
 
 	private Registry()
 	{
 		try {
 			loadCommands(nafcmds);
+			loadResources(nafresources);
+			setHomePage(nafresources[0].name);
 		} catch (Exception ex) {
-			throw new RuntimeException("Fatal error loading NAF NAFMAN commands", ex);
+			throw new RuntimeException("Fatal error loading core NAFMAN defs - "+ex, ex);
 		}
 	}
 
-	public void loadCommands(Command.Def[] defs) throws com.grey.base.ConfigException {
+	synchronized public void setHomePage(String rsrc_name) throws com.grey.base.ConfigException
+	{
+		if (getResource(rsrc_name) == null) throw new com.grey.base.ConfigException("NAFMAN: Unknown homepage="+rsrc_name);
+		homepage = rsrc_name;
+	}
+
+	synchronized public void loadCommands(DefCommand[] defs) throws com.grey.base.ConfigException
+	{
 		for (int idx = 0; idx != defs.length; idx++) {
-			loadCommand(defs[idx]);
+			DefCommand def = defs[idx];
+			if (commands.containsKey(def.code)) throw new com.grey.base.ConfigException("NAFMAN: Duplicate cmd="+def.code);
+			if (resources.containsKey(def.code)) throw new com.grey.base.ConfigException("NAFMAN: Command="+def.code+" conflicts with Resources");
+			commands.put(def.code, def);
 		}
 	}
 
-	public Command.Def loadCommand(Command.Def def) throws com.grey.base.ConfigException
+	// The Server class looks up the URL path as first a Command code and then a Resource name, so their IDs must be disjoint.
+	// Unlike Commands however, duplicate Resources are allowed, and simply oveerride.
+	synchronized public void loadResources(DefResource[] defs) throws com.grey.base.ConfigException
 	{
-		if (def.name == null || def.name.length() == 0) {
-			throw new com.grey.base.ConfigException("Invalid NAFMAN command def - code="+def.code+", name="+def.name);
+		for (int idx = 0; idx != defs.length; idx++) {
+			DefResource def = defs[idx];
+			if (commands.containsKey(def.name)) throw new com.grey.base.ConfigException("NAFMAN: Resource="+def.path+" conflicts with cmd="+def.name);
+			resources.put(def.name, def);
 		}
-		Command.Def def1 = commands.putIfAbsent(def.code, def);
-		if (def1 != null) {
-			if (!def1.name.equals(def.name)
-					|| def1.min_args != def.min_args
-					|| def1.max_args != def.max_args
-					|| def1.dispatcher1 != def.dispatcher1
-					|| !StringOps.sameSeq(def1.usage, def.usage)) {
-				throw new com.grey.base.ConfigException("Inconsistent NAFMAN command def for code="+def.code+" - "+def.name+" conflicts with "+def.name);
-			}
-			def = def1;
+	}
+
+	synchronized boolean isCommandRegistered(String code, com.grey.naf.reactor.Dispatcher d)
+	{
+		java.util.ArrayList<CommandHandlerReg> lst = handlers.get(code);
+		if (lst == null) return false;
+		if (d == null) return true;  //just wanted to know if it was registered by anybody
+		for (int idx = 0; idx != lst.size(); idx++) {
+			if (lst.get(idx).dsptch == d) return true;
 		}
-		return def;
+		return false;
 	}
 
-	public java.util.Collection<Command.Def> getCommands()
-	{
-		return commands.values();
-	}
-
-	public Command.Def getCommand(String name)
-	{
-		return getCommand(name, null);
-	}
-
-	public Command.Def getCommand(String name, StringBuilder sb)
-	{
-		java.util.Iterator<Command.Def> iter = commands.values().iterator();
-		while (iter.hasNext()) {
-			Command.Def def = iter.next();
-			if (def.name.equals(name)) return def;
-		}
-		if (sb != null) {
-			sb.append("'").append(name).append("' is not a recognised NAFMAN command.\n");
-			showCommands(sb);
-		}
-		return null;
-	}
-
-	public Command.Def getCommand(Integer code)
-	{
-		return getCommand(code, null);
-	}
-
-	public Command.Def getCommand(Integer code, StringBuilder sb)
-	{
-		Command.Def def = commands.get(code);
-		if (def == null && sb != null) {
-			sb.append("Code=").append(code).append(" is not a recognised NAFMAN command.\n");
-			showCommands(sb);
-		}
-		return def;
-	}
-
-	// convenience method which saves callers having to check for presence of NAFMAN agent
-	public void registerHandler(int cmdcode, Registry.CommandHandler handler, com.grey.naf.reactor.Dispatcher dsptch)
+	// Register handlers for various commands.
+	// Some commands can have multiple handlers, while others can only have one, which is regulated by the preference
+	// arg - lower values indicate higher priority.
+	// A non-zero preference indicates a conditional registration, which will be blocked or displaced by higher-priority ones.
+	// pref==0 means this is an unconditional registration, which will co-exist with any other unconditional registrations, but
+	// evict any conditional ones.
+	// All else being equal, later registrations within same Dispatcher supercede earlier ones.
+	synchronized public boolean registerHandler(String cmdcode, int pref, Command.Handler handler, com.grey.naf.reactor.Dispatcher dsptch)
 			throws com.grey.base.ConfigException
 	{
-		if (dsptch.nafman == null) return;
-		dsptch.nafman.registerHandler(cmdcode, handler);
-	}
-
-	// Provisional registration, which will be finalised by confirmCandidates(). This method is used for
-	// commands which can only be handled by a single Dispatcher, as each lower-preference candidate replaces
-	// the previous one.
-	// Therefore this method can only be used by Dispatchers that are created and launched by the wired naf.xml
-	// container. Any Dispatchers that are subsequently dynamically created can only call their their own NAFMAN's
-	// registerHandler() method, which categorically registers the specified handler within that Dispatcher.
-	// Pref=0 indicates an absolute preference, ie. it replaces any prior candidate.
-	// That is also why there's no need to synchronise the 'candidates' map. confirmCandidates is called after the
-	// naf.xml container initialises its wired Dispatchers, but before it activates them.
-	public boolean registerCandidate(Command.Def cmd, int pref, CommandHandler handler, com.grey.naf.reactor.Dispatcher dsptch)
-	{
-		if (dsptch.nafman == null) return false;
-		CandidateHandler candidate = (pref == 0 ? null : candidates.get(cmd.code));
-		if (candidate != null && candidate.pref < pref) return false; //existing candidate is better
-		candidate = new CandidateHandler(dsptch, handler, cmd, pref);
-		candidates.put(cmd.code, candidate); //replace previous candidate
+		if (dsptch.nafman == null) {
+			// If this is an internal NAFMAN handler (primary or secondary agent) then obviously its Dispatcher is NAFMAN-enabled
+			// but we have to insert this get-out clause for internal handlers because the dsptch.nafman field is not set until
+			// after the Agent constructor returns, and that's where they call this method from.
+			if (!(handler instanceof Agent)) {
+				return false;
+			}
+		}
+		if (!commands.containsKey(cmdcode)) {
+			dsptch.logger.warn("NAFMAN discarding undefined cmd="+cmdcode+" for handler="+dsptch.name+"/"+handler.getClass().getName());
+			return false;
+		}
+		java.util.ArrayList<CommandHandlerReg> lst = handlers.get(cmdcode);
+		if (lst != null) {
+			//this list can hold multiple unconditional (zero-preference) handlers in different Dispatchers, or one conditional one
+			for (int idx = 0; idx != lst.size(); idx++) {
+				CommandHandlerReg def = lst.get(idx);
+				if (pref != 0 && pref >= def.pref) return false; //existing handler has higher priority
+				if (pref == 0 && def.pref == 0 && dsptch != def.dsptch) continue; //new handler can co-exist with this one
+				// new handler has higher priority, so displace existing one
+				if (inviolate_handlers.contains(def.dsptch)) return false; //but existing handler has been marked permanent
+				lst.remove(idx);
+				break; //any further handlers can only be unconditional ones in different Dispatchers, so can co-exist
+			}
+		} else {
+			lst = new java.util.ArrayList<CommandHandlerReg>();
+			handlers.put(cmdcode, lst);
+		}
+		CommandHandlerReg def = new CommandHandlerReg(handler, dsptch, pref);
+		lst.add(def);
 		return true;
 	}
 
-	public void confirmCandidates() throws com.grey.base.ConfigException
+	synchronized void getHandlers(com.grey.naf.reactor.Dispatcher d, com.grey.base.utils.HashedMap<String, Command.Handler> h)
 	{
-		java.util.Iterator<CandidateHandler> iter = candidates.valuesIterator();
-		while (iter.hasNext()) {
-			CandidateHandler candidate = iter.next();
-			candidate.dsptch.nafman.registerHandler(candidate.cmd.code, candidate.handler);
+		java.util.Iterator<String> it = handlers.keySet().iterator();
+		while (it.hasNext()) {
+			String cmdcode = it.next();
+			java.util.ArrayList<CommandHandlerReg> lst = handlers.get(cmdcode);
+			for (int idx = 0; idx != lst.size(); idx++) {
+				CommandHandlerReg def = lst.get(idx);
+				if (def.dsptch == d) h.put(cmdcode, def.handler);
+			}
 		}
-		candidates = null;
+		inviolate_handlers.add(d); //now that we've propagated its handlers, this Dispatcher becomes inviolate
 	}
 
-	public StringBuilder validateArgCount(Command.Def def, int argc, StringBuilder sb)
-	{
-		if (argc >= def.min_args && argc <= def.max_args) {
-			// number of args is valid
-			return null;
-		}
-		if (sb == null) sb = new StringBuilder();
-		sb.append("Invalid parameters for NAFMAN command=").append(def.name);
-		sb.append(": args=").append(argc).append(" vs min=").append(def.min_args).append("/max=").append(def.max_args);
-		sb.append("\nUSAGE: ").append(def.name);
-		int argpos = 0;
-		if (def.dispatcher1) {
-			argpos++;
-			String dname = "Dispatcher-name";
-			if (def.min_args == 0) dname = "["+dname+"]";
-			sb.append(' ').append(dname);
-		}
-		if (def.usage != null) {
-			sb.append(' ').append(def.usage);
-		} else if (def.max_args > argpos) {
-			sb.append(" ...");
-		}
-		return sb;
-	}
-
-	private CharSequence showCommands(StringBuilder sb)
+	synchronized CharSequence dumpState(StringBuilder sb, boolean xml)
 	{
 		if (sb == null) sb = new StringBuilder();
-		sb.append("Supported commands: ");
-		java.util.Collection<Command.Def> defs = getCommands();
-		java.util.List<String> cmdnames = new java.util.ArrayList<String>();
-		java.util.Iterator<Command.Def> iter = defs.iterator();
-		while (iter.hasNext()) cmdnames.add(iter.next().name);
-		java.util.Collections.sort(cmdnames);
-		for (int idx = 0; idx != cmdnames.size(); idx++) {
-			if (idx != 0) sb.append(", ");
-			sb.append(cmdnames.get(idx)).append('/').append(getCommand(cmdnames.get(idx)).code);
+		if (xml) {
+			sb.append("<commands>");
+		} else {
+			sb.append("NAFMAN registered commands=").append(handlers.size()).append('/').append(commands.size());
+		}
+		java.util.Iterator<String> it = handlers.keySet().iterator();
+		while (it.hasNext()) {
+			String cmdcode = it.next();
+			DefCommand cdef = getCommand(cmdcode);
+			java.util.ArrayList<CommandHandlerReg> lst = handlers.get(cmdcode);
+			if (xml) {
+				sb.append("<command code=\"").append(cmdcode).append("\"");
+				sb.append(" family=\"").append(cdef.family).append("\">");
+				sb.append("<desc><![CDATA[").append(cdef.descr).append("]]></desc>");
+				sb.append("<handlers>");
+			} else {
+				sb.append("\n- ").append(cmdcode).append('=').append(lst.size());
+			}
+			String dlm = ": ";
+			for (int idx = 0; idx != lst.size(); idx++) {
+				CommandHandlerReg hdef = lst.get(idx);
+				if (xml) {
+					sb.append("<handler dispatcher=\"").append(hdef.dsptch.name).append("\" pref=\"").append(hdef.pref).append("\">");
+					sb.append(hdef.handler.getClass().getName()).append("</handler>");
+				} else {
+					sb.append(dlm).append(hdef.dsptch.name).append('/').append(hdef.handler.getClass().getName());
+					sb.append('/').append(hdef.pref);
+					dlm = "; ";
+				}
+			}
+			if (xml) sb.append("</handlers></command>");
+		}
+		if (xml) {
+			sb.append("</commands>");
+		} else {
+			sb.append("\nNAFMAN registered resources=").append(resources.size()).append(", Home=").append(homepage);
 		}
 		return sb;
 	}

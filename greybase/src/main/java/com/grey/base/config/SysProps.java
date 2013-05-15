@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.config;
@@ -45,6 +45,12 @@ public class SysProps
 	{
 		String val = get(name, Long.toString(dflt));
 		return TimeOps.parseMilliTime(val);
+	}
+
+	public static long getTime(String name, String dflt)
+	{
+		long msecs = com.grey.base.utils.TimeOps.parseMilliTime(dflt);
+		return getTime(name, msecs);
 	}
 
 	public static String set(String name, String newval)

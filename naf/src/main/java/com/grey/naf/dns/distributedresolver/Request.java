@@ -5,7 +5,7 @@
 package com.grey.naf.dns.distributedresolver;
 
 // This class specifies a Proxy request
-public class Request
+public final class Request
 {
 	// this is the reply channel to the Proxy client
 	public final com.grey.naf.reactor.Producer<Request> client;

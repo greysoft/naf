@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns;
@@ -10,8 +10,8 @@ public final class ResourceData
 	// Because so many 10s of 1000s of instances of this class may potentially exist, we've tried to optimise its storage requirements by pruning
 	// the Type and Class back to their minimum practical bit size. Even though they are technically 16-bit quantities, there are no defined values
 	// greater than a byte, so we can get away with this (but beware of sign extension).
-	public byte rrtype;
-	public byte rrclass;
+	public byte rrtype; //Resolver.QTYPE_x values
+	public byte rrclass; //Packet.QCLASS_x values
 	public com.grey.base.utils.ByteChars domnam;
 	public int ipaddr;
 	public short pref;

@@ -1,20 +1,19 @@
 /*
- * Copyright 2012 Yusef Badri - All rights reserved.
+ * Copyright 2012-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.portfwd;
 
-import com.grey.naf.nafman.Command;
+import com.grey.naf.nafman.Registry;
 
 public class Task
 	extends com.grey.naf.Naflet
-	implements com.grey.naf.nafman.Registry.CommandHandler, com.grey.naf.EntityReaper
+	implements com.grey.naf.nafman.Command.Handler, com.grey.naf.EntityReaper
 {
-	private static final int CMD_BASE = com.grey.naf.nafman.Registry.CMD_NAFRESERVED;
-	public static final int CMD_SHOWCONNS = CMD_BASE + 1;
+	public static final String CMD_SHOWCONNS = "SHOWCONNS";
 
-	private static final Command.Def[] nafman_cmds = new Command.Def[] {
-		new Command.Def(CMD_SHOWCONNS, "showconns", 0, 0, false, null),
+	private static final com.grey.naf.nafman.Registry.DefCommand[] nafman_cmds = new com.grey.naf.nafman.Registry.DefCommand[] {
+		new com.grey.naf.nafman.Registry.DefCommand(CMD_SHOWCONNS, "Port-Forwarder", "Show connection details", Registry.RSRC_CMDSTATUS, true)
 	};
 
 	private final java.util.ArrayList<Relay> active = new java.util.ArrayList<Relay>();
@@ -32,7 +31,7 @@ public class Task
 	{
 		super(name, dsptch, cfg);
 		listeners = new com.grey.naf.reactor.ListenerSet("Task="+naflet_name, dsptch, this, this, "listeners/listener", appcfg, null);
-		com.grey.naf.nafman.Registry.get().registerHandler(CMD_SHOWCONNS, this, dsptch);
+		com.grey.naf.nafman.Registry.get().registerHandler(CMD_SHOWCONNS, 0, this, dsptch);
 	}
 
 	@Override
@@ -57,26 +56,25 @@ public class Task
 	}
 
 	@Override
-	public void handleNAFManCommand(Command cmd)
+	public CharSequence handleNAFManCommand(com.grey.naf.nafman.Command cmd)
 	{
 		StringBuilder sb = new StringBuilder(512);
 
-		switch (cmd.def.code)
-		{
-		case CMD_SHOWCONNS:
-			sb.append("Connections = ").append(active.size());
-			if (active.size() != 0) sb.append(':');
+		if (cmd.def.code.equals(CMD_SHOWCONNS)) {
+			sb.append("Total Connections: ").append(active.size());
+			if (active.size() != 0) sb.append("<ul>");
 			for (int idx = 0; idx != active.size(); idx++) {
-				sb.append("\n- ").append(idx+1).append(": ");
+				sb.append("<li>");
 				active.get(idx).dumpState(sb);
+				sb.append("</li>");
 			}
-			break;
-		default:
+			if (active.size() != 0) sb.append("</ul>");
+		} else {
 			// we've obviously registered for this command, so we must be missing a Case label - clearly a bug
 			dsptch.logger.error("NAFMAN="+dsptch.name+": Missing case for cmd="+cmd.def.code);
-			return;
+			return null;
 		}
-		cmd.sendResponse(dsptch, sb);
+		return sb;
 	}
 
 	public void connectionStarted(Relay relay)

@@ -61,7 +61,7 @@ public class SysPropsTest
 	public void miscellaneous() throws java.io.IOException
 	{
 		String pthnam = "/no/such/props/file";
+		org.junit.Assert.assertFalse(new java.io.File(pthnam).exists()); //sanity check
 		org.junit.Assert.assertNull(SysProps.load(pthnam));
-		org.junit.Assert.assertFalse(new java.io.File(pthnam).exists());
 	}
 }

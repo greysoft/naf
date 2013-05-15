@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Yusef Badri - All rights reserved.
+ * Copyright 2012-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.portfwd;
@@ -34,7 +34,7 @@ public class ServerSession
 			ioDisconnected(diag);
 			return;
 		}
-		chanreader.receive(0, true);
+		chanreader.receive(0);
 		relay.serverConnected();
 	}
 

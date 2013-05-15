@@ -1,10 +1,10 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.distributedresolver;
 
-public class Client
+public final class Client
 	extends com.grey.naf.dns.Resolver
 	implements com.grey.naf.reactor.Producer.Consumer
 {
@@ -23,7 +23,7 @@ public class Client
 		}
 	}
 
-	protected final com.grey.naf.reactor.Producer<Request> prod;
+	final com.grey.naf.reactor.Producer<Request> prod; //package-private
 
 	private final Proxy proxy;
 	final com.grey.base.utils.ObjectWell<Request> reqpool;
@@ -79,5 +79,11 @@ public class Client
 			if (req.caller != null) req.caller.dnsResolved(dsptch, req.answer, req.cbdata);
 			reqpool.store(req);
 		}
+	}
+
+	@Override
+	public String toString()
+	{
+		return getClass().getName()+"/Master="+(proxy.getMaster()==dsptch);
 	}
 }

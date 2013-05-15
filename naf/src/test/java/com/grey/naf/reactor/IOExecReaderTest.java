@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Yusef Badri - All rights reserved.
+ * Copyright 2012-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -29,7 +29,7 @@ public class IOExecReaderTest
 			this.bufspec = bufspec;
 			chanreader = new IOExecReader(bufspec);
 			initChannel(r, true, true);
-			chanreader.receive(0, true);
+			chanreader.receive(0);
 		}
 
 		public void write(CharSequence data) throws java.io.IOException {
@@ -69,7 +69,7 @@ public class IOExecReaderTest
 				break;
 			case 3:
 				//switch to a delimited read and do a send that will take two callbacks to receive
-				chanreader.receiveDelimited((byte)'\n', true);
+				chanreader.receiveDelimited((byte)'\n');
 				writedata = "abcde\n123456789\n";
 				write(writedata);
 				expect = writedata.substring(0,  6);
@@ -82,7 +82,7 @@ public class IOExecReaderTest
 				break;
 			case 5:
 				//switch to a fixed-size read - do a send that will take more than 3 reads to consume
-				chanreader.receive(10, true);
+				chanreader.receive(10);
 				writedata = "abcdefghij0123456789ABCDEFGHIJxyz";
 				org.junit.Assert.assertEquals(33, writedata.length()); //sanity check
 				write(writedata);
@@ -104,7 +104,7 @@ public class IOExecReaderTest
 				break;
 			case 9:
 				// exercise the "deadlock" code path
-				chanreader.receiveDelimited((byte)'\n', true);
+				chanreader.receiveDelimited((byte)'\n');
 				carr = new char[bufspec.rcvbufsiz];
 				java.util.Arrays.fill(carr, 'z');
 				sb.setLength(0);

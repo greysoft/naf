@@ -16,24 +16,13 @@ public final class Dispatcher
 	private static final String STOPCMD = "_STOP_";
 	private static final String SYSPROP_EXITDUMP = "greynaf.dispatchers.exitdump";
 	private static final String SYSPROP_HEAPWAIT = "greynaf.dispatchers.heapwait";
+	private static final long shutdown_timer_advance = SysProps.getTime("greynaf.dispatchers.shutdown_advance", "1s");
 
 	private static final java.util.concurrent.ConcurrentHashMap<String, Dispatcher> activedispatchers 
 			= new java.util.concurrent.ConcurrentHashMap<String, Dispatcher>();
 	private static final java.util.concurrent.atomic.AtomicInteger anoncnt = new java.util.concurrent.atomic.AtomicInteger();
 
-	private final Thread thrd_main;
-	private final java.util.ArrayList<com.grey.naf.Naflet> naflets = new java.util.ArrayList<com.grey.naf.Naflet>();
-	private final java.nio.channels.Selector slct;
-	private final com.grey.base.utils.Circulist<Timer> activetimers;
-	private final com.grey.base.utils.HashedSet<ChannelMonitor> activechannels = new com.grey.base.utils.HashedSet<ChannelMonitor>();
-	private final com.grey.base.utils.ObjectQueue<Timer> pendingtimers;  //timers which have expired and are ready to fire
-	private final com.grey.base.utils.ObjectWell<Timer> sparetimers;
-	private final Producer<Object> apploader;
-
-	private int uniqtimerid;
-	private boolean shutdownRequested;
-	private boolean shutdownPerformed;
-
+	public final long timeboot = System.currentTimeMillis();
 	public final String name;
 	public final com.grey.naf.Config nafcfg;
 	public final com.grey.naf.nafman.Agent nafman;
@@ -42,15 +31,31 @@ public final class Dispatcher
 	public final com.grey.logging.Logger logger;
 	private long systime_msecs;
 
+	private final Thread thrd_main;
+	private final java.util.ArrayList<com.grey.naf.Naflet> naflets = new java.util.ArrayList<com.grey.naf.Naflet>();
+	private final java.nio.channels.Selector slct;
+	private final com.grey.base.utils.HashedMapIntKey<ChannelMonitor> activechannels;
+	private final com.grey.base.utils.Circulist<Timer> activetimers;
+	private final com.grey.base.utils.ObjectQueue<Timer> pendingtimers;  //timers which have expired and are ready to fire
+	private final com.grey.base.utils.ObjectWell<Timer> sparetimers;
+	private final Producer<Object> apploader;
+
 	public final boolean surviveDownstream;  //survive the exit/death of downstream Dispatchers
 	private final boolean surviveHandlers; //survive error in event handlers
 	private final boolean zeroNafletsOK;  //true means ok if no Naflets running, else exit when count falls to zero
 
+	private int uniqid_timer;
+	private int uniqid_chan;
+	private boolean shutdownRequested;
+	private boolean shutdownPerformed;
+
 	// temp working buffers, preallocated (on demand) for efficiency
+	final java.util.Calendar dtcal = TimeOps.getCalendar(null); //package-private
 	private byte[] xferbuf;
 	private java.nio.ByteBuffer tmpniobuf;
 
 	public boolean isRunning() {return thrd_main.isAlive();}
+	int allocateChannelId() {return ++uniqid_chan;}
 
 	private Dispatcher(com.grey.naf.Config ncfg, com.grey.naf.DispatcherDef def, com.grey.logging.Logger initlog)
 			throws com.grey.base.GreyException, java.io.IOException
@@ -66,12 +71,12 @@ public final class Dispatcher
 		FileOps.ensureDirExists(nafcfg.path_var);
 		FileOps.ensureDirExists(nafcfg.path_tmp);
 
-		slct = java.nio.channels.Selector.open();
+		activechannels = new com.grey.base.utils.HashedMapIntKey<ChannelMonitor>();
 		activetimers = new com.grey.base.utils.Circulist<Timer>(Timer.class);
 		pendingtimers = new com.grey.base.utils.ObjectQueue<Timer>(Timer.class);
 		sparetimers = new com.grey.base.utils.ObjectWell<Timer>(Timer.class, "Dispatcher_Timers_"+name);
 		flusher = new Flusher(this, def.flush_interval);
-		apploader = new Producer<Object>(Object.class, this, this);
+		slct = java.nio.channels.Selector.open();
 
 		com.grey.logging.Logger dlog = com.grey.logging.Factory.getLogger(def.logname);
 		initlog.info("Initialising Dispatcher="+name+" - Logger="+def.logname+" - "+dlog);
@@ -80,6 +85,9 @@ public final class Dispatcher
 		logger.info("Dispatcher="+name+": survive_downstream="+surviveDownstream+", survive_handlers="+surviveHandlers
 				+", zero_naflets="+zeroNafletsOK+", flush="+TimeOps.expandMilliTime(def.flush_interval));
 		logger.trace("Dispatcher="+name+": Selector="+slct.getClass().getCanonicalName()+" - Provider="+slct.provider().getClass().getCanonicalName());
+
+		//this has to be done after creating slct, and might as well wait till logger exists as well
+		apploader = new Producer<Object>(Object.class, this, this);
 
 		if (def.hasNafman) {
 			// We are constructed within a synchronised block, so no race condition checking Primary
@@ -111,7 +119,7 @@ public final class Dispatcher
 				if (app.naflet_name.charAt(0) == '_') {
 					throw new com.grey.base.ConfigException("Invalid Naflet name (starts with underscore) - "+app.naflet_name);
 				}
-				naflets.add(app);
+				addNaflet(app);
 			}
 		}
 		logger.info("Dispatcher="+name+": Init complete - Naflets="+naflets.size());
@@ -173,12 +181,12 @@ public final class Dispatcher
 		logger.info("Dispatcher="+name+": Received Stop request - naflets="+naflets.size()+", shutdownreq="+shutdownRequested);
 
 		if (!shutdownRequested) {
+			shutdownRequested = true; //must set this before notifying the naflets
 			com.grey.naf.Naflet[] arr = listNaflets();
 			for (int idx = 0; idx != arr.length; idx++) {
 				stopNaflet(arr[idx]);
 			}
 			logger.trace("Dispatcher="+name+": Issued Stop commands - naflets="+naflets.size());
-			shutdownRequested = true;
 
 		}
 
@@ -220,7 +228,8 @@ public final class Dispatcher
 		} while (!joined);
 	}
 
-	public long systime() {
+	public long systime()
+	{
 		if (systime_msecs == 0) systime_msecs = System.currentTimeMillis();
 		return systime_msecs;
 	}
@@ -267,7 +276,7 @@ public final class Dispatcher
 		logger.info("Dispatcher="+name+": Activity ceased - Naflets="+naflets.size()
 				+", IO="+activechannels.size()+"/"+finalkeys
 				+", Timers="+activetimers.size()+" (spare="+sparetimers.size()+")");
-		if (SysProps.get(SYSPROP_EXITDUMP, false)) logger.info("Dumping final state - " +dumpState(null));
+		if (SysProps.get(SYSPROP_EXITDUMP, false)) logger.info("Dumping final state - " +dumpState(null, true));
 		while (activetimers.size() != 0) activetimers.get(0).cancel();
 	}
 
@@ -354,7 +363,7 @@ public final class Dispatcher
 	// In between, they can can call monitorIO() multiple times to commence listening for specific I/O events.
 	protected void registerIO(ChannelMonitor cm) throws java.io.IOException
 	{
-		if (!activechannels.add(cm)) {
+		if (activechannels.put(cm.cm_id, cm) != null) {
 			throw new java.io.IOException("Illegal registerIO on CM="+cm.getClass().getName()
 					+" - Ops="+(cm.regkey==null? "None" : "0x"+Integer.toHexString(cm.regkey.interestOps())));
 		}
@@ -362,7 +371,7 @@ public final class Dispatcher
 
 	protected void deregisterIO(ChannelMonitor cm) throws java.io.IOException
 	{
-		if (!activechannels.remove(cm)) {
+		if (activechannels.remove(cm.cm_id) == null) {
 			throw new java.io.IOException("Illegal deregisterIO on CM="+cm.getClass().getName()
 					+" - Ops="+(cm.regkey==null? "None" : "0x"+Integer.toHexString(cm.regkey.interestOps())));
 		}
@@ -387,7 +396,21 @@ public final class Dispatcher
 
 	public Timer setTimer(long interval, int type, Timer.Handler handler)
 	{
-		Timer tmr = sparetimers.extract().init(this, handler, interval, type, ++uniqtimerid);
+		Timer tmr = sparetimers.extract().init(this, handler, interval, type, ++uniqid_timer);
+		if (shutdownRequested && interval < shutdown_timer_advance) {
+			//This timer will never get fired, so if it was intended as a zero-second (or similiar)
+			//action, do it now.
+			//Some apps set a short delay on their ChannelMonitor.disconnect() call to avoid
+			//reentrancy issues, so without this they would never disconnect. That's obviously
+			//a worse outcome than risking any reentrancy issues during the final shutdown.
+			try {
+				tmr.fire(this);
+			} catch (Throwable ex) {
+				logger.log(LEVEL.ERR, ex, true, "Dispatcher="+name+": Shutdown error on Timer handler="+tmr.handler);
+			}
+			sparetimers.store(tmr.clear());
+			return null; //callers need to handle null return as meaning timer already executed
+		}
 		activateTimer(tmr);
 		return tmr;
 	}
@@ -456,7 +479,7 @@ public final class Dispatcher
 				} else {
 					com.grey.naf.Naflet app = getNaflet(evtname);
 					if (app == null) {
-						logger.info("Discarding stop request for Naflet="+evtname+"- unknown Naflet");
+						logger.info("Discarding stop request for Naflet="+evtname+" - unknown Naflet");
 						continue;
 					}
 					logger.info("Unloading Naflet="+app.naflet_name+" via Producer");
@@ -469,7 +492,7 @@ public final class Dispatcher
 					continue;
 				}
 				logger.info("Loading Naflet="+app.naflet_name+" via Producer");
-				naflets.add(app);
+				addNaflet(app);
 				app.start(this);
 			}
 		}
@@ -495,7 +518,7 @@ public final class Dispatcher
 	public void entityStopped(Object entity)
 	{
 		com.grey.naf.Naflet app = com.grey.naf.Naflet.class.cast(entity);
-		boolean exists = naflets.remove(app);
+		boolean exists = removeNaflet(app);
 		if (!exists) return;  // duplicate notification - ignore
 		logger.info("Dispatcher="+name+": Naflet="+app.naflet_name+" has terminated - remaining="+naflets.size());
 	}
@@ -514,64 +537,106 @@ public final class Dispatcher
 	}
 
 	// NB: This is not a performance-critical method, expected to be rarely called
-	public CharSequence dumpState(StringBuilder sb)
+	// The markup is XML, and if some of it happens to look like XHTML, that's a happy coincidence ...
+	public CharSequence dumpState(StringBuilder sb, boolean verbose)
 	{
 		if (sb == null) sb = new StringBuilder();
-		sb.append("Dispatcher: ").append(name);
-		sb.append("\nNAFMAN=").append(nafman == null ? "N" : (nafman.isPrimary() ? "Primary" : "Secondary"));
-		sb.append("\nDNS=").append(dnsresolv == null ? "N" : "Y");
+		sb.append("<infonodes>");
+		sb.append("<infonode name=\"Disposition\" dispatcher=\"").append(name).append("\">");
+		sb.append("NAFMAN = ").append(nafman == null ? "No" : (nafman.isPrimary() ? "Primary" : "Secondary"));
+		sb.append("<br/>DNS = ").append(dnsresolv == null ? "No" : dnsresolv);
+		sb.append("<br/>Log-Level = ").append(logger.getLevel());
+		if (shutdownRequested) sb.append("<br/>In Shutdown");
+		sb.append("</infonode>");
 
-		sb.append("\nNaflets=").append(naflets.size());
+		sb.append("<infonode name=\"NAFlets\" total=\"").append(naflets.size()).append("\">");
 		for (int idx = 0; idx != naflets.size(); idx++) {
-			sb.append("\n- Naflet ").append(idx+1).append(": ").append(naflets.get(idx).naflet_name);
+			sb.append("<item id=\"").append(naflets.get(idx).naflet_name).append("\">");
+			sb.append(naflets.get(idx).getClass().getName()).append("</item>");
 		}
+		sb.append("</infonode>");
 
-		sb.append("\nI/O Channels=").append(activechannels.size());
-		java.util.Iterator<ChannelMonitor> itcm = activechannels.iterator();
+		// NB: 'total' attribute will be different to 'item' count, as the former is the actual number of
+		// registered channels, while the latter is only the "interesting" ones.
+		sb.append("<infonode name=\"IO Channels\" total=\"").append(activechannels.size()).append("\">");
+		com.grey.base.utils.IteratorInt itcm = activechannels.keysIterator();
 		while (itcm.hasNext()) {
-			ChannelMonitor cm = itcm.next();
-			sb.append("\n- Channel=");
-			if (Listener.class.isInstance(cm)) {
-				sb.append(cm.getClass().getSimpleName()).append('/').append(((Listener)cm).getServerType().getName());
-			} else if (cm.getClass().equals(Producer.AlertsPipe.class)) {
-				sb.append("Producer/").append(((Producer.AlertsPipe)cm).producer.consumerType);
-			} else {
-				sb.append(cm.getClass().getName());
-			}
-			sb.append(": ");
+			ChannelMonitor cm = activechannels.get(itcm.next());
+			int prevlen1 = sb.length();
+			sb.append("<item id=\"").append(cm.cm_id).append("\"");
+			if (cm.canKill()) sb.append(" cankill=\"y\"").append(" time=\"").append(cm.getStartTime()).append("\"");
+			sb.append('>');
+			int prevlen2 = sb.length();
 			try {
-				cm.dumpState(sb);
+				cm.dumpState(sb, verbose);
 			} catch (Throwable ex) {
 				// have observed CancelledKeyException happening here during shutdown - not sure how
 				sb.append(com.grey.base.GreyException.summary(ex));
 			}
+			if (sb.length() == prevlen2) {
+				sb.setLength(prevlen1);
+			} else {
+				sb.append("</item>");
+			}
 		}
+		sb.append("</infonode>");
 
-		sb.append("\nTimers=").append(activetimers.size());
-		for (int idx = 0; idx != activetimers.size(); idx++) {
+		// As above, the 'total' attribute will be different to the 'item' count, as the latter depends on various options
+		sb.append("<infonode name=\"Timers\" total=\"").append(activetimers.size()).append("\">");
+		int cnt = (verbose ? activetimers.size() : 0);
+		for (int idx = 0; idx != cnt; idx++) {
 			Timer tmr = activetimers.get(idx);
-			sb.append("\n- Timer=").append(tmr.id).append('/').append(tmr.type);
-			sb.append(": Expiry=");
-			TimeOps.makeTimeLogger(tmr.expiry, sb, true, true);
-			sb.append(" (");
-			TimeOps.expandMilliTime(tmr.interval, sb, false);
-			sb.append(") Handler=");
+			sb.append("<item>ID=").append(tmr.id).append('/').append(tmr.type).append(" - Expires ");
+			TimeOps.makeTimeLogger(tmr.expiry, sb, true, true).append(" (");
+			TimeOps.expandMilliTime(tmr.interval, sb, false).append(")<br/>Handler=");
 			if (tmr.handler == null) {
 				sb.append("null");
 			} else {
 				sb.append(tmr.handler.getClass().getName());
 			}
 			if (tmr.attachment != null) sb.append('/').append(tmr.attachment.getClass().getName());
+			sb.append("</item>");
 		}
+		sb.append("</infonode>");
+		sb.append("</infonodes>");
 		return sb;
+	}
+
+	//Since ChannelMonitors are reused, a non-zero stimee arg protects against killing a previous incarnation
+	public boolean killConnection(int id, long stime, String diag) throws java.io.IOException
+	{
+		ChannelMonitor cm = activechannels.get(id);
+		if (cm == null) return false;
+		if (stime != 0 && stime != cm.getStartTime()) return false;
+		cm.ioDisconnected(diag);
+		return true;
 	}
 
 	// This lets us take a snapshot of the Naflets to iterate over.
 	// It's not safe to iterate over the original 'naflets' list as it can be modified (Senders can exit) during the loop.
 	// This is only intended for startup and shutdown, so don't worry about the memory allocation.
-	private com.grey.naf.Naflet[] listNaflets()
+	// This method is also used by other threads (eg. NAFMAN) to get a snapshot of the current NAFlets, and it is for this
+	// reason that it is synchronised. This method needs to be synchronised against local actions that add/remove entries from
+	// the Naflets list.
+	public com.grey.naf.Naflet[] listNaflets()
 	{
-		return naflets.toArray(new com.grey.naf.Naflet[naflets.size()]);
+		synchronized (naflets) {
+			return naflets.toArray(new com.grey.naf.Naflet[naflets.size()]);
+		}
+	}
+
+	private void addNaflet(com.grey.naf.Naflet app)
+	{
+		synchronized (naflets) {
+			naflets.add(app);
+		}
+	}
+
+	private boolean removeNaflet(com.grey.naf.Naflet app)
+	{
+		synchronized (naflets) {
+			return naflets.remove(app);
+		}
 	}
 
 	// convenience method which leverages a single pre-allocated transfer buffer for this thread
@@ -656,7 +721,6 @@ public final class Dispatcher
 			com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef(cfgdispatchers[idx]);
 			dlst[idx] = create(def, nafcfg, log);
 		}
-		com.grey.naf.nafman.Registry.get().confirmCandidates();
 
 		// log the initial config and dump the sytem-properties
 		String txt = dumpConfig();
@@ -682,13 +746,14 @@ public final class Dispatcher
 		return create(def, nafcfg, log);
 	}
 
-	private static String dumpConfig()
+	public static String dumpConfig()
 	{
 		String txt = "Dispatchers="+activedispatchers.size()+":";
 		java.util.Iterator<String> it = activedispatchers.keySet().iterator();
 		while (it.hasNext()) {
 			String name = it.next();
 			Dispatcher d = activedispatchers.get(name);
+			if (d == null) continue; //must have just exited
 			txt += "\n- "+name+": NAFlets="+d.naflets.size();
 			String dlm = " - ";
 			for (int idx = 0; idx != d.naflets.size(); idx++) {

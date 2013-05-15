@@ -1,11 +1,14 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns;
 
-import com.grey.base.config.SysProps;
 import com.grey.logging.Logger.LEVEL;
+import com.grey.base.config.SysProps;
+import com.grey.base.utils.StringOps;
+import com.grey.base.utils.FileOps;
+import com.grey.base.utils.IP;
 
 /*
  * As a general principle, this class seeks to reclaim stale objects for future use, such that it doesn't generate any garbage for the GC to collect.
@@ -18,8 +21,13 @@ import com.grey.logging.Logger.LEVEL;
  * each connection.
  */
 public final class ResolverService
-	implements com.grey.naf.reactor.Timer.Handler, com.grey.naf.nafman.Registry.CommandHandler
+	implements com.grey.naf.reactor.Timer.Handler, com.grey.naf.nafman.Command.Handler
 {
+	//NAFMAN attributes
+	private static final String MATTR_QTYP = "qt";
+	private static final String MATTR_QVAL = "qv";
+	private static final String MATTR_NODOWNLOAD = "nodown";
+
 	// UDP max: add a small buffer at end to allow for sloppy encoding by remote host (NB: no reason to suspect that)
 	private static final int pktsizudp = SysProps.get("greynaf.dns.maxudp", Packet.UDPMAXMSG + 64);
 	// TCP max: allow for larger TCP messages (but we only really expect a fraction larger, not 4-fold)
@@ -44,6 +52,7 @@ public final class ResolverService
 
 	public final com.grey.naf.reactor.Dispatcher dsptch;
 	private final ServerHandle[] dnsservers;
+	private final java.io.File fh_dump;
 
 	private com.grey.naf.reactor.Timer tmr_prunecache;
 	private int next_qryid = new java.util.Random(System.nanoTime()).nextInt(0xffff);
@@ -73,11 +82,18 @@ public final class ResolverService
 								= new com.grey.base.utils.HashedMapIntKey<QueryHandle>();
 
 	// state which is required to persist across one callout from Dispatcher (or user)
-	private Packet udpdnspkt;
+	private final Packet udpdnspkt;
 
 	// these represent non-persistent global state shared with subroutines - safe because w're single-threaded
 	private boolean inUserCall;  // True means we're still in the resolv() call chain
 	public boolean badquestion;
+
+	//stats
+	private int stats_reqcnt; //number of DNS requests received
+	private int stats_udpxmt; //UDP packets sent
+	private int stats_udprcv; //UDP packets received
+	private int stats_tmt; //number of attempt timeouts (as opposed to final failure status)
+	private int stats_trunc; //truncated UDP responses necessitating a TCP follow-up
 
 	// We pre-allocate spare instances of these objects, for efficiency
 	final com.grey.base.utils.ObjectWell<com.grey.base.utils.ByteChars> bcstore;
@@ -88,8 +104,10 @@ public final class ResolverService
 	// these are just temporary work areas, pre-allocated for efficiency
 	private final Answer dnsAnswer = new Answer();
 	private final ResourceData tmprr = new ResourceData();
-	private final com.grey.base.utils.ByteChars tmpnam = new com.grey.base.utils.ByteChars(Resolver.MAXDOMAIN);
+	private final com.grey.base.utils.ByteChars tmpnam = new com.grey.base.utils.ByteChars(Resolver.MAXDOMAIN); //doesn't grow, so must be large enough
 	private final StringBuilder sbtmp = new StringBuilder();
+	private final com.grey.base.utils.ByteChars tmpbc_nafman = new com.grey.base.utils.ByteChars();
+	private final StringBuilder sbtmp_nafman = new StringBuilder();
 
 	// already logged by Dispatcher, nothing more for us to do
 	@Override
@@ -113,9 +131,9 @@ public final class ResolverService
 		mx_fallback_a = cfg.getBool("query_mx/@fallback_a", false);
 		mx_maxrr = cfg.getInt("query_mx/@maxrr", false, 5);
 		retrymax = cfg.getInt("retry/@max", false, 3);
-		retrytmt = cfg.getTime("retry/@timeout", "15s");
+		retrytmt = cfg.getTime("retry/@timeout", "10s");
 		retrytmt_tcp = cfg.getTime("retry/@timeout_tcp", "60s");
-		retrystep = cfg.getTime("retry/@step", "20s");
+		retrystep = cfg.getTime("retry/@step", "3s");
 		negttl = cfg.getTime("cache/@negttl", "1h");
 		cache_hiwater = cfg.getInt("cache/@hiwater", true, 5000);
 		cache_hiwater_mx = cfg.getInt("cache/@hiwater_mx", true, 2500);
@@ -125,9 +143,8 @@ public final class ResolverService
 		com.grey.naf.BufferSpec bufspec_tcp = new com.grey.naf.BufferSpec(pktsiztcp, pktsiztcp, true);
 		com.grey.naf.BufferSpec bufspec_udp = new com.grey.naf.BufferSpec(pktsizudp, pktsizudp, true);
 
-		if (!always_tcp) {
-			udpdnspkt = new Packet(false, bufspec_udp);
-		}
+		udpdnspkt = (always_tcp ? null : new Packet(false, bufspec_udp));
+
 		Packet.Factory pktfact = new Packet.Factory(true, bufspec_tcp);
 		pktstore = new com.grey.base.utils.ObjectWell<Packet>(pktfact, "DNS_TCP_packets_"+dsptch.name);
 
@@ -140,15 +157,17 @@ public final class ResolverService
 			selectedservers = selectedservers + dlm + srvnames[idx];
 			dlm = " | ";
 		}
-		long tmt = 0;
+		fh_dump = new java.io.File(dsptch.nafcfg.path_var+"/DNSdump-"+dsptch.name+".txt");
+		FileOps.ensureDirExists(fh_dump.getParentFile());
+		com.grey.naf.nafman.Registry reg = com.grey.naf.nafman.Registry.get();
+		reg.registerHandler(com.grey.naf.nafman.Registry.CMD_DNSDUMP, 0, this, dsptch);
+		reg.registerHandler(com.grey.naf.nafman.Registry.CMD_DNSPRUNE, 0, this, dsptch);
+		reg.registerHandler(com.grey.naf.nafman.Registry.CMD_DNSQUERY, 0, this, dsptch);
 
+		long tmt = 0;
 		for (int idx = 0; idx <= retrymax; idx++) {
 			tmt += retrytmt + (retrystep * idx);
 		}
-		com.grey.naf.nafman.Registry reg = com.grey.naf.nafman.Registry.get();
-		reg.registerHandler(com.grey.naf.nafman.Registry.CMD_DNSDUMP, this, dsptch);
-		reg.registerHandler(com.grey.naf.nafman.Registry.CMD_DNSPRUNE, this, dsptch);
-
 		dsptch.logger.info("DNS-Resolver: Selected DNS servers: "+dnsservers.length+" ["+selectedservers+"]");
 		if (always_tcp) dsptch.logger.info("DNS-Resolver: In always-TCP mode");
 		dsptch.logger.info("DNS-Resolver: MX-A-fallback="+mx_fallback_a+"; MX-maxrr="+mx_maxrr);
@@ -180,8 +199,8 @@ public final class ResolverService
 
 		if (dump_on_exit) {
 			pruneCache();
-			String pthnam = dumpCache("Dumping cache on exit");
-			dsptch.logger.info("Dumped final cache to "+pthnam);
+			dsptch.logger.info("Dumping final cache to "+fh_dump.getAbsolutePath());
+			dumpCacheFile("Dumping cache on exit",  null);
 		}
 		com.grey.base.utils.IteratorInt iter = pendingreqs.keysIterator();
 		while (iter.hasNext()) {
@@ -206,34 +225,72 @@ public final class ResolverService
 	}
 
 	@Override
-	public void handleNAFManCommand(com.grey.naf.nafman.Command cmd)
+	public CharSequence handleNAFManCommand(com.grey.naf.nafman.Command cmd)
 	{
-		sbtmp.setLength(0);
+		StringBuilder sbrsp = sbtmp_nafman;
+		sbrsp.setLength(0);
 
-		switch (cmd.def.code)
-		{
-		case com.grey.naf.nafman.Registry.CMD_DNSDUMP:
-			String pthnam = dumpCache("NAFMAN-initiated dump");
-			if (pthnam == null) {
-				sbtmp.append("Failed to dump DNS cache");
+		if (cmd.def.code.equals(com.grey.naf.nafman.Registry.CMD_DNSDUMP)) {
+			StringBuilder sb = dumpCacheFile("NAFMAN-initiated dump", sbrsp);
+			if (sb == null) {
+				sbrsp.append("Failed to dump DNS cache");
 			} else {
-				sbtmp.append("Dumped DNS cache to ").append(pthnam);
+				if (!StringOps.stringAsBool(cmd.getArg(MATTR_NODOWNLOAD))) {
+					String html = sb.toString().replace("\n", "<br/>");
+					sbrsp.setLength(0);
+					sbrsp.append(html);
+				}
+				sbrsp.append("<br/>Dumped cache to ").append(fh_dump.getAbsolutePath());
 			}
-			break;
-		case com.grey.naf.nafman.Registry.CMD_DNSPRUNE:
+		} else if (cmd.def.code.equals(com.grey.naf.nafman.Registry.CMD_DNSPRUNE)) {
+			sbrsp.append("DNS cache has been pruned");
+			sbrsp.append("<br/>Cache sizes before: A=").append(cache_a.size());
+			sbrsp.append("; MX=").append(cache_mx.size());
+			sbrsp.append("; PTR=").append(cache_ptr.size());
 			pruneCache();
-			break;
-		default:
-			// we've obviously registered for this command, so we must be missing a Case label - clearly a bug
-			dsptch.logger.error("DNS NAFMAN Handler: Missing case for cmd="+cmd);
-			return;
+			sbrsp.append("<br/>Cache sizes after: A=").append(cache_a.size());
+			sbrsp.append("; MX=").append(cache_mx.size());
+			sbrsp.append("; PTR=").append(cache_ptr.size());
+		} else if (cmd.def.code.equals(com.grey.naf.nafman.Registry.CMD_DNSQUERY)) {
+			String pqt = cmd.getArg(MATTR_QTYP);
+			String pqv = cmd.getArg(MATTR_QVAL);
+			if (pqv == null) return sbrsp.append("INVALID: Missing query attribute=").append(MATTR_QVAL);
+			Answer ans = null;
+			byte qt = 0;
+			if ("A".equalsIgnoreCase(pqt)) {
+				qt = Resolver.QTYPE_A;
+			} else if ("MX".equalsIgnoreCase(pqt)) {
+				qt = Resolver.QTYPE_MX;
+			} else if ("PTR".equalsIgnoreCase(pqt)) {
+				qt = Resolver.QTYPE_PTR;
+			}
+			if (qt == Resolver.QTYPE_A || qt == Resolver.QTYPE_MX) {
+				ans = resolve(qt, tmpbc_nafman.set(pqv), null, null, 0);
+			} else if (qt == Resolver.QTYPE_PTR) {
+				int ip = IP.convertDottedIP(pqv);
+				if (!IP.validDottedIP(pqv, ip)) return sbrsp.append("INVALID: Not a valid dotted IP - ").append(pqv);
+				ans = resolve(qt, ip, null, null, 0);
+			} else {
+				return sbrsp.append("INVALID: Unsupported query type - ").append(MATTR_QTYP).append('=').append(pqt);
+			}
+			if (ans == null) {
+				sbrsp.append("Answer not in cache - query has been issued");
+			} else {
+				sbrsp.append("Cached Answer: ");
+				ans.toString(sbrsp);
+			}
+		} else {
+			// we've obviously registered for this command, so we must be missing a clause - clearly a bug
+			dsptch.logger.error("DNS-Resolver NAFMAN: Missing case for cmd="+cmd.def.code);
+			return null;
 		}
-		cmd.sendResponse(dsptch, sbtmp);
+		return sbrsp;
 	}
 
 	public Answer resolve(byte qtype, com.grey.base.utils.ByteChars qname, Resolver.Client caller, Object callerparam, int flags)
 	{
 		// try to satisfy query from our local cache first
+		stats_reqcnt++;
 		inUserCall = true;
 		Answer answer = lookupCache(qtype, qname);
 
@@ -253,6 +310,7 @@ public final class ResolverService
 	public Answer resolve(byte qtype, int qip, Resolver.Client caller, Object callerparam, int flags)
 	{
 		// try to satisfy query from our local cache first
+		stats_reqcnt++;
 		inUserCall = true;
 		Answer answer = lookupCache(qtype, qip);
 
@@ -403,10 +461,20 @@ public final class ResolverService
 
 		if (qtype == Resolver.QTYPE_MX) {
 			if ((mxips = cache_mx.get(qname)) != null) {
-				rr = mxips.get(0);
-				if (rr.ttl < dsptch.systime()) {
-					cache_mx.remove(qname);
+				//preferred relay is at start of list
+				int expire_cnt = 0;
+				for (int idx = 0; idx != mxips.size(); idx++) {
+					rr = mxips.get(idx);
+					if (rr.ttl >= dsptch.systime()) break;
+					expire_cnt++;
 					rr = null;
+				}
+				if (rr == null) {
+					cache_mx.remove(qname); //all expired
+				} else {
+					for (int idx = expire_cnt - 1; idx >= 0; idx--) {
+						mxips.remove(idx);
+					}
 				}
 			}
 		} else {
@@ -473,6 +541,7 @@ public final class ResolverService
 	{
 		int pktcnt = 0;
 		while (udpdnspkt.receive(true, srvr, null) > 0) {
+			stats_udprcv++;
 			processResponse(null);
 			if (++pktcnt == udprcvmax) break;
 		}
@@ -489,6 +558,7 @@ public final class ResolverService
 		}
 		QueryHandle qryh = (QueryHandle)tmr.attachment;
 		qryh.tmr = null;  // this timer is now expired, so we must not access it again
+		stats_tmt++;
 
 		// one timeout is enough to fail a TCP query
 		if (qryh.isTCP() || (qryh.retrycnt == retrymax)) {
@@ -501,8 +571,9 @@ public final class ResolverService
 		qryh.prevqid[qryh.retrycnt++] = qryh.qid;
 
 		// now reissue previous query
-		if (dsptch.logger.isActive(LEVEL.TRC2)) {
-			dsptch.logger.log(LEVEL.TRC2, "DNS-Resolver timeout "+qryh.retrycnt+"/"+retrymax+" on "+qryh.pktqtype+"/"+qryh.pktqname);
+		LEVEL lvl = LEVEL.TRC2;
+		if (dsptch.logger.isActive(lvl)) {
+			dsptch.logger.log(lvl, "DNS-Resolver timeout "+qryh.retrycnt+"/"+retrymax+" on "+qryh.pktqtype+"/"+qryh.pktqname);
 		}
 		issueRequest(qryh, qryh.pktqtype, qryh.pktqname);
 	}
@@ -549,7 +620,10 @@ public final class ResolverService
 
 		// set the expected Response ID - for UDP responses, we rely on this to identify the associated query, but for TCP it's just a sanity check
 		qryh.qid = pkt.qid;
-		if (!pkt.isTCP) pendingreqs.put(qryh.qid, qryh);
+		if (!pkt.isTCP) {
+			pendingreqs.put(qryh.qid, qryh);
+			stats_udpxmt++;
+		}
 		qryh.startTimer(this, tmt);
 
 		int errcod = qryh.send(pkt);
@@ -595,6 +669,7 @@ public final class ResolverService
 				endQuery(qryh, Answer.STATUS.ERROR);
 				return;
 			}
+			stats_trunc++;
 			switchTcp(qryh);
 			return;
 		}
@@ -792,7 +867,7 @@ public final class ResolverService
 		sbtmp.setLength(0);
 		int shift = 0;
 
-		for (int idx = 0; idx != com.grey.base.utils.IP.IPADDR_OCTETS; idx++) {
+		for (int idx = 0; idx != IP.IPADDR_OCTETS; idx++) {
 			int bval = (ipaddr >> shift) & 0xFF;
 			shift += 8;
 			sbtmp.append(bval).append('.');
@@ -804,83 +879,119 @@ public final class ResolverService
 		return nambuf;
 	}
 
-	public String dumpCache(CharSequence msg)
+	private StringBuilder dumpCacheFile(CharSequence msg, StringBuilder sb)
 	{
-		String pthnam = dsptch.nafcfg.path_var+"/DNSdump-"+dsptch.name+".txt";
-		int rrcnt = cache_a.size() + cache_ptr.size();
-		java.io.OutputStream fout;
-
+		sb = dumpCache(sb);
+		java.io.OutputStream fout = null;
+		java.io.PrintWriter ostrm = null;
 		try {
-			pthnam = new java.io.File(pthnam).getCanonicalPath();
-			fout = new java.io.FileOutputStream(pthnam, true);
-		} catch (Exception ex) {
-			dsptch.logger.log(LEVEL.ERR, ex, false, "DNS-Resolver failed to create dumpfile="+pthnam);
-			return null;
-		}
-		java.io.PrintWriter ostrm = new java.io.PrintWriter(fout);
-
-		try {
-			ostrm.println("===========================================================");
-			if (msg != null) ostrm.println(msg);
-			ostrm.println("Time is "+new java.util.Date(dsptch.systime()));
-			ostrm.println("A = "+cache_a.size()+"; MX = "+cache_mx.size()+"; PTR = "+cache_ptr.size());
-
-			if (cache_a.size() != 0) ostrm.println();
-			java.util.Iterator<com.grey.base.utils.ByteChars> itip = cache_a.keySet().iterator();
-			while (itip.hasNext()) {
-				com.grey.base.utils.ByteChars k = itip.next();
-				ostrm.println("A: "+k+" - "+cache_a.get(k));
-			}
-
-			if (cache_mx.size() != 0) ostrm.println();
-			java.util.Iterator<com.grey.base.utils.ByteChars> itmx = cache_mx.keySet().iterator();
-			while (itmx.hasNext()) {
-				com.grey.base.utils.ByteChars k = itmx.next();
-				java.util.ArrayList<ResourceData> mxips = cache_mx.get(k);
-				int cnt = mxips.size();
-				rrcnt += cnt;
-				ostrm.println("MX: "+k+" - RRs="+cnt);
-				for (int idx = 0; idx != cnt; idx++) {
-					ostrm.println("\tRR #"+idx+": "+mxips.get(idx));
-				}
-			}
-
-			if (cache_ptr.size() != 0) ostrm.println();
-			com.grey.base.utils.IteratorInt iter = cache_ptr.keysIterator();
-			while (iter.hasNext()) {
-				int key = iter.next();
-				sbtmp.setLength(0);
-				sbtmp.append("PTR: ");
-				com.grey.base.utils.IP.displayDottedIP(key, sbtmp);
-				sbtmp.append(" - ");
-				sbtmp.append(cache_ptr.get(key));
-				ostrm.println(sbtmp);
-			}
-			if (rrcnt != 0) ostrm.println(com.grey.base.config.SysProps.EOL+"Total RRs = "+rrcnt);
-			dsptch.logger.trace("DNS Resolver dumped cache: A="+cache_a.size()+"; MX="+cache_mx.size()+"; PTR="+cache_ptr.size()+" (total RRs="+rrcnt+")"
-					+" - "+pthnam);
-		} catch (Throwable ex) {
-			dsptch.logger.log(LEVEL.ERR, ex, true, "DNS-Resolver failed to dump cache to "+pthnam);
-			pthnam = null;
-		}
-
-		try {
+			fout = new java.io.FileOutputStream(fh_dump, true);
+			ostrm = new java.io.PrintWriter(fout);
+			fout = null;
+			ostrm.print("===========================================================\n");
+			if (msg != null) ostrm.print(msg+"\n");
+			ostrm.print(sb);
 			ostrm.close();
+			ostrm = null;
 		} catch (Exception ex) {
-			dsptch.logger.log(LEVEL.ERR, ex, false, "DNS-Resolver failed to close dumpfile="+pthnam);
-			pthnam = null;
+			dsptch.logger.log(LEVEL.ERR, ex, false, "DNS-Resolver failed to create dumpfile="+fh_dump.getAbsolutePath()+" - strm="+fout);
+			sb = null;
+		} finally {
+			try {
+				if (ostrm != null) ostrm.close();
+				if (fout != null) fout.close();
+			} catch (Exception ex) {
+				dsptch.logger.log(LEVEL.ERR, ex, false, "DNS-Resolver failed to close dumpfile="+fh_dump.getAbsolutePath());
+				sb = null;
+			}
 		}
-		return pthnam;
+		return sb;
+	}
+
+	private StringBuilder dumpCache(StringBuilder sb)
+	{
+		String eol = "\n";
+		if (sb == null) sb = new StringBuilder();
+		sb.append("DNS-Resolver status as of ").append(new java.util.Date(dsptch.systime())).append(eol);
+		sb.append("Requests=").append(stats_reqcnt);
+		sb.append(", UDP send/receive=").append(stats_udpxmt).append('/').append(stats_udprcv);
+		sb.append(" - truncated=").append(stats_trunc).append(", timeouts=").append(stats_tmt).append(eol);
+		sb.append("Cache Sizes: A=").append(cache_a.size()).append("; MX=").append(cache_mx.size());
+		sb.append("; PTR=").append(cache_ptr.size()).append(eol);
+
+		if (cache_a.size() != 0) sb.append(eol);
+		java.util.Iterator<com.grey.base.utils.ByteChars> itbc = cache_a.keysIterator();
+		while (itbc.hasNext()) {
+			com.grey.base.utils.ByteChars bc = itbc.next();
+			sb.append("A: ").append(bc).append(" => ");
+			cache_a.get(bc).toString(sb).append(eol);
+		}
+
+		if (cache_mx.size() != 0) sb.append(eol);
+		itbc = cache_mx.keysIterator();
+		while (itbc.hasNext()) {
+			com.grey.base.utils.ByteChars bc = itbc.next();
+			java.util.ArrayList<ResourceData> mxips = cache_mx.get(bc);
+			sb.append("MX: ").append(bc).append(" => ").append(mxips.size());
+			String dlm = ": ";
+			for (int idx = 0; idx != mxips.size(); idx++) {
+				sb.append(dlm);
+				mxips.get(idx).toString(sb);
+				dlm = "; ";
+			}
+			sb.append(eol);
+		}
+
+		if (cache_ptr.size() != 0) sb.append(eol);
+		com.grey.base.utils.IteratorInt it_ptr = cache_ptr.keysIterator();
+		while (it_ptr.hasNext()) {
+			int ip = it_ptr.next();
+			sb.append("PTR: ");
+			IP.displayDottedIP(ip, sb);
+			sb.append(" => ");
+			cache_ptr.get(ip).toString(sb).append(eol);
+		}
+
+		String dlm1 = " - ";
+		String dlm2 = ", ";
+		sb.append(eol).append("Pending Requests:");
+		sb.append(eol).append("A=").append(pendingdoms_a.size());
+		itbc = pendingdoms_a.keysIterator();
+		String dlm = dlm1;
+		while (itbc.hasNext()) {
+			com.grey.base.utils.ByteChars bc = itbc.next();
+			sb.append(dlm).append(bc);
+			dlm = dlm2;
+		}
+		sb.append(eol).append("MX=").append(pendingdoms_mx.size());
+		itbc = pendingdoms_mx.keysIterator();
+		dlm = dlm1;
+		while (itbc.hasNext()) {
+			com.grey.base.utils.ByteChars bc = itbc.next();
+			sb.append(dlm).append(bc);
+			dlm = dlm2;
+		}
+		sb.append(eol).append("PTR=").append(pendingdoms_ptr.size());
+		it_ptr = pendingdoms_ptr.keysIterator();
+		dlm = dlm1;
+		while (it_ptr.hasNext()) {
+			int ip = it_ptr.next();
+			sb.append(dlm);
+			IP.displayDottedIP(ip, sb);
+			dlm = dlm2;
+		}
+		sb.append(eol);
+		return sb;
 	}
 
 	// remove expired entries from our DNS cache
-	public void pruneCache()
+	private void pruneCache()
 	{
 		long time1 = System.currentTimeMillis();
 		int rrcnt = cache_a.size() + cache_ptr.size();
 		int rrdelcnt = 0;
 
-		// delete all cache_a entries with an expired TTL
+		// delete all expired cache_a entries
 		int oldsize = cache_a.size();
 		java.util.Iterator<com.grey.base.utils.ByteChars> itip = cache_a.keySet().iterator();
 		while (itip.hasNext()) {
@@ -895,8 +1006,9 @@ public final class ResolverService
 		if (excess > 0) {
 			// delete random entries to bring us down to the stable high-water ceiling
 			itip = cache_a.keySet().iterator();
-			for (int idx = 0; idx != excess; idx++) {
-				itip.next(); itip.remove();
+			for (int loop = 0; loop != excess; loop++) {
+				itip.next();
+				itip.remove();
 			}
 			rrdelcnt += excess;
 			dsptch.logger.trace("DNS Resolver: Pruned IP cache back to hiwater="+cache_a.size()+" - excess="+excess);
@@ -906,18 +1018,23 @@ public final class ResolverService
 		oldsize = cache_mx.size();
 		java.util.Iterator<com.grey.base.utils.ByteChars> itmx = cache_mx.keySet().iterator();
 		while (itmx.hasNext()) {
-			// rrdata list should never be empty, but verify anyway
 			com.grey.base.utils.ByteChars k = itmx.next();
 			java.util.ArrayList<ResourceData> mxips = cache_mx.get(k);
 			rrcnt += mxips.size();
-			if (mxips.size() == 0 || mxips.get(0).ttl < dsptch.systime()) {rrdelcnt += mxips.size(); itmx.remove();}
+			for (int idx = mxips.size() - 1; idx >= 0; idx--) {
+				if (mxips.get(idx).ttl < dsptch.systime()) {
+					mxips.remove(idx);
+					rrdelcnt++;
+				}
+			}
+			if (mxips.size() == 0) itmx.remove(); //all expired
 		}
 		dels = oldsize - cache_mx.size();
 		if (dels != 0) dsptch.logger.trace("DNS Resolver: Pruned stale MX cache entries: " + dels + "/" + oldsize);
 
 		if ((excess = cache_mx.size() - cache_hiwater_mx) > 0) {
 			itmx = cache_mx.keySet().iterator();
-			for (int idx = 0; idx != excess; idx++) {
+			for (int loop = 0; loop != excess; loop++) {
 				com.grey.base.utils.ByteChars k = itmx.next();
 				rrdelcnt += cache_mx.get(k).size();
 				itmx.remove();
@@ -938,7 +1055,7 @@ public final class ResolverService
 
 		if ((excess = cache_ptr.size() - cache_hiwater) > 0) {
 			com.grey.base.utils.IteratorInt iter2 = cache_ptr.keysIterator();
-			for (int idx = 0; idx != excess; idx++) {
+			for (int loop = 0; loop != excess; loop++) {
 				iter2.next();
 				iter2.remove();
 			}

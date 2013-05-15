@@ -32,7 +32,7 @@ public final class ObjectWell<T>
 		public Object factory_create();
 	}
 
-	private static final int DFLT_POPINCR = SysProps.get("grey.well.popincr", 16);
+	private static final int DFLT_POPINCR = SysProps.get("grey.well.popincr", 10);
 	private static final ShutdownHook shutdown_hook = (SysProps.get("grey.well.shutdump", false) ? new ShutdownHook() : null);
 
 	public final String name;

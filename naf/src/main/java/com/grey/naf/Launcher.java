@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf;
@@ -8,18 +8,19 @@ import com.grey.base.config.SysProps;
 import com.grey.base.utils.CommandParser;
 import com.grey.base.utils.FileOps;
 import com.grey.base.utils.DynLoader;
+import com.grey.logging.Logger;
 
 public class Launcher
 {
 	private static final String SYSPROP_CP = "greynaf.cp";
+	private static final String SYSPROP_BOOTLVL = "greynaf.boot.loglevel";
 
 	private static final int F_DUMPENV = 1 << 0;
 	private static final int F_QUIET = 1 << 1;  //mainly for the benefit of the unit tests
-	private static final int F_NOCHECK = 1 << 2;  //allows us to probe NAFMAN response to bad args, for test purposes
 
-	private static final String[] opts = new String[]{"c:", "cmd:", "remote:", "logger:", "dumpenv", "q", "nocheck"};
+	private static final String[] opts = new String[]{"c:", "cmd:", "remote:", "logger:", "dumpenv", "q"};
 
-	private volatile static boolean announcedNAF;
+	private static boolean announcedNAF;
 	static {
 		announceNAF();
 	}
@@ -34,9 +35,9 @@ public class Launcher
 		extends CommandParser.OptionsHandler
 	{
 		public String cfgpath = "naf.xml";
-		public String logname = "";
-		public String cmdname;
-		public String hostport;  //qualifies command-name
+		public String cmd;
+		public String hostport;  //qualifies cmd option
+		public String logname;
 		public int flags;
 
 		public BaseOptsHandler() {super(opts, 0, -1);}
@@ -49,8 +50,6 @@ public class Launcher
 				setFlag(F_DUMPENV);
 			} else if (opt.equals("q")) {
 				setFlag(F_QUIET);
-			} else if (opt.equals("nocheck")) {
-				setFlag(F_NOCHECK);
 			} else {
 				throw new RuntimeException("Missing case for bool-option="+opt);
 			}
@@ -61,7 +60,7 @@ public class Launcher
 			if (opt.equals("c")) {
 				cfgpath = val;
 			} else if (opt.equals("cmd")) {
-				cmdname = val;
+				cmd = val;
 			} else if (opt.equals("remote")) {
 				hostport = val;
 			} else if (opt.equals("logger")) {
@@ -75,8 +74,8 @@ public class Launcher
 		public String displayUsage()
 		{
 			String txt = "\t[-c naf-config-file] [-logger name] [-dumpenv]";
-			txt += "\n\t-cmd cmdname [-c naf-config-file] [-q] [-nocheck] command-args";
-			txt += "\n\t-cmd cmdname -remote host:port [-q] [-nocheck] command-args";
+			txt += "\n\t-cmd cmd-URL [-c naf-config-file] [-q]";
+			txt += "\n\t-cmd cmd-URL -remote host:port [-q]";
 			txt += "\nThe config file defaults to ./naf.xml";
 			return txt;
 		}
@@ -102,7 +101,7 @@ public class Launcher
         	com.grey.base.utils.PkgInfo.dumpEnvironment(getClass(), System.out);
         }
 
-		if (baseOptions.cmdname != null) {
+		if (baseOptions.cmd != null) {
 			try {
 				issueCommand(param1);
 			} catch (java.io.IOException ex) {
@@ -113,9 +112,6 @@ public class Launcher
 		}
 	}
 
-	// It's up to the user how they configure the logging framework, but the intention is that ideally bootlog,
-	// stdio and stderr all point at the same stream. The advantage of writing to it with bootlog rather than
-	// PrintStream.println() is that we get properly timestamped entries.
 	protected void appExec(int param1) throws Exception
 	{
 		if (param1 != cmdlineArgs.length) {
@@ -131,8 +127,14 @@ public class Launcher
 			DynLoader.load(cp);
 		}
 		System.out.println("Loading NAF config file: "+baseOptions.cfgpath+" => "+new java.io.File(baseOptions.cfgpath).getCanonicalPath());
+		java.io.File fh = new java.io.File(baseOptions.cfgpath);
+		if (!fh.exists()) {
+			//avoid big ugly stack dump for what is likely to be a common problem
+			System.out.println("NAF Config file not found");
+			return;
+		}
 		com.grey.naf.Config nafcfg = com.grey.naf.Config.load(baseOptions.cfgpath);
-		com.grey.logging.Logger bootlog = com.grey.logging.Factory.getLogger(baseOptions.logname);
+		com.grey.logging.Logger bootlog = createBootLogger(baseOptions);
 		bootlog.info("Created NAF Boot Logger");
 		nafcfg.announce(bootlog);
 		com.grey.naf.reactor.Dispatcher[] dispatchers;
@@ -158,26 +160,33 @@ public class Launcher
 
 	private void issueCommand(int param1) throws com.grey.base.ConfigException, java.io.IOException
 	{
-		int argc = cmdlineArgs.length - param1;
-		com.grey.naf.nafman.Command.Def def = com.grey.naf.nafman.Client.parseCommand(baseOptions.cmdname, argc, baseOptions.isFlagSet(F_NOCHECK), null);
-		if (def == null) return;
-		String[] cmdargs = new String[argc];
-		for (int idx = param1; idx != cmdlineArgs.length; idx++) cmdargs[idx - param1] = cmdlineArgs[idx];
-
-		com.grey.logging.Logger log = (baseOptions.isFlagSet(F_QUIET) ? com.grey.logging.Factory.getLogger("no-such-logger") : null);
+		com.grey.logging.Logger log = null; //use stdout
+		if (baseOptions.isFlagSet(F_QUIET)) log = com.grey.logging.Factory.getLogger("no-such-logger"); //sink logger
 		String rsp;
 		if (baseOptions.hostport != null) {
-			rsp = com.grey.naf.nafman.Client.submitCommand(baseOptions.hostport, def, cmdargs, log);
+			rsp = com.grey.naf.nafman.Client.submitCommand(baseOptions.cmd, baseOptions.hostport, log);
 		} else {
-			rsp = com.grey.naf.nafman.Client.submitLocalCommand(baseOptions.cfgpath, def, cmdargs, log);
+			rsp = com.grey.naf.nafman.Client.submitLocalCommand(baseOptions.cmd, baseOptions.cfgpath, log);
 		}
-		if (rsp.length() != 0 && !baseOptions.isFlagSet(F_QUIET)) {
-			if (rsp.length() != 0) System.out.println("\nNAFMAN Response:\n"+rsp.replaceAll("^\\s+", "")+"\n");
-		}
+		System.out.println("NAFMAN Response="+rsp.length()+":\n\n"+rsp);
+	}
+
+	// It's ultimately up to the user how they configure the logging framework, but some initialisation code
+	// here and there writes directly to stdout, so by default we direct the boot logger to stdout as well, so
+	// that it and the raw stdout writes can be captured/redirected as one.
+	// The advantage of writing to stdout with bootlog rather than System.out() is that we get properly
+	// timestamped entries.
+	private static com.grey.logging.Logger createBootLogger(BaseOptsHandler opts)
+			throws com.grey.base.ConfigException, java.io.IOException
+	{
+		if (opts.logname != null) return com.grey.logging.Factory.getLogger(opts.logname);
+		Logger.LEVEL lvl = Logger.LEVEL.valueOf(SysProps.get(SYSPROP_BOOTLVL, Logger.LEVEL.TRC.toString()));
+		com.grey.logging.Parameters params = new com.grey.logging.Parameters(lvl, System.out);
+		return com.grey.logging.Factory.getLogger(params, "NAF-bootlog");
 	}
 
 	// This may not look MT-safe, but it only gets called early on during startup, when still single-threaded
-	public static void announceNAF()
+	public static synchronized void announceNAF()
 	{
 		if (announcedNAF) return;
 		announcedNAF = true;

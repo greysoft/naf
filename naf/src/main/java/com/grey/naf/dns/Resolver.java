@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns;
@@ -17,9 +17,8 @@ public abstract class Resolver
 
 	public static final int FLAG_NOQRY = 1 << 0;  //give up if answer not already in cache
 	public static final int FLAG_SYNTAXONLY = 1 << 1; //don't do any lookup or query at all
-	public static final int FLAG_ISMAILBOX = 1 << 2;
-	public static final int FLAG_MUSTHAVEDOTS = 1 << 3;
-	public static final int FLAG_NODOTTEDIP = 1 << 4;
+	public static final int FLAG_MUSTHAVEDOTS = 1 << 2;
+	public static final int FLAG_NODOTTEDIP = 1 << 3;
 
 	public static final int MAXDOMAIN = 255;
 	public static final int MAXNAMELABEL = 63;
@@ -58,7 +57,6 @@ public abstract class Resolver
 	private final Answer dnsAnswer = new Answer();
 	private final Answer answerA = new Answer();
 	private final Answer answerLocalIP = new Answer();
-	private final ByteChars tmplightname = new ByteChars(-1);  // lightweight object without own storage
 
 	public static Resolver create(com.grey.naf.reactor.Dispatcher dsptch, com.grey.base.config.XmlConfig cfg)
 			throws com.grey.base.ConfigException
@@ -119,7 +117,6 @@ public abstract class Resolver
 	public final Answer resolveMailDomain(ByteChars maildom, Client caller, Object cbdata, int flags)
 			throws java.io.IOException
 	{
-		if ((flags & FLAG_ISMAILBOX) != 0) maildom = maildom.extractTerm(com.grey.base.utils.EmailAddress.DLM, 0, 1, true, tmplightname);
 		Answer answer = verifyQuery(QTYPE_MX, maildom, flags);
 		if (answer != null) return answer;
 		return resolveDomain(QTYPE_MX, maildom, caller, cbdata, flags);

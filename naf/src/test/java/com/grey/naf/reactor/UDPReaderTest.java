@@ -67,7 +67,7 @@ public class UDPReaderTest
 			com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(1024, 1024, false);
 			chanreader = new IOExecReader(bufspec);
 			initChannel(udpchan, true, false);
-			chanreader.receive(0, true);
+			chanreader.receive(0);
 		}
 
 		@Override

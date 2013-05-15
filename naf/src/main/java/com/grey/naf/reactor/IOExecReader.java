@@ -11,6 +11,7 @@ public final class IOExecReader
 	private static final int F_ARRBACK = 1 << 0; //rcvbuf has backing array
 	private static final int F_ENABLED = 1 << 1; //receive is currently enabled
 	private static final int F_HASDLM = 1 << 2;  //current receive phase is delimited by particular byte value (rcvdlm)
+	private static final int F_INRCVCB = 1 << 3;  //inside ChannelMonitor.ioReceived() callback
 
 	private final com.grey.naf.BufferSpec bufspec;
 	private final java.nio.ByteBuffer rcvbuf;
@@ -49,7 +50,7 @@ public final class IOExecReader
 		userbuf.ar_len = 0;
 	}
 
-	protected void initChannel(ChannelMonitor cm)
+	void initChannel(ChannelMonitor cm)
 	{
 		chanmon = cm;
 		readmark = 0;
@@ -57,7 +58,7 @@ public final class IOExecReader
 		rcvbuf.clear();
 	}
 
-	protected void clearChannel()
+	void clearChannel()
 	{
 		chanmon = null;
 		clearFlag(F_ENABLED);
@@ -65,37 +66,43 @@ public final class IOExecReader
 
 	// Non-zero max means a fixed-size read.
 	// NB: Note that max==0 is the only valid receive mode if F_UDP is set, and we enforce it silently.
-	public void receive(int max, boolean enableOnly) throws com.grey.base.FaultException, java.io.IOException
+	public void receive(int max) throws com.grey.base.FaultException, java.io.IOException
 	{
 		clearFlag(F_HASDLM);
-		startReceive(max, enableOnly);
+		enableReceive(max);
 	}
 
-	public void receiveDelimited(byte dlm, boolean enableOnly) throws com.grey.base.FaultException, java.io.IOException
+	public void receiveDelimited(byte dlm) throws com.grey.base.FaultException, java.io.IOException
 	{
 		if (chanmon.isUDP()) {
 			throw new java.lang.IllegalArgumentException("IOExecReader: Delimited receives not allowed in UDP mode");
 		}
 		setFlag(F_HASDLM);
 		rcvdlm = dlm;
-		startReceive(0, enableOnly);
+		enableReceive(0);
 	}
 
-	private void startReceive(int max, boolean enableOnly) throws com.grey.base.FaultException, java.io.IOException
+	// Regarding the likelihood that the ChannelMonitor.ioReceived() callback will in turn call this via our public
+	// receive() or receiveDelimited() methods ...
+	// From NAF's point of view it is perfectly safe to recursively call this method from inside its own receive() loop,
+	// but we use F_INRCVCB to avoid doing so, to help the application code avoid reentrancy issues and prevent the
+	// call stack growing indefinitely.
+	private void enableReceive(int max) throws com.grey.base.FaultException, java.io.IOException
 	{
 		rcvmax = max;
-
 		try {
 			// assuming our code is error-free, an exception here typically means the remote party has closed the connection
-			if (!isFlagSet(F_ENABLED)) chanmon.enableRead();
+			if (!isFlagSet(F_ENABLED)) {
+				chanmon.enableRead();
+				setFlag(F_ENABLED);
+			}
 		} catch (Exception ex) {
 			chanmon.brokenPipe(LEVEL.TRC2, "I/O error on Receive registration", "IOExec: failed to enable Read", ex);
 			return;
 		}
-		setFlag(F_ENABLED);
 
-		if (!enableOnly) {
-			while (receive() != 0);
+		if (!isFlagSet(F_INRCVCB) && !chanmon.isUDP()) {
+			while (readNextChunk());
 		}
 	}
 
@@ -107,19 +114,22 @@ public final class IOExecReader
 			try {
 				chanmon.disableRead();
 			} catch (Exception ex) {
-				chanmon.dsptch.logger.log(LEVEL.TRC2, ex, false, "IOExec: failed to disable Read");
+				LEVEL lvl = LEVEL.TRC2;
+				if (chanmon.dsptch.logger.isActive(lvl)) {
+					chanmon.dsptch.logger.log(lvl, ex, false, "IOExec: failed to disable Read on E"+chanmon.cm_id);
+				}
 			}
 		}
 		clearFlag(F_ENABLED);
 	}
 
 	// Could check Dispatcher.canRead(SelectionKey), but read() safely returns zero if no data, so we can save ourselves the method call.
-	protected void handleIO() throws com.grey.base.FaultException, java.io.IOException
+	void handleIO() throws com.grey.base.FaultException, java.io.IOException
 	{
 		handleIO(null);
 	}
 
-	protected void handleIO(java.nio.ByteBuffer srcbuf) throws com.grey.base.FaultException, java.io.IOException
+	void handleIO(java.nio.ByteBuffer srcbuf) throws com.grey.base.FaultException, java.io.IOException
 	{
 		int bufpos = 0;
 		int nbytes = -1;  //will remain -1 if channel-read throws
@@ -151,7 +161,7 @@ public final class IOExecReader
 			discmsg = "Broken pipe on Receive";
 			LEVEL lvl = LEVEL.TRC3;
 			if (chanmon.dsptch.logger.isActive(lvl)) {
-				chanmon.dsptch.logger.log(lvl, ex, false, "IOExec: read() failed on "+chanmon.iochan);
+				chanmon.dsptch.logger.log(lvl, ex, false, "IOExec: read() failed on E"+chanmon.cm_id+"/"+chanmon.iochan);
 			}
 		}
 		if (nbytes == 0) return;
@@ -169,13 +179,14 @@ public final class IOExecReader
 
 		if (chanmon.isUDP()) {
 			// All data is always passed up as soon as it arrives, so can optimise this case
+			// INRCVCB flag doesn't apply here.
 			userbuf.ar_off = rcvbuf0;
 			userbuf.ar_len = nbytes;
 			chanmon.ioReceived(userbuf, remaddr);
 			return;
 		}
 
-		while (receive() != 0) {
+		while (readNextChunk()) {
 			if (chanmon != null && chanmon.sslconn != null && srcbuf == null) {
 				// We've obviously switched to SSL mode while working through the contents of the last read, and
 				// the rest of it is part of the SSL phase. Hand it off to the SSL manager and our own handleIO()
@@ -192,10 +203,11 @@ public final class IOExecReader
 		}
 	}
 
-	private int receive() throws com.grey.base.FaultException, java.io.IOException
+	// Returns false to indicate rcvbuf definitely cannot satisfy another read
+	private boolean readNextChunk() throws com.grey.base.FaultException, java.io.IOException
 	{
 		int buflimit = rcvbuf.position();
-		if (!isFlagSet(F_ENABLED) || scanmark == buflimit) return 0;
+		if (!isFlagSet(F_ENABLED) || scanmark == buflimit) return false;
 		int userbytes = 0; //number of bytes to return in callback
 
 		if (isFlagSet(F_HASDLM)) {
@@ -215,13 +227,14 @@ public final class IOExecReader
 				//     readmark = scanmark (or alternatively, readmark += userbytes)
 				//     compact()
 				// So we effectively condense them into 2 assignments with the same effect.
+				// No need to set INRCVCB, because a recursive call to enableReceive() will find no more data.
 				userbuf.ar_off = rcvbuf0 + readmark;
 				userbuf.ar_len = buflimit - readmark;
 				rcvbuf.clear();
 				scanmark = 0;
 				readmark = 0;
 				chanmon.ioReceived(userbuf);
-				return userbuf.ar_len;
+				return false;
 			}
 			// we are in a fixed-sized read
 			if (buflimit - readmark >= rcvmax) {
@@ -238,20 +251,23 @@ public final class IOExecReader
 			// Just return the partial data to the caller.
 			userbytes = buflimit;
 		}
-
-		if (userbytes != 0) {
-			userbuf.ar_off = rcvbuf0 + readmark;
-			userbuf.ar_len = userbytes;
-			readmark = scanmark;  //gives same result as: readmark += userbytes;
-			if (scanmark == buflimit) {
-				// We can optimise by clearing the receive buffer now that it's been fully consumed.
-				// Else we will keep bumping into the end of it and having to shift the contents
-				// leftward in compact() so this minimises the number of such buffer-copy ops.
-				compact();
-			}
-			chanmon.ioReceived(userbuf);
+		if (userbytes == 0) return false;
+		userbuf.ar_off = rcvbuf0 + readmark;
+		userbuf.ar_len = userbytes;
+		readmark = scanmark;  //gives same result as: readmark += userbytes;
+		if (scanmark == buflimit) {
+			// We can optimise by clearing the receive buffer now that it's been fully consumed.
+			// Else we will keep bumping into the end of it and having to shift the contents
+			// leftward in compact() so this minimises the number of such buffer-copy ops.
+			compact();
 		}
-		return userbytes;
+		setFlag(F_INRCVCB);
+		try {
+			chanmon.ioReceived(userbuf);
+		} finally {
+			clearFlag(F_INRCVCB);
+		}
+		return true;
 	}
 
 	/*

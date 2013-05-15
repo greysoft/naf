@@ -222,20 +222,18 @@ public class DynLoader
 		return jarfiles;
 	}
 
-	public static byte[] readBytes(String path, Class<?> clss)
+	public static byte[] readBinaryResource(String path, Class<?> clss)
 	{
-		java.net.URL url = DynLoader.getResource(path, clss);
 		try {
-			java.io.File fh = new java.io.File(url.toURI());
-			return FileOps.read(fh, -1, null);
+			return FileOps.readResource(path, clss);
 		} catch (Exception ex) {
 			throw new RuntimeException("Failed to read resource="+path+" as class="+clss+" - "+ex, ex);
 		}
 	}
 
-	public static String readText(String path, Class<?> clss)
+	public static String readTextResource(String path, Class<?> clss)
 	{
-		byte[] buf = readBytes(path, clss);
+		byte[] buf = readBinaryResource(path, clss);
 		try {
 			return StringOps.convert(buf, null);
 		} catch (Exception ex) {

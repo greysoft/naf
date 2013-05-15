@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.logging;
@@ -47,14 +47,17 @@ abstract public class Logger
 	protected final int bufsiz;
 	private final java.util.Calendar dtcal = TimeOps.getCalendar(null); //merely pre-allocated for efficiency
 
-	private java.io.File fh_active;
-	private LEVEL maxLevel;
+	private LEVEL maxLevel; //active log level
 	private long prevtime;
-	private boolean isOwner;
 	private long last_flushtime;
 
-	// This is to avoid an MT logger having to override and synchronise getLevel(), but any other MT protection
-	// has to be provided by an MT logger class
+	// All access to these fields is MT-safe.
+	// They are rarely accessed, so synchronisation cost is not an issue.
+	private java.io.File fh_active;
+	private boolean isOwner;
+
+	// This replaces maxLevel for MT loggers - all accesses to maxLevel are intercepted and redirected to here.
+	// Saves MT loggers having to provide boiler-plate code to override getLevel() and setLevel()
 	private volatile LEVEL maxLevel_MT;
 
 	abstract public void log(LEVEL lvl, CharSequence msg);
@@ -128,15 +131,11 @@ abstract public class Logger
 		return maxLevel;
 	}
 
-	// even if we're not in MT mode, this is a rarely called method, so we can easily afford the cost of synchronising
 	public final LEVEL setLevel(LEVEL newlvl)
 	{
-		LEVEL oldlvl;
-		synchronized (this) {
-			oldlvl = getLevel();
-			if (newlvl == oldlvl) return oldlvl;
-			set_level(newlvl);
-		}
+		LEVEL oldlvl = getLevel();
+		if (newlvl == oldlvl) return oldlvl;
+		set_level(newlvl);
 		String action = (newlvl.ordinal() < oldlvl.ordinal()) ? "Reduced" : "Increased";
 		log(LEVEL.ALL, action+" log level from " + oldlvl.toString() + " to " + newlvl.toString());
 		return oldlvl;
@@ -254,6 +253,10 @@ abstract public class Logger
 	// One possible optimisation is to pre-build the portion up to the Minute and just rebuild that once an hour (can record prev hour and compare to
 	// dtcal.get(DAY)), but the calls to zeropad() turn out to have no measurable time cost, so they're probably at least as cheap as the arithmetic
 	// to compare change-of-hour (which would also have to confirm whether the day has changed as well, to guarantee we don't miss the hour change).
+	//
+	// NB: There is no synchronisation performed in here, and multi-threaded loggers need to ensure that all necessary synchronisation
+	// happens at a higher level.
+	// This is a very low-level routine where synchronisation would be a significant and unnecessary burden on non-MT loggers.
 	protected final StringBuilder setLogEntry(LEVEL lvl, StringBuilder pfxbuf) throws java.io.IOException
 	{
 		long systime = System.currentTimeMillis();

@@ -92,12 +92,12 @@ public final class DynLoaderTest
 		//now verify that a repeat load of DynTest4 would have no effect
 		boolean prevhack = SysProps.set(DynLoader.SYSPROP_CLDHACK, false);
 		org.junit.Assert.assertTrue(DynLoader.getClassLoader() == cld_after2);
-		String loadpath = FileOps.getResourcePath("DynTest4.jar", getClass());
+		String loadpath = getResourcePath("DynTest4.jar", getClass());
 		java.util.List<java.net.URL> newcp = DynLoader.load(loadpath);
 		org.junit.Assert.assertTrue(newcp == null || newcp.size() == 0);
 		org.junit.Assert.assertTrue(DynLoader.getClassLoader() == cld_after2);
 		//same for DynTest2, which was the last JAR we loaded without the hack
-		loadpath = FileOps.getResourcePath("DynTest2.jar", getClass());
+		loadpath = getResourcePath("DynTest2.jar", getClass());
 		newcp = DynLoader.load(loadpath);
 		org.junit.Assert.assertTrue(newcp == null || newcp.size() == 0);
 		org.junit.Assert.assertTrue(DynLoader.getClassLoader() == cld_after2);
@@ -238,7 +238,7 @@ public final class DynLoaderTest
 
 		// Now load the JAR and verify we can access its member class
 		boolean prevhack = SysProps.set(DynLoader.SYSPROP_CLDHACK, hack);
-		String loadpath = FileOps.getResourcePath(targetjar, getClass());
+		String loadpath = getResourcePath(targetjar, getClass());
 		String cp = loadpath+" "+DynLoader.CPDLM+"  "+loadpath;  //double up to test duplicates detection and add white space
 		cp += DynLoader.CPDLM+DynLoader.CPDLM;  //empty path elements
 		cp += DynLoader.CPDLM+"/tmpx2/yyydir/n0nzushf1le";  //missing file
@@ -312,5 +312,14 @@ public final class DynLoaderTest
 		java.io.File fh_path = new java.io.File(file);
 		java.io.File fh_url = new java.io.File(url.toURI());
 		return fh_path.getCanonicalPath().equals(fh_url.getCanonicalPath());
+	}
+
+	// NB: The concept of mapping a resource URL to a File is inherently flawed, but this utility works
+	// beecause the resources we're looking up are in the same build tree.
+	private static String getResourcePath(String path, Class<?> clss) throws java.io.IOException, java.net.URISyntaxException
+	{
+		java.net.URL url = DynLoader.getResource(path, clss);
+		if (url == null) return null;
+		return new java.io.File(url.toURI()).getCanonicalPath();
 	}
 }

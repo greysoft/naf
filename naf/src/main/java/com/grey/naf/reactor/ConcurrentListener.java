@@ -34,6 +34,7 @@ public final class ConcurrentListener
 	private final Class<?> serverType;
 	private final com.grey.base.utils.HashedSet<Server> activeservers = new com.grey.base.utils.HashedSet<Server>();
 	private final com.grey.base.utils.ObjectWell<Server> spareservers;
+	private boolean in_sync_stop;
 
 	@Override
 	public Class<?> getServerType() {return serverType;}
@@ -84,14 +85,16 @@ public final class ConcurrentListener
 	@Override
 	public boolean stopListener()
 	{
-		int cnt = activeservers.size();
-		java.util.Iterator<Server> it = activeservers.iterator();
-		while (it.hasNext()) {
-			Server cep = it.next();
-			boolean stopped = cep.stopServer();
-			if (stopped || !dsptch.isRunning()) it.remove();
+		//cannot iterate on activeservers as it may get modified by stopServer(), so take a copy
+		in_sync_stop = true;
+		Server[] arr = activeservers.toArray(new Server[activeservers.size()]);
+		for (int idx = 0; idx != arr.length; idx++) {
+			Server srvr = arr[idx];
+			boolean stopped = srvr.stopServer();
+			if (stopped || !dsptch.isRunning()) deallocateServer(srvr);
 		}
-		log.info("Listener="+name+" has stopped "+(cnt - activeservers.size())+"/"+cnt+" servers");
+		log.info("Listener="+name+" stopped "+(arr.length - activeservers.size())+"/"+arr.length+" servers");
+		in_sync_stop = false;
 		return (activeservers.size() == 0);
 	}
 
@@ -104,14 +107,8 @@ public final class ConcurrentListener
 	@Override
 	public void entityStopped(Object obj)
 	{
-		Server srvr = Server.class.cast(obj);
-		activeservers.remove(srvr);
-		spareservers.store(srvr);
-
-		if (inShutdown && activeservers.size() == 0) {
-			stopped(true);
-			return;
-		}
+		boolean not_dup = deallocateServer(Server.class.cast(obj));
+		if (not_dup && inShutdown && !in_sync_stop && activeservers.size() == 0) stopped(true);
 	}
 
 	// NB: Can't loop on SelectionKey.isAcceptable(), as it will remain True until we return to Dispatcher
@@ -148,5 +145,15 @@ public final class ConcurrentListener
 		} finally {
 			if (!ok) entityStopped(srvr);
 		}
+	}
+
+	private boolean deallocateServer(Server srvr)
+	{
+		//guard against duplicate entityStopped() notifications
+		if (!activeservers.remove(srvr)) {
+			return false;
+		}
+		spareservers.store(srvr);
+		return true;
 	}
 }

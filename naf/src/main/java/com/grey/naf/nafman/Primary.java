@@ -1,11 +1,11 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.nafman;
 
+import com.grey.logging.Logger.LEVEL;
 import com.grey.base.config.SysProps;
-import com.grey.naf.reactor.Dispatcher;
 
 public final class Primary
 	extends Agent
@@ -17,18 +17,14 @@ public final class Primary
 	private final java.util.ArrayList<Command> activecmds = new java.util.ArrayList<Command>();
 	private final com.grey.naf.reactor.Producer<Object> events;
 
-	final com.grey.naf.BufferSpec bufspec;
-	final com.grey.base.utils.ObjectWell<com.grey.base.utils.ByteChars> bcstore;
-	final com.grey.base.utils.ObjectWell<Command> cmdstore;
-	final long tmt_idle;
-
+	//preallocated purely for efficiency
 	private final java.util.ArrayList<Agent> tmpagents = new java.util.ArrayList<Agent>();
 	private final java.util.ArrayList<Command> tmpcmds = new java.util.ArrayList<Command>();
 
 	// Primary is implicitly a singleton - duplicate instances would fail when binding Listener port
 	public static Primary get()
 	{
-		Dispatcher[] arr = Dispatcher.getDispatchers();
+		com.grey.naf.reactor.Dispatcher[] arr = com.grey.naf.reactor.Dispatcher.getDispatchers();
 		for (int idx = 0; idx != arr.length; idx++) {
 			if (arr[idx].nafman != null && arr[idx].nafman.isPrimary()) return Primary.class.cast(arr[idx].nafman);
 		}
@@ -38,33 +34,32 @@ public final class Primary
 	@Override
 	public boolean isPrimary() {return true;}
 	@Override
+	public Primary getPrimary() {return this;}
+	@Override
 	public int getPort() {return lstnr.getLocalPort();}
 
-	public Primary(Dispatcher d, com.grey.base.config.XmlConfig cfg)
+	public Primary(com.grey.naf.reactor.Dispatcher d, com.grey.base.config.XmlConfig cfg)
 			throws com.grey.base.GreyException, java.io.IOException
 	{
 		super(d, cfg);
-		bufspec = new com.grey.naf.BufferSpec(cfg, "niobuffers", 128, 4096, true);
-		tmt_idle = cfg.getTime("timeout", com.grey.base.utils.TimeOps.parseMilliTime("10s"));
-
 		events = new com.grey.naf.reactor.Producer<Object>(Object.class, dsptch, this);
-
-		Command.Factory fact = new Command.Factory(this);
-		cmdstore = new com.grey.base.utils.ObjectWell<Command>(fact, "NAFMAN_Cmds_"+dsptch.name);
-		bcstore = new com.grey.base.utils.ObjectWell<com.grey.base.utils.ByteChars>(com.grey.base.utils.ByteChars.class, "NAFMAN_BC_"+dsptch.name);
 
 		int lstnport = d.nafcfg.assignPort(com.grey.naf.Config.RSVPORT_NAFMAN);
 		com.grey.base.config.XmlConfig lstncfg = new com.grey.base.config.XmlConfig(cfg, "listener");
 		lstnr = new com.grey.naf.reactor.ConcurrentListener("NAFMAN-Primary", dsptch, this, null, lstncfg, Server.class, null, lstnport);
 
 		// these commands are only fielded by the Primary NAFMAN agent
-		registerHandler(Registry.CMD_DLIST, this);
-		registerHandler(Registry.CMD_APPSTOP, this);
+		Registry reg = Registry.get();
+		reg.registerHandler(Registry.CMD_DLIST, 0, this, dsptch);
+		reg.registerHandler(Registry.CMD_APPSTOP, 0, this, dsptch);
+		reg.registerHandler(Registry.CMD_SHOWCMDS, 0, this, dsptch);
 	}
 
 	@Override
 	public void start() throws com.grey.base.FaultException, java.io.IOException
 	{
+		if (dsptch.logger.isActive(LEVEL.TRC)) System.out.println(Registry.get().dumpState(null, false));
+		super.start();
 		lstnr.start();
 	}
 
@@ -95,18 +90,19 @@ public final class Primary
 		dsptch.logger.info("Primary shutdown completed - Secondaries="+secondaries.size()+", Commands="+activecmds.size());
 	}
 
-	protected void forwardCommand(Command cmd) throws com.grey.base.FaultException, java.io.IOException
+	void handleCommand(Command cmd) throws com.grey.base.FaultException, java.io.IOException
 	{
 		for (int idx = 0; idx != secondaries.size(); idx++) {
 			cmd.attach(secondaries.get(idx));
 		}
 		cmd.attach(this);
 		tmpagents.clear();
-
-		//NB: This synchronises on cmd, before we pass it to secondaries
-		cmd.getAttachedAgents(tmpagents);
-		dsptch.logger.trace("NAFMAN Primary fielding command="+cmd.getDescription()+" for Agents="+tmpagents.size()+"/"+(secondaries.size()+1)
-				+" - ActiveCmds="+activecmds.size());
+		cmd.getAttachedAgents(tmpagents); //synchronises on cmd, before we pass it to secondaries
+		LEVEL lvl = LEVEL.TRC2;
+		if (dsptch.logger.isActive(lvl)) {
+			dsptch.logger.log(lvl, "NAFMAN Primary fielding command="+cmd.def.code+" for Agents="
+						+tmpagents.size()+"/"+(secondaries.size()+1)+" - ActiveCmds="+activecmds.size());
+		}
 		activecmds.add(cmd);
 		boolean completed = (tmpagents.size() == 0);
 		boolean deadsecs = false;
@@ -120,17 +116,17 @@ public final class Primary
 					agent.requests.produce(cmd, dsptch);
 				} catch (java.io.IOException ex) {
 					int status = cmd.detach(agent);
-					if (status == -1) continue;
-					if (status == 1) completed = true;
+					if (status == Command.DETACH_NOT) continue;
+					if (status == Command.DETACH_FINAL) completed = true;
 					deadsecs = true; //assume the Secondary has died
-					dsptch.logger.info("NAFMAN="+dsptch.name+" failed to forward cmd="+cmd.def.name+" to Secondary="
+					dsptch.logger.info("NAFMAN="+dsptch.name+" failed to forward cmd="+cmd.def.code+" to Secondary="
 							+agent.dsptch.name+" - "+com.grey.base.GreyException.summary(ex));
 				}
 			}
 		}
 
 		if (completed) {
-			cmd.completed(dsptch);
+			commandCompleted(cmd, dsptch);
 		}
 
 		if (deadsecs && !dsptch.surviveDownstream) {
@@ -139,7 +135,7 @@ public final class Primary
 	}
 
 	@Override
-	public void producerIndication(com.grey.naf.reactor.Producer<?> p) throws java.io.IOException
+	public void producerIndication(com.grey.naf.reactor.Producer<?> p) throws java.io.IOException, com.grey.base.FaultException
 	{
 		Object event;
 		while ((event = events.consume()) != null) {
@@ -156,22 +152,24 @@ public final class Primary
 			} else if (event instanceof Command) {
 				Command cmd = Command.class.cast(event);
 				activecmds.remove(cmd);
-				cmd.srvr.sendResponse();
+				cmd.completed();
 			}
 		}
 	}
 
-	protected void secondarySubscribed(Secondary agent) throws java.io.IOException
+	void secondarySubscribed(Secondary agent) throws java.io.IOException
 	{
 		events.produce(agent, agent.dsptch);
 	}
 
-	protected void secondaryUnsubscribed(Secondary agent) throws java.io.IOException
+	void secondaryUnsubscribed(Secondary agent) throws java.io.IOException
 	{
 		events.produce(agent.dsptch.name, agent.dsptch);
 	}
 
-	protected void commandCompleted(Command cmd, com.grey.naf.reactor.Dispatcher dsptch) throws java.io.IOException
+	// The parameter is the Dispatcher in whose thread this is being called, not necessarily the
+	// one whose agent has just completed this command.
+	void commandCompleted(Command cmd, com.grey.naf.reactor.Dispatcher dsptch) throws java.io.IOException
 	{
 		events.produce(cmd, dsptch);
 	}
@@ -184,9 +182,7 @@ public final class Primary
 		tmpcmds.addAll(activecmds);
 		for (int idx = 0; idx != tmpcmds.size(); idx++) {
 			Command cmd = tmpcmds.get(idx);
-			if (cmd.detach(agent) == 1) {
-				cmd.completed(dsptch);
-			}
+			if (cmd.detach(agent) == Command.DETACH_FINAL) commandCompleted(cmd, dsptch);
 		}
 	}
 
