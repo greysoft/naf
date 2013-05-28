@@ -31,7 +31,7 @@ public final class ResolverService
 	// UDP max: add a small buffer at end to allow for sloppy encoding by remote host (NB: no reason to suspect that)
 	private static final int pktsizudp = SysProps.get("greynaf.dns.maxudp", Packet.UDPMAXMSG + 64);
 	// TCP max: allow for larger TCP messages (but we only really expect a fraction larger, not 4-fold)
-	private static final int pktsiztcp = SysProps.get("greynaf.dns.maxtcp", Packet.UDPMAXMSG * 64);
+	private static final int pktsiztcp = SysProps.get("greynaf.dns.maxtcp", Packet.UDPMAXMSG * 4);
 	// max number of consecutive UDP reads, before yielding control back to framework (zero means unlimited)
 	private static final int udprcvmax = SysProps.get("greynaf.dns.udprcvmax", 100);
 
@@ -118,8 +118,8 @@ public final class ResolverService
 		throws com.grey.base.ConfigException, java.io.IOException, javax.naming.NamingException
 	{
 		dsptch = d;
-		bcstore = new com.grey.base.utils.ObjectWell<com.grey.base.utils.ByteChars>(com.grey.base.utils.ByteChars.class, "DNS_BC_"+dsptch.name);
-		rrstore = new com.grey.base.utils.ObjectWell<ResourceData>(ResourceData.class, "DNS_RR_"+dsptch.name);
+		bcstore = new com.grey.base.utils.ObjectWell<com.grey.base.utils.ByteChars>(com.grey.base.utils.ByteChars.class, "DNS_"+dsptch.name);
+		rrstore = new com.grey.base.utils.ObjectWell<ResourceData>(ResourceData.class, "DNS_"+dsptch.name);
 
 		String selectedservers = "";
 		String srvnames_sys = getSystemDnsServers();
@@ -146,10 +146,10 @@ public final class ResolverService
 		udpdnspkt = (always_tcp ? null : new Packet(false, bufspec_udp));
 
 		Packet.Factory pktfact = new Packet.Factory(true, bufspec_tcp);
-		pktstore = new com.grey.base.utils.ObjectWell<Packet>(pktfact, "DNS_TCP_packets_"+dsptch.name);
+		pktstore = new com.grey.base.utils.ObjectWell<Packet>(pktfact, "DNS_"+dsptch.name);
 
 		QueryHandle.Factory qryfact = new QueryHandle.Factory(dsptch);
-		qrystore = new com.grey.base.utils.ObjectWell<QueryHandle>(qryfact, "DNS_QH_"+dsptch.name);
+		qrystore = new com.grey.base.utils.ObjectWell<QueryHandle>(qryfact, "DNS_"+dsptch.name);
 
 		String dlm = "";
 		for (int idx = 0; idx != dnsservers.length; idx++) {
@@ -560,6 +560,11 @@ public final class ResolverService
 		qryh.tmr = null;  // this timer is now expired, so we must not access it again
 		stats_tmt++;
 
+		LEVEL lvl = LEVEL.TRC3;
+		if (dsptch.logger.isActive(lvl)) {
+			dsptch.logger.log(lvl, "DNS-Resolver timeout "+(qryh.retrycnt+1)+"/"+(retrymax+1)+" on "+qryh.pktqtype+"/"+qryh.pktqname);
+		}
+
 		// one timeout is enough to fail a TCP query
 		if (qryh.isTCP() || (qryh.retrycnt == retrymax)) {
 			endQuery(qryh, Answer.STATUS.TIMEOUT);
@@ -571,10 +576,6 @@ public final class ResolverService
 		qryh.prevqid[qryh.retrycnt++] = qryh.qid;
 
 		// now reissue previous query
-		LEVEL lvl = LEVEL.TRC2;
-		if (dsptch.logger.isActive(lvl)) {
-			dsptch.logger.log(lvl, "DNS-Resolver timeout "+qryh.retrycnt+"/"+retrymax+" on "+qryh.pktqtype+"/"+qryh.pktqname);
-		}
 		issueRequest(qryh, qryh.pktqtype, qryh.pktqname);
 	}
 
@@ -654,7 +655,8 @@ public final class ResolverService
 		}
 
 		if (!validresponse) {
-			if (dsptch.logger.isActive(LEVEL.TRC)) dsptch.logger.trace("DNS Resolver discarding unexpected packet: Response="+pkt.isResponse()
+			LEVEL lvl = LEVEL.TRC;
+			if (dsptch.logger.isActive(lvl)) dsptch.logger.log(lvl, "DNS Resolver discarding unexpected packet: Response="+pkt.isResponse()
 					+", QID="+pkt.qid+" vs "+(qryh==null?-1:qryh.qid)+" - TCP="+pkt.isTCP);
 			if (pkt.isTCP) endQuery(qryh, Answer.STATUS.ERROR);  // no excuse for TCP connections, so abort it with failure
 			return;
@@ -885,6 +887,7 @@ public final class ResolverService
 		java.io.OutputStream fout = null;
 		java.io.PrintWriter ostrm = null;
 		try {
+			FileOps.ensureDirExists(fh_dump.getParentFile());
 			fout = new java.io.FileOutputStream(fh_dump, true);
 			ostrm = new java.io.PrintWriter(fout);
 			fout = null;
@@ -990,6 +993,7 @@ public final class ResolverService
 		long time1 = System.currentTimeMillis();
 		int rrcnt = cache_a.size() + cache_ptr.size();
 		int rrdelcnt = 0;
+		LEVEL lvl = LEVEL.TRC;
 
 		// delete all expired cache_a entries
 		int oldsize = cache_a.size();
@@ -1000,7 +1004,7 @@ public final class ResolverService
 		}
 		int dels = oldsize - cache_a.size();
 		rrdelcnt += dels;
-		if (dels != 0) dsptch.logger.trace("DNS Resolver: Pruned stale IP cache entries: " + dels + "/" + oldsize);
+		if (dels != 0) dsptch.logger.log(lvl, "DNS Resolver: Pruned stale IP cache entries: " + dels + "/" + oldsize);
 
 		int excess = cache_a.size() - cache_hiwater;
 		if (excess > 0) {
@@ -1011,7 +1015,7 @@ public final class ResolverService
 				itip.remove();
 			}
 			rrdelcnt += excess;
-			dsptch.logger.trace("DNS Resolver: Pruned IP cache back to hiwater="+cache_a.size()+" - excess="+excess);
+			dsptch.logger.log(lvl, "DNS Resolver: Pruned IP cache back to hiwater="+cache_a.size()+" - excess="+excess);
 		}
 
 		// prune MX cache in same way
@@ -1030,7 +1034,7 @@ public final class ResolverService
 			if (mxips.size() == 0) itmx.remove(); //all expired
 		}
 		dels = oldsize - cache_mx.size();
-		if (dels != 0) dsptch.logger.trace("DNS Resolver: Pruned stale MX cache entries: " + dels + "/" + oldsize);
+		if (dels != 0) dsptch.logger.log(lvl, "DNS Resolver: Pruned stale MX cache entries: " + dels + "/" + oldsize);
 
 		if ((excess = cache_mx.size() - cache_hiwater_mx) > 0) {
 			itmx = cache_mx.keySet().iterator();
@@ -1039,7 +1043,7 @@ public final class ResolverService
 				rrdelcnt += cache_mx.get(k).size();
 				itmx.remove();
 			}
-			dsptch.logger.trace("DNS Resolver: Pruned MX cache back to hiwater="+cache_mx.size()+" - excess="+excess);
+			dsptch.logger.log(lvl, "DNS Resolver: Pruned MX cache back to hiwater="+cache_mx.size()+" - excess="+excess);
 		}
 
 		// prune PTR cache in same way
@@ -1051,7 +1055,7 @@ public final class ResolverService
 		}
 		dels = oldsize - cache_ptr.size();
 		rrdelcnt += dels;
-		if (dels != 0) dsptch.logger.trace("DNS Resolver: Pruned stale PTR cache entries: " + dels + "/" + oldsize);
+		if (dels != 0) dsptch.logger.log(lvl, "DNS Resolver: Pruned stale PTR cache entries: " + dels + "/" + oldsize);
 
 		if ((excess = cache_ptr.size() - cache_hiwater) > 0) {
 			com.grey.base.utils.IteratorInt iter2 = cache_ptr.keysIterator();
@@ -1060,10 +1064,10 @@ public final class ResolverService
 				iter2.remove();
 			}
 			rrdelcnt += excess;
-			dsptch.logger.trace("DNS Resolver: Pruned PTR cache back to hiwater="+cache_ptr.size()+" - excess="+excess);
+			dsptch.logger.log(lvl, "DNS Resolver: Pruned PTR cache back to hiwater="+cache_ptr.size()+" - excess="+excess);
 		}
 		long time2 = System.currentTimeMillis();
-		dsptch.logger.trace("DNS Resolver: Swept cache in time="+(time2-time1)+", removed RRs="+rrdelcnt+"/"+rrcnt
+		dsptch.logger.log(lvl, "DNS Resolver: Swept cache in time="+(time2-time1)+", removed RRs="+rrdelcnt+"/"+rrcnt
 				+" - A="+cache_a.size()+", MX="+cache_mx.size()+", PTR="+cache_ptr.size());
 	}
 

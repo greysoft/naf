@@ -2,6 +2,7 @@
 <HTML>
 <HEAD>
 <TITLE>NAF - Programmer's Guide</TITLE>
+<meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/>
 <link rel="stylesheet" type="text/css" href="naf.css"/>
 </HEAD>
 <BODY>
@@ -9,7 +10,7 @@
 <div class="menu">
 <p>
 Programmer's Guide<br/>
-NAF v2.3.0
+NAF v2.3.1
 </p>
 <hr class="mline"/>
 <p>
@@ -565,9 +566,9 @@ The second form illustrates how to connect to an arbitrary instance of NAFMAN, r
 </p>
 <div>
 <span class="vt220">
-java -jar lib/greynaf-2.3.0.jar -c conf/naf.xml -cmd showconns?nohttp=y&nbsp;
+java -jar lib/greynaf-2.3.1.jar -c conf/naf.xml -cmd showconns?nohttp=y&nbsp;
 <br/><br/><br/>
-&nbsp;java -jar lib/greynaf-2.3.0.jar -remote hostname:13000 -cmd showconns?nohttp=y
+&nbsp;java -jar lib/greynaf-2.3.1.jar -remote hostname:13000 -cmd showconns?nohttp=y
 </span>
 </div>
 <p>
@@ -593,7 +594,7 @@ Putting it all together, the following command-line invocation can be used to te
 </p>
 <div>
 <span class="vt220">
-java -jar lib/greynaf-2.3.0.jar -remote hostname:13000 -cmd appstop?d=dispname&amp;n=appname
+java -jar lib/greynaf-2.3.1.jar -remote hostname:13000 -cmd appstop?d=dispname&amp;n=appname
 </span>
 </div>
 <p>
@@ -992,7 +993,7 @@ Setting it to 1 merely tells Java to pass the client certificate up to NAF, and 
 <span class="cfgname">peercert</span>
 setting) or your application.
 <br/>
-This settting defaults to 1.
+This setting defaults to 1.
 </li>
 
 <li><span class="cfgtitle">latent</span><br/>
@@ -1194,7 +1195,7 @@ Run NAF directly with the -h option to see its built-in options.
 </p>
 <div>
 <span class="vt220">
-java -jar greynaf-2.3.0.jar -h
+java -jar greynaf-2.3.1.jar -h
 </span>
 </div>
 
@@ -1218,7 +1219,7 @@ Assuming you have downloaded and extracted the binary NAF distribution (or built
 </p>
 <div>
 <span class="vt220">
-java -jar lib/greynaf-2.3.0.jar -c conf/batchresolver.xml -logger dnsbatch &lt; infile
+java -jar lib/greynaf-2.3.1.jar -c conf/batchresolver.xml -logger dnsbatch &lt; infile
 </span>
 </div>
 <p>

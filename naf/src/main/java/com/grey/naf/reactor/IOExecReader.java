@@ -102,7 +102,10 @@ public final class IOExecReader
 		}
 
 		if (!isFlagSet(F_INRCVCB) && !chanmon.isUDP()) {
+			//read any pending data in our local holding buffer
 			while (readNextChunk());
+			//if we're still enabled, kickstart the SSL component (if any) in case it stalled while we were suspended
+			if (chanmon != null && chanmon.sslconn != null && isFlagSet(F_ENABLED)) chanmon.sslconn.forwardReceivedIO();
 		}
 	}
 
@@ -129,7 +132,8 @@ public final class IOExecReader
 		handleIO(null);
 	}
 
-	void handleIO(java.nio.ByteBuffer srcbuf) throws com.grey.base.FaultException, java.io.IOException
+	// Returns False if we're unable to consume any of the incoming data
+	boolean handleIO(java.nio.ByteBuffer srcbuf) throws com.grey.base.FaultException, java.io.IOException
 	{
 		int bufpos = 0;
 		int nbytes = -1;  //will remain -1 if channel-read throws
@@ -151,24 +155,25 @@ public final class IOExecReader
 				if (!isFlagSet(F_ARRBACK)) bufpos = rcvbuf.position();
 				if (srcbuf != null) {
 					nbytes = chanmon.dsptch.transfer(srcbuf, rcvbuf);
+					if (nbytes == 0) return false; //rcvbuf must be full
 				} else {
 					java.nio.channels.ReadableByteChannel iochan = (java.nio.channels.ReadableByteChannel)chanmon.iochan;
 					nbytes = iochan.read(rcvbuf);
 				}
 			}
 		} catch (Exception ex) {
-			if (ex instanceof java.net.PortUnreachableException) return;  //indicates we've just received associated ICMP packet - discard
+			if (ex instanceof java.net.PortUnreachableException) return true;  //indicates we've just received associated ICMP packet - discard
 			discmsg = "Broken pipe on Receive";
 			LEVEL lvl = LEVEL.TRC3;
 			if (chanmon.dsptch.logger.isActive(lvl)) {
 				chanmon.dsptch.logger.log(lvl, ex, false, "IOExec: read() failed on E"+chanmon.cm_id+"/"+chanmon.iochan);
 			}
 		}
-		if (nbytes == 0) return;
+		if (nbytes == 0) return true;
 
 		if (nbytes == -1) {
 			chanmon.ioDisconnected(discmsg);
-			return;
+			return true;
 		}
 
 		if (!isFlagSet(F_ARRBACK)) {
@@ -183,7 +188,7 @@ public final class IOExecReader
 			userbuf.ar_off = rcvbuf0;
 			userbuf.ar_len = nbytes;
 			chanmon.ioReceived(userbuf, remaddr);
-			return;
+			return true;
 		}
 
 		while (readNextChunk()) {
@@ -201,6 +206,7 @@ public final class IOExecReader
 				break;
 			}
 		}
+		return true;
 	}
 
 	// Returns false to indicate rcvbuf definitely cannot satisfy another read

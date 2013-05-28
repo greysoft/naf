@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -15,7 +15,7 @@ public final class EmailAddress
 
 	public EmailAddress()
 	{
-		full = new ByteChars(25);
+		full = new ByteChars();
 	}
 
 	public EmailAddress(CharSequence addr)
@@ -54,42 +54,82 @@ public final class EmailAddress
 		return this;
 	}
 
+	public EmailAddress stripDomain()
+	{
+		full.ar_len = mailbox.ar_len;
+		domain.ar_len = 0;
+		return this;
+	}
+
+	// This is a bit too oriented towards Mailismus and SMTP
+	// We also convert to lower-case, for the sake of the Mailismus' DNS-Resolver.
 	public void parse(ArrayRef<byte[]> data)
 	{
 		reset();
-		int idx = data.ar_off;
-		int limit = idx + data.ar_len;
-		byte[] dbuf = data.ar_buf;
+		final byte[] dbuf = data.ar_buf;
+		int doff = data.ar_off;
+		int len = data.ar_len;
+		final int lmt = doff + len;
 
-		// seek to start of address
-		while ((idx != limit) && (dbuf[idx] == ' ' || dbuf[idx] == '\t')) idx++;
-		int doff = idx;
-
-		// Seek to end of address.
-		// Convert to lower-case at same time, as DNS Resolver's cache is case sensitive
-		while ((idx != limit) && dbuf[idx] > 32) {
-			dbuf[idx] = (byte)Character.toLowerCase(dbuf[idx]);
-			idx++;
-		}
-		int len = idx - doff;
-
-		if (len != 0) {
-			// Strip surrounding brackets (RFC-2821 section 4.1.3 specifies square brackets for literal dotted IPs)
-			byte lastchar = dbuf[doff + len - 1];
-
-			if ((dbuf[doff] == '<' && lastchar == '>')
-					|| (dbuf[doff] == '[' && lastchar == ']')) {
-				doff++;
-				len -= 2;
-				if (len != 0) lastchar = dbuf[doff + len - 1];
+		int pos = ByteOps.indexOf(dbuf, doff, len, (byte)'<');
+		if (pos != -1) {
+			// strip enclosing <> brackets - allow final one to be absent
+			doff = pos + 1;
+			int idx = doff;
+			while (idx != lmt && dbuf[idx] > 32 && dbuf[idx] != '>') {
+				dbuf[idx] = (byte)Character.toLowerCase(dbuf[idx]);
+				idx++;
 			}
-			if (lastchar == '.') len--;  // strip one trailing dot, in case address had an odd absolute FQDN format
+			len = idx - doff;
+		} else {
+			// seek to start of address
+			while ((doff != lmt) && (dbuf[doff] == ' ' || dbuf[doff] == '\t')) doff++;
+
+			// Seek to end of address.
+			// Convert to lower-case at same time, as DNS Resolver's cache is case sensitive
+			int idx = doff;
+			while (idx != lmt && dbuf[idx] > 32) {
+				dbuf[idx] = (byte)Character.toLowerCase(dbuf[idx]);
+				idx++;
+			}
+			len = idx - doff;
+
+			if (len != 0) {
+				// Strip surrounding brackets (RFC-2821 section 4.1.3 specifies square brackets for literal dotted IPs)
+				byte lastchar = dbuf[doff + len - 1];
+				if (dbuf[doff] == '[' && lastchar == ']') {
+					doff++;
+					len -= 2;
+				} else {
+					if (lastchar == '.') len--;  // strip one trailing dot, in case address had an odd absolute FQDN format
+				}
+			}
 		}
 
 		// copy data to address buffer
-		if (len != 0) full.ensureCapacity(len + 10);  // margin of 10 to avoid growth increments smaller than that
-		if ((full.ar_len = len) == 0) return;
+		if (len == 0) {
+			full.ar_len = 0;
+			return;
+		}
+		full.ensureCapacity(len);
+		full.ar_len = len;
 		System.arraycopy(dbuf, doff, full.ar_buf, full.ar_off, len);
+	}
+
+	@Override
+	public boolean equals(Object obj)
+	{
+		if (obj == this) return true;
+		if (!(obj instanceof EmailAddress)) return false;
+		EmailAddress addr2 = (EmailAddress)obj;
+		if (addr2.mailbox.ar_len != mailbox.ar_len) return false;
+		return full.equals(addr2.full);
+	}
+
+	@Override
+	public int hashCode()
+	{
+		return full.hashCode();
 	}
 
 	@Override

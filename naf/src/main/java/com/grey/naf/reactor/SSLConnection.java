@@ -158,14 +158,23 @@ final class SSLConnection
 
 			// note that we can still receive app data while re-handshaking
 			if (isFlagSet(S_STARTED) && appdataRcvBuf.position() != 0) {
-				appdataRcvBuf.limit(appdataRcvBuf.position());
-				appdataRcvBuf.position(0);
-				while (appdataRcvBuf.remaining() != 0) {
-					cm.chanreader.handleIO(appdataRcvBuf);
-				}
-				appdataRcvBuf.clear();
+				forwardReceivedIO();
 			}
 		} while (engineStatus == SSLEngineResult.Status.OK && sslprotoRcvBuf.position() != 0);
+	}
+
+	public void forwardReceivedIO() throws com.grey.base.FaultException, java.io.IOException
+	{
+		appdataRcvBuf.limit(appdataRcvBuf.position());
+		appdataRcvBuf.position(0);
+		while (appdataRcvBuf.remaining() != 0) {
+			if (!cm.chanreader.handleIO(appdataRcvBuf)) {
+				//IOExecReader can't consume any more right now, so leave the remainder of appdataRcvBuf pending
+				appdataRcvBuf.compact();
+				return;
+			}
+		}
+		appdataRcvBuf.clear();
 	}
 
 	public boolean transmit(java.nio.channels.FileChannel fchan, long pos, long limit) throws java.io.IOException

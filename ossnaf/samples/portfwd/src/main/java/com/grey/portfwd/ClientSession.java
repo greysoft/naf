@@ -88,14 +88,14 @@ public class ClientSession
 	@Override
 	public void ioReceived(com.grey.base.utils.ArrayRef<byte[]> data) throws java.io.IOException
 	{
-		if (tmr != null) dsptch.resetTimer(tmr);
+		if (tmr != null) tmr.reset();
 		relay.server.transmit(data);
 	}
 
 	public void endConnection()
 	{
 		if (tmr != null) {
-			dsptch.cancelTimer(tmr);
+			tmr.cancel();
 			tmr = null;
 		}
 		disconnect(); //returns this object to Listener's ObjectWell of inactive servers

@@ -59,7 +59,7 @@ public abstract class Agent
 			sbtmp.append(" - no Handler");
 			dsptch.logger.log(Logger.LEVEL.TRC3, sbtmp);
 		} else {
-			sbtmp.append(" - Handler=").append(handler);
+			sbtmp.append(" - Handler=").append(handler.getClass().getName());
 			dsptch.logger.log(Logger.LEVEL.TRC2, sbtmp);
 			CharSequence rsp = handler.handleNAFManCommand(cmd);
 			if (rsp != null && rsp.length() != 0) cmd.addHandlerResponse(dsptch, rsp);

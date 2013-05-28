@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Yusef Badri - All rights reserved.
+ * Copyright 2012-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -31,7 +31,7 @@ public class Flusher
 	{
 		if (!(flushable instanceof java.io.Flushable)) return false;
 		flushables.add(java.io.Flushable.class.cast(flushable));
-		if (tmr == null) setTimer();
+		setTimer();
 		return true;
 	}
 
@@ -79,7 +79,7 @@ public class Flusher
 
 	private void setTimer()
 	{
-		if (interval == 0) return;
+		if (tmr != null || interval == 0) return;
 		tmr = dsptch.setTimer(interval, 1, this);
 	}
 

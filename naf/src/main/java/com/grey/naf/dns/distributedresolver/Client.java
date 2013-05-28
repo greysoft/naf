@@ -36,7 +36,7 @@ public final class Client
 		prod = new com.grey.naf.reactor.Producer<Request>(Request.class, dsptch, this);
 
 		RequestFactory factory = new RequestFactory(prod);
-		reqpool = new com.grey.base.utils.ObjectWell<Request>(Request.class, factory, "DNS_DistribReqs_"+dsptch.name, 0, 0, 1);
+		reqpool = new com.grey.base.utils.ObjectWell<Request>(Request.class, factory, "DNS_Client_"+dsptch.name, 0, 0, 1);
 	}
 
 	@Override

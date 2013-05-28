@@ -46,8 +46,8 @@ public final class Server
 			tmt_idle = cfg.getTime("timeout", com.grey.base.utils.TimeOps.parseMilliTime("30s"));
 			long permcache = cfg.getTime("permcache", com.grey.base.utils.TimeOps.parseMilliTime("1d"));
 			long dyncache = cfg.getTime("dyncache", "5s");
-			bufspec = new com.grey.naf.BufferSpec(cfg, "niobuffers", 1024, 1024, true);
-			cmdstore = new com.grey.base.utils.ObjectWell<Command>(Command.class, "NAFMAN_Cmds_"+primary.dsptch.name);
+			bufspec = new com.grey.naf.BufferSpec(cfg, "niobuffers", 1024, 4*1024, true);
+			cmdstore = new com.grey.base.utils.ObjectWell<Command>(Command.class, "NAFMAN_"+primary.dsptch.name);
 			http = new HTTP(bufspec, permcache);
 			rsrcmgr = new ResourceManager(cfg_rsrc, primary, http, dyncache);
 			httprsp400 = http.buildErrorResponse("400 Unexpected body");

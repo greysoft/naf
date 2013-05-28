@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -41,6 +41,17 @@ public class EmailAddressTest
 	}
 
 	@org.junit.Test
+	public void testStripDomain() {
+		String mbx = "mbxname";
+		EmailAddress emaddr = new com.grey.base.utils.EmailAddress(mbx+"@domainpart");
+		emaddr.decompose();
+		emaddr.stripDomain();
+		org.junit.Assert.assertEquals(0, emaddr.domain.length());
+		org.junit.Assert.assertEquals(mbx, emaddr.mailbox.toString());
+		org.junit.Assert.assertEquals(mbx, emaddr.full.toString());
+	}
+
+	@org.junit.Test
 	public void testReset() {
 		EmailAddress emaddr = new com.grey.base.utils.EmailAddress("any_old_address");
 		emaddr.reset();
@@ -52,6 +63,20 @@ public class EmailAddressTest
 		EmailAddress emaddr = new com.grey.base.utils.EmailAddress("any_old_address");
 		emaddr.set(FULLADDR);
 		verifyAddress(emaddr, false);
+	}
+
+	@org.junit.Test
+	public void testEquals() {
+		EmailAddress emaddr = new com.grey.base.utils.EmailAddress(FULLADDR);
+		org.junit.Assert.assertTrue(emaddr.equals(new com.grey.base.utils.EmailAddress(FULLADDR)));
+		org.junit.Assert.assertFalse(emaddr.equals(new com.grey.base.utils.EmailAddress(MBXPART+"x@"+DOMPART)));
+		org.junit.Assert.assertFalse(emaddr.equals(new com.grey.base.utils.EmailAddress(MBXPART+"@x"+DOMPART)));
+		StringBuilder sb = new StringBuilder(FULLADDR);
+		sb.setCharAt(0, (char)(sb.charAt(0)+1));
+		org.junit.Assert.assertFalse(emaddr.equals(new com.grey.base.utils.EmailAddress(sb)));
+		sb = new StringBuilder(FULLADDR);
+		sb.setCharAt(sb.length()-1, (char)(sb.charAt(sb.length()-1)+1));
+		org.junit.Assert.assertFalse(emaddr.equals(new com.grey.base.utils.EmailAddress(sb)));
 	}
 	
 	@org.junit.Test
@@ -74,7 +99,7 @@ public class EmailAddressTest
 		emaddr.parse(data);
 		verifyEmpty(emaddr);
 
-		data = setBytes("", 5);
+		data = setBytes("", 0);
 		emaddr.parse(data);
 		verifyEmpty(emaddr);
 
@@ -82,11 +107,23 @@ public class EmailAddressTest
 		emaddr.parse(data);
 		verifyAddress(emaddr, false);
 
+		data = setBytes("  ["+FULLADDR+"]  ", 0);
+		emaddr.parse(data);
+		verifyAddress(emaddr, false);
+
 		data = setBytes("<"+FULLADDR+">", 0);
 		emaddr.parse(data);
 		verifyAddress(emaddr, false);
 
-		data = setBytes("  ["+FULLADDR+"]  ", 0);
+		data = setBytes("  <"+FULLADDR+">  ", 0);
+		emaddr.parse(data);
+		verifyAddress(emaddr, false);
+
+		data = setBytes(" full name<"+FULLADDR.toUpperCase()+">  ", 0);
+		emaddr.parse(data);
+		verifyAddress(emaddr, false);
+
+		data = setBytes(" \"full name\"  <"+FULLADDR+">  ", 0);
 		emaddr.parse(data);
 		verifyAddress(emaddr, false);
 
@@ -114,7 +151,7 @@ public class EmailAddressTest
 		addrstr = "<randomtext]";
 		data = setBytes("  "+addrstr+"  ", 5);
 		emaddr.parse(data);
-		org.junit.Assert.assertEquals(addrstr, emaddr.full.toString());
+		org.junit.Assert.assertEquals(addrstr.substring(1), emaddr.full.toString());
 
 		addrstr = "[randomtext>";
 		data = setBytes(addrstr, 0);
@@ -156,7 +193,7 @@ public class EmailAddressTest
 	}
 
 	private void verifyEmpty(EmailAddress emaddr) {
-		org.junit.Assert.assertEquals(0, emaddr.full.length());
+		org.junit.Assert.assertEquals(emaddr.full.toString(), 0, emaddr.full.length());
 		org.junit.Assert.assertEquals(0, emaddr.mailbox.length());
 		org.junit.Assert.assertEquals(0, emaddr.domain.length());
 	}

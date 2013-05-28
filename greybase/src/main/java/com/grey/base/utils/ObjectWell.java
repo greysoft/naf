@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -68,7 +68,7 @@ public final class ObjectWell<T>
 		Class<T> unchecked_clss = (Class<T>)c;
 		clss = unchecked_clss;  //minimised scope of Suppress annotation
 		factory = f;
-		name = well_name;
+		name = well_name+(clss==null?"":"/"+clss.getName())+(factory==null?"":"/"+factory.getClass().getName());
 		maxpop = max;
 		popincr = (incr == 0 ? DFLT_POPINCR : incr);
 		populate(initpop);

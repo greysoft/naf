@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -70,38 +70,28 @@ public final class Circulist<T>
 
 	public void insert(int pos, T obj)
 	{
-		if (count == arr.length)
-		{
+		if (count == arr.length) {
 			// time to grow the array
 			if (increment == 0) throw new UnsupportedOperationException(getClass().getName()+"/"+clss.getName()+" has max capacity="+arr.length);
 			grow(increment);
 		}
 
-		if (pos == count)
-		{
+		if (pos == count) {
 			// append at tail - checking for this first means we take care of incrementing tail on first element (when it might be -1)
 			if (++tail == arr.length) tail = 0;
 			arr[tail] = obj;
-		}
-		else if (pos == 0)
-		{
+		} else if (pos == 0) {
 			// prepend - the Head pointer simply retreats, to avoid any copying or shifting
 			if (head-- == 0) head = arr.length - 1;
 			arr[head] = obj;
-		}
-		else
-		{
+		} else {
 			// yes, if we grew the array above, we will do yet another copy here, but Grows are presumed infrequent
 			int physpos = physicalIndex(pos);
-
-			if (head == 0 || physpos < head)
-			{
+			if (head == 0 || physpos < head) {
 				// shift tail segment up - physpos<head means list has already wrapped, and either way, above grow() means tail has room to advance
 				tail++;
 				System.arraycopy(arr, physpos, arr, physpos + 1, tail - physpos);
-			}
-			else
-			{
+			} else {
 				// list is a single segment, offset from start of array - shift down the leading elements to make room for the new one
 				System.arraycopy(arr, head, arr, head - 1, physpos - head);
 				head--;
@@ -118,20 +108,14 @@ public final class Circulist<T>
 		T obj = arr[physpos];
 
 		// we can optimise a bit when removing head or tail - the head advances and the tail retreats
-		if (pos == 0)  //means physpos==head
-		{
-			arr[head] = null;  // release the vacated slot's object reference
+		if (pos == 0) { //means physpos==head
+			arr[head] = null;  //release the vacated slot's object reference
 			if (++head == arr.length) head = 0;
-		}
-		else if (physpos == tail)
-		{
-			arr[tail] = null;  // release the vacated slot's object reference
+		} else if (physpos == tail) {
+			arr[tail] = null;  //release the vacated slot's object reference
 			if (tail-- == 0) tail = arr.length - 1;
-		}
-		else
-		{
-			if (head == 0 || physpos < head)
-			{
+		} else {
+			if (head == 0 || physpos < head) {
 				// Need to do a shift to fill the deleted element's slot.
 				// If head points to distinct upper segment, then this operation only applies to the tail segment (in lower part of buffer),
 				// so have to shift trailing elements down to fill deleted slot.
@@ -143,9 +127,7 @@ public final class Circulist<T>
 				// limit (tail==arr.length-1) which would preclude that.
 				System.arraycopy(arr, physpos + 1, arr, physpos, tail - physpos);
 				arr[tail--] = null;  // release the vacated tail slot's object reference
-			}
-			else
-			{
+			} else {
 				// the list is not wrapped, and we go for our preferred option of shifting up (see above comment)
 				System.arraycopy(arr, head, arr, head + 1, physpos - head);
 				arr[head++] = null;  // release the vacated head slot's object reference
@@ -161,9 +143,7 @@ public final class Circulist<T>
 	public void removeRange(int pos_from, int pos_to)
 	{
 		int delcount = pos_to - pos_from + 1;
-		
-		for (int loop = 0; loop != delcount; loop++)
-		{
+		for (int loop = 0; loop != delcount; loop++) {
 			remove(pos_from);
 		}
 	}
@@ -271,5 +251,19 @@ public final class Circulist<T>
 	private final T[] alloc(int cap)
 	{
 		return (T[])java.lang.reflect.Array.newInstance(clss, cap);
+	}
+
+	@Override
+	public String toString()
+	{
+		String txt = "Circulist#"+System.identityHashCode(this)+"="+count+"/head="+head+"/tail="+tail+"/cap="+arr.length;
+		String dlm = " [";
+		for (int idx = 0; idx != count; idx++) {
+			int phys = (head+idx)%arr.length;
+			txt += dlm+phys+"#"+arr[phys];
+			dlm = "; ";
+		}
+		txt += "]";
+		return txt;
 	}
 }

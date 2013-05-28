@@ -15,7 +15,7 @@ public final class Timer
 	}
 
 	// dampens jitter - see reset() and nextExpiry() comments below
-	static final long JITTER_INTERVAL = SysProps.getTime("greynaf.timers.jitter", 10L); //deliberately package-private
+	static final long JITTER_INTERVAL = SysProps.getTime("greynaf.timers.jitter", 20L); //deliberately package-private
 
 	public int id;	// unique ID for every timer activation event (within each Dispatcher)
 	public int type;  //caller-specific ID to identify the purpose of this timer
@@ -25,7 +25,6 @@ public final class Timer
 	public Object attachment;
 
 	private Dispatcher dsptch;
-	private boolean isSuspended;
 	private long activated;  // absolute system time at which this timer was set (milliseconds since epoch)
 
 	public Timer init(Dispatcher d, Handler h, long interval, int type, int id)
@@ -37,7 +36,6 @@ public final class Timer
 		this.id = id;
 		activated = dsptch.systime();
 		expiry = activated + interval;
-		isSuspended = false;
 		return this;
 	}
 
@@ -59,7 +57,6 @@ public final class Timer
 			// dampen excessive reset rates without affecting genuinely short intervals (especially zero-second timers!)
 			return dsptch.systime() - expiry;
 		}
-		isSuspended = false;
 		activated = dsptch.systime();
 		return dsptch.resetTimer(this);
 	}
@@ -76,15 +73,6 @@ public final class Timer
 	public void cancel()
 	{
 		dsptch.cancelTimer(this);
-	}
-
-	public void suspend()
-	{
-		if (isSuspended) return;
-		dsptch.deactivateTimer(this);
-		isSuspended = true;
-		activated = 0;  // this ensures the next call to reset() will do something
-		expiry = 0;  // this tells the outside world that we're suspended
 	}
 
 	public static void sleep(long msecs)
@@ -115,5 +103,14 @@ public final class Timer
 		long next = systime - (systime % interval) + interval;
 		if (next - systime < JITTER_INTERVAL) next += interval;  //suspiciously small delay, advance to next interval
 		return next;
+	}
+
+	@Override
+	public String toString()
+	{
+		String txt = id+":"+type+"/"+interval;
+		if (handler != null) txt += "/"+handler.getClass().getName();
+		if (attachment != null) txt += "/"+attachment.getClass().getName();
+		return txt;
 	}
 }

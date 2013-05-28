@@ -14,7 +14,6 @@ public final class Dispatcher
 	implements Runnable, com.grey.naf.EntityReaper, Producer.Consumer
 {
 	private static final String STOPCMD = "_STOP_";
-	private static final String SYSPROP_EXITDUMP = "greynaf.dispatchers.exitdump";
 	private static final String SYSPROP_HEAPWAIT = "greynaf.dispatchers.heapwait";
 	private static final long shutdown_timer_advance = SysProps.getTime("greynaf.dispatchers.shutdown_advance", "1s");
 
@@ -74,7 +73,7 @@ public final class Dispatcher
 		activechannels = new com.grey.base.utils.HashedMapIntKey<ChannelMonitor>();
 		activetimers = new com.grey.base.utils.Circulist<Timer>(Timer.class);
 		pendingtimers = new com.grey.base.utils.ObjectQueue<Timer>(Timer.class);
-		sparetimers = new com.grey.base.utils.ObjectWell<Timer>(Timer.class, "Dispatcher_Timers_"+name);
+		sparetimers = new com.grey.base.utils.ObjectWell<Timer>(Timer.class, "Dispatcher-"+name);
 		flusher = new Flusher(this, def.flush_interval);
 		slct = java.nio.channels.Selector.open();
 
@@ -84,7 +83,8 @@ public final class Dispatcher
 		if (logger != initlog) flusher.register(logger);
 		logger.info("Dispatcher="+name+": survive_downstream="+surviveDownstream+", survive_handlers="+surviveHandlers
 				+", zero_naflets="+zeroNafletsOK+", flush="+TimeOps.expandMilliTime(def.flush_interval));
-		logger.trace("Dispatcher="+name+": Selector="+slct.getClass().getCanonicalName()+" - Provider="+slct.provider().getClass().getCanonicalName());
+		logger.trace("Dispatcher="+name+": Selector="+slct.getClass().getCanonicalName()
+				+" - Provider="+slct.provider().getClass().getCanonicalName()+", jitter="+Timer.JITTER_INTERVAL);
 
 		//this has to be done after creating slct, and might as well wait till logger exists as well
 		apploader = new Producer<Object>(Object.class, this, this);
@@ -154,10 +154,14 @@ public final class Dispatcher
 			logger.log(LEVEL.ERR, ex, true, msg);
 		}
 		shutdown(true);
-		logger.info("Dispatcher="+name+" has terminated");
+		logger.info("Dispatcher="+name+" terminated - Naflets="+naflets.size()+", Channels="+activechannels.size()
+				+", Timers="+activetimers.size()+":"+pendingtimers.size());
+		if (naflets.size() != 0) logger.trace("Naflets: "+naflets);
+		if (activechannels.size() != 0) logger.trace("Channels: "+activechannels);
+		if (activetimers.size()+pendingtimers.size() != 0) logger.trace("Timers: Active="+activetimers+" - Pending="+pendingtimers);
 
 		if (SysProps.get(SYSPROP_HEAPWAIT, false)) {
-			System.out.println("Dispatcher="+name+" has now terminated, and is suspended to provide a heap dump");
+			System.out.println("Dispatcher="+name+" has now terminated, and is suspended to offer a heap dump");
 			for (;;) Timer.sleep(5000);
 		}
 	}
@@ -239,7 +243,7 @@ public final class Dispatcher
 	private void activate() throws java.io.IOException
 	{
 		logger.info("Dispatcher="+name+": Entering Reactor event loop with Naflets="+naflets.size()
-				+", I/O="+activechannels.size()+", Timers=" + activetimers.size()+", shutdown="+shutdownRequested);
+				+", Channels="+activechannels.size()+", Timers="+activetimers.size()+", shutdown="+shutdownRequested);
 
 		while (!shutdownRequested && (activechannels.size() + activetimers.size() != 0))
 		{
@@ -273,11 +277,10 @@ public final class Dispatcher
 			//do a final Select to flush the SelectionKeys, as they're always 1 interval in arrears
 			finalkeys = slct.selectNow();
 		}
-		logger.info("Dispatcher="+name+": Activity ceased - Naflets="+naflets.size()
-				+", IO="+activechannels.size()+"/"+finalkeys
-				+", Timers="+activetimers.size()+" (spare="+sparetimers.size()+")");
-		if (SysProps.get(SYSPROP_EXITDUMP, false)) logger.info("Dumping final state - " +dumpState(null, true));
-		while (activetimers.size() != 0) activetimers.get(0).cancel();
+		logger.info("Dispatcher="+name+": Reactor terminated - Naflets="+naflets.size()
+				+", Channels="+activechannels.size()+"/"+finalkeys
+				+", Timers="+activetimers.size()+" (pending="+pendingtimers.size()+")");
+		logger.trace("Dumping final state - " +dumpState(null, true));
 	}
 
 	private void fireTimers()
@@ -328,7 +331,7 @@ public final class Dispatcher
 
 	private void eventHandlerFailed(ChannelMonitor cm, Timer tmr, Throwable ex)
 	{
-		boolean bpex = (ex instanceof ChannelMonitor.BrokenPipeException);
+		boolean bpex = ChannelMonitor.isBrokenPipe(ex, cm);
 		if (!bpex) {
 			if (cm == null) {
 				logger.log(LEVEL.ERR, ex, true, "Dispatcher="+name+": Error on Timer handler="+tmr.handler);
@@ -361,7 +364,7 @@ public final class Dispatcher
 
 	// ChannelMonitors must bookend all their activity on each channel between this call and deregisterlIO().
 	// In between, they can can call monitorIO() multiple times to commence listening for specific I/O events.
-	protected void registerIO(ChannelMonitor cm) throws java.io.IOException
+	void registerIO(ChannelMonitor cm) throws java.io.IOException
 	{
 		if (activechannels.put(cm.cm_id, cm) != null) {
 			throw new java.io.IOException("Illegal registerIO on CM="+cm.getClass().getName()
@@ -369,7 +372,7 @@ public final class Dispatcher
 		}
 	}
 
-	protected void deregisterIO(ChannelMonitor cm) throws java.io.IOException
+	void deregisterIO(ChannelMonitor cm) throws java.io.IOException
 	{
 		if (activechannels.remove(cm.cm_id) == null) {
 			throw new java.io.IOException("Illegal deregisterIO on CM="+cm.getClass().getName()
@@ -383,7 +386,7 @@ public final class Dispatcher
 
 	// If remote party disconnects before we enter here, the chan.register() call will throw, so callers have to be prepared to handle
 	// exceptions without treating them as an error, but rather as a routine disconnect event
-	protected void monitorIO(ChannelMonitor cm, int ops) throws java.nio.channels.ClosedChannelException
+	void monitorIO(ChannelMonitor cm, int ops) throws java.nio.channels.ClosedChannelException
 	{
 		if (shutdownPerformed) return;
 		if (cm.iochan.isRegistered()) {
@@ -415,12 +418,21 @@ public final class Dispatcher
 		return tmr;
 	}
 
-	public void cancelTimer(Timer tmr)
+	void cancelTimer(Timer tmr)
 	{
-		if (deactivateTimer(tmr)) sparetimers.store(tmr.clear());
+		//remove from scheduled queue
+		if (!activetimers.remove(tmr)) {
+			//remove from ready-to-fire queue
+			if (!pendingtimers.withdraw(tmr)) {
+				//unknown timer - it is safe to repeat a cancel-timer op, but this could be a bug - worth logging
+				logger.info("Cancel on unknown Timer="+tmr+" - "+activetimers+" - pend="+pendingtimers);
+				return;
+			}
+		}
+		sparetimers.store(tmr.clear());
 	}
 
-	public long resetTimer(Timer tmr)
+	long resetTimer(Timer tmr)
 	{
 		long prev_remaining = systime() - tmr.expiry;
 		tmr.expiry = systime() + tmr.interval;
@@ -447,23 +459,14 @@ public final class Dispatcher
 	{
 		int pos = 0; // will insert new timer at head of list, if we don't find any earlier timers
 		
-		for (int idx = activetimers.size() - 1; idx != -1; idx--)
-		{
-			if (tmr.expiry >= activetimers.get(idx).expiry)
-			{
+		for (int idx = activetimers.size() - 1; idx != -1; idx--) {
+			if (tmr.expiry >= activetimers.get(idx).expiry) {
 				// insert tmr AFTER this node
 				pos = idx + 1;
 				break;
 			}
 		}
 		activetimers.insert(pos, tmr);
-	}
-
-	// expired timers are placed on the pending-timers list before firing them, so this will prevent the timer from actually firing
-	protected boolean deactivateTimer(Timer tmr)
-	{
-		if (activetimers.remove(tmr)) return true;
-		return pendingtimers.withdraw(tmr);
 	}
 
 	@Override
@@ -586,7 +589,7 @@ public final class Dispatcher
 		int cnt = (verbose ? activetimers.size() : 0);
 		for (int idx = 0; idx != cnt; idx++) {
 			Timer tmr = activetimers.get(idx);
-			sb.append("<item>ID=").append(tmr.id).append('/').append(tmr.type).append(" - Expires ");
+			sb.append("<item>ID=").append(tmr.id).append(':').append(tmr.type).append(" - Expires ");
 			TimeOps.makeTimeLogger(tmr.expiry, sb, true, true).append(" (");
 			TimeOps.expandMilliTime(tmr.interval, sb, false).append(")<br/>Handler=");
 			if (tmr.handler == null) {

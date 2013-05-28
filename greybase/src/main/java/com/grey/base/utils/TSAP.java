@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -12,16 +12,18 @@ public final class TSAP
 	public int ip;
 	public int port;
 	public java.net.InetSocketAddress sockaddr;
-	public final StringBuilder dotted_ip = new StringBuilder();
+	public StringBuilder dotted_ip;
 
 	private String host;  //records the host as originally supplied, if any
 	private final byte[] ipbytes = new byte[IP.IPADDR_OCTETS];
+
+	public static TSAP build(String hostport, int port) throws java.net.UnknownHostException {return build(hostport, port, true);}
 
 	// hostport is of the form "hostname:portnumber", where one (but not both) of those components is optional (unless hostport null).
 	// The port paramter is a default, which is overridden by any port component embedded in hostport.
 	// port==0 means the hostname part is optional and defaults to localhost. Else the portnumber part of hostpart is the optional bit.
 	// Null hostport is interpreted as "localhost" regardless of port parameter.
-	public static TSAP build(String hostport, int port) throws java.net.UnknownHostException
+	public static TSAP build(String hostport, int port, boolean with_dotted) throws java.net.UnknownHostException
 	{
 		String host = null;
 		int pos = (hostport == null ? -1 : hostport.indexOf(":"));
@@ -41,9 +43,7 @@ public final class TSAP
 		tsap.port = port;
 		java.net.InetAddress jdkip = IP.getHostByName(host);
 		tsap.sockaddr =  new java.net.InetSocketAddress(jdkip, port);
-		byte[] ipbytes = jdkip.getAddress();
-		tsap.ip = IP.net2ip(ipbytes, 0);
-		IP.displayDottedIP(tsap.ip, tsap.dotted_ip);
+		setIP(tsap, jdkip, with_dotted);
 		return tsap;
 	}
 
@@ -80,8 +80,7 @@ public final class TSAP
 	{
 		byte[] ipbytes = jdkip.getAddress();
 		tsap.ip = IP.net2ip(ipbytes, 0);
-
-		if (with_dotted) IP.displayDottedIP(tsap.ip, tsap.dotted_ip);
+		if (with_dotted) tsap.setDotted();
 	}
 
 	// Unlike build(), this method is expected to do everything in-situ, with no new memory being allocated - apart from the sockaddr object,
@@ -95,20 +94,31 @@ public final class TSAP
 		IP.ip2net(ip, ipbytes, 0);
 		java.net.InetAddress jdkip = java.net.InetAddress.getByAddress(ipbytes);
 		sockaddr = new java.net.InetSocketAddress(jdkip, port);
-		if (with_dotted) IP.displayDottedIP(ip, dotted_ip);
+		if (with_dotted) setDotted();
+	}
+
+	public void ensureDotted()
+	{
+		if (dotted_ip == null || dotted_ip.length() == 0) setDotted();
+	}
+
+	private void setDotted()
+	{
+		if (dotted_ip == null) dotted_ip = new StringBuilder();
+		IP.displayDottedIP(ip, dotted_ip);
 	}
 
 	public void clear()
 	{
 		sockaddr = null;
 		host = null;
-		dotted_ip.setLength(0);
+		if (dotted_ip != null) dotted_ip.setLength(0);
 	}
 
 	@Override
 	public String toString()
 	{
-		CharSequence hostpart = (host == null ? dotted_ip : host);
+		CharSequence hostpart = (host == null ? (dotted_ip==null?"":dotted_ip) : host);
 		if (hostpart == null || hostpart.length() == 0) hostpart = sockaddr.getAddress().toString();
 		return hostpart + ":" + port;
 	}

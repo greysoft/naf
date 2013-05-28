@@ -20,6 +20,7 @@ public abstract class ChannelMonitor
 	private static final int S_INWRITE = 1 << 5;
 	private static final int S_UDP = 1 << 6;
 	private static final int S_INDISC = 1 << 7;
+	private static final int S_BRKPIPE = 1 << 8;
 
 	public final int cm_id;
 	public final Dispatcher dsptch;
@@ -29,7 +30,7 @@ public abstract class ChannelMonitor
 	java.nio.channels.SelectionKey regkey;
 	SSLConnection sslconn;
 
-	private byte cmstate;  //records which of the S_... state flags above are in effect
+	private short cmstate;  //records which of the S_... state flags above are in effect
 	private byte regOps;   //JDK flags - shadows/mirrors regkey.interestOps()
 	private com.grey.naf.EntityReaper reaper;
 	private long start_time;
@@ -62,8 +63,9 @@ public abstract class ChannelMonitor
 	protected void eventError(ChannelMonitor cm, Throwable ex) {}
 	protected void dumpAppState(StringBuilder sb) {}
 
-	public final boolean isConnected() {return isFlagSet(S_ISCONN);}
 	public final boolean isUDP() {return isFlagSet(S_UDP);}
+	public final boolean isConnected() {return isFlagSet(S_ISCONN);}
+	public final boolean isBrokenPipe() {return isFlagSet(S_BRKPIPE);}
 	public final boolean disconnect() {return disconnect(true);}
 	protected final void setReaper(com.grey.naf.EntityReaper rpr) {reaper = rpr;}
 	final boolean canKill() {return (isConnected() && !getClass().equals(Producer.AlertsPipe.class));}
@@ -172,7 +174,7 @@ public abstract class ChannelMonitor
 				sslconn = null;
 			}
 			if (chanwriter != null) {
-				if (linger && !isFlagSet(S_CLOSELINGER) && chanwriter.isBlocked()) {
+				if (linger && chanwriter.isBlocked() && !isFlagSet(S_CLOSELINGER | S_BRKPIPE)) {
 					// Still waiting for a write to complete, so linger-on-close till it does.
 					// This is irrespective of the S_WECLOSE setting.
 					// If we were already lingering, then the repeated disconnect call means no-linger.
@@ -382,6 +384,7 @@ public abstract class ChannelMonitor
 		if (isFlagSet(S_UDP)) sb.append('U');
 		if (isFlagSet(S_ISCONN)) sb.append('C');
 		if (isFlagSet(S_INDISC)) sb.append('D');
+		if (isFlagSet(S_BRKPIPE)) sb.append('P');
 		if (isFlagSet(S_APPCONN)) sb.append('A');
 		if (isFlagSet(S_WECLOSE)) sb.append('X');
 		if (isFlagSet(S_CLOSELINGER)) sb.append('L');
@@ -429,6 +432,8 @@ public abstract class ChannelMonitor
 					+" - cmstate=0x"+Integer.toHexString(cmstate)
 					+"; blocked="+(chanwriter != null && chanwriter.isBlocked()));
 		}
+		setFlag(S_BRKPIPE);
+
 		if (isFlagSet(S_CLOSELINGER)) {
 			//Connection has been lost while we're lingering on close to flush a blocked IOExcWriter.
 			//Clearly no point lingering now that connnection is lost (or we'd get stuck in infinite loop).
@@ -437,10 +442,7 @@ public abstract class ChannelMonitor
 			disconnect(false);
 			return;
 		}
-		//Make sure we don't enter linger-on-close phase when disconnect() is subsequently called, since as
-		//we said above, there's no point now.
-		setFlag(S_CLOSELINGER);
-		if (!isFlagSet(S_INDISC)) throw new BrokenPipeException(discmsg);
+		if (!isFlagSet(S_INDISC)) throw new BrokenPipeException(this, discmsg);
 	}
 
 	private static void dumpInterestOps(int ops, StringBuilder sb)
@@ -449,6 +451,12 @@ public abstract class ChannelMonitor
 		if ((ops & java.nio.channels.SelectionKey.OP_WRITE) != 0) sb.append('W');
 		if ((ops & java.nio.channels.SelectionKey.OP_ACCEPT) != 0) sb.append('A');
 		if ((ops & java.nio.channels.SelectionKey.OP_CONNECT) != 0) sb.append('C');
+	}
+
+	public static boolean isBrokenPipe(Throwable ex, ChannelMonitor cm)
+	{
+		if (!(ex instanceof ChannelMonitor.BrokenPipeException)) return false;
+		return ((ChannelMonitor.BrokenPipeException)ex).cm == cm;
 	}
 
 
@@ -463,6 +471,7 @@ public abstract class ChannelMonitor
 	public static class BrokenPipeException extends java.io.IOException
 	{
 		private static final long serialVersionUID = 1L;
-		public BrokenPipeException(CharSequence msg) {super(msg.toString());}
+		public final ChannelMonitor cm;
+		public BrokenPipeException(ChannelMonitor c, CharSequence msg) {super(msg.toString()); cm=c;}
 	}
 }
