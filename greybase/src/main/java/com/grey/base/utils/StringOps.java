@@ -35,12 +35,6 @@ public class StringOps
 		return new String(buf, charset == null ? DFLT_CHARSET : charset);
 	}
 
-	public static boolean sameSeq(CharSequence str1, CharSequence str2)
-	{
-		if (str1 == null || str2 == null) return  (str1 == null && str2 == null);
-		return sameSeq(str1, 0, str1.length(), str2, 0, str2.length());
-	}
-
 	public static boolean sameSeq(CharSequence str1, int off1, int len1, CharSequence str2, int off2, int len2)
 	{
 		if (len1 != len2) return false;
@@ -52,16 +46,16 @@ public class StringOps
 		return true;
 	}
 
+	public static boolean sameSeq(CharSequence str1, CharSequence str2)
+	{
+		if (str1 == null || str2 == null) return  (str1 == null && str2 == null);
+		return sameSeq(str1, 0, str1.length(), str2, 0, str2.length());
+	}
+
 	public static boolean sameSeq(CharSequence str1, int off1, int len1, CharSequence str2)
 	{
 		if (str2 == null) return (len1 == 0);
 		return sameSeq(str1, off1, len1, str2, 0, str2.length());
-	}
-
-	public static boolean sameSeqNoCase(CharSequence str1, CharSequence str2)
-	{
-		if (str1 == null || str2 == null) return  (str1 == null && str2 == null);
-		return sameSeqNoCase(str1, 0, str1.length(), str2, 0, str2.length());
 	}
 
 	public static boolean sameSeqNoCase(CharSequence str1, int off1, int len1, CharSequence str2, int off2, int len2)
@@ -75,10 +69,45 @@ public class StringOps
 		return true;
 	}
 
+	public static boolean sameSeqNoCase(CharSequence str1, CharSequence str2)
+	{
+		if (str1 == null || str2 == null) return  (str1 == null && str2 == null);
+		return sameSeqNoCase(str1, 0, str1.length(), str2, 0, str2.length());
+	}
+
 	public static boolean sameSeqNoCase(CharSequence str1, int off1, int len1, CharSequence str2)
 	{
 		if (str2 == null) return (len1 == 0);
 		return sameSeqNoCase(str1, off1, len1, str2, 0, str2.length());
+	}
+
+	public static int indexOfNoCase(CharSequence str, int off, int len, CharSequence target)
+	{
+		int tlen = target.length();
+		if (tlen > len) return -1;
+		int lmt = off + len;
+		int maxpos = lmt - tlen;
+		int toff = 0;
+		char tval = Character.toLowerCase(target.charAt(toff));
+
+		for (int idx = off; idx != lmt; idx++) {
+			if (Character.toLowerCase(str.charAt(idx)) == tval) {
+				if (++toff == tlen) return idx - tlen + 1;
+				tval = Character.toLowerCase(target.charAt(toff));
+			} else {
+				if (off == maxpos) return -1;
+				if (toff != 0) {
+					toff = 0;
+					tval = Character.toLowerCase(target.charAt(toff));
+				}
+			}
+		}
+		return -1;
+	}
+
+	public static int indexOfNoCase(CharSequence str, CharSequence target)
+	{
+		return indexOfNoCase(str, 0, str.length(), target);
 	}
 
 	public static int indexOf(CharSequence str, int off, int len, char ch)

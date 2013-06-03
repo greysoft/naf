@@ -64,7 +64,7 @@ public class UDPReaderTest
 			java.net.DatagramSocket sock = udpchan.socket();
 			sock.bind(null);
 
-			com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(1024, 1024, false);
+			com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(1024, 0);
 			chanreader = new IOExecReader(bufspec);
 			initChannel(udpchan, true, false);
 			chanreader.receive(0);

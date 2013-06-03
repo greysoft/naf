@@ -19,22 +19,22 @@ public final class BufferSpec
 
 	public String charsetName() {return (chenc == null ? "n/a" : chenc.charset().displayName());}
 
-	public BufferSpec(int rcvsiz, int xmtsiz, boolean withpool) throws com.grey.base.ConfigException
+	public BufferSpec(int rcvsiz, int xmtsiz) throws com.grey.base.ConfigException
 	{
-		this(null, null, rcvsiz, xmtsiz, withpool);
+		this(null, null, rcvsiz, xmtsiz);
 	}
 
-	public BufferSpec(int rcvsiz, int xmtsiz, boolean withpool, boolean direct) throws com.grey.base.ConfigException
+	public BufferSpec(int rcvsiz, int xmtsiz, boolean direct) throws com.grey.base.ConfigException
 	{
-		this(null, null, rcvsiz, xmtsiz, withpool, direct);
+		this(null, null, rcvsiz, xmtsiz, direct);
 	}
 
-	public BufferSpec(com.grey.base.config.XmlConfig cfg, String xpath, int rcvsiz, int xmtsiz, boolean withpool) throws com.grey.base.ConfigException
+	public BufferSpec(com.grey.base.config.XmlConfig cfg, String xpath, int rcvsiz, int xmtsiz) throws com.grey.base.ConfigException
 	{
-		this(cfg, xpath, rcvsiz, xmtsiz, withpool, directniobufs);
+		this(cfg, xpath, rcvsiz, xmtsiz, directniobufs);
 	}
 
-	public BufferSpec(com.grey.base.config.XmlConfig cfg, String xpath, int rcvsiz, int xmtsiz, boolean withpool, boolean direct) throws com.grey.base.ConfigException
+	public BufferSpec(com.grey.base.config.XmlConfig cfg, String xpath, int rcvsiz, int xmtsiz, boolean direct) throws com.grey.base.ConfigException
 	{
 		String charset = null;
 		if (cfg != null) {
@@ -57,12 +57,12 @@ public final class BufferSpec
 			chenc = null;
 		}
 
-		if (withpool && xmtbufsiz != 0) {
+		if (xmtbufsiz == 0) {
+			xmtpool = null;
+		} else {
 			com.grey.base.utils.NIOBuffers.BufferFactory factory = new com.grey.base.utils.NIOBuffers.BufferFactory(xmtbufsiz, directbufs);
 			xmtpool = new com.grey.base.utils.ObjectWell<java.nio.ByteBuffer>(java.nio.ByteBuffer.class, factory,
-					"BufferSpecPool_"+xmtbufsiz+"/"+directbufs, 0, 0, 1);
-		} else {
-			xmtpool = null;
+								"BufferSpecPool_"+xmtbufsiz+"/"+directbufs, 0, 0, 1);
 		}
 	}
 

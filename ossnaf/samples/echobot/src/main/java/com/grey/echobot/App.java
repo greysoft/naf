@@ -135,7 +135,7 @@ public class App
 		Dispatcher[] cdispatchers = new Dispatcher[dcnt];
 		ClientGroup[] cgroups = new ClientGroup[options.cgrpcnt];
 		TSAP tsap = TSAP.build(hostport, 0);
-		sbufspec = (options.server_enabled ? new BufferSpec(options.srcvbuf, options.sxmtbuf, true) : null);
+		sbufspec = (options.server_enabled ? new BufferSpec(options.srcvbuf, options.sxmtbuf) : null);
 		byte[] msgbuf = null;
 
 		if (options.cgrpsiz != 0) {
@@ -183,7 +183,7 @@ public class App
 					if (options.server_solo) continue;
 				}
 			}
-			BufferSpec bufspec = new BufferSpec(options.crcvbuf, options.cxmtbuf, true);
+			BufferSpec bufspec = new BufferSpec(options.crcvbuf, options.cxmtbuf);
 			cgroups[cgnum++] = new ClientGroup(this, dsptch, options.udpmode, tsap, options.cgrpsiz, bufspec, msgbuf, options.msgcnt,
 					options.sockbufsiz, options.verify);
 		}

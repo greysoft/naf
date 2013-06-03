@@ -15,7 +15,7 @@ public final class Timer
 	}
 
 	// dampens jitter - see reset() and nextExpiry() comments below
-	static final long JITTER_INTERVAL = SysProps.getTime("greynaf.timers.jitter", 20L); //deliberately package-private
+	static final long JITTER_THRESHOLD = SysProps.getTime("greynaf.timers.jitter", 10L); //deliberately package-private
 
 	public int id;	// unique ID for every timer activation event (within each Dispatcher)
 	public int type;  //caller-specific ID to identify the purpose of this timer
@@ -53,7 +53,7 @@ public final class Timer
 
 	public long reset()
 	{
-		if ((interval > JITTER_INTERVAL) && (dsptch.systime() - activated < JITTER_INTERVAL)) {
+		if ((interval > JITTER_THRESHOLD) && (dsptch.systime() - activated < JITTER_THRESHOLD)) {
 			// dampen excessive reset rates without affecting genuinely short intervals (especially zero-second timers!)
 			return dsptch.systime() - expiry;
 		}
@@ -101,7 +101,7 @@ public final class Timer
 	public static long nextExpiry(long interval, long systime)
 	{
 		long next = systime - (systime % interval) + interval;
-		if (next - systime < JITTER_INTERVAL) next += interval;  //suspiciously small delay, advance to next interval
+		if (next - systime < JITTER_THRESHOLD) next += interval;  //suspiciously small delay, advance to next interval
 		return next;
 	}
 

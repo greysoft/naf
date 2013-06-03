@@ -48,6 +48,12 @@ public final class ObjectQueue<T>
 		return lst.get(0);
 	}
 
+	//peek(0) is equivant to peek() with no args, except it doesn't verify queue size
+	public T peek(int pos)
+	{
+		return lst.get(pos);
+	}
+
 	// extract object from queue, returning True if it was actually found on the queue
 	public boolean withdraw(T obj)
 	{

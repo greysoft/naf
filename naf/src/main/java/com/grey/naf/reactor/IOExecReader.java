@@ -97,7 +97,7 @@ public final class IOExecReader
 				setFlag(F_ENABLED);
 			}
 		} catch (Exception ex) {
-			chanmon.brokenPipe(LEVEL.TRC2, "I/O error on Receive registration", "IOExec: failed to enable Read", ex);
+			chanmon.brokenPipe(LEVEL.TRC2, "I/O error on Read registration", "IOExec: failed to enable Read", ex);
 			return;
 		}
 
@@ -119,7 +119,8 @@ public final class IOExecReader
 			} catch (Exception ex) {
 				LEVEL lvl = LEVEL.TRC2;
 				if (chanmon.dsptch.logger.isActive(lvl)) {
-					chanmon.dsptch.logger.log(lvl, ex, false, "IOExec: failed to disable Read on E"+chanmon.cm_id);
+					chanmon.dsptch.logger.log(lvl, ex, false, "IOExec: failed to disable Read on "
+							+chanmon.getClass().getName()+"/E"+chanmon.cm_id+"/"+chanmon.iochan);
 				}
 			}
 		}
@@ -143,7 +144,7 @@ public final class IOExecReader
 		// Windows (or Java?) doesn't reliably report a lost connection by returning -1, so trap exceptions and interpret in same way
 		try {
 			if (chanmon.isUDP()) {
-				java.nio.channels.DatagramChannel iochan = (java.nio.channels.DatagramChannel)chanmon.iochan;
+				final java.nio.channels.DatagramChannel iochan = (java.nio.channels.DatagramChannel)chanmon.iochan;
 				rcvbuf.clear();
 				remaddr = (java.net.InetSocketAddress)iochan.receive(rcvbuf);
 				nbytes = rcvbuf.position();
@@ -157,16 +158,16 @@ public final class IOExecReader
 					nbytes = chanmon.dsptch.transfer(srcbuf, rcvbuf);
 					if (nbytes == 0) return false; //rcvbuf must be full
 				} else {
-					java.nio.channels.ReadableByteChannel iochan = (java.nio.channels.ReadableByteChannel)chanmon.iochan;
+					final java.nio.channels.ReadableByteChannel iochan = (java.nio.channels.ReadableByteChannel)chanmon.iochan;
 					nbytes = iochan.read(rcvbuf);
 				}
 			}
 		} catch (Exception ex) {
-			if (ex instanceof java.net.PortUnreachableException) return true;  //indicates we've just received associated ICMP packet - discard
+			if (ex instanceof java.net.PortUnreachableException) return true;  //UDP error, meanning we've received associated ICMP packet - discard
 			discmsg = "Broken pipe on Receive";
 			LEVEL lvl = LEVEL.TRC3;
 			if (chanmon.dsptch.logger.isActive(lvl)) {
-				chanmon.dsptch.logger.log(lvl, ex, false, "IOExec: read() failed on E"+chanmon.cm_id+"/"+chanmon.iochan);
+				chanmon.dsptch.logger.log(lvl, ex, false, "IOExec: read() failed on "+chanmon.getClass().getName()+"/E"+chanmon.cm_id+"/"+chanmon.iochan);
 			}
 		}
 		if (nbytes == 0) return true;
@@ -212,7 +213,7 @@ public final class IOExecReader
 	// Returns false to indicate rcvbuf definitely cannot satisfy another read
 	private boolean readNextChunk() throws com.grey.base.FaultException, java.io.IOException
 	{
-		int buflimit = rcvbuf.position();
+		final int buflimit = rcvbuf.position();
 		if (!isFlagSet(F_ENABLED) || scanmark == buflimit) return false;
 		int userbytes = 0; //number of bytes to return in callback
 
@@ -308,7 +309,7 @@ public final class IOExecReader
 	// ultimate position. So it would be wrong.
 	public int flush()
 	{
-		int nbytes = rcvbuf.position() - readmark;
+		final int nbytes = rcvbuf.position() - readmark;
 		rcvbuf.clear();
 		scanmark = 0;
 		readmark = 0;

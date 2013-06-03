@@ -77,6 +77,27 @@ public class StringOpsTest
 		org.junit.Assert.assertFalse(StringOps.sameSeqNoCase("AbC", 0, 1, null));
 	}
 
+	@org.junit.Test
+	public void testIndexOf()
+	{
+		org.junit.Assert.assertEquals(-1, StringOps.indexOfNoCase("vvv", "abc"));
+		org.junit.Assert.assertEquals(-1, StringOps.indexOfNoCase("vvvv", "abc"));
+		org.junit.Assert.assertEquals(-1, StringOps.indexOfNoCase("vv", "abc"));
+		org.junit.Assert.assertEquals(-1, StringOps.indexOfNoCase("ab", "abc"));
+		org.junit.Assert.assertEquals(-1, StringOps.indexOfNoCase("avvabvvab", "abc"));
+
+		org.junit.Assert.assertEquals(0, StringOps.indexOfNoCase("abc", "A"));
+		org.junit.Assert.assertEquals(1, StringOps.indexOfNoCase("abc", "B"));
+		org.junit.Assert.assertEquals(2, StringOps.indexOfNoCase("abc", "C"));
+
+		org.junit.Assert.assertEquals(0, StringOps.indexOfNoCase("abc", "abc"));
+		org.junit.Assert.assertEquals(0, StringOps.indexOfNoCase("abc", "aBc"));
+		String lead = "avvabvv";
+		org.junit.Assert.assertEquals(lead.length(), StringOps.indexOfNoCase(lead+"abc", "abc"));
+		org.junit.Assert.assertEquals(lead.length(), StringOps.indexOfNoCase(lead+"abcvv", "abc"));
+		org.junit.Assert.assertEquals(2, StringOps.indexOfNoCase("vvabcvv", "abc"));
+	}
+
     @org.junit.Test
     public void testStripQuotes()
     {

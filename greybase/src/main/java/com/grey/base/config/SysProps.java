@@ -123,7 +123,7 @@ public class SysProps
 		String sysprop_override = "grey.properties";
 		String pthnam = System.getProperty(sysprop_override);
 		if (pthnam == null) {
-			String[] huntpath = new String[]{"./grey.properties",
+			String[] huntpath = new String[]{"./grey.properties", "./conf/grey.properties",
 					System.getProperty("user.home", ".")+"/grey.properties"};
 			for (int idx = 0; idx != huntpath.length; idx++) {
 				if (huntpath[idx] == null) continue;

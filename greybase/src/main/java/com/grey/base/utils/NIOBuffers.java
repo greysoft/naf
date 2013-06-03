@@ -67,7 +67,7 @@ public class NIOBuffers
 	public static java.nio.ByteBuffer encode(java.nio.CharBuffer chbuf, java.nio.ByteBuffer bybuf, java.nio.charset.CharsetEncoder chenc,
 			boolean directbuf)
 	{
-		int bufsiz = (int)(chenc.maxBytesPerChar() * chbuf.capacity()) + 1;
+		final int bufsiz = (int)(chenc.maxBytesPerChar() * chbuf.capacity()) + 1;
 		bybuf = prepareBuffer(bufsiz, bybuf, directbuf);
 		chenc.reset();
 		java.nio.charset.CoderResult sts = chenc.encode(chbuf, bybuf, true);
@@ -88,11 +88,11 @@ public class NIOBuffers
 	public static java.nio.ByteBuffer encode(CharSequence str, int off, int len, java.nio.ByteBuffer bybuf, boolean directbuf)
 	{
 		bybuf = prepareBuffer(len, bybuf, directbuf);
-		int lmt = off + len;
+		final int lmt = off + len;
 
 		if (bybuf.hasArray()) {
 			// not sure if we gain much by this, especially as we still have to make a method call on str.charAt()
-			byte[] arr = bybuf.array();
+			final byte[] arr = bybuf.array();
 			int bidx = bybuf.arrayOffset();
 
 			for (int idx = off; idx != lmt; idx++) {
@@ -143,19 +143,17 @@ public class NIOBuffers
 	
 	public static StringBuilder decode(java.nio.ByteBuffer bybuf, StringBuilder sb, java.nio.charset.CharsetDecoder chdec)
 	{
-		java.nio.CharBuffer chbuf = java.nio.CharBuffer.allocate(bybuf.remaining());  // number of decoded chars will never exceed number of bytes
+		final java.nio.CharBuffer chbuf = java.nio.CharBuffer.allocate(bybuf.remaining());  // number of decoded chars will never exceed number of bytes
 		if (sb == null) sb = new StringBuilder();
-		chbuf = decodeCB(bybuf, chbuf, chdec);
+		decodeCB(bybuf, chbuf, chdec);
 		sb.append(chbuf);
 		return sb;
 	}
 	
 	public static java.nio.CharBuffer decodeCB(java.nio.ByteBuffer bybuf, java.nio.CharBuffer chbuf, java.nio.charset.CharsetDecoder chdec)
 	{
-		java.nio.charset.CoderResult sts;
 		chdec.reset();
-
-		sts = chdec.decode(bybuf, chbuf, true);
+		java.nio.charset.CoderResult sts = chdec.decode(bybuf, chbuf, true);
 		if (sts == java.nio.charset.CoderResult.UNDERFLOW) sts = chdec.flush(chbuf);
 		if (sts != java.nio.charset.CoderResult.UNDERFLOW) throw new RuntimeException("Failed to byte-encode strlen=" + chbuf.length()
 				+ " into bufsiz=" + bybuf.capacity() + " with " + chdec + " - " + sts);
@@ -170,10 +168,10 @@ public class NIOBuffers
 	 */
 	public static int transfer(java.nio.ByteBuffer srcbuf, java.nio.ByteBuffer dstbuf, byte[] xferbuf)
 	{
-		int off_src = srcbuf.position();
-		int off_dst = dstbuf.position();
-		int datalen = srcbuf.limit() - off_src;
-		int nbytes = Math.min(dstbuf.limit() - off_dst, datalen);
+		final int off_src = srcbuf.position();
+		final int off_dst = dstbuf.position();
+		final int datalen = srcbuf.limit() - off_src;
+		final int nbytes = Math.min(dstbuf.limit() - off_dst, datalen);
 
 		if (srcbuf.hasArray()) {
 			if (dstbuf.hasArray()) {
@@ -198,7 +196,7 @@ public class NIOBuffers
 	public static int transfer(java.nio.ByteBuffer srcbuf, java.nio.ByteBuffer dstbuf)
 	{
 		if (srcbuf.hasArray() || dstbuf.hasArray()) return transfer(srcbuf, dstbuf, null);
-		int nbytes = srcbuf.remaining();
+		final int nbytes = srcbuf.remaining();
 		dstbuf.put(srcbuf);
 		return nbytes;
 	}
@@ -216,6 +214,7 @@ public class NIOBuffers
 	private static java.nio.ByteBuffer prepareBuffer(int siz, java.nio.ByteBuffer buf, boolean directbuf)
 	{
 		if (buf == null || buf.capacity() < siz) {
+			if (buf != null) directbuf = buf.isDirect();
 			buf = create(siz, directbuf);
 		} else {
 			buf.clear();

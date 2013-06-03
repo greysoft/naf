@@ -140,8 +140,8 @@ public final class ResolverService
 		tmtcacheprune = cfg.getTime("cache/@prune", "4h");
 		dump_on_exit = cfg.getBool("cache/@exitdump", false);
 		
-		com.grey.naf.BufferSpec bufspec_tcp = new com.grey.naf.BufferSpec(pktsiztcp, pktsiztcp, true);
-		com.grey.naf.BufferSpec bufspec_udp = new com.grey.naf.BufferSpec(pktsizudp, pktsizudp, true);
+		com.grey.naf.BufferSpec bufspec_tcp = new com.grey.naf.BufferSpec(pktsiztcp, pktsiztcp);
+		com.grey.naf.BufferSpec bufspec_udp = new com.grey.naf.BufferSpec(pktsizudp, pktsizudp);
 
 		udpdnspkt = (always_tcp ? null : new Packet(false, bufspec_udp));
 

@@ -74,7 +74,6 @@ public class ChannelMonitorTest
 	{
 		private final ChannelMonitorTest runner;
 		public int xmtbytes;  //total number of bytes transmitted
-		private boolean inshutdown;
 
 		public CMW(Dispatcher d, java.nio.channels.SelectableChannel w, com.grey.naf.BufferSpec bufspec, ChannelMonitorTest runner)
 				throws com.grey.base.ConfigException, com.grey.base.FaultException, java.io.IOException {
@@ -91,21 +90,38 @@ public class ChannelMonitorTest
 		}
 
 		public void stop() throws java.io.IOException {
-			inshutdown = true;
-			if (chanwriter.isBlocked()) return;
-			disconnect();
-			disconnect();//make sure twice is safe
-			if (--runner.cmcnt == 0) {
-				runner.completed = true;
-				dsptch.stop(dsptch);
+			boolean done = disconnect();
+			if (chanwriter.isBlocked()) {
+				org.junit.Assert.assertFalse(done);
+				return;
 			}
+			org.junit.Assert.assertTrue(done);
+			terminated();
 		}
 
 		@Override
-		protected void ioTransmitted()
-				throws com.grey.base.FaultException, java.io.IOException {
-			if (inshutdown) stop();
+		protected void disconnectLingerDone(boolean ok, CharSequence info, Throwable ex) {
+			if (!ok) org.junit.Assert.fail("Disconnect failed - "+info+" - "+ex);
+			boolean done = disconnect(true); //make sure repeated call is ok
+			org.junit.Assert.assertTrue(done);
+			terminated();
 		}
+
+		private void terminated() {
+			boolean done = disconnect(); //make sure twice is safe
+			org.junit.Assert.assertTrue(done);
+
+			if (--runner.cmcnt == 0) {
+				try {
+					dsptch.stop(dsptch);
+				} catch (Exception ex2) {
+					org.junit.Assert.fail("Failed to stop Dispatcher - "+ex2);
+					return;
+				}
+				runner.completed = true;
+			}
+		}
+
 	}
 
 	@org.junit.Test
@@ -130,7 +146,7 @@ public class ChannelMonitorTest
 		completed = false;
 		cmcnt = 0;
 		int rcvcap = xmtsiz - 1;
-		com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(rcvcap, xmtsiz, true, directbufs);
+		com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(rcvcap, xmtsiz, directbufs);
 
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
 		def.hasNafman = false;

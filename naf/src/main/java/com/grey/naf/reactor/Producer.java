@@ -52,8 +52,10 @@ public final class Producer<T>
 		consumerType = consumer.getClass().getName()+"/"+clss_item.getName();
 		exchgq = new com.grey.base.utils.Circulist<T>(clss_item);
 		availq = new com.grey.base.utils.Circulist<T>(clss_item);
-		if (logger != null) logger.trace("Dispatcher="+(dsptch==null?"n/a":dsptch.name)+" created Producer="+this
-				+" for Consumer="+consumerType);
+		if (logger != null) {
+			logger.trace("Dispatcher="+(dsptch==null?"n/a":dsptch.name)+" created Producer="
+					+this+"/"+alertspipe+" for Consumer="+consumerType);
+		}
 	}
 
 	// If some items are already on the available queue, then we don't attempt to consume them even if
@@ -137,9 +139,7 @@ public final class Producer<T>
 	// so we can skip the I/O cost of sending it a redundant signal.
 	private void produce(Dispatcher d, int exchq_prevsize) throws java.io.IOException
 	{
-		if (consumer == null) {
-			throw new java.io.IOException("Illegal put-array on closed Producer+"+this+" - "+(alertspipe==null?"Sync":alertspipe.dsptch.name));
-		}
+		if (consumer == null) return;
 		if (alertspipe == null || d == alertspipe.dsptch) {
 			producerEvent(); //we can synchronously call the Consumer
 		} else {
@@ -203,7 +203,7 @@ public final class Producer<T>
 			xmtbuf = niobuf.asReadOnlyBuffer();
 
 			// enable event notifications on the read (consumer) endpoint of our pipe
-			com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(64, 0, false);
+			com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(64, 0);
 			chanreader = new IOExecReader(bufspec);
 			initChannel(rep, true, true);
 			chanreader.receive(0);

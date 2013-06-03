@@ -177,25 +177,10 @@ final class SSLConnection
 		appdataRcvBuf.clear();
 	}
 
-	public boolean transmit(java.nio.channels.FileChannel fchan, long pos, long limit) throws java.io.IOException
-	{
-		boolean done = true;
-		java.nio.ByteBuffer buf = cm.dsptch.allocBuffer(engine.getSession().getApplicationBufferSize());
-		while (pos != limit) {
-			buf.clear();
-			int nbytes = fchan.read(buf, pos);
-			buf.flip();
-			done = transmit(buf);
-			pos += nbytes;
-		}
-		//final status dominates - it can only transition from non-blocked (true) to blocked (false)
-		return done;
-	}
-
-	public boolean transmit(java.nio.ByteBuffer xmtbuf) throws java.io.IOException
+	public void transmit(java.nio.ByteBuffer xmtbuf) throws java.io.IOException
 	{
 		try {
-			return transmit(xmtbuf, false);
+			transmit(xmtbuf, false);
 		} catch (com.grey.base.FaultException ex) {
 			throw new java.io.IOException("SSL transmit failed - "+ex, ex);
 		}
@@ -213,7 +198,7 @@ final class SSLConnection
 		}
 		SSLEngineResult.Status engineStatus;
 
-		// Prepare to loop, on the off chance that xmtbuf is too large to stuff into sslprotoXmtBuf in one go
+		// Prepare to loop, in case xmtbuf is too large to stuff into sslprotoXmtBuf in one go
 		while (xmtbuf.hasRemaining()) {
 			try {
 				engineStatus = encode(xmtbuf);

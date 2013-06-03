@@ -286,7 +286,7 @@ public class SSLConnectionTest
 			srvport = port;
 			XmlConfig sslcfg = (cfg == null ? XmlConfig.NULLCFG : new XmlConfig(cfg, "ssl"));
 			sslconfig = com.grey.naf.SSLConfig.create(sslcfg, null, null, true);
-			com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(cfg, "niobuffers", 256, 128, true);
+			com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(cfg, "niobuffers", 256, 128);
 			chanreader = new IOExecReader(bufspec);
 			chanwriter = new IOExecWriter(bufspec);
 			org.junit.Assert.assertNotNull(getSSLConfig());
@@ -359,7 +359,7 @@ public class SSLConnectionTest
 				throws com.grey.base.ConfigException, java.io.IOException, java.security.GeneralSecurityException
 		{
 			super(l);
-			bufspec = new com.grey.naf.BufferSpec(cfg, "niobuffers", 256, 128, true);
+			bufspec = new com.grey.naf.BufferSpec(cfg, "niobuffers", 256, 128);
 			org.junit.Assert.assertNotNull(getSSLConfig());
 		}
 

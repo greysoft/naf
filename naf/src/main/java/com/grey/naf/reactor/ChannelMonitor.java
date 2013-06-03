@@ -10,7 +10,7 @@ import com.grey.logging.Logger.LEVEL;
 
 public abstract class ChannelMonitor
 {
-	private static final boolean halfduplex = SysProps.get("greynaf.io.halfduplex", false);
+	static final boolean halfduplex = SysProps.get("greynaf.io.halfduplex", false);
 
 	private static final int S_ISCONN = 1 << 0; //the iochan endpoint is connected to its remote peer
 	private static final int S_APPCONN = 1 << 1; //the application has been notified that we are connected
@@ -44,8 +44,6 @@ public abstract class ChannelMonitor
 	// particular method is actually abstract.
 	protected void ioDisconnected(CharSequence diagnostic)
 			throws java.io.IOException {disconnect(false);}
-	protected void ioTransmitted()
-			throws com.grey.base.FaultException, java.io.IOException {}
 	protected void ioReceived(com.grey.base.utils.ArrayRef<byte[]> rcvdata, java.net.InetSocketAddress remaddr)
 			throws com.grey.base.FaultException, java.io.IOException {throw new Error("UDP CM.ioReceived() not implemented");}
 	protected void ioReceived(com.grey.base.utils.ArrayRef<byte[]> rcvdata)
@@ -242,14 +240,17 @@ public abstract class ChannelMonitor
 		return (sslcfg != null && !sslcfg.latent);
 	}
 
-	final void transmitCompleted() throws com.grey.base.FaultException, java.io.IOException
+	// The I/O operation is already over, so just swallow any exceptions.
+	// They are probably due to a remote disconnect, and we can handle that later if/when we do any more I/O on this channel
+	final void transmitCompleted() throws BrokenPipeException
 	{
+		disableWrite();
+
 		if (isFlagSet(S_CLOSELINGER)) {
 			disconnectLingerDone(true, null, null); //notify app first
 			disconnect(false); //now disconnect
 			return;
 		}
-		ioTransmitted();
 	}
 
 	// We should not receive Read events after disabling OP_READ, and same goes for Write/OP_WRITE, but beware that some IO events could
@@ -261,7 +262,7 @@ public abstract class ChannelMonitor
 	// call, in case its handler drastically changes our state.
 	final void handleIO(int readyOps) throws com.grey.base.FaultException, java.io.IOException
 	{
-		int validReadyOps = readyOps & regOps;
+		final int validReadyOps = readyOps & regOps;
 
 		if ((validReadyOps & java.nio.channels.SelectionKey.OP_READ) != 0) {
 			if (sslconn != null) {
@@ -310,22 +311,35 @@ public abstract class ChannelMonitor
 		return monitorIO(regOps & ~java.nio.channels.SelectionKey.OP_READ);
 	}
 
-	// Writes mask Reads, so disable any existing Read interest
-	public final boolean enableWrite() throws java.io.IOException
+	final boolean enableWrite() throws BrokenPipeException
 	{
 		setFlag(S_INWRITE);
 		int opflags = (regOps | java.nio.channels.SelectionKey.OP_WRITE);
 		if (halfduplex) opflags &= ~java.nio.channels.SelectionKey.OP_READ;
-		return monitorIO(opflags);
+		try {
+			//this typically means the remote party has closed the connection.
+			return monitorIO(opflags);
+		} catch (Exception ex) {
+			brokenPipe(LEVEL.TRC2, "I/O error on Write registration", "IOExec: failed to enable Write", ex);
+			return false;
+		}
 	}
 
-	public final boolean disableWrite() throws java.io.IOException
+	// if in half-duplex mode, we restore the read that was disabled by the OP_WRITE
+	private final boolean disableWrite() throws BrokenPipeException
 	{
 		clearFlag(S_INWRITE);
 		int opflags = regOps & ~java.nio.channels.SelectionKey.OP_WRITE;
-		// if in half-duplex mode, restore the read that was blocked by this write
 		if (halfduplex && isFlagSet(S_INREAD)) opflags |= java.nio.channels.SelectionKey.OP_READ;
-		return monitorIO(opflags);
+		try {
+			return monitorIO(opflags);
+		} catch (Exception ex) {
+			LEVEL lvl = LEVEL.TRC2;
+			if (dsptch.logger.isActive(lvl)) {
+				dsptch.logger.log(lvl, ex, false, "IOExec: failed to disable Write on "+getClass().getName()+"/E"+cm_id+"/"+iochan);
+			}
+			return false;
+		}
 	}
 
 	public final boolean enableListen() throws java.io.IOException
@@ -428,7 +442,7 @@ public abstract class ChannelMonitor
 	final void brokenPipe(LEVEL lvl, CharSequence discmsg, CharSequence errmsg, Throwable ex) throws BrokenPipeException
 	{
 		if (dsptch.logger.isActive(lvl)) {
-			dsptch.logger.log(lvl, ex, false, "E"+cm_id+": "+errmsg
+			dsptch.logger.log(lvl, ex, false, getClass().getName()+"/E"+cm_id+" "+errmsg
 					+" - cmstate=0x"+Integer.toHexString(cmstate)
 					+"; blocked="+(chanwriter != null && chanwriter.isBlocked()));
 		}

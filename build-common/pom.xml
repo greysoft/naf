@@ -11,12 +11,12 @@
 	<name>Common Build Defs</name>
 	<packaging>pom</packaging>
 	<properties>
-		<grey.version.naf>2.3.1</grey.version.naf>
+		<grey.version.naf>2.3.2</grey.version.naf>
 		<grey.version.greybase>${grey.version.naf}</grey.version.greybase>
 		<grey.version.greylog>${grey.version.naf}</grey.version.greylog>
 		<grey.version.greylog-slf4j>${grey.version.greylog}</grey.version.greylog-slf4j>
-		<grey.version.mailismusmta>1.6.1</grey.version.mailismusmta>
-		<grey.version.liceman>1.3.2</grey.version.liceman>
+		<grey.version.mailismusmta>1.6.2</grey.version.mailismusmta>
+		<grey.version.liceman>1.3.3</grey.version.liceman>
 		<grey.manifest.builder>Build Manager</grey.manifest.builder>
 		<grey.manifest.vendor>Grey Software</grey.manifest.vendor>
 		<grey.javaver>1.6</grey.javaver>

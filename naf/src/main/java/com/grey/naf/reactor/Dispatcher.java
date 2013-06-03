@@ -13,9 +13,9 @@ import com.grey.logging.Logger.LEVEL;
 public final class Dispatcher
 	implements Runnable, com.grey.naf.EntityReaper, Producer.Consumer
 {
-	private static final String STOPCMD = "_STOP_";
 	private static final String SYSPROP_HEAPWAIT = "greynaf.dispatchers.heapwait";
 	private static final long shutdown_timer_advance = SysProps.getTime("greynaf.dispatchers.shutdown_advance", "1s");
+	private static final String STOPCMD = "_STOP_";
 
 	private static final java.util.concurrent.ConcurrentHashMap<String, Dispatcher> activedispatchers 
 			= new java.util.concurrent.ConcurrentHashMap<String, Dispatcher>();
@@ -38,6 +38,7 @@ public final class Dispatcher
 	private final com.grey.base.utils.ObjectQueue<Timer> pendingtimers;  //timers which have expired and are ready to fire
 	private final com.grey.base.utils.ObjectWell<Timer> sparetimers;
 	private final Producer<Object> apploader;
+	final com.grey.base.utils.ObjectWell<IOExecWriter.FileWrite> filewritepool;
 
 	public final boolean surviveDownstream;  //survive the exit/death of downstream Dispatchers
 	private final boolean surviveHandlers; //survive error in event handlers
@@ -74,6 +75,7 @@ public final class Dispatcher
 		activetimers = new com.grey.base.utils.Circulist<Timer>(Timer.class);
 		pendingtimers = new com.grey.base.utils.ObjectQueue<Timer>(Timer.class);
 		sparetimers = new com.grey.base.utils.ObjectWell<Timer>(Timer.class, "Dispatcher-"+name);
+		filewritepool = new com.grey.base.utils.ObjectWell<IOExecWriter.FileWrite>(new IOExecWriter.FileWrite.Factory(), "Dispatcher-"+name);
 		flusher = new Flusher(this, def.flush_interval);
 		slct = java.nio.channels.Selector.open();
 
@@ -84,7 +86,9 @@ public final class Dispatcher
 		logger.info("Dispatcher="+name+": survive_downstream="+surviveDownstream+", survive_handlers="+surviveHandlers
 				+", zero_naflets="+zeroNafletsOK+", flush="+TimeOps.expandMilliTime(def.flush_interval));
 		logger.trace("Dispatcher="+name+": Selector="+slct.getClass().getCanonicalName()
-				+" - Provider="+slct.provider().getClass().getCanonicalName()+", jitter="+Timer.JITTER_INTERVAL);
+				+", Provider="+slct.provider().getClass().getCanonicalName()
+				+" - half-duplex="+ChannelMonitor.halfduplex+", jitter="+Timer.JITTER_THRESHOLD
+				+", wbufs="+IOExecWriter.MAXBUFSIZ+"/"+IOExecWriter.FILEBUFSIZ);
 
 		//this has to be done after creating slct, and might as well wait till logger exists as well
 		apploader = new Producer<Object>(Object.class, this, this);
@@ -159,6 +163,7 @@ public final class Dispatcher
 		if (naflets.size() != 0) logger.trace("Naflets: "+naflets);
 		if (activechannels.size() != 0) logger.trace("Channels: "+activechannels);
 		if (activetimers.size()+pendingtimers.size() != 0) logger.trace("Timers: Active="+activetimers+" - Pending="+pendingtimers);
+		try {logger.flush(); } catch (Exception ex) {}
 
 		if (SysProps.get(SYSPROP_HEAPWAIT, false)) {
 			System.out.println("Dispatcher="+name+" has now terminated, and is suspended to offer a heap dump");
@@ -280,7 +285,6 @@ public final class Dispatcher
 		logger.info("Dispatcher="+name+": Reactor terminated - Naflets="+naflets.size()
 				+", Channels="+activechannels.size()+"/"+finalkeys
 				+", Timers="+activetimers.size()+" (pending="+pendingtimers.size()+")");
-		logger.trace("Dumping final state - " +dumpState(null, true));
 	}
 
 	private void fireTimers()
@@ -292,7 +296,7 @@ public final class Dispatcher
 			// Fire within milliseconds of maturity, as jitter in the system clock means the NIO
 			// Selector can trigger a fraction early.
 			Timer tmr = activetimers.get(0);
-			if (tmr.expiry - systime() >= Timer.JITTER_INTERVAL) break;
+			if (tmr.expiry - systime() >= Timer.JITTER_THRESHOLD) break;
 			activetimers.remove(0);
 			pendingtimers.add(tmr);
 		}
@@ -329,23 +333,28 @@ public final class Dispatcher
 		keys.clear(); //this clears the NIO Ready set - NIO would hang otherwise
 	}
 
+	//BrokenPipe is handled differently, but beware of situations where it was thrown by a ChannelMonitor
+	//other than the one whose callback has just failed. This error handler can only deal with the Timer
+	//or ChannelMonitor in whose context it's being called, and it's up to the latter to handle broken
+	//pipes in any other associated connections.
 	private void eventHandlerFailed(ChannelMonitor cm, Timer tmr, Throwable ex)
 	{
-		boolean bpex = ChannelMonitor.isBrokenPipe(ex, cm);
-		if (!bpex) {
-			if (cm == null) {
-				logger.log(LEVEL.ERR, ex, true, "Dispatcher="+name+": Error on Timer handler="+tmr.handler);
-			} else {
-				logger.log(LEVEL.ERR, ex, true, "Dispatcher="+name+": Error on IO handler="+cm);
-			}
-		}
+		boolean bpex = (ex instanceof ChannelMonitor.BrokenPipeException); //BrokenPipe already logged
+		ChannelMonitor cmdisc = (bpex ?
+				(cm == null ? (tmr.handler instanceof ChannelMonitor ? (ChannelMonitor)tmr.handler : null) : cm)
+				: null);
+		if (cmdisc != null && ((ChannelMonitor.BrokenPipeException)ex).cm != cmdisc) cmdisc = null;
 		try {
-			ChannelMonitor cmdisc = (bpex ?
-					(cm == null ? (tmr.handler instanceof ChannelMonitor ? (ChannelMonitor)tmr.handler : null) : cm)
-					: null);
 			if (cmdisc != null) {
 				cmdisc.ioDisconnected(ex.getMessage());
 			} else {
+				if (!bpex) {
+					if (cm == null) {
+						logger.log(LEVEL.ERR, ex, true, "Dispatcher="+name+": Error on Timer handler="+tmr.handler);
+					} else {
+						logger.log(LEVEL.ERR, ex, true, "Dispatcher="+name+": Error on IO handler="+cm);
+					}
+				}
 				if (cm == null) {
 					tmr.handler.eventError(tmr, this, ex);
 				} else {

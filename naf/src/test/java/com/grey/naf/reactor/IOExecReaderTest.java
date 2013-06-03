@@ -152,7 +152,7 @@ public class IOExecReaderTest
 	private void launch(boolean direct) throws com.grey.base.GreyException, java.io.IOException
 	{
 		FileOps.deleteDirectory(rootdir);
-		com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(25, 0, false, direct);
+		com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(25, 0, direct);
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
 		def.hasNafman = false;
 		def.surviveHandlers = false;

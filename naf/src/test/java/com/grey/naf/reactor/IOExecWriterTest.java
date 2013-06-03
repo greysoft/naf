@@ -4,8 +4,6 @@
  */
 package com.grey.naf.reactor;
 
-import java.util.Arrays;
-
 import com.grey.base.utils.ByteChars;
 import com.grey.base.utils.FileOps;
 import com.grey.base.utils.StringOps;
@@ -26,18 +24,24 @@ public class IOExecWriterTest
 		}
 
 		public boolean write(CharSequence data) throws java.io.IOException {
-			return chanwriter.transmit(data, 0, data.length());
+			chanwriter.transmit(data, 0, data.length());
+			return !chanwriter.isBlocked();
 		}
 
 		@Override
-		protected void ioTransmitted()
-				throws com.grey.base.FaultException, java.io.IOException {
+		protected void disconnectLingerDone(boolean ok, CharSequence info, Throwable ex) {
+			if (!ok) org.junit.Assert.fail("Linger failed - "+info+" - "+ex);
+			boolean done = disconnect(true); //make sure repeated call is ok
+			org.junit.Assert.assertTrue(done);
+			try {
+				dsptch.stop(dsptch);
+			} catch (Exception ex2) {
+				org.junit.Assert.fail("Failed to stop Dispatcher - "+ex2);
+				return;
+			}
 			synchronized (this) {
 				completed = true;
 			}
-			disconnect();
-			disconnect();//make sure twice is safe
-			dsptch.stop(dsptch);
 		}
 
 		@Override
@@ -52,8 +56,11 @@ public class IOExecWriterTest
 	public void testBlocking() throws com.grey.base.GreyException, java.io.IOException
 	{
 		FileOps.deleteDirectory(rootdir);
-		com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(0, 10, true);
-		String finalseq = "FinalSequence";  //deliberately larger than IOExecWriter's buffer-size
+		final com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(0, 10);
+		final String rdwrdata = "This goes into an xmtpool buffer";  //deliberately larger than IOExecWriter's buffer-size
+		final String rdonlydata = "This is a read-only buffer";  //deliberately larger than IOExecWriter's buffer-size
+		final String initialchar = "z";
+		final java.nio.ByteBuffer rdonlybuf = com.grey.base.utils.NIOBuffers.encode(rdonlydata, null, false).asReadOnlyBuffer();
 
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
 		def.hasNafman = false;
@@ -69,49 +76,60 @@ public class IOExecWriterTest
 		// write to the pipe till it blocks, and then write some more
 		org.junit.Assert.assertFalse(cm.chanwriter.isBlocked());
 		int pipesize = 0;
-		while (cm.write("z")) pipesize++;
+		while (cm.write(initialchar)) pipesize++;
 		org.junit.Assert.assertTrue(cm.chanwriter.isBlocked());
-		boolean done = cm.write(finalseq);
-		org.junit.Assert.assertFalse(done);
-		org.junit.Assert.assertTrue(cm.chanwriter.isBlocked());
-		int xmitcnt = pipesize + 1 + finalseq.length();
+		String expectdata = initialchar;
+		for (int loop = 0; loop != 3; loop++) {
+			cm.chanwriter.transmit(rdonlybuf);
+			org.junit.Assert.assertTrue(cm.chanwriter.isBlocked());
+			expectdata += rdonlydata;
+		}
+		for (int loop = 0; loop != 10; loop++) {
+			boolean done = cm.write(rdwrdata);
+			org.junit.Assert.assertFalse(done);
+			org.junit.Assert.assertTrue(cm.chanwriter.isBlocked());
+			expectdata += rdwrdata;
+		}
+		int xmitcnt = pipesize + expectdata.length();
 
 		// read the first pipe-load of data
 		java.nio.ByteBuffer rcvbuf = com.grey.base.utils.NIOBuffers.create(xmitcnt+10, false); //a few bytes to spare
 		int nbytes = rep.read(rcvbuf);
 		org.junit.Assert.assertEquals(pipesize, nbytes);
 		for (int idx = 0; idx != pipesize; idx++) {
-			org.junit.Assert.assertEquals('z', rcvbuf.get(idx));
+			org.junit.Assert.assertEquals(initialchar.charAt(0), rcvbuf.get(idx));
 		}
 		//there will be no more data to read till Dispatcher triggers the Writer
 		nbytes = rep.read(rcvbuf);
 		org.junit.Assert.assertEquals(0, nbytes);
 		org.junit.Assert.assertTrue(cm.chanwriter.isBlocked());
+		boolean done = cm.disconnect(); //should be delayed by linger
+		org.junit.Assert.assertFalse(done);
 
 		// start the Dispatcher and wait for writer to drain its backlog
-		cm.disconnect();  //make sure it lingers
 		dsptch.start();
 		ByteChars bc = new ByteChars();
 		int rdbytes = 0;
 		rcvbuf.clear();
 		while ((nbytes = rep.read(rcvbuf)) != -1) {
 			if (nbytes == 0) continue;
-			rdbytes += nbytes;
 			for (int idx = 0; idx != nbytes; idx++) {
 				bc.append(rcvbuf.get(idx));
 			}
 			rcvbuf.clear();
+			rdbytes += nbytes;
 		}
 		org.junit.Assert.assertEquals(xmitcnt - pipesize, rdbytes);
-		org.junit.Assert.assertTrue(StringOps.sameSeq("z"+finalseq, bc));
+		org.junit.Assert.assertTrue(StringOps.sameSeq(expectdata, bc));
 
 		dsptch.stop(null);
 		dsptch.waitStopped();
 		synchronized (cm) {
-			org.junit.Assert.assertFalse(cm.completed);
+			org.junit.Assert.assertTrue(cm.completed);
 		}
 		rep.close();
 		org.junit.Assert.assertFalse(cm.isConnected());
+		org.junit.Assert.assertFalse(dsptch.isRunning());
 		org.junit.Assert.assertEquals(bufspec.xmtpool.size(), bufspec.xmtpool.population());
 	}
 
@@ -122,19 +140,19 @@ public class IOExecWriterTest
 	public void testFile() throws com.grey.base.GreyException, java.io.IOException
 	{
 		FileOps.deleteDirectory(rootdir);
-		int filesize = 8 * 1024 * 1024;
-		int xmitbuf = 2 * 1024 * 1024;
-		com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(0, 0, false);
+		final com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(0, 0);
 
 		// create the file
-		String pthnam = rootdir+"/sendfile";
-		java.io.File fh = new java.io.File(pthnam);
+		final int filesize = 8 * 1024 * 1024;
+		final char chval = 'A';
+		final String pthnam = rootdir+"/sendfile";
+		final java.io.File fh = new java.io.File(pthnam);
 		com.grey.base.utils.FileOps.ensureDirExists(fh.getParentFile());
 		org.junit.Assert.assertFalse(fh.exists());
 
 		byte[] filebody = new byte[filesize];
-		Arrays.fill(filebody, (byte)'A');
-		java.io.FileOutputStream ostrm = new java.io.FileOutputStream(fh);
+		java.util.Arrays.fill(filebody, (byte)chval);
+		java.io.FileOutputStream ostrm = new java.io.FileOutputStream(fh, false);
 		try {
 			ostrm.write(filebody);
 		} finally {
@@ -151,17 +169,31 @@ public class IOExecWriterTest
 		java.nio.channels.Pipe pipe = java.nio.channels.Pipe.open();
 		java.nio.channels.Pipe.SourceChannel rep = pipe.source();
 		java.nio.channels.Pipe.SinkChannel wep = pipe.sink();
-		rep.configureBlocking(false);
+		rep.configureBlocking(false); //else rep.read() will hang below if Dispatcher fails, rather than return 0
 		CMW cm = new CMW(dsptch, wep, bufspec);
 		org.junit.Assert.assertTrue(cm.isConnected());
 		java.nio.ByteBuffer rcvbuf = com.grey.base.utils.NIOBuffers.create(filesize, false);
 
-		// send the file down the pipe
-		java.io.FileInputStream istrm = new java.io.FileInputStream(pthnam);
+		// The first send will succeed on Windows, and the next one will find it blocked.
+		// On Linux, even the first send is only partially written.
+		int sendbytes = 0;
+		for (int idx = 0; idx != 3; idx++) {
+			java.io.FileInputStream istrm = new java.io.FileInputStream(fh);
+			java.nio.channels.FileChannel fchan = istrm.getChannel();
+			cm.chanwriter.transmit(fchan);
+			if (idx != 0) org.junit.Assert.assertTrue(cm.chanwriter.isBlocked());
+			sendbytes += filesize;
+		}
+		cm.chanwriter.transmit(fh);
+		sendbytes += filesize;
+		java.io.FileInputStream istrm = new java.io.FileInputStream(fh);
 		java.nio.channels.FileChannel fchan = istrm.getChannel();
-		boolean done = cm.chanwriter.transmit(fchan, xmitbuf, 0, 0);
+		int off = (1024*1024*2)+100;
+		int lmt = (1024*1024*6)+200;
+		cm.chanwriter.transmitChunked(fchan, off, lmt, 900*1000, false);
+		sendbytes += (lmt - off);
+		boolean done = cm.disconnect(true); //should be delayed by linger
 		org.junit.Assert.assertFalse(done);
-		org.junit.Assert.assertTrue(cm.chanwriter.isBlocked());
 
 		// start the Dispatcher and wait for writer to drain its backlog
 		dsptch.start();
@@ -170,18 +202,19 @@ public class IOExecWriterTest
 		rcvbuf.clear();
 		while ((nbytes = rep.read(rcvbuf)) != -1) {
 			if (nbytes == 0) continue;
-			rdbytes += nbytes;
 			for (int idx = 0; idx != nbytes; idx++) {
-				org.junit.Assert.assertEquals('A', rcvbuf.get(idx));
+				org.junit.Assert.assertEquals(chval, rcvbuf.get(idx));
 			}
 			rcvbuf.clear();
+			rdbytes += nbytes;
 		}
-		org.junit.Assert.assertEquals(filesize, rdbytes);
+		org.junit.Assert.assertEquals(sendbytes, rdbytes);
 		dsptch.waitStopped();
 		synchronized (cm) {
 			org.junit.Assert.assertTrue(cm.completed);
 		}
 		rep.close();
 		org.junit.Assert.assertFalse(cm.isConnected());
+		org.junit.Assert.assertFalse(dsptch.isRunning());
 	}
 }

@@ -25,7 +25,7 @@ public class ClientSession
 		relay = null;
 		com.grey.base.config.XmlConfig[] servicecfg = cfg.subSections("services/service");
 		com.grey.base.config.XmlConfig balancercfg = new com.grey.base.config.XmlConfig(cfg, "loadbalancer");
-		bufspec = new com.grey.naf.BufferSpec(cfg, "niobuffers", 1024, 512, true);
+		bufspec = new com.grey.naf.BufferSpec(cfg, "niobuffers", 1024, 512);
 		tmt_idle = cfg.getTime("services/@timeout", 0);
 
 		if (servicecfg == null) {

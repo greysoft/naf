@@ -4,7 +4,7 @@
  */
 package com.grey.naf.reactor;
 
-public class Flusher
+public final class Flusher
 	implements Timer.Handler
 {
 	private final java.util.ArrayList<java.io.Flushable> flushables = new java.util.ArrayList<java.io.Flushable>();
@@ -12,13 +12,13 @@ public class Flusher
 	private final long interval; //needn't be aligned with com.grey.logging.Parameters.flush_interval
 	private Timer tmr;
 
-	public Flusher(Dispatcher d, long interval)
+	Flusher(Dispatcher d, long interval)
 	{
 		dsptch = d;
 		this.interval = interval;
 	}
 
-	public void shutdown()
+	void shutdown()
 	{
 		if (tmr != null) {
 			tmr.cancel();
