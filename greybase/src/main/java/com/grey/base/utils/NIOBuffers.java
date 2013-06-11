@@ -84,10 +84,16 @@ public class NIOBuffers
 		return encode(str, 0, str.length(), bybuf, directbuf);
 	}
 
-	// direct manipulation of ByteBuffer to directly map bytes to chars without any charset encoding - assumes 8-bit chars
 	public static java.nio.ByteBuffer encode(CharSequence str, int off, int len, java.nio.ByteBuffer bybuf, boolean directbuf)
 	{
 		bybuf = prepareBuffer(len, bybuf, directbuf);
+		encode(str, off, len, bybuf);
+		return bybuf;
+	}
+
+	// direct manipulation of ByteBuffer to directly map bytes to chars without any charset encoding - assumes 8-bit chars
+	public static void encode(CharSequence str, int off, int len, java.nio.ByteBuffer bybuf)
+	{
 		final int lmt = off + len;
 
 		if (bybuf.hasArray()) {
@@ -106,23 +112,31 @@ public class NIOBuffers
 		}
 		//position is guaranteed to be zero at this stage, so set the limit to complete our work
 		bybuf.limit(len);
-		return bybuf;
 	}
 
-	// direct manipulation of ByteBuffer to load a byte array into it
 	public static java.nio.ByteBuffer encode(byte[] databuf, int off, int len, java.nio.ByteBuffer bybuf, boolean directbuf)
 	{
 		bybuf = prepareBuffer(len, bybuf, directbuf);
-		bybuf.put(databuf, off, len);
-		bybuf.position(0);
-		bybuf.limit(len);
+		encode(databuf, off, len, bybuf);
 		return bybuf;
 	}
 
-	// direct manipulation of ByteBuffer to load a byte array into it
 	public static java.nio.ByteBuffer encode(byte[] databuf, java.nio.ByteBuffer bybuf, boolean directbuf)
 	{
 		return encode(databuf, 0, databuf.length, bybuf, directbuf);
+	}
+
+	public static void encode(byte[] databuf, java.nio.ByteBuffer bybuf)
+	{
+		encode(databuf, 0, databuf.length, bybuf);
+	}
+
+	// direct manipulation of ByteBuffer to load a byte array into it
+	public static void encode(byte[] databuf, int off, int len, java.nio.ByteBuffer bybuf)
+	{
+		bybuf.put(databuf, off, len);
+		bybuf.position(0);
+		bybuf.limit(len);
 	}
 	
 	

@@ -498,9 +498,9 @@ public final class HashedMap<K,V>
 		@Override
 		public boolean contains(Object obj)
 		{
-			if (!(obj instanceof HashedMap<?,?>.MapEntry)) return false;
+			if (obj == null || obj.getClass() != MapEntry.class) return false;
 			@SuppressWarnings("unchecked")
-			MapEntry entry = MapEntry.class.cast(obj);
+			MapEntry entry = (MapEntry)obj;
 			return HashedMap.this.containsKey(entry.key);
 		}
 
@@ -509,7 +509,7 @@ public final class HashedMap<K,V>
 		{
 			if (!contains(obj)) return false;
 			@SuppressWarnings("unchecked")
-			MapEntry entry = MapEntry.class.cast(obj);
+			MapEntry entry = (MapEntry)obj;
 			HashedMap.this.remove(entry.key);
 			return true;
 		}

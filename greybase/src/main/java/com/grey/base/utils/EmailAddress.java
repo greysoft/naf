@@ -120,7 +120,7 @@ public final class EmailAddress
 	public boolean equals(Object obj)
 	{
 		if (obj == this) return true;
-		if (!(obj instanceof EmailAddress)) return false;
+		if (obj == null || obj.getClass() != EmailAddress.class) return false;
 		EmailAddress addr2 = (EmailAddress)obj;
 		if (addr2.mailbox.ar_len != mailbox.ar_len) return false;
 		return full.equals(addr2.full);

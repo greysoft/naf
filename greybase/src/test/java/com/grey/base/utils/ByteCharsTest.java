@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2012 Yusef Badri - All rights reserved.
+ * Copyright 2011-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -64,8 +64,13 @@ public class ByteCharsTest
 		org.junit.Assert.assertEquals(src_ah.byteAt(len), ah.byteAt(len-1));
 
 		// This constructor call doesn't compile!  Just pass in ArrayRef<byte[]> via the byte[] constructors
-		//ArrayRef<byte[]> ahbyte = new ArrayRef<byte[]>(src_arr);
-		//ah = new ByteChars(ahbyte);
+		ArrayRef<byte[]> ahbyte = new ArrayRef<byte[]>(src_arr);
+		ah = new ByteChars(ahbyte);
+		org.junit.Assert.assertTrue(src_arr == ahbyte.ar_buf);
+		org.junit.Assert.assertTrue(ah.ar_buf == ahbyte.ar_buf);
+		org.junit.Assert.assertEquals(src_arr.length, ah.length());
+		org.junit.Assert.assertEquals(src_arr[0], ah.byteAt(0));
+		org.junit.Assert.assertEquals(src_arr[src_arr.length-1], ah.byteAt(src_arr.length-1));
 	}
 
 	@org.junit.Test
@@ -224,10 +229,12 @@ public class ByteCharsTest
 		org.junit.Assert.assertTrue(ah1.equals(ah2));
 		org.junit.Assert.assertTrue(ah1.hashCode() == ah2.hashCode());
 
-		org.junit.Assert.assertTrue(ah1.equals(ah2.toByteArray()));
-		org.junit.Assert.assertFalse(ah1.equals(ah2.toByteArray(), 0, ah1.ar_len-1));
-		org.junit.Assert.assertTrue(ah1.equals(str.toCharArray()));
-		org.junit.Assert.assertFalse(ah1.equals(ah2.toCharArray(), 0, ah1.ar_len-1));
+		org.junit.Assert.assertTrue(ah1.equalsBytes(ah2.toByteArray()));
+		org.junit.Assert.assertFalse(ah1.equals(ah2.toByteArray()));
+		org.junit.Assert.assertFalse(ah1.equalsBytes(ah2.toByteArray(), 0, ah1.ar_len-1));
+		org.junit.Assert.assertTrue(ah1.equalsChars(str.toCharArray()));
+		org.junit.Assert.assertFalse(ah1.equals(str.toCharArray()));
+		org.junit.Assert.assertFalse(ah1.equalsChars(ah2.toCharArray(), 0, ah1.ar_len-1));
 
 		ah2.ar_buf[ah2.ar_off + ah2.ar_len - 1]++;
 		org.junit.Assert.assertFalse(ah1.equals(ah2));

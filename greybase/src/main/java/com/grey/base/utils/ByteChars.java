@@ -37,9 +37,9 @@ public final class ByteChars
 	public ByteChars append(byte[] barr) {return append(barr, 0, barr == null ? 0 : barr.length);}
 	public ByteChars append(char[] carr) {return append(carr, 0, carr == null ? 0 : carr.length);}
 	public ByteChars appendRange(CharSequence cs, int start, int end) {return append(cs, start, end - start);}
-	public ByteChars pointAt(ByteChars src, int off) {return pointAt(src, off, src.ar_len - off);}
-	public ByteChars pointAt(ByteChars src) {return pointAt(src, 0, src.ar_len);}
-	public ByteChars pointAt(ByteChars src, int off, int len) {return pointAt(src.ar_buf, src.ar_off + off, len);}
+	public ByteChars pointAt(ArrayRef<byte[]> src, int off) {return pointAt(src, off, src.ar_len - off);}
+	public ByteChars pointAt(ArrayRef<byte[]> src) {return pointAt(src, 0, src.ar_len);}
+	public ByteChars pointAt(ArrayRef<byte[]> src, int off, int len) {return pointAt(src.ar_buf, src.ar_off + off, len);}
 	public ByteChars pointAt(byte[] buf) {return pointAt(buf, 0, buf.length);}
 	public int indexOf(CharSequence cs) {return indexOf(0, cs, 0, cs.length());}
 	public int indexOf(int bcoff, CharSequence cs) {return indexOf(bcoff, cs, 0, cs.length());}
@@ -49,6 +49,8 @@ public final class ByteChars
 	public long parseDecimal(int off, int len) {return parseNumber(off, len, 10);}
 	public long parseHexadecimal() {return parseHexadecimal(0, ar_len);}
 	public long parseHexadecimal(int off, int len) {return parseNumber(off, len, 16);}
+	public boolean equalsBytes(byte[] arr) {return equalsBytes(arr, 0, arr.length);}
+	public boolean equalsChars(char[] arr) {return equalsChars(arr, 0, arr.length);}
 
 	public ByteChars() {this(INCR);}
 	public ByteChars(int cap) {super(byte.class, cap);}
@@ -134,8 +136,9 @@ public final class ByteChars
 	public ByteChars append(CharSequence cs, int csoff, int cslen)
 	{
 		if (cslen == 0) return this;
-		if (cs instanceof ByteChars)
-		{
+		Class<?> clss = cs.getClass();
+
+		if (clss == ByteChars.class) {
 			ByteChars bc = (ByteChars)cs;
 			return append(bc.ar_buf, bc.ar_off + csoff, cslen);
 		}
@@ -145,27 +148,19 @@ public final class ByteChars
 		byte[] buf = ar_buf;
 		bcoff += ar_off;
 
-		if (cs instanceof String)
-		{
+		if (clss == String.class) {
 			// tried the deprecated str.getBytes() - simply doesn't work, even for simple ASCII text
 			String str = (String)cs;
-			for (int idx = 0; idx != cslen; idx++)
-			{
+			for (int idx = 0; idx != cslen; idx++) {
 				buf[bcoff++] = (byte)str.charAt(csoff++);
 			}
-		}
-		else if (cs instanceof StringBuilder)
-		{
+		} else if (clss == StringBuilder.class) {
 			StringBuilder str = (StringBuilder)cs;
-			for (int idx = 0; idx != cslen; idx++)
-			{
+			for (int idx = 0; idx != cslen; idx++) {
 				buf[bcoff++] = (byte)str.charAt(csoff++);
 			}
-		}
-		else
-		{
-			for (int idx = 0; idx != cslen; idx++)
-			{
+		} else {
+			for (int idx = 0; idx != cslen; idx++) {
 				buf[bcoff++] = (byte)cs.charAt(csoff++);
 			}	
 		}
@@ -312,9 +307,7 @@ public final class ByteChars
 	public boolean equals(Object obj)
 	{
 		if (obj == this) return true;
-		if (obj instanceof byte[]) return equals((byte[])obj, 0, ((byte[])obj).length);
-		if (obj instanceof char[]) return equals((char[])obj, 0, ((char[])obj).length);
-		if (obj == null || !obj.getClass().equals(getClass())) return false;
+		if (obj == null || obj.getClass() != ByteChars.class) return false;
 		ByteChars bc2 = (ByteChars)obj;
 		if (bc2.ar_len != ar_len) return false;
 
@@ -331,7 +324,7 @@ public final class ByteChars
 		return true;
 	}
 
-	public boolean equals(byte[] barr, int boff, int blen)
+	public boolean equalsBytes(byte[] barr, int boff, int blen)
 	{
 		if (blen != ar_len) return false;
 		final byte[] buf = ar_buf;
@@ -345,7 +338,7 @@ public final class ByteChars
 	}
 
 	// Obviously this will truncate char values larger than a byte
-	public boolean equals(char[] carr, int coff, int clen)
+	public boolean equalsChars(char[] carr, int coff, int clen)
 	{
 		if (clen != ar_len) return false;
 		final byte[] buf = ar_buf;
@@ -436,7 +429,7 @@ public final class ByteChars
 
 	public static ByteChars convertCharSequence(CharSequence src, ByteChars buf)
 	{
-		if (src == null || src instanceof ByteChars) return (ByteChars)src;
+		if (src == null || src.getClass() == ByteChars.class) return (ByteChars)src;
 		if (buf == null) buf = new ByteChars(src.length());
 		return buf.set(src);
 	}

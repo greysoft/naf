@@ -12,7 +12,7 @@ public final class BufferSpec
 	public static final boolean directniobufs = SysProps.get("greynaf.nio.directbufs", false);
 
 	public final int rcvbufsiz;  //receive-buffer size
-	public final int xmtbufsiz;  //transmit buffer size
+	private final int xmtbufsiz;  //transmit buffer size - has no relevance any more, as IOExecWriter now uses SysProps for pool buffer sizes
 	public final boolean directbufs; //false by default, because direct buffers don't have a backing array in standard JDK implementation
 	public final com.grey.base.utils.ObjectWell<java.nio.ByteBuffer> xmtpool;
 	private final java.nio.charset.CharsetEncoder chenc;
@@ -39,15 +39,14 @@ public final class BufferSpec
 		String charset = null;
 		if (cfg != null) {
 			xpath = (xpath == null ? "" : xpath+"/");
-			rcvbufsiz = (int)cfg.getSize(xpath+"@recvsize", rcvsiz);
-			xmtbufsiz = (int)cfg.getSize(xpath+"@xmitsize", xmtsiz);
-			directbufs = cfg.getBool(xpath+"@direct", direct);
+			rcvsiz = (int)cfg.getSize(xpath+"@recvsize", rcvsiz);
+			xmtsiz = (int)cfg.getSize(xpath+"@xmitsize", xmtsiz);
+			direct = cfg.getBool(xpath+"@direct", direct);
 			charset = cfg.getValue(xpath+"@charset", false, null);
-		} else {
-			rcvbufsiz = rcvsiz;
-			xmtbufsiz = xmtsiz;
-			directbufs = direct;
 		}
+		rcvbufsiz = rcvsiz;
+		xmtbufsiz = xmtsiz;
+		directbufs = direct;
 
 		// ISO-8859-1 should be ok, but best to omit, so we can default to direct byte-copy
 		if (charset != null) {
@@ -60,16 +59,17 @@ public final class BufferSpec
 		if (xmtbufsiz == 0) {
 			xmtpool = null;
 		} else {
-			com.grey.base.utils.NIOBuffers.BufferFactory factory = new com.grey.base.utils.NIOBuffers.BufferFactory(xmtbufsiz, directbufs);
+			// initial alloc of pool buffers should be as small as possible, since IOExecWriter will expand them on demand
+			com.grey.base.utils.NIOBuffers.BufferFactory factory = new com.grey.base.utils.NIOBuffers.BufferFactory(1, directbufs);
 			xmtpool = new com.grey.base.utils.ObjectWell<java.nio.ByteBuffer>(java.nio.ByteBuffer.class, factory,
-								"BufferSpecPool_"+xmtbufsiz+"/"+directbufs, 0, 0, 1);
+								"BufferSpecPool_"+rcvbufsiz+":"+xmtbufsiz+":"+directbufs, 0, 0, 1);
 		}
 	}
 
 	public java.nio.ByteBuffer encode(CharSequence content, java.nio.ByteBuffer bybuf)
 	{
-		if (content instanceof com.grey.base.utils.ByteChars) {
-			com.grey.base.utils.ByteChars bc = com.grey.base.utils.ByteChars.class.cast(content);
+		if (content.getClass() == com.grey.base.utils.ByteChars.class) {
+			com.grey.base.utils.ByteChars bc = (com.grey.base.utils.ByteChars)content;
 			return com.grey.base.utils.NIOBuffers.encode(bc.ar_buf, bc.ar_off, bc.ar_len, bybuf, directbufs);
 		}
 		return com.grey.base.utils.NIOBuffers.encode(content, chenc, null, null, bybuf, directbufs);

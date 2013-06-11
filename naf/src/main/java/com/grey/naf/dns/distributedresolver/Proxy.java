@@ -104,10 +104,10 @@ final class Proxy
 	{
 		Object event;
 		while ((event = prod.consume()) != null) {
-			if (event instanceof Request) {
-				issueRequest(Request.class.cast(event));
-			} else if (event instanceof com.grey.naf.dns.Resolver.Client) {
-				rslvr.cancel(com.grey.naf.dns.Resolver.Client.class.cast(event));
+			if (event.getClass() == Request.class) {
+				issueRequest((Request)event);
+			} else {
+				rslvr.cancel((com.grey.naf.dns.Resolver.Client)event);
 			}
 		}
 	}
@@ -115,7 +115,7 @@ final class Proxy
 	@Override
 	public void dnsResolved(com.grey.naf.reactor.Dispatcher d, com.grey.naf.dns.Answer answer, Object cbdata) throws java.io.IOException
 	{
-		requestResolved(Request.class.cast(cbdata), answer);
+		requestResolved((Request)cbdata, answer);
 	}
 
 	private void issueRequest(Request req) throws java.io.IOException

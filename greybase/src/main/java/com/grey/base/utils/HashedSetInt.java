@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -55,7 +55,7 @@ public final class HashedSetInt
 	public IteratorInt recycledIterator()
 	{
 		if (recycled_iterator == null) {
-			recycled_iterator = HashedMapIntInt.KeysIterator.class.cast(iterator());
+			recycled_iterator = (HashedMapIntInt.KeysIterator)iterator();
 		} else {
 			recycled_iterator.reset();
 		}

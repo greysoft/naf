@@ -4,7 +4,6 @@
  */
 package com.grey.naf.reactor;
 
-import com.grey.base.utils.ByteChars;
 import com.grey.base.utils.FileOps;
 import com.grey.base.utils.StringOps;
 
@@ -25,6 +24,16 @@ public class IOExecWriterTest
 
 		public boolean write(CharSequence data) throws java.io.IOException {
 			chanwriter.transmit(data, 0, data.length());
+			return !chanwriter.isBlocked();
+		}
+
+		public boolean write(com.grey.base.utils.ByteChars data) throws java.io.IOException {
+			chanwriter.transmit(data);
+			return !chanwriter.isBlocked();
+		}
+
+		public boolean write(java.nio.ByteBuffer data) throws java.io.IOException {
+			chanwriter.transmit(data);
 			return !chanwriter.isBlocked();
 		}
 
@@ -73,23 +82,31 @@ public class IOExecWriterTest
 		CMW cm = new CMW(dsptch, wep, bufspec);
 		org.junit.Assert.assertTrue(cm.isConnected());
 
-		// write to the pipe till it blocks, and then write some more
+		// write to the pipe till it blocks
 		org.junit.Assert.assertFalse(cm.chanwriter.isBlocked());
 		int pipesize = 0;
 		while (cm.write(initialchar)) pipesize++;
 		org.junit.Assert.assertTrue(cm.chanwriter.isBlocked());
 		String expectdata = initialchar;
+		// pipe has now blocked, so do some more sends
 		for (int loop = 0; loop != 3; loop++) {
 			cm.chanwriter.transmit(rdonlybuf);
 			org.junit.Assert.assertTrue(cm.chanwriter.isBlocked());
 			expectdata += rdonlydata;
 		}
+		com.grey.base.utils.ByteChars bc = new com.grey.base.utils.ByteChars(rdwrdata);
 		for (int loop = 0; loop != 10; loop++) {
-			boolean done = cm.write(rdwrdata);
+			boolean done = cm.write(bc);
 			org.junit.Assert.assertFalse(done);
 			org.junit.Assert.assertTrue(cm.chanwriter.isBlocked());
 			expectdata += rdwrdata;
 		}
+		//need to do this send to test main enqueue() loop
+		java.nio.ByteBuffer niobuf = com.grey.base.utils.NIOBuffers.encode(rdwrdata, null, false);
+		boolean done = cm.write(niobuf);
+		org.junit.Assert.assertFalse(done);
+		org.junit.Assert.assertTrue(cm.chanwriter.isBlocked());
+		expectdata += rdwrdata;
 		int xmitcnt = pipesize + expectdata.length();
 
 		// read the first pipe-load of data
@@ -103,12 +120,12 @@ public class IOExecWriterTest
 		nbytes = rep.read(rcvbuf);
 		org.junit.Assert.assertEquals(0, nbytes);
 		org.junit.Assert.assertTrue(cm.chanwriter.isBlocked());
-		boolean done = cm.disconnect(); //should be delayed by linger
+		done = cm.disconnect(); //should be delayed by linger
 		org.junit.Assert.assertFalse(done);
 
 		// start the Dispatcher and wait for writer to drain its backlog
 		dsptch.start();
-		ByteChars bc = new ByteChars();
+		bc = new com.grey.base.utils.ByteChars();
 		int rdbytes = 0;
 		rcvbuf.clear();
 		while ((nbytes = rep.read(rcvbuf)) != -1) {

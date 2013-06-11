@@ -139,7 +139,6 @@ public final class Producer<T>
 	// so we can skip the I/O cost of sending it a redundant signal.
 	private void produce(Dispatcher d, int exchq_prevsize) throws java.io.IOException
 	{
-		if (consumer == null) return;
 		if (alertspipe == null || d == alertspipe.dsptch) {
 			producerEvent(); //we can synchronously call the Consumer
 		} else {

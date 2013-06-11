@@ -34,6 +34,7 @@ public final class Secondary
 	{
 		in_shutdown = true;
 		requests.shutdown(false);
+		if (Primary.get() == null) return; //Primary has already exited, so don't signal it
 		try {
 			primary.secondaryUnsubscribed(this);
 		} catch (Exception ex) {

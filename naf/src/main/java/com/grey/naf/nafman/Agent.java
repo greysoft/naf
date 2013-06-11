@@ -152,7 +152,7 @@ public abstract class Agent
 	}
 
 	// signal our Dispatcher to stop, and it will in turn stop us when it shuts down
-	protected boolean stopDispatcher() throws java.io.IOException
+	protected boolean stopDispatcher()
 	{
 		if (in_shutdown) return true;  //Dispatcher has already told us to stop
 		return dsptch.stop(dsptch);

@@ -66,7 +66,7 @@ public abstract class ChannelMonitor
 	public final boolean isBrokenPipe() {return isFlagSet(S_BRKPIPE);}
 	public final boolean disconnect() {return disconnect(true);}
 	protected final void setReaper(com.grey.naf.EntityReaper rpr) {reaper = rpr;}
-	final boolean canKill() {return (isConnected() && !getClass().equals(Producer.AlertsPipe.class));}
+	final boolean canKill() {return (isConnected() && getClass() != Producer.AlertsPipe.class);}
 	final long getStartTime() {return start_time;}
 
 	protected final boolean usingSSL() {return sslconn != null;}
@@ -379,12 +379,13 @@ public abstract class ChannelMonitor
 
 	final void dumpState(StringBuilder sb, boolean verbose)
 	{
+		final Class<?> clss = getClass();
 		boolean is_producer = false;
 		int prevlen = sb.length();
 		sb.append("ID=").append(cm_id).append(": ");
 		if (Listener.class.isInstance(this)) {
-			sb.append(getClass().getSimpleName()).append('/').append(((Listener)this).getServerType().getName());
-		} else if (getClass().equals(Producer.AlertsPipe.class)) {
+			sb.append(clss.getSimpleName()).append('/').append(((Listener)this).getServerType().getName());
+		} else if (clss == Producer.AlertsPipe.class) {
 			if (!verbose) {
 				sb.setLength(prevlen);
 				return;
@@ -392,7 +393,7 @@ public abstract class ChannelMonitor
 			is_producer = true;
 			sb.append("Producer/").append(((Producer.AlertsPipe)this).producer.consumerType);
 		} else {
-			sb.append(getClass().getName());
+			sb.append(clss.getName());
 		}
 		sb.append("<br/>State=");
 		if (isFlagSet(S_UDP)) sb.append('U');
@@ -469,8 +470,8 @@ public abstract class ChannelMonitor
 
 	public static boolean isBrokenPipe(Throwable ex, ChannelMonitor cm)
 	{
-		if (!(ex instanceof ChannelMonitor.BrokenPipeException)) return false;
-		return ((ChannelMonitor.BrokenPipeException)ex).cm == cm;
+		if (ex == null || ex.getClass() != BrokenPipeException.class) return false;
+		return ((BrokenPipeException)ex).cm == cm;
 	}
 
 
@@ -482,7 +483,7 @@ public abstract class ChannelMonitor
 	 * almost impossible to guard against - certainly not without inserting state checks after every call to
 	 * IOExecWriter and IOExecReader.
 	 */
-	public static class BrokenPipeException extends java.io.IOException
+	public static final class BrokenPipeException extends java.io.IOException
 	{
 		private static final long serialVersionUID = 1L;
 		public final ChannelMonitor cm;

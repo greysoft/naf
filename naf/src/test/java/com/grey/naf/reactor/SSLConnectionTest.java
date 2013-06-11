@@ -14,6 +14,9 @@ public class SSLConnectionTest
 	implements com.grey.naf.EntityReaper, Timer.Handler
 {
 	private static final String rootdir = DispatcherTest.initPaths(SSLConnectionTest.class);
+	private static int filesize = (int)(IOExecWriter.MAXBUFSIZ * 1.5) + 1;
+	private static int filexmtsiz = filesize - 30;
+	private static byte filebyte = (byte)143; //deliberately 8-bit
 
 	/* The required keys and certificates are generated with this script:
 	keytool -genkeypair -v -alias server1key -keystore keystore.jks -keypass server1pass -validity 3650 -dname "CN=server1@localhost, O=Grey Software, ST=London, C=UK" -storepass kspass123
@@ -163,8 +166,8 @@ public class SSLConnectionTest
 			org.junit.Assert.assertEquals(fail_step, lastsrv.step);
 		} else {
 			//this tests for successful completion, ie. it ran all the way through
-			org.junit.Assert.assertEquals(iomessages.length, clnt.step);
-			org.junit.Assert.assertEquals(iomessages.length, lastsrv.step);
+			org.junit.Assert.assertEquals(iomessages.length+1, clnt.step);
+			org.junit.Assert.assertEquals(iomessages.length+1, lastsrv.step);
 		}
 		org.junit.Assert.assertEquals(1, srvcnt);
 		org.junit.Assert.assertEquals(1, reapcnt);
@@ -339,12 +342,43 @@ public class SSLConnectionTest
 
 		private void action() throws java.io.IOException
 		{
-			if (step == iomessages.length) {
+			if (step == iomessages.length+1) {
 				disconnect();
 				return;
 			}
-			chanwriter.transmit(iomessages[step++]+"\n");
+			if (step == iomessages.length) {
+				sendfile();
+			} else {
+				chanwriter.transmit(iomessages[step]+"\n");
+			}
+			step++;
 			expectedRsp = "OK"+step;
+		}
+
+		private void sendfile() throws java.io.IOException
+		{
+			final String pthnam = rootdir+"/sendfile";
+			final java.io.File fh = new java.io.File(pthnam);
+			com.grey.base.utils.FileOps.ensureDirExists(fh.getParentFile());
+			org.junit.Assert.assertFalse(fh.exists());
+
+			final byte[] filebody = new byte[filesize];
+			final int off = 10;
+			final int lmt = off + filexmtsiz;
+			org.junit.Assert.assertTrue(lmt < filesize); //sanity check
+			java.util.Arrays.fill(filebody, (byte)0);
+			java.util.Arrays.fill(filebody, off, lmt, filebyte);
+			java.io.FileOutputStream ostrm = new java.io.FileOutputStream(fh, false);
+			try {
+				ostrm.write(filebody);
+			} finally {
+				ostrm.close();
+			}
+			org.junit.Assert.assertTrue(fh.exists());
+			org.junit.Assert.assertEquals(filebody.length, fh.length());
+			java.io.FileInputStream istrm = new java.io.FileInputStream(fh);
+			java.nio.channels.FileChannel fchan = istrm.getChannel();
+			chanwriter.transmit(fchan, off, lmt, false);
 		}
 	}
 
@@ -353,13 +387,14 @@ public class SSLConnectionTest
 	{
 		private final com.grey.naf.BufferSpec bufspec;
 		private int step;
+		private int filebytes;
 
 		// This is the constructor for the prototype server object
 		public SSLS(ConcurrentListener l, com.grey.base.config.XmlConfig cfg)
 				throws com.grey.base.ConfigException, java.io.IOException, java.security.GeneralSecurityException
 		{
 			super(l);
-			bufspec = new com.grey.naf.BufferSpec(cfg, "niobuffers", 256, 128);
+			bufspec = new com.grey.naf.BufferSpec(cfg, "niobuffers", 8 * 1024, 128);
 			org.junit.Assert.assertNotNull(getSSLConfig());
 		}
 
@@ -403,8 +438,19 @@ public class SSLConnectionTest
 		@Override
 		public void ioReceived(com.grey.base.utils.ArrayRef<byte[]> rcvdata) throws com.grey.base.FaultException, java.io.IOException
 		{
-			verifyReceivedMessage(iomessages[step], rcvdata);
-			chanwriter.transmit("OK"+(++step)+"\n");
+			if (step == iomessages.length) {
+				int lmt = rcvdata.ar_off + rcvdata.ar_len;
+				for (int idx = rcvdata.ar_off; idx != lmt; idx++) {
+					org.junit.Assert.assertEquals(filebyte, rcvdata.ar_buf[idx]);
+				}
+				filebytes += rcvdata.ar_len;
+				if (filebytes != filexmtsiz) return;
+			} else {
+				verifyReceivedMessage(iomessages[step], rcvdata);
+			}
+			step++;
+			chanwriter.transmit("OK"+(step)+"\n");
+			if (step == iomessages.length) chanreader.receive(0);
 			verifySSL(this, (SSLConnectionTest)lstnr.controller, getSSLConfig().peerCertName != null, clnt_certname);
 		}
 

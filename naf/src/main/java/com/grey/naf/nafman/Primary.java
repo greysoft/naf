@@ -26,7 +26,7 @@ public final class Primary
 	{
 		com.grey.naf.reactor.Dispatcher[] arr = com.grey.naf.reactor.Dispatcher.getDispatchers();
 		for (int idx = 0; idx != arr.length; idx++) {
-			if (arr[idx].nafman != null && arr[idx].nafman.isPrimary()) return Primary.class.cast(arr[idx].nafman);
+			if (arr[idx].nafman != null && arr[idx].nafman.isPrimary()) return (Primary)arr[idx].nafman;
 		}
 		return null;
 	}
@@ -72,12 +72,7 @@ public final class Primary
 
 		// No danger of list changing in mid-iteration - same reason as processCommand() comments below
 		for (int idx = 0; idx != secondaries.size(); idx++) {
-			try {
-				secondaries.get(idx).dsptch.stop(dsptch);
-			} catch (java.io.IOException ex) {
-				dsptch.logger.info("NAFMAN="+dsptch.name+" failed to issue shutdown on Dispatcher="
-						+secondaries.get(idx).dsptch.name+" - "+com.grey.base.GreyException.summary(ex));
-			}
+			secondaries.get(idx).dsptch.stop(dsptch);
 		}
 
 		if (secondaries.size() != 0) {
@@ -111,7 +106,7 @@ public final class Primary
 			if (tmpagents.get(idx) == this) {
 				commandReceived(cmd);
 			} else {
-				Secondary agent = Secondary.class.cast(tmpagents.get(idx));
+				Secondary agent = (Secondary)tmpagents.get(idx);
 				try {
 					agent.requests.produce(cmd, dsptch);
 				} catch (java.io.IOException ex) {
@@ -139,18 +134,19 @@ public final class Primary
 	{
 		Object event;
 		while ((event = events.consume()) != null) {
-			if (event instanceof Secondary) {
-				Secondary agent = Secondary.class.cast(event);
+			Class<?> clss = event.getClass();
+			if (clss == Secondary.class) {
+				Secondary agent = (Secondary)event;
 				dsptch.logger.info("NAFMAN="+dsptch.name+" received subscription from Secondary="+agent.dsptch.name);
 				secondaries.add(agent);
-			} else if (event instanceof String) {
-				Secondary agent = getSecondary(String.class.cast(event));
+			} else if (clss == String.class) {
+				Secondary agent = getSecondary((String)event);
 				dsptch.logger.info("NAFMAN="+dsptch.name+" received unsubscription from Secondary="+agent.dsptch.name);
 				discardSecondary(agent);
 				secondaries.remove(agent);
 				if (!dsptch.surviveDownstream) stopDispatcher();
-			} else if (event instanceof Command) {
-				Command cmd = Command.class.cast(event);
+			} else {
+				Command cmd = (Command)event;
 				activecmds.remove(cmd);
 				cmd.completed();
 			}

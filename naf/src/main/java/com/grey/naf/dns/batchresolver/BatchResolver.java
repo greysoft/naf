@@ -137,7 +137,7 @@ public final class BatchResolver
 					+" - Result="+answer.result+" for "+answer.qname+" - "+cbdata);
 		}
 		waitcount--;
-		printAnswer(answer, false, String.class.cast(cbdata));
+		printAnswer(answer, false, (String)cbdata);
 		suspend();
 	}
 

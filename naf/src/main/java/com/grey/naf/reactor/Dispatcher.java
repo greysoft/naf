@@ -172,13 +172,18 @@ public final class Dispatcher
 	}
 
 	// This method can be (and is meant to be) called by other threads
-	public boolean stop(Dispatcher d) throws java.io.IOException
+	public boolean stop(Dispatcher d)
 	{
 		if (d == this) {
 			// handle this request synchronously
 			return stop();
 		}
-		apploader.produce(STOPCMD, d);
+		try {
+			apploader.produce(STOPCMD, d);
+		} catch (java.io.IOException ex) {
+			//probably a harmless error caused by Dispatcher already being shut down
+			logger.trace("Failed to send cmd="+STOPCMD+" to Dispatcher="+name+"/Running="+isRunning()+" - "+ex);
+		}
 		return false;
 	}
 
@@ -483,8 +488,8 @@ public final class Dispatcher
 	{
 		Object event;
 		while ((event = apploader.consume()) != null) {
-			if (event instanceof String) {
-				String evtname = String.class.cast(event);
+			if (event.getClass() == String.class) {
+				String evtname = (String)event;
 				if (evtname.equals(STOPCMD)) {
 					// we're being asked to stop this entire dispatcher, not just a naflet
 					stop();
@@ -497,8 +502,8 @@ public final class Dispatcher
 					logger.info("Unloading Naflet="+app.naflet_name+" via Producer");
 					stopNaflet(app);
 				}
-			} else if (event instanceof com.grey.naf.Naflet) {
-				com.grey.naf.Naflet app = com.grey.naf.Naflet.class.cast(event);
+			} else {
+				com.grey.naf.Naflet app = (com.grey.naf.Naflet)event;
 				if (shutdownRequested) {
 					logger.info("Discarding dynamic NAFlet="+app.naflet_name+" as we're in shutdown mode");
 					continue;

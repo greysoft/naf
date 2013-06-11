@@ -38,7 +38,7 @@ final class SSLConnection
 	public SSLConnection(ChannelMonitor chanmon)
 	{
 		cm = chanmon;
-		rawsock = java.nio.channels.SocketChannel.class.cast(cm.iochan);
+		rawsock = (java.nio.channels.SocketChannel)cm.iochan;
 		com.grey.naf.SSLConfig sslcfg = cm.getSSLConfig();
 		engine = sslcfg.isClient ?
 				sslcfg.ctx.createSSLEngine(sslcfg.peerCertName, rawsock.socket().getPort())
@@ -221,7 +221,7 @@ final class SSLConnection
 				throw new java.io.IOException("SSLConnection: engine-status="+engineStatus+" on Transmit");
 			}
 			sslprotoXmtBuf.flip();
-			cm.chanwriter.write(sslprotoXmtBuf);
+			cm.chanwriter.write(sslprotoXmtBuf, false);
 			sslprotoXmtBuf.clear();
 			if (xmtbuf == dummyShakeBuf) break;
 		}
@@ -386,7 +386,7 @@ final class SSLConnection
 		public void drain() throws com.grey.base.FaultException, java.io.IOException {
 			while (bufq.size() != 0) {
 				java.nio.ByteBuffer buf = bufq.peek();
-				if (!transmit(buf, true)) break;
+				if (!transmit(buf, true)) break; //buffer will be sent in full or not at all
 				bufq.remove();
 			}
 		}

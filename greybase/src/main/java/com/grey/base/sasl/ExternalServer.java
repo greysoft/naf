@@ -30,7 +30,7 @@ public final class ExternalServer
 		if (cn == null) return false;
 		auth_username.set(cn);
 		if (msg.ar_len != 0) {
-			if (!auth_username.equals(msg.ar_buf, msg.ar_off, msg.ar_len)) return false;
+			if (!auth_username.equalsBytes(msg.ar_buf, msg.ar_off, msg.ar_len)) return false;
 		}
 		com.grey.base.utils.ByteChars passwd = authenticator.saslPassword(null, auth_username);
 		return (passwd != null);  //just need to establish that user is known

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -19,7 +19,7 @@ public final class IntValue
 	// We need equals() and hashCode() to be able to act as a Collections key
 	public boolean equals(Object obj)
 	{
-		if (!(obj instanceof IntValue)) return false;
+		if (obj == null || obj.getClass() != IntValue.class) return false;
 		IntValue iv2 = (IntValue)obj;
 		return (val == iv2.val);
 	}

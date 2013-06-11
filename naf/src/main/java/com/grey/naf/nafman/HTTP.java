@@ -162,7 +162,6 @@ final class HTTP
 		}
 		bc.append(EOL).append(EOL);
 		if (body != null) bc.append(body);
-		if (niobuf != null && niobuf.capacity() < bc.length()) niobuf = null; //will have to recreate it
 		niobuf = bufspec.encode(bc, niobuf);
 		if (perm) niobuf = niobuf.asReadOnlyBuffer();
 		return niobuf;
