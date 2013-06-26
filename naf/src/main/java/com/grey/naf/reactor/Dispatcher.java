@@ -398,6 +398,11 @@ public final class Dispatcher
 		}
 	}
 
+	void conditionalDeregisterIO(ChannelMonitor cm) throws java.io.IOException
+	{
+		if (activechannels.containsKey(cm.cm_id)) deregisterIO(cm);
+	}
+
 	// If remote party disconnects before we enter here, the chan.register() call will throw, so callers have to be prepared to handle
 	// exceptions without treating them as an error, but rather as a routine disconnect event
 	void monitorIO(ChannelMonitor cm, int ops) throws java.nio.channels.ClosedChannelException

@@ -183,7 +183,7 @@ public class StringOps
 		for (int idx = off+len-1; idx >= off; idx--) {
 			long digit = Character.digit(cs.charAt(idx), radix);
 			if (digit == -1) {
-				throw new NumberFormatException(cs.charAt(idx)+"@"+idx+" in "+off+"+"+len+" - "+cs.subSequence(off, off+len));
+				throw new NumberFormatException(cs.charAt(idx)+"@"+idx+" in "+off+":"+len+" - "+cs.subSequence(off, off+len));
 			}
 			numval += (digit * power);
 			power *= radix;

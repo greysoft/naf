@@ -191,16 +191,16 @@ public class IOExecWriterTest
 		org.junit.Assert.assertTrue(cm.isConnected());
 		java.nio.ByteBuffer rcvbuf = com.grey.base.utils.NIOBuffers.create(filesize, false);
 
-		// The first send will succeed on Windows, and the next one will find it blocked.
-		// On Linux, even the first send is only partially written.
+		// This send loop seems to block at different stages on different platforms, but it
+		// is always blocked by the end.
 		int sendbytes = 0;
 		for (int idx = 0; idx != 3; idx++) {
 			java.io.FileInputStream istrm = new java.io.FileInputStream(fh);
 			java.nio.channels.FileChannel fchan = istrm.getChannel();
 			cm.chanwriter.transmit(fchan);
-			if (idx != 0) org.junit.Assert.assertTrue(cm.chanwriter.isBlocked());
 			sendbytes += filesize;
 		}
+		org.junit.Assert.assertTrue(cm.chanwriter.isBlocked());
 		cm.chanwriter.transmit(fh);
 		sendbytes += filesize;
 		java.io.FileInputStream istrm = new java.io.FileInputStream(fh);

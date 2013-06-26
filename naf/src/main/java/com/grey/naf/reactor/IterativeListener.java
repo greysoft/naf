@@ -61,6 +61,7 @@ public final class IterativeListener
 				cnxhandler.accepted(connsock, this);
 			} catch (Throwable ex) {
 				log.log(LEVEL.TRC, ex, true, "Listener="+name+": Error fielding connection");
+				dsptch.conditionalDeregisterIO(cnxhandler);
 			}
 		}
 	}

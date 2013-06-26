@@ -127,10 +127,13 @@ public final class IOExecWriter
 	// and this class still takes responsibility for closing the file.
 	public void transmit(java.nio.channels.FileChannel fchan, long pos, long lmt, boolean noclose) throws java.io.IOException
 	{
-		if (lmt == 0) lmt = fchan.size();
+		long maxlmt = (lmt == 0 ? fchan.size() : 0); //no need to determine chan.size() just yet, if lmt specified
+		if (lmt == 0) lmt = maxlmt;
 		try {
 			if (chanmon.sslconn != null) {
 				final java.nio.ByteBuffer niobuf = chanmon.dsptch.allocBuffer((int)Math.min(lmt-pos, MAXBUFSIZ));
+				if (maxlmt == 0) maxlmt = fchan.size();
+				if (lmt > maxlmt) lmt = maxlmt;
 				while (pos < lmt) {
 					niobuf.clear();
 					int chunksiz = (int)(lmt - pos);
@@ -274,12 +277,14 @@ public final class IOExecWriter
 			//throws on closed channel (java.io.IOException) or other error, so can't be sure it's closed, but it might as well be
 			final long nbytes = fchan.transferTo(pos, sendbytes, iochan);
 			if (nbytes != sendbytes) {
-				//We didn't write as much as we requested, but that could be because we reached end-of-file.
-				//NB: This code is also designed to spot any reduction in file size, since we started this file-send.
+				//We didn't write as much as we requested, so we're probably blocked, but it could also be because
+				//we reached end-of-file.
+				//NB: This code would also spot any reduction in file size, since we started this file-send.
 				final long maxlmt = fchan.size();
+				pos += nbytes;
 				if (lmt > maxlmt) lmt = maxlmt;
-				if ((pos = pos + nbytes) < lmt) {
-					//Not at end-of-file (or even end-of-send, if we were only sending part of the file)
+				if (pos < lmt) {
+					//Not at end-of-file (or even end-of-send, if we were only sending partial file), so we're blocked
 					if (fw == null) {
 						if (chanmon.dsptch.logger.isActive(WRBLOCKTRC)) {
 							chanmon.dsptch.logger.log(WRBLOCKTRC, "IOExec: File-send="+sendbytes+" blocked with "+nbytes+"/"+sendbytes

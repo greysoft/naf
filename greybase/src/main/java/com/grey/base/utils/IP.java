@@ -173,75 +173,85 @@ public final class IP
 
 	public static int countLocalIPs(int flags) throws java.net.SocketException
 	{
-		return enumerateLocalIPs(flags, null);
+		int[] ips = getLocalIPs(flags);
+		return (ips == null ? 0 : ips.length);
 	}
 
 	public static int[] getLocalIPs(int flags) throws java.net.SocketException
 	{
 		java.util.List<Integer> iplist = new java.util.ArrayList<Integer>();
-		if (enumerateLocalIPs(flags, iplist) == 0) return null;
-		int[] arr = new int[iplist.size()];
+		java.util.Enumeration<java.net.NetworkInterface> ifaces = java.net.NetworkInterface.getNetworkInterfaces();
+		while (ifaces != null && ifaces.hasMoreElements()) {
+			getLocalIPs(ifaces.nextElement(), iplist, flags);
+		}
+		if (iplist.size() == 0) return null;
 
+		int[] arr = new int[iplist.size()];
 		for (int idx = 0; idx != arr.length; idx++) {
 			arr[idx] = iplist.get(idx).intValue();
 		}
 		return arr;
 	}
 
-	private static int enumerateLocalIPs(int flags, java.util.List<Integer> iplist) throws java.net.SocketException
+	private static void getLocalIPs(java.net.NetworkInterface nif, java.util.List<Integer> iplist, int flags) throws java.net.SocketException
 	{
-		int cnt = 0;
-		java.util.Enumeration<java.net.NetworkInterface> ifaces = java.net.NetworkInterface.getNetworkInterfaces();
+		if ((flags & FLAG_IFREAL) != 0
+				&& (nif.isVirtual() || nif.isLoopback() || nif.isPointToPoint())) return;
+		if ((flags & FLAG_IFUP) != 0 && !nif.isUp()) return;
 
-		while (ifaces != null && ifaces.hasMoreElements()) {
-			java.net.NetworkInterface nif = ifaces.nextElement();
-			if ((flags & FLAG_IFUP) != 0 && !nif.isUp()) continue;
-			if ((flags & FLAG_IFREAL) != 0 && nif.isVirtual()) continue;
-			java.util.Enumeration<java.net.InetAddress> ips = nif.getInetAddresses();
-
-			while (ips != null && ips.hasMoreElements()) {
-				java.net.InetAddress ip = ips.nextElement();
-				if ((flags & FLAG_IFREAL) != 0 && (ip.isLoopbackAddress() || ip.isMulticastAddress())) continue;
-				if ((flags & FLAG_IFIP4) != 0 && !ip.getClass().equals(java.net.Inet4Address.class)) continue;
-				if ((flags & FLAG_IFIP6) != 0 && !ip.getClass().equals(java.net.Inet6Address.class)) continue;
-				if (iplist != null) iplist.add(Integer.valueOf(net2ip(ip.getAddress(), 0)));
-				cnt++;
-			}
+		java.util.Enumeration<java.net.InetAddress> ips = nif.getInetAddresses();
+		while (ips != null && ips.hasMoreElements()) {
+			java.net.InetAddress ip = ips.nextElement();
+			if ((flags & FLAG_IFREAL) != 0 && (ip.isLoopbackAddress() || ip.isMulticastAddress())) continue;
+			if ((flags & FLAG_IFIP4) != 0 && !ip.getClass().equals(java.net.Inet4Address.class)) continue;
+			if ((flags & FLAG_IFIP6) != 0 && !ip.getClass().equals(java.net.Inet6Address.class)) continue;
+			iplist.add(Integer.valueOf(net2ip(ip.getAddress(), 0)));
 		}
-		return cnt;
+
+		java.util.Enumeration<java.net.NetworkInterface> ifaces = nif.getSubInterfaces();
+		while (ifaces != null && ifaces.hasMoreElements()) {
+			getLocalIPs(ifaces.nextElement(), iplist, flags);
+		}
 	}
 
 	public static String[] getLocalMACs(int flags) throws java.net.SocketException
 	{
 		java.util.List<String> maclist = new java.util.ArrayList<String>();
 		java.util.Enumeration<java.net.NetworkInterface> ifaces = java.net.NetworkInterface.getNetworkInterfaces();
-
 		while (ifaces != null && ifaces.hasMoreElements()) {
-			// include this interface if it has at least one valid IP attached to it
-			boolean hasvalidIPs = false;
-			java.net.NetworkInterface nif = ifaces.nextElement();
-			if ((flags & FLAG_IFUP) != 0 && !nif.isUp()) continue;
-			if ((flags & FLAG_IFREAL) != 0 && nif.isVirtual()) continue;
-			java.util.Enumeration<java.net.InetAddress> ips = nif.getInetAddresses();
+			getLocalMACs(ifaces.nextElement(), maclist, flags);
+		}
+		if (maclist.size() == 0) return null;
+		return maclist.toArray(new String[maclist.size()]);
+	}
 
-			while (!hasvalidIPs && ips != null && ips.hasMoreElements()) {
+	private static void getLocalMACs(java.net.NetworkInterface nif, java.util.List<String> maclist,
+			int flags) throws java.net.SocketException
+	{
+		if ((flags & FLAG_IFREAL) != 0
+				&& (nif.isVirtual() || nif.isLoopback() || nif.isPointToPoint())) return;
+		if ((flags & FLAG_IFUP) != 0 && !nif.isUp()) return;
+
+		if ((flags & FLAG_IFIP4) != 0 || (flags & FLAG_IFIP6) != 0) {
+			java.util.Enumeration<java.net.InetAddress> ips = nif.getInetAddresses();
+			boolean hasValidIPs = false;
+			while (!hasValidIPs && ips != null && ips.hasMoreElements()) {
 				java.net.InetAddress ip = ips.nextElement();
 				if ((flags & FLAG_IFREAL) != 0 && (ip.isLoopbackAddress() || ip.isMulticastAddress())) continue;
 				if ((flags & FLAG_IFIP4) != 0 && !ip.getClass().equals(java.net.Inet4Address.class)) continue;
 				if ((flags & FLAG_IFIP6) != 0 && !ip.getClass().equals(java.net.Inet6Address.class)) continue;
-				hasvalidIPs = true;
+				hasValidIPs = true;
 			}
-			if (!hasvalidIPs) continue;
-			byte[] mac = nif.getHardwareAddress();
-			if (mac == null || mac.length == 0) continue;
-			maclist.add(new String(com.grey.base.crypto.Ascii.hexEncode(mac)));
+			if (!hasValidIPs) return;
 		}
-		String[] arr = (maclist.size() == 0 ? null : new String[maclist.size()]);
+		byte[] mac = nif.getHardwareAddress();
+		if (mac == null || mac.length == 0) return;
+		maclist.add(new String(com.grey.base.crypto.Ascii.hexEncode(mac)));
 
-		for (int idx = 0; idx != maclist.size(); idx++) {
-			arr[idx] = maclist.get(idx);
+		java.util.Enumeration<java.net.NetworkInterface> ifaces = nif.getSubInterfaces();
+		while (ifaces != null && ifaces.hasMoreElements()) {
+			getLocalMACs(ifaces.nextElement(), maclist, flags);
 		}
-		return arr;
 	}
 
 	// This method uses the blocking OS-level DNS resolver.

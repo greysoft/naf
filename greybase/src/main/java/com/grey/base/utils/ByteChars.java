@@ -36,7 +36,6 @@ public final class ByteChars
 	public ByteChars append(char c) {if (c > 255) throw new IllegalArgumentException("Invalid ByteChar="+c); return append((byte)c);}
 	public ByteChars append(byte[] barr) {return append(barr, 0, barr == null ? 0 : barr.length);}
 	public ByteChars append(char[] carr) {return append(carr, 0, carr == null ? 0 : carr.length);}
-	public ByteChars appendRange(CharSequence cs, int start, int end) {return append(cs, start, end - start);}
 	public ByteChars pointAt(ArrayRef<byte[]> src, int off) {return pointAt(src, off, src.ar_len - off);}
 	public ByteChars pointAt(ArrayRef<byte[]> src) {return pointAt(src, 0, src.ar_len);}
 	public ByteChars pointAt(ArrayRef<byte[]> src, int off, int len) {return pointAt(src.ar_buf, src.ar_off + off, len);}

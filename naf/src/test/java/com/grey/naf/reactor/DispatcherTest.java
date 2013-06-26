@@ -24,7 +24,7 @@ public class DispatcherTest
 		try {
 			FileOps.deleteDirectory(rootpath);
 		} catch (Exception ex) {
-			throw new RuntimeException("DispatcherTest.initPaths failed to remote root="+rootpath+" - "+ex, ex);
+			throw new RuntimeException("DispatcherTest.initPaths failed to remove root="+rootpath+" - "+ex, ex);
 		}
 		return rootpath;
 	}

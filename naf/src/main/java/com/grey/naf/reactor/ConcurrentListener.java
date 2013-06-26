@@ -139,11 +139,15 @@ public final class ConcurrentListener
 		}
 		boolean ok = false;
 		activeservers.add((Server)srvr);
+
 		try {
 			srvr.accepted(connsock, this);
 			ok = true;
 		} finally {
-			if (!ok) entityStopped(srvr);
+			if (!ok) {
+				dsptch.conditionalDeregisterIO(srvr);
+				entityStopped(srvr);
+			}
 		}
 	}
 

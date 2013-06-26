@@ -37,8 +37,8 @@ public class ObjectPile<T>
 					throw new IllegalArgumentException("ObjectPile: Duplicates not allowed - "+obj);
 				}
 			}
-			if (obj == null) throw new NullPointerException("ObjectPile: Nulls not allowed");
 		}
+		if (obj == null) throw new NullPointerException("ObjectPile: Nulls not allowed");
 		cache.add(obj);
 	}
 
