@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns;
@@ -188,12 +188,11 @@ public final class QueryHandle
 	}
 
 	// Our TCP connection has been aborted by the Dispatcher after an error somewhere, so notify the resolver
-	// We know that 'cm' arg must be tcpmon, so don't bother checking that.
 	@Override
-	public void eventError(com.grey.naf.reactor.ChannelMonitor cm, Throwable ex)
+	public void eventError(Throwable ex)
 	{
-		disconnect();
 		rslvr.endQuery(this, Answer.STATUS.ERROR);
+		disconnect();
 	}
 
 	public void notifyCallers(Answer answer)

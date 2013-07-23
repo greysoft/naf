@@ -239,12 +239,6 @@ public final class Server
 		endConnection();
 	}
 
-	@Override
-	public void eventError(com.grey.naf.reactor.ChannelMonitor cm, Throwable ex)
-	{
-		ioDisconnected(null);
-	}
-
 	// already logged by Dispatcher, we have nothing more to add
 	@Override
 	public void eventError(com.grey.naf.reactor.Timer tmr, com.grey.naf.reactor.Dispatcher d, Throwable ex) {}

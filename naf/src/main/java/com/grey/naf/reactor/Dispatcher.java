@@ -13,8 +13,8 @@ import com.grey.logging.Logger.LEVEL;
 public final class Dispatcher
 	implements Runnable, com.grey.naf.EntityReaper, Producer.Consumer
 {
-	private static final String SYSPROP_HEAPWAIT = "greynaf.dispatchers.heapwait";
 	private static final long shutdown_timer_advance = SysProps.getTime("greynaf.dispatchers.shutdown_advance", "1s");
+	private static final String SYSPROP_HEAPWAIT = "greynaf.dispatchers.heapwait";
 	private static final String STOPCMD = "_STOP_";
 
 	private static final java.util.concurrent.ConcurrentHashMap<String, Dispatcher> activedispatchers 
@@ -51,8 +51,9 @@ public final class Dispatcher
 
 	// temp working buffers, preallocated (on demand) for efficiency
 	final java.util.Calendar dtcal = TimeOps.getCalendar(null); //package-private
-	private byte[] xferbuf;
+	private final StringBuilder tmpsb = new StringBuilder();
 	private java.nio.ByteBuffer tmpniobuf;
+	private byte[] xferbuf;
 
 	public boolean isRunning() {return thrd_main.isAlive();}
 	int allocateChannelId() {return ++uniqid_chan;}
@@ -344,26 +345,33 @@ public final class Dispatcher
 	//pipes in any other associated connections.
 	private void eventHandlerFailed(ChannelMonitor cm, Timer tmr, Throwable ex)
 	{
-		boolean bpex = (ex instanceof ChannelMonitor.BrokenPipeException); //BrokenPipe already logged
-		ChannelMonitor cmdisc = (bpex ?
-				(cm == null ? (tmr.handler instanceof ChannelMonitor ? (ChannelMonitor)tmr.handler : null) : cm)
-				: null);
-		if (cmdisc != null && ((ChannelMonitor.BrokenPipeException)ex).cm != cmdisc) cmdisc = null;
+		final boolean bpex = (ex instanceof ChannelMonitor.BrokenPipeException); //BrokenPipe already logged
+		final ChannelMonitor cmerr = (cm == null ?
+				(tmr.handler instanceof ChannelMonitor ? (ChannelMonitor)tmr.handler : null)
+				: cm);
 		try {
-			if (cmdisc != null) {
-				cmdisc.ioDisconnected(ex.getMessage());
+			if (bpex && ((ChannelMonitor.BrokenPipeException)ex).cm == cmerr && cmerr != null) {
+				//cmerr ought to be non-null if the prior conditions are met, but make double sure
+				cmerr.failed(true, ex);
 			} else {
 				if (!bpex) {
-					if (cm == null) {
-						logger.log(LEVEL.ERR, ex, true, "Dispatcher="+name+": Error on Timer handler="+tmr.handler);
-					} else {
-						logger.log(LEVEL.ERR, ex, true, "Dispatcher="+name+": Error on IO handler="+cm);
+					tmpsb.setLength(0);
+					tmpsb.append("Dispatcher=");
+					tmpsb.append(name);
+					tmpsb.append(": Error on ");
+					tmpsb.append(cm == null ? "Timer" : "IO");
+					tmpsb.append(" handler=");
+					tmpsb.append(cm == null ? tmr.handler : cm);
+					if (cmerr != null) {
+						tmpsb.append(" - cmstate: ");
+						cmerr.dumpState(tmpsb, true);
 					}
+					logger.log(LEVEL.ERR, ex, true, tmpsb);
 				}
 				if (cm == null) {
 					tmr.handler.eventError(tmr, this, ex);
 				} else {
-					cm.eventError(cm, ex);
+					cm.failed(false, ex);
 				}
 			}
 		} catch (Throwable ex2) {
@@ -562,7 +570,10 @@ public final class Dispatcher
 	// The markup is XML, and if some of it happens to look like XHTML, that's a happy coincidence ...
 	public CharSequence dumpState(StringBuilder sb, boolean verbose)
 	{
-		if (sb == null) sb = new StringBuilder();
+		if (sb == null) {
+			sb = tmpsb;
+			sb.setLength(0);
+		}
 		sb.append("<infonodes>");
 		sb.append("<infonode name=\"Disposition\" dispatcher=\"").append(name).append("\">");
 		sb.append("NAFMAN = ").append(nafman == null ? "No" : (nafman.isPrimary() ? "Primary" : "Secondary"));

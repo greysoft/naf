@@ -14,6 +14,7 @@
 		<groupId>com.grey.naf</groupId>
 		<artifactId>build-common</artifactId>
 		<version>1.0.0</version>
+		<relativePath>../build-common/pom.xml</relativePath>
 	</parent>
 	<modules>
 		<module>../greybase</module>

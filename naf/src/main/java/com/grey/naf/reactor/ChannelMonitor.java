@@ -39,11 +39,9 @@ public abstract class ChannelMonitor
 	// use of functionality which invokes them.
 	// For example: If monitoring for Read, then ioIndication() must be provided if the subclass has not defined an IOExecReader,
 	// and ioReceived() must be defined if it has.
-	// It wouldn't make sense to subclass this if you weren't interested in monitoring anything at all, whether that be Read events,
+	// It wouldn't make sense to use this class if you weren't interested in monitoring anything at all, whether that be Read events,
 	// incoming connections, or the conclusion of outgoing connections, hence this class has been declared as abstract even though no
 	// particular method is actually abstract.
-	protected void ioDisconnected(CharSequence diagnostic)
-			throws java.io.IOException {disconnect(false);}
 	protected void ioReceived(com.grey.base.utils.ArrayRef<byte[]> rcvdata, java.net.InetSocketAddress remaddr)
 			throws com.grey.base.FaultException, java.io.IOException {throw new Error("UDP CM.ioReceived() not implemented");}
 	protected void ioReceived(com.grey.base.utils.ArrayRef<byte[]> rcvdata)
@@ -56,9 +54,14 @@ public abstract class ChannelMonitor
 	// server mode - this indicates we've accepted a connection from a remote client
 	protected void connected()
 			throws com.grey.base.FaultException, java.io.IOException {throw new Error("Server-CM.connected() not implemented");}
+
+	protected void ioDisconnected(CharSequence diagnostic)
+			throws java.io.IOException {disconnect(false);}
+	protected void eventError(Throwable ex)
+			throws java.io.IOException {failed(true, ex);}
+
 	protected void initServer() {} //called before connected() for TCP servers, irrelevant for all other entities
 	protected void disconnectLingerDone(boolean ok, CharSequence info, Throwable ex) {} //called later, if disconnect() returns False
-	protected void eventError(ChannelMonitor cm, Throwable ex) {}
 	protected void dumpAppState(StringBuilder sb) {}
 
 	public final boolean isUDP() {return isFlagSet(S_UDP);}
@@ -201,6 +204,22 @@ public abstract class ChannelMonitor
 			rpr.entityStopped(this);
 		}
 		return true;
+	}
+
+	final void failed(boolean disconnect, Throwable ex) throws java.io.IOException
+	{
+		if (isFlagSet(S_CLOSELINGER)) {
+			// This entity is already in shutdown mode waiting to flush its final transmissions.
+			// Time to discard any blocked sends and terminate it immediately.
+			disconnect(false);
+		} else {
+			if (disconnect) {
+				// Tell the application to initiate the disconnect
+				ioDisconnected(ex==null ? null : ex.getMessage());
+			} else {
+				eventError(ex);
+			}
+		}
 	}
 
 	public final void startSSL() throws com.grey.base.FaultException, java.io.IOException

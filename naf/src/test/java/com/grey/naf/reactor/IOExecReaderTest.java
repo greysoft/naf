@@ -129,12 +129,6 @@ public class IOExecReaderTest
 				throw new RuntimeException("Missing case for phase="+phase);
 			}
 		}
-
-		@Override
-		protected void eventError(ChannelMonitor cm, Throwable ex)
-		{
-			throw new RuntimeException("Throwing fatal error to halt Dispatcher");
-		}
 	}
 
 	@org.junit.Test

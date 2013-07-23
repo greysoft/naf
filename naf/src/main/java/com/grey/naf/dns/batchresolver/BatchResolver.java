@@ -167,7 +167,7 @@ public final class BatchResolver
 			if (resolve_mode == Resolver.QTYPE_A) {
 				answer = dsptch.dnsresolv.resolveHostname(domnam, this, inline, 0);
 			} else if (resolve_mode == Resolver.QTYPE_MX) {
-				int pos = domnam.indexOf(com.grey.base.utils.EmailAddress.DLM);
+				int pos = domnam.indexOf((byte)com.grey.base.utils.EmailAddress.DLM_DOM);
 				pos = (pos == -1 ? 0 : pos+1);
 				tmplightbc.pointAt(domnam, pos);
 				answer = dsptch.dnsresolv.resolveMailDomain(tmplightbc, this, inline, 0);

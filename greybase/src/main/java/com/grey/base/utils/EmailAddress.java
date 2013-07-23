@@ -6,8 +6,8 @@ package com.grey.base.utils;
 
 public final class EmailAddress
 {
-	public static final String DLMSTR = "@";
-	public static final byte DLM = (byte)DLMSTR.charAt(0);
+	public static final char DLM_DOM = '@';
+	public static final char DLM_RT = '%'; //preferred delimiter for source-routing (there is no standard)
 
 	public final ByteChars domain = new ByteChars(-1);  // lightweight object without own storage
 	public final ByteChars mailbox = new ByteChars(-1);  // lightweight object without own storage
@@ -42,7 +42,7 @@ public final class EmailAddress
 	public EmailAddress decompose()
 	{
 		if (mailbox.ar_len != 0) return this; //already broken down
-		int off = full.lastIndexOf(DLM);
+		int off = full.lastIndexOf((byte)DLM_DOM);
 
 		if (off == -1) {
 			mailbox.pointAt(full);

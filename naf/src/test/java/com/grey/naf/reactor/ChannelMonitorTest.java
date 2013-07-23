@@ -62,12 +62,6 @@ public class ChannelMonitorTest
 				}
 			}
 		}
-
-		@Override
-		protected void eventError(ChannelMonitor cm, Throwable ex)
-		{
-			throw new RuntimeException("Throwing fatal error to halt Dispatcher");
-		}
 	}
 
 	private static class CMW extends ChannelMonitor

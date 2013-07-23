@@ -52,12 +52,6 @@ public class IOExecWriterTest
 				completed = true;
 			}
 		}
-
-		@Override
-		protected void eventError(ChannelMonitor cm, Throwable ex)
-		{
-			throw new RuntimeException("Throwing fatal error to halt Dispatcher");
-		}
 	}
 
 	// Pipe seems to be 8K in size

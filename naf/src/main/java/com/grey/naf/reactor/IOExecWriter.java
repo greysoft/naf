@@ -24,6 +24,7 @@ public final class IOExecWriter
 	public void transmit(java.nio.ByteBuffer xmtbuf) throws java.io.IOException {transmit(xmtbuf, false);}
 	public void transmit(com.grey.base.utils.ArrayRef<byte[]> data) throws java.io.IOException {transmit(data.ar_buf, data.ar_off, data.ar_len);}
 	public void transmit(com.grey.base.utils.ByteChars data) throws java.io.IOException {transmit(data.ar_buf, data.ar_off, data.ar_len);}
+	public void transmit(byte[] data) throws java.io.IOException {transmit(data, 0, data.length);}
 	public void transmit(CharSequence data) throws java.io.IOException {transmit(data, 0, data.length());}
 
 	public IOExecWriter(com.grey.naf.BufferSpec spec)
@@ -101,9 +102,8 @@ public final class IOExecWriter
 
 	void write(java.nio.ByteBuffer xmtbuf, boolean is_poolbuf) throws ChannelMonitor.BrokenPipeException
 	{
-		final int initpos = xmtbuf.position();
 		if (isBlocked()) {
-			enqueue(xmtbuf, initpos, xmtbuf.remaining(), is_poolbuf);
+			enqueue(xmtbuf, xmtbuf.remaining(), is_poolbuf);
 			return;
 		}
 		final int nbytes = sendBuffer(xmtbuf);
@@ -116,7 +116,7 @@ public final class IOExecWriter
 			chanmon.dsptch.logger.log(WRBLOCKTRC, "IOExec: Buffer-send blocked with "+nbytes+"/"+remainbytes
 					+" - E"+chanmon.cm_id+"/"+chanmon.getClass().getName()+"/"+chanmon.iochan);
 		}
-		writemark = enqueue(xmtbuf, initpos + nbytes, remainbytes, is_poolbuf);
+		writemark = enqueue(xmtbuf, remainbytes, is_poolbuf);
 		chanmon.enableWrite();
 	}
 
@@ -208,7 +208,15 @@ public final class IOExecWriter
 				dequeue(Boolean.TRUE);
 			} else {
 				final java.nio.ByteBuffer xmtbuf = (java.nio.ByteBuffer)obj;
-				xmtbuf.position(writemark);
+				try {
+					//have observed an unexplained problem here - log some info
+					xmtbuf.position(writemark);
+				} catch (IllegalArgumentException ex) {
+					chanmon.dsptch.logger.error("IOExec: position("+writemark+") failed on xmtq="+xmtq.size()
+							+" - pos="+xmtbuf.position()+"/"+xmtbuf.limit()+"/"+xmtbuf.capacity()
+							+", type="+xmtbuf.isReadOnly()+"/"+xmtbuf.hasArray()+"/"+xmtbuf.isDirect());
+					throw ex;
+				}
 				final int nbytes = sendBuffer(xmtbuf);
 				if (nbytes == -1) return false;
 
@@ -224,24 +232,25 @@ public final class IOExecWriter
 		return true;
 	}
 
-	private int enqueue(java.nio.ByteBuffer databuf, int xmtoff, int xmtbytes, boolean is_poolbuf)
+	private int enqueue(java.nio.ByteBuffer databuf, int xmtbytes, boolean is_poolbuf)
 	{
 		if (is_poolbuf || databuf.isReadOnly()) {
-			// no need to take copy of read-only buffer, as it is guaranteed to be preserved while it's on the transmit queue
-			xmtq.add(databuf);
-			return xmtoff;
+			// no need to take copy of read-only buffer, as it is guaranteed to be preserved while on the queue
+			int pos = databuf.position();
+			if (pos == 0 || xmtq.size() == 0) {
+				// but make sure we don't put offset buffer on middle of queue - writemark is expected to be zero there
+				xmtq.add(databuf);
+				return pos;
+			}
 		}
 
 		while (xmtbytes != 0) {
 			final int chunk = Math.min(xmtbytes, MAXBUFSIZ);
 			final java.nio.ByteBuffer qbuf = allocBuffer(chunk);
-			databuf.position(xmtoff);
-			databuf.limit(xmtoff + chunk);
 			final int nbytes = chanmon.dsptch.transfer(databuf, qbuf);
 			qbuf.limit(nbytes);
 			xmtq.add(qbuf);
 			xmtbytes -= nbytes;
-			xmtoff += nbytes;
 		}
 		return 0; //buffer was copied to start of new buffer(s)
 	}

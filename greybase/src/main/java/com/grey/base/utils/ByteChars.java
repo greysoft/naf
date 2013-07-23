@@ -279,7 +279,7 @@ public final class ByteChars
 
 		if (limit == -1)
 		{
-			// trailing blank term might as well not exist, eg. the strings "@" and "abc@" both contain one term (terminated by dlm=@)
+			// trailing blank term might as well not exist, eg. the strings "+" and "abc+" both contain one term (terminated by dlm=+)
 			if ((limit = length()) == off) return null;
 		}
 		if (ptr == null) ptr = new ByteChars(-1);  // lightweight ByteChars object, without own storage

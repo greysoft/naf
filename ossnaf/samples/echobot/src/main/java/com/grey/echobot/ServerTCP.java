@@ -52,15 +52,4 @@ public class ServerTCP
 	{
 		chanwriter.transmit(data.ar_buf, data.ar_off, data.ar_len);
 	}
-
-	@Override
-	public void eventError(com.grey.naf.reactor.ChannelMonitor cm, Throwable ex) 
-	{
-		try {
-			ioDisconnected("I/O handler error");
-		} catch (Exception ex2) {
-			dsptch.logger.error("Server failed to signal Disconnect - "+com.grey.base.GreyException.summary(ex2)
-					+" - Due to "+com.grey.base.GreyException.summary(ex));
-		}
-	}
 }
