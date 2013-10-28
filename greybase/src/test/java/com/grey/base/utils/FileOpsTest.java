@@ -135,30 +135,55 @@ public final class FileOpsTest
 		int numfiles = 4;
 		int cnt = FileOps.countFiles(dirh, true);
 		org.junit.Assert.assertEquals(numfiles, cnt);
-		cnt = FileOps.countFiles(dirh, (java.io.FilenameFilter)null, false, true);
+		cnt = FileOps.countFiles(dirh, false, true);
 		org.junit.Assert.assertEquals(numfiles, cnt);
 		cnt = FileOps.countFiles(dirh, false);
 		org.junit.Assert.assertEquals(numfiles-1, cnt);
-		cnt = FileOps.countFiles(dirh, (java.io.FilenameFilter)null, false, false);
+		cnt = FileOps.countFiles(dirh, false, false);
 		org.junit.Assert.assertEquals(numfiles-1, cnt);
-		cnt = FileOps.countFiles(dirh, (java.io.FileFilter)null, true, true);
+		cnt = FileOps.countFiles(dirh, true, true);
 		org.junit.Assert.assertEquals(1, cnt);
-		cnt = FileOps.countFiles(dirh, (java.io.FilenameFilter)null, true, true);
+		cnt = FileOps.countFiles(dirh, true, true);
 		org.junit.Assert.assertEquals(1, cnt);
-		cnt = FileOps.countFiles(dirh, (java.io.FileFilter)null, true, false);
+		cnt = FileOps.countFiles(dirh, true, false);
 		org.junit.Assert.assertEquals(1, cnt);
-		cnt = FileOps.countFiles(dirh, (java.io.FilenameFilter)null, true, false);
+		cnt = FileOps.countFiles(dirh, true, false);
 		org.junit.Assert.assertEquals(1, cnt);
 
 		// now count with a filter
-		FileOps.Filter_EndsWith filter = new FileOps.Filter_EndsWith("1", true, true);
+		FileOps.Filter_EndsWith filter = new FileOps.Filter_EndsWith("e1");
 		cnt = FileOps.countFiles(dirh, filter, false, true);
 		org.junit.Assert.assertEquals(2, cnt);
+		filter = new FileOps.Filter_EndsWith("E1");
+		cnt = FileOps.countFiles(dirh, filter, false, true);
+		org.junit.Assert.assertEquals(0, cnt);
+		filter = new FileOps.Filter_EndsWith(new String[]{"e1"}, false, false);
+		cnt = FileOps.countFiles(dirh, filter, false, true);
+		org.junit.Assert.assertEquals(2, cnt);
+		filter = new FileOps.Filter_EndsWith(new String[]{"e1"}, true, false);
+		cnt = FileOps.countFiles(dirh, filter, false, true);
+		org.junit.Assert.assertEquals(2, cnt);
+		filter = new FileOps.Filter_EndsWith(new String[]{"E1"}, false, false);
+		cnt = FileOps.countFiles(dirh, filter, false, true);
+		org.junit.Assert.assertEquals(0, cnt);
+		filter = new FileOps.Filter_EndsWith(new String[]{"E1"}, true, false);
+		cnt = FileOps.countFiles(dirh, filter, false, true);
+		org.junit.Assert.assertEquals(2, cnt);
+		filter = new FileOps.Filter_EndsWith(new String[]{"e2"}, false, false);
+		cnt = FileOps.countFiles(dirh, filter, false, true);
+		org.junit.Assert.assertEquals(1, cnt);
+		filter = new FileOps.Filter_EndsWith(new String[]{"e2"}, false, true);
+		cnt = FileOps.countFiles(dirh, filter, false, true);
+		org.junit.Assert.assertEquals(3, cnt);
+		filter = new FileOps.Filter_EndsWith(new String[]{"E2"}, true, true);
+		cnt = FileOps.countFiles(dirh, filter, false, true);
+		org.junit.Assert.assertEquals(3, cnt);
+		filter = new FileOps.Filter_EndsWith(new String[]{"e1"}, false, false);
 		cnt = FileOps.countFiles(dirh, filter, false, false);
 		org.junit.Assert.assertEquals(1, cnt);
 		cnt = FileOps.countFiles(dirh, filter, true, true);
 		org.junit.Assert.assertEquals(1, cnt);
-		filter = new FileOps.Filter_EndsWith("x", false, true);
+		filter = new FileOps.Filter_EndsWith("x");
 		cnt = FileOps.countFiles(dirh, filter, false, true);
 		org.junit.Assert.assertEquals(0, cnt);
 
@@ -168,9 +193,7 @@ public final class FileOpsTest
 		org.junit.Assert.assertEquals(numfiles, cnt);
 		cnt = FileOps.deleteDirectory(workdir);
 		org.junit.Assert.assertEquals(0, cnt);
-		cnt = FileOps.countFiles(dirh, (java.io.FileFilter)null, false, true);
-		org.junit.Assert.assertEquals(0, cnt);
-		cnt = FileOps.countFiles(dirh, (java.io.FilenameFilter)null, false, true);
+		cnt = FileOps.countFiles(dirh, false, true);
 		org.junit.Assert.assertEquals(0, cnt);
 
 		// miscellaenous

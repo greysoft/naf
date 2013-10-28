@@ -163,8 +163,6 @@ public class SSLConfig
 		}
 	}
 
-	// Can't help turning the passwords into Strings when we're dealing with a DOM, but discard the Strings as
-	// quickly as possible and just hope for their rapid garbage collection.
 	private static Def convert(XmlConfig cfg, com.grey.naf.Config nafcfg, Def def, String peername, boolean client)
 			throws com.grey.base.ConfigException, java.io.IOException
 	{
@@ -176,10 +174,10 @@ public class SSLConfig
 		def.peerCertName = cfg.getValue("@peercert", false, peername);
 		def.clientAuth = cfg.getInt("@clientauth", false, def.clientAuth);
 		def.trustFormat = cfg.getValue("@tstype", false, def.trustFormat);
-		def.trustPasswd = makeChars(cfg.getValue("@tspass", false, makeString(def.trustPasswd)));
+		def.trustPasswd = cfg.getPassword("@tspass", def.trustPasswd);
 		def.storeFormat = cfg.getValue("@kstype", false, def.storeFormat);
-		def.storePasswd = makeChars(cfg.getValue("@kspass", false, makeString(def.storePasswd)));
-		def.certPasswd = makeChars(cfg.getValue("@certpass", false, makeString(def.certPasswd)));
+		def.storePasswd = cfg.getPassword("@kspass", def.storePasswd);
+		def.certPasswd = cfg.getPassword("@certpass", def.certPasswd);
 		def.protocol = cfg.getValue("@proto", false, def.protocol);
 		def.sessionCache = cfg.getInt("@cache", false, def.sessionCache);
 		def.sessionTimeout = cfg.getTime("@expiry", def.sessionTimeout);
@@ -244,10 +242,5 @@ public class SSLConfig
 	private static char[] makeChars(String str) {
 		if (str == null) return null;
 		return str.toCharArray();
-	}
-
-	private static String makeString(char[] arr) {
-		if (arr == null) return null;
-		return new String(arr);
 	}
 }

@@ -6,6 +6,7 @@ package com.grey.naf.nafman;
 
 public final class Secondary
 	extends Agent
+	implements com.grey.naf.reactor.Producer.Consumer<Command>
 {
 	final com.grey.naf.reactor.Producer<Command> requests; //package-private
 	private final Primary primary;
@@ -33,7 +34,7 @@ public final class Secondary
 	public void stop()
 	{
 		in_shutdown = true;
-		requests.shutdown(false);
+		requests.shutdown();
 		if (Primary.get() == null) return; //Primary has already exited, so don't signal it
 		try {
 			primary.secondaryUnsubscribed(this);
@@ -44,7 +45,7 @@ public final class Secondary
 	}
 
 	@Override
-	public void producerIndication(com.grey.naf.reactor.Producer<?> p) throws com.grey.base.FaultException, java.io.IOException
+	public void producerIndication(com.grey.naf.reactor.Producer<Command> p) throws com.grey.base.FaultException, java.io.IOException
 	{
 		Command cmd;
 		while ((cmd = requests.consume()) != null) {

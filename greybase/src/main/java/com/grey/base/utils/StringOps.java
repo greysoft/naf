@@ -276,4 +276,14 @@ public class StringOps
 		while (str.indexOf("  ") != -1) str = str.replaceAll("  ", " ");
 		return leadingChars(str, maxlen);
 	}
+
+	public static void erase(String str)
+	{
+		char[] value = (char[])DynLoader.getField(str, "value");
+		Integer offset = (Integer)DynLoader.getField(str, "offset");
+		int lmt = offset.intValue() + str.length();
+		for (int idx = offset; idx != lmt; idx++) {
+			value[idx] = '?';
+		}
+	}
 }

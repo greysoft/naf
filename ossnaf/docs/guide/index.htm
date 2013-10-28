@@ -73,11 +73,11 @@ Network Application Framework
 </h2>
 
 <p>
-NAF (Network Application Framework) is a Java library that implements an event-driven API framework based around the Java JDK's NIO subsystem.
+NAF (Network Application Framework) is a Java API that implements an event-driven framework based on the Java JDK's NIO interface.
 </p>
 <b>Why NAF?</b>
 <ul><li>
-NAF supports non-blocking I/O operations and timers, enabling extremely large numbers of concurrent connections and high data throughput levels.
+NAF supports non-blocking I/O operations (sockets and pipes) and timers, enabling extremely large numbers of concurrent connections and high data throughput levels.
 </li><li>
 NAF provides a lock-free single-threaded execution environment based on the Reactor pattern - parallelism can be provided by adding more Dispatcher threads.
 </li><li>
@@ -98,13 +98,13 @@ NAF is intended to be easy to use and does not provide gratuitous layers of abst
 <br/>
 What it does, is turn the raw NIO Selector and Channel interfaces into a functioning multiplexor based on the Reactor comms pattern, that performs the I/O ops for you, calls your code with the received data, and then gets out of the way to let your application handle the event.
 <br/> <br/>
-NAF transparently handles non-blocking writes as you would expect, lets you schedule an unlimited number of arbitrary timed ops (and easily cancel or reschedule them before they trigger) as you would hope and lets you specify whether reads should return after a fixed number of bytes, on receipt of a marker char (eg. a LineFeed) or just as soon as any data is available.
+NAF transparently handles non-blocking writes as you would expect, lets you schedule an unlimited number of arbitrary timed ops (and cancel or reschedule them before they trigger) as you would hope and also lets you specify whether reads should return after a fixed number of bytes, on receipt of a marker char (eg. a LineFeed) or just as soon as any data is available.
 <br/> <br/>
 NAF also provides the possibly unique feature of a non-blocking DNS resolver, which lets you perform hostname lookups, reverse-IP (PTR) lookups and MX (mailserver) lookups.
 <br/> <br/>
-In more detail, a NAF application (more precisely termed a "NAFlet", or sometimes a "NAF task") executes under the control of a single-threaded object called a <dfn>Dispatcher</dfn>, which acts as an NIO wrapper and invokes registered callbacks in your application, as triggered by I/O, Timer and DNS events.
+In more detail, a NAF application (more precisely termed a "NAFlet", or sometimes a "NAF task") executes under the control of a single-threaded object called a <dfn>Dispatcher</dfn>, which acts as an NIO controller and invokes registered callbacks in your application, as triggered by I/O, Timer and DNS events.
 <br/>
-As well as simplifying the code, the single-threaded reactor mode of operation permits many optimisations, not least of which is pre-allocating many of the temporary objects that your code might require.
+As well as simplifying the code, the single-threaded reactor mode of operation permits many optimisations, not least of which is pre-allocating many of the temporary objects that your code might require, so as to reduce memory churn for the GC.
 </p>
 
 <hr width="40%"/>
@@ -124,7 +124,7 @@ To find code-level documentation, you are urged to go to the example programs (s
 <p>
 NAF applications are config-driven, and are specified in an XML-based configuration file which is generically referred to as the
 <span class="pathname">naf.xml</span>
-file, though it is not necessarily named that.
+file (though it is not necessarily named that).
 <br/>
 This config file defines the application's Dispatchers and provides a mechanism for automatically wiring in and launching all your application code without you having to provide the <span class="compcode">main()</span> method (<em>and</em> without the use of custom annotations).
 <br/>
@@ -167,7 +167,7 @@ The naf.xml header config elements are as follows:
 <p><span class="cfgtitle">dirpaths</span><br/>
 This section defines directory paths that a typical NAF application might use. The entire section is optional, since all the paths have default values that are as explicitly defined above.
 <br/>
-For each path, there is an associated system-property that is looked up if the config entry is absent, and the default value kicks in if the system property isn't defined either.
+For each path, there is an associated system-property that is looked up if the naf.xml config element is absent, and the default value kicks in if the system property isn't defined either.
 <br/>
 Thereafter, the value of the path is used to substitute token strings to generate a concrete path.
 <br/> <br/>
@@ -288,6 +288,7 @@ It is a matter of personal preference as to whether you would prefer to specify 
 <p>
 Dispatchers are the event multiplexers at the heart of the NAF framework, and each dispatcher resides in its own thread.
 Multiple Dispatchers can exist within one JVM process, and they are completely independent of each other.
+In a widely used terminology, each Dispatcher represents an event loop.
 <br/>
 Users can simply regard a Dispatchers as a single-threaded execution context within which their applications reside.
 Dispatchers monitor all events (eg. I/O) in which their applications have registered an interest, and they also provide built-in services such as DNS resolution, NAFMAN and logging.
@@ -420,13 +421,13 @@ method.
 <p>
 Each NAF dispatcher executes one or more application entities, known as
 <dfn>NAFlets</dfn>.
-If dispatchers can be thought of as representing a generic processing mechanism which NAF provides for you, then NAFlets embody specific functionality which you have to code.
+Whereas Dispatchers are event managers which NAF provides for you, NAFlets embody application-specific functionality which you have to code.
 <br/>
 Naflets are independent processing tasks which are unaware of other Naflets executing within the same dispatcher, and can be freely moved between dispatchers, according to performance-tuning considerations.
 <br/> <br/>
 When we say that NAF is a single-threaded framework, what we really mean is that individual NAFlets execute in a single-threaded context (ie. the Dispatcher).
 However, real-world applications may comprise multiple NAFlets, which in turn may or may not be distributed over multiple Dispatchers (ie. multiple threads).
-The important point is that the Dispatchers are independent of one another, and co-exist without incurring anyn synchronisation overhead, it's ultimately up to the developer how closely coupled their own bespoke NAFlets are, and whether they require synchronisation across multiple threads.
+The important point is that the Dispatchers are independent of one another and co-exist without incurring any synchronisation overhead, it's ultimately up to the developer how closely coupled their own bespoke NAFlets are, and whether they require synchronisation across multiple threads.
 </p>
 
 <p>
@@ -441,7 +442,7 @@ All NAFlets are required to be a subclass of <span class="compcode">com.grey.naf
 </li>
 
 <li><span class="cfgtitle">enabled</span>:
-A boolean attribute which defaults to Yes, but can be set to No to disable a dispatcher (may sometimes be preferable to removing it from the naf.xml file for good).
+A boolean attribute which defaults to Yes, but can be set to No to disable a Naflet (may sometimes be preferable to removing it from the naf.xml file for good).
 </li>
 
 <li><span class="cfgtitle">name</span>:

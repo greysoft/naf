@@ -90,7 +90,8 @@ public final class DynLoaderTest
 		org.junit.Assert.assertEquals(0, fails.length());
 
 		//now verify that a repeat load of DynTest4 would have no effect
-		boolean prevhack = SysProps.set(DynLoader.SYSPROP_CLDHACK, false);
+		boolean prevhack = DynLoader.CLDHACK;
+		DynLoader.setField(DynLoader.class, "CLDHACK", Boolean.valueOf(false), null);
 		org.junit.Assert.assertTrue(DynLoader.getClassLoader() == cld_after2);
 		String loadpath = getResourcePath("DynTest4.jar", getClass());
 		java.util.List<java.net.URL> newcp = DynLoader.load(loadpath);
@@ -101,7 +102,7 @@ public final class DynLoaderTest
 		newcp = DynLoader.load(loadpath);
 		org.junit.Assert.assertTrue(newcp == null || newcp.size() == 0);
 		org.junit.Assert.assertTrue(DynLoader.getClassLoader() == cld_after2);
-		SysProps.set(DynLoader.SYSPROP_CLDHACK, prevhack);
+		DynLoader.setField(DynLoader.class, "CLDHACK", Boolean.valueOf(prevhack), null);
 		//can still access all classes
 		DynLoader.loadClass("greytest.DynTest1");
 		DynLoader.loadClass("greytest.DynTest2");
@@ -139,7 +140,8 @@ public final class DynLoaderTest
 		throws ClassNotFoundException, java.io.IOException, java.net.URISyntaxException, NoSuchMethodException,
 			IllegalAccessException, java.lang.reflect.InvocationTargetException
 	{
-		boolean hackflag = com.grey.base.config.SysProps.get(DynLoader.SYSPROP_CLDHACK, false);
+		boolean hackflag = DynLoader.CLDHACK;
+		DynLoader.setField(DynLoader.class, "CLDHACK", Boolean.valueOf(false), null);
 
 		// populate a directory tree which we've ensured was previously empty
 		FileOps.deleteDirectory(workdir);
@@ -199,7 +201,8 @@ public final class DynLoaderTest
 		org.junit.Assert.assertFalse(dh.exists());
 
 		// now test loading from non-existent directory - disable hack so we can test classloader state as well
-		boolean prevhack = SysProps.set(DynLoader.SYSPROP_CLDHACK, false);
+		boolean prevhack = DynLoader.CLDHACK;
+		DynLoader.setField(DynLoader.class, "CLDHACK", Boolean.valueOf(false), null);
 		ClassLoader cld = DynLoader.getClassLoader();
 		newcp = DynLoader.loadFromDir(workdir);
 		org.junit.Assert.assertTrue(newcp == null || newcp.size() == 0);
@@ -209,7 +212,7 @@ public final class DynLoaderTest
 		newcp = DynLoader.load(workdir+"/nonsuch.jar");
 		org.junit.Assert.assertTrue(newcp == null || newcp.size() == 0);
 		org.junit.Assert.assertTrue(DynLoader.getClassLoader() == cld);
-		SysProps.set(DynLoader.SYSPROP_CLDHACK, prevhack);
+		DynLoader.setField(DynLoader.class, "CLDHACK", Boolean.valueOf(prevhack), null);
 	}
 
 	private String verifyLoad(String target, int flags, boolean expect)
@@ -237,7 +240,8 @@ public final class DynLoaderTest
 		} catch (ClassNotFoundException ex) {}
 
 		// Now load the JAR and verify we can access its member class
-		boolean prevhack = SysProps.set(DynLoader.SYSPROP_CLDHACK, hack);
+		boolean prevhack = DynLoader.CLDHACK;
+		DynLoader.setField(DynLoader.class, "CLDHACK", Boolean.valueOf(hack), null);
 		String loadpath = getResourcePath(targetjar, getClass());
 		String cp = loadpath+" "+DynLoader.CPDLM+"  "+loadpath;  //double up to test duplicates detection and add white space
 		cp += DynLoader.CPDLM+DynLoader.CPDLM;  //empty path elements
@@ -248,7 +252,7 @@ public final class DynLoaderTest
 		assertPath(loadpath, newcp.get(0));
 		ClassLoader cld = DynLoader.getClassLoader();
 		org.junit.Assert.assertTrue(hack ? cld == prev_cld : cld != prev_cld);
-		SysProps.set(DynLoader.SYSPROP_CLDHACK, prevhack);
+		DynLoader.setField(DynLoader.class, "CLDHACK", Boolean.valueOf(prevhack), null);
 		boolean success;
 		String diag = "";
 

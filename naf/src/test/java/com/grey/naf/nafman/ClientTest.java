@@ -17,28 +17,16 @@ public class ClientTest
 	private static final Registry.DefCommand fakecmd2 = new Registry.DefCommand("fake-cmd-2", "utest", "fake2", null, false);
 	private static final Registry.DefCommand stopcmd = Registry.get().getCommand(Registry.CMD_STOP);
 	private static final com.grey.logging.Logger logger = com.grey.logging.Factory.getLoggerNoEx("");
+	private static final int cfgbaseport = 21000; //same as in resources:naf.xml
 
-	@org.junit.Test
-	public void testDefs() throws com.grey.base.ConfigException, java.io.IOException
-	{
+	public ClientTest() throws java.io.IOException {
 		FileOps.deleteDirectory(rootdir);
-		Registry.get().loadCommands(new Registry.DefCommand[]{fakecmd1});
-		org.junit.Assert.assertSame(fakecmd1, Registry.get().getCommand(fakecmd1.code));
-		org.junit.Assert.assertEquals(Registry.CMD_STOP, stopcmd.code);
-		org.junit.Assert.assertNull(Primary.get());
-
-		Registry.DefCommand stop2 = new Registry.DefCommand(stopcmd.code, "utest", "dup stop", null, false);
-		try {
-			Registry.get().loadCommands(new Registry.DefCommand[]{stop2});
-			org.junit.Assert.fail("Failed to detect command redefinition");
-		} catch (com.grey.base.ConfigException ex) {}
 	}
 
 	// For this to complete at all is proof of correctness. It would hang if shutdown failed
 	@org.junit.Test
 	public void testStopSolo() throws Exception
 	{
-		FileOps.deleteDirectory(rootdir);
 		java.net.URL url = DynLoader.getResource("/naf.xml", getClass());
 		String cfgpath = new java.io.File(url.toURI()).getCanonicalPath();
 		com.grey.naf.Config nafcfg = com.grey.naf.Config.load(cfgpath);
@@ -70,22 +58,21 @@ public class ClientTest
 
 		try {
 			Client.submitLocalCommand(stopcmd.code, cfgpath, null);
-			org.junit.Assert.fail("Expected this to fail - and to detect its failure");
+			org.junit.Assert.fail("Failed to trap command submission to stopped Dispatcher");
 		} catch (java.io.IOException ex) {}
 	}
 
 	@org.junit.Test
 	public void testStopMulti() throws com.grey.base.GreyException, java.io.IOException
 	{
-		FileOps.deleteDirectory(rootdir);
-		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
+		DispatcherDef def = new DispatcherDef();
 		def.name = "utest_d1";
 		def.surviveHandlers = false;
-		Dispatcher dp = Dispatcher.create(def, null, logger);
+		Dispatcher dp = Dispatcher.create(def, cfgbaseport, logger);
 		def.name = "utest_d2";
-		Dispatcher ds1 = Dispatcher.create(def, null, logger);
+		Dispatcher ds1 = Dispatcher.create(def, cfgbaseport, logger);
 		def.name = "utest_d3";
-		Dispatcher ds2 = Dispatcher.create(def, null, logger);
+		Dispatcher ds2 = Dispatcher.create(def, cfgbaseport, logger);
 		dp.start();
 		ds1.start();
 		ds2.start();
@@ -107,12 +94,11 @@ public class ClientTest
 	@org.junit.Test
 	public void testCommands() throws com.grey.base.GreyException, java.io.IOException
 	{
-		FileOps.deleteDirectory(rootdir);
 		DispatcherDef def = new DispatcherDef();
 		def.name = "utest_allcmds";
 		def.hasDNS = true;
 		def.surviveHandlers = false;
-		Dispatcher dsptch = Dispatcher.create(def, null, logger);
+		Dispatcher dsptch = Dispatcher.create(def, cfgbaseport, logger);
 		dsptch.start();
 		Registry reg = Registry.get();
 		int port =  dsptch.nafman.getPort();

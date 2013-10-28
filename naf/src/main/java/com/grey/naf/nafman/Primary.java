@@ -9,6 +9,7 @@ import com.grey.base.config.SysProps;
 
 public final class Primary
 	extends Agent
+	implements com.grey.naf.reactor.Producer.Consumer<Object>
 {
 	private static final long shutdown_delay = SysProps.getTime("greynaf.nafman.shutdown.delay", 500);
 
@@ -70,9 +71,11 @@ public final class Primary
 		in_shutdown = true;
 		lstnr.stop();
 
-		// No danger of list changing in mid-iteration - same reason as processCommand() comments below
-		for (int idx = 0; idx != secondaries.size(); idx++) {
-			secondaries.get(idx).dsptch.stop(dsptch);
+		// Loop on a copy of the secondaries list, as the Dispatcher stop() command may reentrantly call
+		// back into our producerIndication() method below and modify the list while we're looping on it.
+		Secondary[] arr = secondaries.toArray(new Secondary[secondaries.size()]);
+		for (int idx = 0; idx != arr.length; idx++) {
+			arr[idx].dsptch.stop();
 		}
 
 		if (secondaries.size() != 0) {
@@ -108,7 +111,7 @@ public final class Primary
 			} else {
 				Secondary agent = (Secondary)tmpagents.get(idx);
 				try {
-					agent.requests.produce(cmd, dsptch);
+					agent.requests.produce(cmd);
 				} catch (java.io.IOException ex) {
 					int status = cmd.detach(agent);
 					if (status == Command.DETACH_NOT) continue;
@@ -121,7 +124,7 @@ public final class Primary
 		}
 
 		if (completed) {
-			commandCompleted(cmd, dsptch);
+			commandCompleted(cmd);
 		}
 
 		if (deadsecs && !dsptch.surviveDownstream) {
@@ -130,7 +133,7 @@ public final class Primary
 	}
 
 	@Override
-	public void producerIndication(com.grey.naf.reactor.Producer<?> p) throws java.io.IOException, com.grey.base.FaultException
+	public void producerIndication(com.grey.naf.reactor.Producer<Object> p) throws java.io.IOException, com.grey.base.FaultException
 	{
 		Object event;
 		while ((event = events.consume()) != null) {
@@ -155,19 +158,17 @@ public final class Primary
 
 	void secondarySubscribed(Secondary agent) throws java.io.IOException
 	{
-		events.produce(agent, agent.dsptch);
+		events.produce(agent);
 	}
 
 	void secondaryUnsubscribed(Secondary agent) throws java.io.IOException
 	{
-		events.produce(agent.dsptch.name, agent.dsptch);
+		events.produce(agent.dsptch.name);
 	}
 
-	// The parameter is the Dispatcher in whose thread this is being called, not necessarily the
-	// one whose agent has just completed this command.
-	void commandCompleted(Command cmd, com.grey.naf.reactor.Dispatcher dsptch) throws java.io.IOException
+	void commandCompleted(Command cmd) throws java.io.IOException
 	{
-		events.produce(cmd, dsptch);
+		events.produce(cmd);
 	}
 
 	// Prune a dead Secondary from any active Commands to which it is attached.
@@ -178,7 +179,7 @@ public final class Primary
 		tmpcmds.addAll(activecmds);
 		for (int idx = 0; idx != tmpcmds.size(); idx++) {
 			Command cmd = tmpcmds.get(idx);
-			if (cmd.detach(agent) == Command.DETACH_FINAL) commandCompleted(cmd, dsptch);
+			if (cmd.detach(agent) == Command.DETACH_FINAL) commandCompleted(cmd);
 		}
 	}
 

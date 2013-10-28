@@ -52,9 +52,7 @@
 				<th>NAFlets</th>
 				<th/>
 			</tr>
-			<xsl:apply-templates select="$dspnodes">
-				<xsl:sort select="@name"/>
-			</xsl:apply-templates>
+			<xsl:apply-templates select="$dspnodes"/>
 		</table>
 		<p>
 			Total Dispatchers:&#160;<xsl:value-of select="count($dspnodes)"/>

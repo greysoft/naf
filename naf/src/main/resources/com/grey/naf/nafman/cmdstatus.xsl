@@ -1,7 +1,7 @@
 <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="2.0">
 <xsl:output method="xml" omit-xml-declaration="yes" indent="no"/>
 
-<xsl:variable name="dspnodes" select="//agents/agent"/>
+<xsl:variable name="hnodes" select="//handlers/handler"/>
 
 <xsl:template match="/">
 <xsl:text disable-output-escaping='yes'>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd"&gt;</xsl:text>
@@ -22,19 +22,19 @@
 		<span class="infobutton">Home</span>
 	</xsl:element>
 	<p>
-		Command was processed by <xsl:value-of select="count($dspnodes)"/> Dispatcher(s)
+		Command was processed by <xsl:value-of select="count($hnodes)"/> handler(s)
 	</p>
-	<xsl:apply-templates select="$dspnodes"/>
+	<xsl:apply-templates select="$hnodes"/>
 	<hr class="sectbreak"/>
 </body>
 </html>
 </xsl:template>
 
-<xsl:template match="agent">
+<xsl:template match="handler">
 	<hr class="sectbreak"/>
 	<p>
 		<span class="subtitle">
-			Dispatcher: <xsl:value-of select="@name"/>
+			Dispatcher&#160;<xsl:value-of select="@dname"/>:&#160;<xsl:value-of select="@hname"/>
 		</span>
 		<br/>
 		<xsl:copy-of select="* | text()"/>

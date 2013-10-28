@@ -234,9 +234,9 @@ public class App
 	// initially set in the non-MT initial-setup phase.
 	public synchronized void terminated(ClientGroup cg) throws java.io.IOException
 	{
-		if (cg.dsptch != dserver) cg.dsptch.stop(cg.dsptch);
+		if (cg.dsptch != dserver) cg.dsptch.stop();
 		if (--cgrpcnt == 0 && dserver != null) {
-			dserver.stop(cg.dsptch);
+			dserver.stop();
 			dserver = null;
 		}
 	}

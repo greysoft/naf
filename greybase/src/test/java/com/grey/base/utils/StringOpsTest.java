@@ -4,8 +4,6 @@
  */
 package com.grey.base.utils;
 
-import java.io.UnsupportedEncodingException;
-
 public class StringOpsTest
 {
     @org.junit.Test
@@ -440,7 +438,7 @@ public class StringOpsTest
     }
 
     @org.junit.Test
-    public void testConvertBytes() throws UnsupportedEncodingException
+    public void testConvertBytes() throws java.io.UnsupportedEncodingException
     {
     	String txt = "Hello";
     	byte[] buf = txt.getBytes(StringOps.DFLT_CHARSET);
@@ -555,4 +553,35 @@ public class StringOpsTest
 			// expected error - gets thrown for any invalid char
 		}
 	}
+
+	// We always build the test string via StringBuilder rather than assigning to a literal
+	// or using the String(literal) constructor, to avoid modifying the lieral.
+	@org.junit.Test
+    public void testErase() throws Exception {
+		// test boundary condition of 1-char string
+        StringBuilder sb = new StringBuilder("A");
+        String str = new String(sb);
+        int len = str.length();
+        StringOps.erase(str);
+        org.junit.Assert.assertFalse(str.equals(new String(sb)));
+        org.junit.Assert.assertEquals(len, str.length());
+        char mask = str.charAt(0);
+		// test boundary condition of blank string
+        str = new String(new StringBuilder(""));
+        StringOps.erase(str);
+        org.junit.Assert.assertEquals(0, str.length());
+        // test longer String
+        str = new String(new StringBuilder("ABCDE"));
+        len = str.length();
+        StringOps.erase(str);
+        String masked = StringOps.fill(mask, len);
+        org.junit.Assert.assertEquals(masked, str);
+        // with non-zero offset
+        str = new String(new StringBuilder("ABCDE"));
+        str = str.substring(2, str.length() - 1);
+        len = str.length();
+        StringOps.erase(str);
+        masked = StringOps.fill(mask, len);
+        org.junit.Assert.assertEquals(masked, str);
+    }
 }

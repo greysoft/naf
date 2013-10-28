@@ -35,16 +35,14 @@
 		<xsl:attribute name="href">DSPSHOW?d=<xsl:value-of select="$d"/>%26st=<xsl:value-of select="$st"/>%26v=<xsl:value-of select="$v"/></xsl:attribute>
 		<span class="infobutton">Refresh</span>
 	</xsl:element>
-	<xsl:apply-templates select="//agents/agent">
-		<xsl:sort select="@name"/>
-	</xsl:apply-templates>
+	<xsl:apply-templates select="//handlers/handler"/>
 	<hr class="sectbreak"/>
 </body>
 </html>
 </xsl:template>
 
-<xsl:template match="agent">
-	<xsl:variable name="dname" select="@name"/>
+<xsl:template match="handler">
+	<xsl:variable name="dname" select="@dname"/>
 	<hr class="sectbreak"/>
 	<p>
 		<span class="subtitle">

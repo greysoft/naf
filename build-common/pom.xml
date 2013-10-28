@@ -6,17 +6,17 @@
 		xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.grey.naf</groupId>
-	<artifactId>build-common</artifactId>
+	<artifactId>grey-build-common</artifactId>
 	<version>1.0.0</version>
 	<name>Common Build Defs</name>
 	<packaging>pom</packaging>
 	<properties>
-		<grey.version.naf>2.3.5</grey.version.naf>
+		<grey.version.naf>2.3.6-SNAPSHOT</grey.version.naf>
 		<grey.version.greybase>${grey.version.naf}</grey.version.greybase>
 		<grey.version.greylog>${grey.version.naf}</grey.version.greylog>
 		<grey.version.greylog-slf4j>${grey.version.greylog}</grey.version.greylog-slf4j>
-		<grey.version.mailismusmta>1.6.5</grey.version.mailismusmta>
-		<grey.version.liceman>1.3.6</grey.version.liceman>
+		<grey.version.mailismusmta>1.6.6-SNAPSHOT</grey.version.mailismusmta>
+		<grey.version.liceman>1.3.7-SNAPSHOT</grey.version.liceman>
 		<grey.manifest.builder>Build Manager</grey.manifest.builder>
 		<grey.manifest.vendor>Grey Software</grey.manifest.vendor>
 		<grey.javaver>1.6</grey.javaver>

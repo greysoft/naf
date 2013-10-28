@@ -80,7 +80,7 @@ public class UDPReaderTest
 			if (msgcnt == iomessages.length) {
 				completed = true;
 				disconnect();
-				dsptch.stop(null);
+				dsptch.stop();
 			}
 		}
 	}

@@ -60,12 +60,12 @@
 	<tr>
 		<td>
 			Dispatcher: <xsl:value-of select="@dispatcher"/>
-			<xsl:if test="@pref!=0">
-				(preference=<xsl:value-of select="@pref"/>)
-			</xsl:if>
 		</td>
 		<td>
 			<xsl:value-of select="."/>
+			<xsl:if test="@pref!=0">
+				(preference=<xsl:value-of select="@pref"/>)
+			</xsl:if>
 		</td>
 	</tr>
 </xsl:template>

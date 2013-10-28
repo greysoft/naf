@@ -12,6 +12,7 @@ public class DispatcherTest
 {
 	private static final String rootdir = initPaths(DispatcherTest.class);
 	private static final com.grey.logging.Logger bootlog = com.grey.logging.Factory.getLoggerNoEx("");
+	private static final int cfgbaseport = 21000; //same as in resources:naf.xml
 
 	public static String initPaths(Class<?> clss)
 	{
@@ -43,7 +44,7 @@ public class DispatcherTest
 		org.junit.Assert.assertNotNull(dsptch);
 		org.junit.Assert.assertEquals(dname, dsptch.name);
 		org.junit.Assert.assertTrue(dsptch.isRunning());
-		dsptch.stop(null);
+		dsptch.stop();
 		dsptch.waitStopped();
 		org.junit.Assert.assertFalse(dsptch.isRunning());
 	}
@@ -62,7 +63,7 @@ public class DispatcherTest
 			Dispatcher.createConfigured(dname, nafcfg, bootlog);
 			org.junit.Assert.fail("Failed to trap duplicate Dispatcher name");
 		} catch (com.grey.base.ConfigException ex) {}
-		dsptch.stop(dsptch);
+		dsptch.stop();
 		org.junit.Assert.assertFalse(dsptch.isRunning());
 
 		dsptch = Dispatcher.createConfigured("x"+dname, nafcfg, bootlog);
@@ -78,37 +79,29 @@ public class DispatcherTest
 		def.name = dname;
 		def.hasDNS = true;
 		def.surviveHandlers = false;
-		Dispatcher dsptch = Dispatcher.create(def, null, bootlog);
+		Dispatcher dsptch = Dispatcher.create(def, cfgbaseport, bootlog);
 		org.junit.Assert.assertEquals(dname, dsptch.name);
+		org.junit.Assert.assertEquals(cfgbaseport, dsptch.nafcfg.getPort(0));
 		dsptch.start();
 		org.junit.Assert.assertTrue(dsptch.isRunning());
-		dsptch.stop(null);
+		dsptch.stop();
+		dsptch.waitStopped();
+		org.junit.Assert.assertFalse(dsptch.isRunning());
+
+		//make sure it can be run again
+		dsptch = Dispatcher.create(def, cfgbaseport, bootlog);
+		org.junit.Assert.assertEquals(dname, dsptch.name);
+		org.junit.Assert.assertEquals(cfgbaseport, dsptch.nafcfg.getPort(0));
+		dsptch.start();
+		org.junit.Assert.assertTrue(dsptch.isRunning());
+		dsptch.stop();
 		dsptch.waitStopped();
 		org.junit.Assert.assertFalse(dsptch.isRunning());
 	}
 
-	@org.junit.Test
-	public void testBasePort() throws com.grey.base.GreyException, java.io.IOException, java.net.URISyntaxException
-	{
-		FileOps.deleteDirectory(rootdir);
-		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
-		def.name = "utest_baseport";
-		Dispatcher dsptch = Dispatcher.create(def, null, bootlog);
-		int baseport = dsptch.nafcfg.getPort(0);
-		dsptch.stop(dsptch);
-
-		dsptch = Dispatcher.create(def, baseport+1, bootlog);
-		org.junit.Assert.assertEquals(baseport+1, dsptch.nafcfg.getPort(0));
-		dsptch.stop(dsptch);
-
-		dsptch = Dispatcher.create(def, 0, bootlog);
-		org.junit.Assert.assertEquals(baseport, dsptch.nafcfg.getPort(0));
-		dsptch.stop(dsptch);
-	}
-
 	// NB: The concept of mapping a resource URL to a File is inherently flawed, but this utility works
 	// beecause the resources we're looking up are in the same build tree.
-	private static String getResourcePath(String path, Class<?> clss) throws java.io.IOException, java.net.URISyntaxException
+	public static String getResourcePath(String path, Class<?> clss) throws java.io.IOException, java.net.URISyntaxException
 	{
 		java.net.URL url = DynLoader.getResource(path, clss);
 		if (url == null) return null;

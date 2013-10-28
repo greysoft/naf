@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Yusef Badri - All rights reserved.
+ * Copyright 2012-2013 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -33,7 +33,7 @@ public class TimerTest
 				tmr3 = null;
 				if (tmr1_cnt == 2) {
 					completed = true;
-					dsptch.stop(dsptch);
+					dsptch.stop();
 				} else {
 					//set this later than tmr3, to make sure that got cancelled
 					dsptch.setTimer(100, 1, this);
@@ -66,9 +66,9 @@ public class TimerTest
 		Dispatcher dsptch = Dispatcher.create(def, null, com.grey.logging.Factory.getLogger("no-such-logger"));
 		Handler handler = new Handler();
 
-		dsptch.setTimer(0, 1, handler);
 		handler.tmr2 = dsptch.setTimer(0, 2, handler);
 		handler.tmr3 = dsptch.setTimer(50, 3, handler);
+		dsptch.setTimer(0, 1, handler);
 
 		dsptch.start();
 		dsptch.waitStopped();

@@ -58,7 +58,7 @@ public class ChannelMonitorTest
 				disconnect();//make sure twice is safe
 				if (--runner.cmcnt == 0) {
 					runner.completed = true;
-					dsptch.stop(dsptch);
+					dsptch.stop();
 				}
 			}
 		}
@@ -107,7 +107,7 @@ public class ChannelMonitorTest
 
 			if (--runner.cmcnt == 0) {
 				try {
-					dsptch.stop(dsptch);
+					dsptch.stop();
 				} catch (Exception ex2) {
 					org.junit.Assert.fail("Failed to stop Dispatcher - "+ex2);
 					return;

@@ -66,11 +66,11 @@ public abstract class ChannelMonitor
 
 	public final boolean isUDP() {return isFlagSet(S_UDP);}
 	public final boolean isConnected() {return isFlagSet(S_ISCONN);}
+	public final long getStartTime() {return start_time;}
 	public final boolean isBrokenPipe() {return isFlagSet(S_BRKPIPE);}
 	public final boolean disconnect() {return disconnect(true);}
 	protected final void setReaper(com.grey.naf.EntityReaper rpr) {reaper = rpr;}
 	final boolean canKill() {return (isConnected() && getClass() != Producer.AlertsPipe.class);}
-	final long getStartTime() {return start_time;}
 
 	protected final boolean usingSSL() {return sslconn != null;}
 	protected final java.security.cert.Certificate[] getPeerChain() {return sslconn == null ? null : sslconn.getPeerChain();}
@@ -88,6 +88,7 @@ public abstract class ChannelMonitor
 		cm_id = dsptch.allocateChannelId();
 	}
 
+	// NB: Every type of ChannelMonitor is guaranteed to call this - client, server, Listener, etc
 	protected final void initChannel(java.nio.channels.SelectableChannel chan, boolean takeOwnership, boolean isconn) throws java.io.IOException
 	{
 		iochan = chan;
@@ -101,7 +102,7 @@ public abstract class ChannelMonitor
 		dsptch.registerIO(this);
 		if (chanreader != null) chanreader.initChannel(this);
 		if (chanwriter != null) chanwriter.initChannel(this);
-		start_time = dsptch.systime(); //catches clients, servers and listeners
+		start_time = dsptch.systime();
 	}
 
 	public final void connect(java.net.InetSocketAddress remaddr) throws com.grey.base.FaultException, java.io.IOException
@@ -336,9 +337,9 @@ public abstract class ChannelMonitor
 		int opflags = (regOps | java.nio.channels.SelectionKey.OP_WRITE);
 		if (halfduplex) opflags &= ~java.nio.channels.SelectionKey.OP_READ;
 		try {
-			//this typically means the remote party has closed the connection.
 			return monitorIO(opflags);
 		} catch (Exception ex) {
+			//this typically means the remote party has closed the connection.
 			brokenPipe(LEVEL.TRC2, "I/O error on Write registration", "IOExec: failed to enable Write", ex);
 			return false;
 		}
@@ -410,7 +411,7 @@ public abstract class ChannelMonitor
 				return;
 			}
 			is_producer = true;
-			sb.append("Producer/").append(((Producer.AlertsPipe)this).producer.consumerType);
+			sb.append("Producer/").append(((Producer.AlertsPipe<?>)this).producer.consumerType);
 		} else {
 			sb.append(clss.getName());
 		}

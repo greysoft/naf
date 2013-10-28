@@ -6,7 +6,7 @@ package com.grey.naf.dns.distributedresolver;
 
 public final class Client
 	extends com.grey.naf.dns.Resolver
-	implements com.grey.naf.reactor.Producer.Consumer
+	implements com.grey.naf.reactor.Producer.Consumer<Request>
 {
 	public static final class RequestFactory
 		implements com.grey.base.utils.ObjectWell.ObjectFactory
@@ -72,7 +72,7 @@ public final class Client
 	}
 
 	@Override
-	public void producerIndication(com.grey.naf.reactor.Producer<?> p) throws java.io.IOException
+	public void producerIndication(com.grey.naf.reactor.Producer<Request> p) throws java.io.IOException
 	{
 		Request req;
 		while ((req = prod.consume()) != null) {

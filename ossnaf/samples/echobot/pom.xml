@@ -11,7 +11,7 @@
 	<name>Echo Bot</name>
 	<parent>
 		<groupId>com.grey.naf.samples</groupId>
-		<artifactId>samples-agg</artifactId>
+		<artifactId>grey-samples-agg</artifactId>
 		<version>1.0.0</version>
 	</parent>
 	<properties>

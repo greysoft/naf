@@ -17,41 +17,43 @@ import com.grey.logging.Logger.LEVEL;
  */
 public final class Producer<T>
 {
-	public interface Consumer
+	public interface Consumer<T>
 	{
-		void producerIndication(Producer<?> p) throws com.grey.base.FaultException, java.io.IOException;
+		void producerIndication(Producer<T> p) throws com.grey.base.FaultException, java.io.IOException;
 	}
 
-	public final Dispatcher dsptch;
-	public final String consumerType;
+	public final String consumerType; //this is purely descriptive
+	private final Consumer<T> consumer;
 	private final com.grey.base.utils.Circulist<T> exchgq;  //MT queue, on which Dispatcher receives items from producer
 	private final com.grey.base.utils.Circulist<T> availq;  //non-MT staging queue, only accessed by the Dispatcher
-	private final AlertsPipe alertspipe;
+	private final AlertsPipe<T> alertspipe; //null means this Producer can only be used synchronously (not MT-safe)
 	private final com.grey.logging.Logger logger;
-	private Consumer consumer;
+	private boolean in_shutdown;
 
-	public Producer(Class<?> clss, Dispatcher dsptch, Consumer cons)
+	public Dispatcher getDispatcher() {return alertspipe == null ? null : alertspipe.dsptch;}
+	public void shutdown(){shutdown(false);}
+
+	public Producer(Class<T> clss, Dispatcher dsptch, Consumer<T> cons)
 			throws com.grey.base.ConfigException, com.grey.base.FaultException, java.io.IOException
 	{
 		this(clss, dsptch, cons, null);
 	}
 
-	public Producer(Class<?> clss, Consumer cons, com.grey.logging.Logger log)
+	public Producer(Class<T> clss, Consumer<T> cons, com.grey.logging.Logger log)
 			throws com.grey.base.ConfigException, com.grey.base.FaultException, java.io.IOException
 	{
 		this(clss, null, cons, log);
 	}
 
-	private Producer(Class<?> clss_item, Dispatcher d, Consumer cons, com.grey.logging.Logger log)
+	private Producer(Class<T> clss_item, Dispatcher dsptch, Consumer<T> cons, com.grey.logging.Logger log)
 			throws com.grey.base.ConfigException, com.grey.base.FaultException, java.io.IOException
 	{
-		dsptch = d;
-		logger = (log == null && dsptch != null ? dsptch.logger : log);
-		alertspipe = (dsptch == null ? null : new AlertsPipe(dsptch, this));
 		consumer = cons;
 		consumerType = consumer.getClass().getName()+"/"+clss_item.getName();
 		exchgq = new com.grey.base.utils.Circulist<T>(clss_item);
 		availq = new com.grey.base.utils.Circulist<T>(clss_item);
+		logger = (log == null && dsptch != null ? dsptch.logger : log);
+		alertspipe = (dsptch == null ? null : new AlertsPipe<T>(dsptch, this));
 		if (logger != null) {
 			logger.trace("Dispatcher="+(dsptch==null?"n/a":dsptch.name)+" created Producer="
 					+this+"/"+alertspipe+" for Consumer="+consumerType);
@@ -61,9 +63,9 @@ public final class Producer<T>
 	// If some items are already on the available queue, then we don't attempt to consume them even if
 	// the 'consume' arg is true, as this shutdown could be occurring during a notifyConsumer() callout,
 	// in which case the caller has already decided to abort.
-	public void shutdown(boolean consume)
+	public void shutdown(boolean consume_pending)
 	{
-		if (consumer == null) return;
+		if (in_shutdown) return;
 		try {
 			if (alertspipe != null) alertspipe.shutdown();
 		} catch (Exception ex) {
@@ -73,13 +75,13 @@ public final class Producer<T>
 		takePendingItems();
 		int pending = availq.size() - ready;
 
-		if (logger != null && availq.size() != 0) logger.info("Shutdown Producer="+this+" with pending="+ready+"/"+pending
+		if (logger != null) logger.info("Shutdown Producer="+this+" with pending="+ready+"+"+pending+"/drain="+consume_pending
 				+" - Consumer="+consumerType);
-		if (consume && ready == 0 && pending != 0) {
+		if (consume_pending && ready == 0 && pending != 0) {
 			notifyConsumer();
 			if (logger != null) logger.info("Shutdown Producer="+this+": Drainage completed - pending="+availq.size());
 		}
-		consumer = null;
+		in_shutdown = true; // don't set this till after we've drained any pending events
 	}
 
 	public T consume()
@@ -88,17 +90,17 @@ public final class Producer<T>
 		return availq.remove();
 	}
 
-	public void produce(T item, Dispatcher d) throws java.io.IOException
+	public void produce(T item) throws java.io.IOException
 	{
 		int cnt;
 		synchronized (exchgq) {
 			cnt = exchgq.size();
 			exchgq.append(item);
 		}
-		produce(d, cnt);
+		produce(cnt);
 	}
 
-	public void produce(java.util.ArrayList<T> items, Dispatcher d) throws java.io.IOException
+	public void produce(java.util.ArrayList<T> items) throws java.io.IOException
 	{
 		int cnt;
 		synchronized (exchgq) {
@@ -107,10 +109,10 @@ public final class Producer<T>
 				exchgq.append(items.get(idx));
 			}
 		}
-		produce(d, cnt);
+		produce(cnt);
 	}
 
-	public void produce(T[] items, int off, int len, Dispatcher d) throws java.io.IOException
+	public void produce(T[] items, int off, int len) throws java.io.IOException
 	{
 		int lmt = off + len;
 		int cnt;
@@ -120,12 +122,12 @@ public final class Producer<T>
 				exchgq.append(items[idx]);
 			}
 		}
-		produce(d, cnt);
+		produce(cnt);
 	}
 
-	public void produce(T[] items, Dispatcher d) throws java.io.IOException
+	public void produce(T[] items) throws java.io.IOException
 	{
-		produce(items, 0, items.length, d);
+		produce(items, 0, items.length);
 	}
 
 	// This is the final act of the public produce() methods, which are called by the external producer and
@@ -137,9 +139,9 @@ public final class Producer<T>
 	// the AlertsPipe to signal the owner Dispatcher.
 	// If exchgq already had unconsumed items on it, then we assume the owner Dispatcher has already been signalled,
 	// so we can skip the I/O cost of sending it a redundant signal.
-	private void produce(Dispatcher d, int exchq_prevsize) throws java.io.IOException
+	private void produce(int exchq_prevsize) throws java.io.IOException
 	{
-		if (alertspipe == null || d == alertspipe.dsptch) {
+		if (alertspipe == null || alertspipe.dsptch.inThread()) {
 			producerEvent(); //we can synchronously call the Consumer
 		} else {
 			if (exchq_prevsize == 0) alertspipe.signalConsumer();  //one signal is enough
@@ -149,7 +151,7 @@ public final class Producer<T>
 	private void notifyConsumer()
 	{
 		int ready = availq.size();
-		if (consumer == null || ready == 0) return;
+		if (in_shutdown || ready == 0) return;
 		try {
 			consumer.producerIndication(this);
 		} catch (Exception ex) {
@@ -180,14 +182,14 @@ public final class Producer<T>
 	 * This ChannelMonitor receives I/O indications from the Producer thread(s).
 	 * This class is non-private only because Dispatcher.dumpState() needs to be able to see it.
 	 */
-	static final class AlertsPipe
+	static final class AlertsPipe<T>
 		extends ChannelMonitor
 	{
-		public final Producer<?> producer;
+		public final Producer<T> producer;
 		private final java.nio.channels.Pipe.SinkChannel wep;  //Write end-point of pipe
 		private final java.nio.ByteBuffer xmtbuf;
 
-		AlertsPipe(Dispatcher d, Producer<?> p) throws com.grey.base.ConfigException, com.grey.base.FaultException, java.io.IOException
+		AlertsPipe(Dispatcher d, Producer<T> p) throws com.grey.base.ConfigException, com.grey.base.FaultException, java.io.IOException
 		{
 			super(d);
 			producer = p;

@@ -6,13 +6,13 @@
 		xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.grey.naf</groupId>
-	<artifactId>ossnaf</artifactId>
+	<artifactId>grey-ossnaf-agg</artifactId>
 	<version>${grey.version.naf}</version>
-	<name>OSS NAF (Open Source Software - Network Application Framework)</name>
+	<name>OSS NAF (Network Application Framework - open source build)</name>
 	<packaging>pom</packaging>
 	<parent>
 		<groupId>com.grey.naf</groupId>
-		<artifactId>build-common</artifactId>
+		<artifactId>grey-build-common</artifactId>
 		<version>1.0.0</version>
 		<relativePath>../build-common/pom.xml</relativePath>
 	</parent>
@@ -23,18 +23,6 @@
 		<module>../naf</module>
 		<module>samples</module>
 	</modules>
-	<dependencies>
-		<dependency>
-			<groupId>com.grey.naf</groupId>
-			<artifactId>greynaf</artifactId>
-			<version>${grey.version.naf}</version>
-		</dependency>
-		<dependency>
-			<groupId>com.grey.naf</groupId>
-			<artifactId>greylog-slf4j</artifactId>
-			<version>${grey.version.greylog-slf4j}</version>
-		</dependency>
-	</dependencies>
 	<build>
 		<plugins>
 			<plugin>
@@ -42,7 +30,7 @@
 				<artifactId>maven-dependency-plugin</artifactId>
 				<executions>
 					<execution>
-						<phase>package</phase>
+						<phase>install</phase>
 						<goals>
 							<goal>copy-dependencies</goal>
 						</goals>
@@ -64,10 +52,10 @@
 				</configuration>
 				<executions>
 					<execution>
+						<phase>install</phase>
 						<goals>
 							<goal>aggregate</goal>
 						</goals>
-						<phase>package</phase>
 					</execution>
 				</executions>
 			</plugin>
@@ -76,10 +64,10 @@
 				<artifactId>maven-assembly-plugin</artifactId>
 				<executions>
 					<execution>
+						<phase>install</phase>
 						<goals>
 							<goal>single</goal>
 						</goals>
-						<phase>install</phase>
 					</execution>
 				</executions>
 			</plugin>

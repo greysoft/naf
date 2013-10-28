@@ -59,7 +59,7 @@ public final class Command
 		clear();
 		this.def = def;
 		this.srvr = srvr;
-		response.append("<nafman><agents>");
+		response.append("<nafman><handlers>");
 		return this;
 	}
 
@@ -74,14 +74,14 @@ public final class Command
 	// called at end in Primary thread
 	void completed() throws java.io.IOException, com.grey.base.FaultException
 	{
-		com.grey.base.utils.ByteChars bcrsp;
-		synchronized (this) { //synchronise to see updates performed by other threads
-			bcrsp = response;
+		//The response object is not contended here, but we do need to synchronise for the sake of memory visibility,
+		//so as to see updates performed by other threads.
+		synchronized (this) {
+			response.append("</handlers></nafman>");
 		}
-		bcrsp.append("</agents></nafman>");
 		boolean ok = false;
 		try {
-			srvr.commandCompleted(bcrsp);
+			srvr.commandCompleted(response);
 			ok = true;
 		} finally {
 			if (!ok) srvr.endConnection();
@@ -120,10 +120,11 @@ public final class Command
 	}
 
 	//can be called by any thread
-	synchronized void addHandlerResponse(com.grey.naf.reactor.Dispatcher dsptch, CharSequence msg)
+	synchronized void addHandlerResponse(com.grey.naf.reactor.Dispatcher dsptch, Handler handler, CharSequence msg)
 	{
-		response.append("<agent name=\"").append(dsptch.name).append("\">");
-		response.append(msg).append("</agent>");
+		response.append("<handler dname=\"").append(dsptch.name).append("\"");
+		response.append(" hname=\"").append(handler.getClass().getName()).append("\">");
+		response.append(msg).append("</handler>");
 	}
 
 	private boolean isMatch(Agent agent)

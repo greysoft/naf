@@ -5,7 +5,7 @@
 package com.grey.naf.dns.distributedresolver;
 
 final class Proxy
-	implements com.grey.naf.dns.Resolver.Client, com.grey.naf.reactor.Producer.Consumer
+	implements com.grey.naf.dns.Resolver.Client, com.grey.naf.reactor.Producer.Consumer<Object>
 {
 	private static Proxy instance;
 
@@ -74,7 +74,7 @@ final class Proxy
 		}
 		Request req = clnt.reqpool.extract();
 		req.set(caller, qtype, qname, 0, cbdata, flags);
-		prod.produce(req, dsptch);
+		prod.produce(req);
 		return null;
 	}
 
@@ -86,7 +86,7 @@ final class Proxy
 		}
 		Request req = clnt.reqpool.extract();
 		req.set(caller, qtype, null, qip, cbdata, flags);
-		prod.produce(req, dsptch);
+		prod.produce(req);
 		return null;
 	}
 
@@ -95,12 +95,12 @@ final class Proxy
 		if (clnt.dsptch == dsptch) {
 			return rslvr.cancel(caller);
 		}
-		prod.produce(caller, dsptch);
+		prod.produce(caller);
 		return -1;  //we don't know how many requests will get cancelled
 	}
 
 	@Override
-	public void producerIndication(com.grey.naf.reactor.Producer<?> p) throws java.io.IOException
+	public void producerIndication(com.grey.naf.reactor.Producer<Object> p) throws java.io.IOException
 	{
 		Object event;
 		while ((event = prod.consume()) != null) {
@@ -132,6 +132,6 @@ final class Proxy
 	private void requestResolved(Request req, com.grey.naf.dns.Answer answer) throws java.io.IOException
 	{
 		req.answer.set(answer);
-		req.client.produce(req, dsptch);
+		req.client.produce(req);
 	}
 }

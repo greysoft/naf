@@ -11,7 +11,7 @@
 	<name>GreyBase</name>
 	<parent>
 		<groupId>com.grey.naf</groupId>
-		<artifactId>build-common</artifactId>
+		<artifactId>grey-build-common</artifactId>
 		<version>1.0.0</version>
 	</parent>
 	<properties>

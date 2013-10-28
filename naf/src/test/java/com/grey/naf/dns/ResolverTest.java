@@ -173,7 +173,7 @@ public class ResolverTest
 		org.junit.Assert.assertEquals(3, cnt);
 		cnt = dsptch.dnsresolv.cancel(this);
 		org.junit.Assert.assertEquals(0, cnt);
-		dsptch.stop(dsptch);
+		dsptch.stop();
 	}
 
 	private void exec(Dispatcher dsptch, String cbdata, boolean nowait, Dispatcher d2, boolean nopiggy) throws java.io.IOException
@@ -284,7 +284,7 @@ public class ResolverTest
 			int cnt = dsptch.dnsresolv.cancel(this);
 			int expect = (cbflags.contains("distributed-remote") ? -1 : 0); //unknowable for this case
 			org.junit.Assert.assertEquals(expect, cnt);
-			dsptch.stop(dsptch);
+			dsptch.stop();
 		}
 		synchronized (this) {
 			opencallbacks--;

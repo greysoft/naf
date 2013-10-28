@@ -154,7 +154,7 @@ public class SSLConnectionTest
 
 		// set up a no-op Naflet which simply goes through the motions
 		ctask = new SSLTask("utest_sslc", dsptch);
-		dsptch.loadNaflet(ctask, dsptch);
+		dsptch.loadNaflet(ctask);
 		org.junit.Assert.assertTrue(ctask.started);
 
 		// launch

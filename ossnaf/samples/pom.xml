@@ -6,13 +6,13 @@
 		xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.grey.naf.samples</groupId>
-	<artifactId>samples-agg</artifactId>
+	<artifactId>grey-samples-agg</artifactId>
 	<version>1.0.0</version>
-	<name>Samples Aggregator</name>
+	<name>NAF Samples Aggregator</name>
 	<packaging>pom</packaging>
 	<parent>
 		<groupId>com.grey.naf</groupId>
-		<artifactId>build-common</artifactId>
+		<artifactId>grey-build-common</artifactId>
 		<version>1.0.0</version>
 	</parent>
 	<modules>

@@ -43,7 +43,7 @@ public class IOExecWriterTest
 			boolean done = disconnect(true); //make sure repeated call is ok
 			org.junit.Assert.assertTrue(done);
 			try {
-				dsptch.stop(dsptch);
+				dsptch.stop();
 			} catch (Exception ex2) {
 				org.junit.Assert.fail("Failed to stop Dispatcher - "+ex2);
 				return;
@@ -133,7 +133,7 @@ public class IOExecWriterTest
 		org.junit.Assert.assertEquals(xmitcnt - pipesize, rdbytes);
 		org.junit.Assert.assertTrue(StringOps.sameSeq(expectdata, bc));
 
-		dsptch.stop(null);
+		dsptch.stop();
 		dsptch.waitStopped();
 		synchronized (cm) {
 			org.junit.Assert.assertTrue(cm.completed);

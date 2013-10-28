@@ -4,8 +4,8 @@
  */
 package com.grey.naf;
 
-import com.grey.base.utils.DynLoader;
 import com.grey.base.config.XmlConfig;
+import com.grey.naf.reactor.DispatcherTest;
 
 public class ConfigTest
 {
@@ -50,7 +50,7 @@ public class ConfigTest
 	@org.junit.Test
 	public void testLoad() throws com.grey.base.ConfigException, java.io.IOException, java.net.URISyntaxException
 	{
-		String path = getResourcePath("/naf.xml", ConfigTest.class);
+		String path = DispatcherTest.getResourcePath("/naf.xml", ConfigTest.class);
 		String dname = "testdispatcher1";
 
 		Config cfg = Config.load(path);
@@ -75,14 +75,5 @@ public class ConfigTest
 		org.junit.Assert.assertTrue(def.surviveDownstream);
 		org.junit.Assert.assertFalse(def.surviveHandlers);
 		org.junit.Assert.assertNull(def.naflets);
-	}
-
-	// NB: The concept of mapping a resource URL to a File is inherently flawed, but this utility works
-	// beecause the resources we're looking up are in the same build tree.
-	private static String getResourcePath(String path, Class<?> clss) throws java.io.IOException, java.net.URISyntaxException
-	{
-		java.net.URL url = DynLoader.getResource(path, clss);
-		if (url == null) return null;
-		return new java.io.File(url.toURI()).getCanonicalPath();
 	}
 }

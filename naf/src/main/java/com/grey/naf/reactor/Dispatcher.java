@@ -11,14 +11,13 @@ import com.grey.base.utils.TimeOps;
 import com.grey.logging.Logger.LEVEL;
 
 public final class Dispatcher
-	implements Runnable, com.grey.naf.EntityReaper, Producer.Consumer
+	implements Runnable, com.grey.naf.EntityReaper, Producer.Consumer<Object>
 {
 	private static final long shutdown_timer_advance = SysProps.getTime("greynaf.dispatchers.shutdown_advance", "1s");
 	private static final String SYSPROP_HEAPWAIT = "greynaf.dispatchers.heapwait";
 	private static final String STOPCMD = "_STOP_";
 
-	private static final java.util.concurrent.ConcurrentHashMap<String, Dispatcher> activedispatchers 
-			= new java.util.concurrent.ConcurrentHashMap<String, Dispatcher>();
+	private static final java.util.ArrayList<Dispatcher> activedispatchers = new java.util.ArrayList<Dispatcher>();
 	private static final java.util.concurrent.atomic.AtomicInteger anoncnt = new java.util.concurrent.atomic.AtomicInteger();
 
 	public final long timeboot = System.currentTimeMillis();
@@ -55,7 +54,10 @@ public final class Dispatcher
 	private java.nio.ByteBuffer tmpniobuf;
 	private byte[] xferbuf;
 
+	// assume that a Dispatcher which hasn't yet been started is being called by the thread setting it up
+	public boolean inThread() {return Thread.currentThread() == thrd_main || thrd_main.getState() == Thread.State.NEW;}
 	public boolean isRunning() {return thrd_main.isAlive();}
+
 	int allocateChannelId() {return ++uniqid_chan;}
 
 	private Dispatcher(com.grey.naf.Config ncfg, com.grey.naf.DispatcherDef def, com.grey.logging.Logger initlog)
@@ -160,7 +162,8 @@ public final class Dispatcher
 		}
 		shutdown(true);
 		logger.info("Dispatcher="+name+" terminated - Naflets="+naflets.size()+", Channels="+activechannels.size()
-				+", Timers="+activetimers.size()+":"+pendingtimers.size());
+				+", Timers="+activetimers.size()+":"+pendingtimers.size()
+				+" (well="+sparetimers.size()+"/"+sparetimers.population()+")");
 		if (naflets.size() != 0) logger.trace("Naflets: "+naflets);
 		if (activechannels.size() != 0) logger.trace("Channels: "+activechannels);
 		if (activetimers.size()+pendingtimers.size() != 0) logger.trace("Timers: Active="+activetimers+" - Pending="+pendingtimers);
@@ -172,15 +175,13 @@ public final class Dispatcher
 		}
 	}
 
-	// This method can be (and is meant to be) called by other threads
-	public boolean stop(Dispatcher d)
+	// This method can be called by other threads
+	public boolean stop()
 	{
-		if (d == this) {
-			// handle this request synchronously
-			return stop();
-		}
+		if (inThread()) return stopSynchronously();
+
 		try {
-			apploader.produce(STOPCMD, d);
+			apploader.produce(STOPCMD);
 		} catch (java.io.IOException ex) {
 			//probably a harmless error caused by Dispatcher already being shut down
 			logger.trace("Failed to send cmd="+STOPCMD+" to Dispatcher="+name+"/Running="+isRunning()+" - "+ex);
@@ -188,11 +189,10 @@ public final class Dispatcher
 		return false;
 	}
 
-	private boolean stop()
+	// This must only be called within the Dispatcher thread
+	private boolean stopSynchronously()
 	{
-		if (shutdownPerformed) {
-			return true;
-		}
+		if (shutdownPerformed) return true;
 		logger.info("Dispatcher="+name+": Received Stop request - naflets="+naflets.size()+", shutdownreq="+shutdownRequested);
 
 		if (!shutdownRequested) {
@@ -223,12 +223,15 @@ public final class Dispatcher
 		}
 		if (dnsresolv != null)  dnsresolv.stop();
 		if (nafman != null) nafman.stop();
-		apploader.shutdown(false);
+		apploader.shutdown();
 
-		logger.info("Dispatcher="+name+" exiting - endOfLife="+endOfLife+", DispatcherThread="+(Thread.currentThread() == thrd_main));
+		logger.info("Dispatcher="+name+" exiting - endOfLife="+endOfLife+"/inThread="+inThread()
+				+"/Alive="+thrd_main.isAlive()+"/"+thrd_main.getState());
 		flusher.shutdown();
 
-		activedispatchers.remove(name);
+		synchronized (activedispatchers) {
+			activedispatchers.remove(this);
+		}
 		shutdownPerformed = true;
 	}
 
@@ -259,15 +262,12 @@ public final class Dispatcher
 		while (!shutdownRequested && (activechannels.size() + activetimers.size() != 0))
 		{
 			if (!zeroNafletsOK && naflets.size() == 0) break;
-			long iotmt = 0;
-
-			if (activetimers.size() != 0) {
-				if ((iotmt = activetimers.get(0).expiry - systime()) <= 0) {
-					// Next timer already due, so set infinitesmal timeout.
-					// We need to call the NIO Selector anyway, to pick up pending I/O events as well, else a continuous
-					// stream of zero-second timers could starve the I/O handlers.
-					iotmt = 1L;
-				}
+			long iotmt = (activetimers.size() == 0 ? 0 : activetimers.get(0).expiry - systime());
+			if (iotmt <= 0) {
+				// Next timer already due, so set infinitesmal timeout.
+				// We need to call the NIO Selector anyway, to pick up pending I/O events as well, else a continuous
+				// stream of zero-second timers could starve the I/O handlers.
+				iotmt = 1L;
 			}
 			systime_msecs = 0;
 			int keycnt = slct.select(iotmt);
@@ -288,7 +288,7 @@ public final class Dispatcher
 			//do a final Select to flush the SelectionKeys, as they're always 1 interval in arrears
 			finalkeys = slct.selectNow();
 		}
-		logger.info("Dispatcher="+name+": Reactor terminated - Naflets="+naflets.size()
+		logger.info("Dispatcher="+name+": Reactor loop terminated - Naflets="+naflets.size()
 				+", Channels="+activechannels.size()+"/"+finalkeys
 				+", Timers="+activetimers.size()+" (pending="+pendingtimers.size()+")");
 	}
@@ -296,13 +296,13 @@ public final class Dispatcher
 	private void fireTimers()
 	{
 		// Extract all expired timers before firing any of them, to make sure any further timers they
-		// install don't get fired in this run, else ontinuous zero-second timers could prevent us ever
-		// completing this loop.
+		// install don't get fired in this loop, else continuous zero-second timers could prevent us ever
+		// completing the loop.
 		while (activetimers.size() != 0) {
 			// Fire within milliseconds of maturity, as jitter in the system clock means the NIO
 			// Selector can trigger a fraction early.
 			Timer tmr = activetimers.get(0);
-			if (tmr.expiry - systime() >= Timer.JITTER_THRESHOLD) break;
+			if (tmr.expiry - systime() >= Timer.JITTER_THRESHOLD) break; //no expired timers left
 			activetimers.remove(0);
 			pendingtimers.add(tmr);
 		}
@@ -356,12 +356,9 @@ public final class Dispatcher
 			} else {
 				if (!bpex) {
 					tmpsb.setLength(0);
-					tmpsb.append("Dispatcher=");
-					tmpsb.append(name);
-					tmpsb.append(": Error on ");
+					tmpsb.append("Dispatcher=").append(name).append(": Error on ");
 					tmpsb.append(cm == null ? "Timer" : "IO");
-					tmpsb.append(" handler=");
-					tmpsb.append(cm == null ? tmr.handler : cm);
+					tmpsb.append(" handler=").append(cm == null ? tmr.handler : cm);
 					if (cmerr != null) {
 						tmpsb.append(" - cmstate: ");
 						cmerr.dumpState(tmpsb, true);
@@ -380,12 +377,13 @@ public final class Dispatcher
 		}
 		if (!surviveHandlers) {
 			logger.warn("Initiating Abort due to error in "+(cm==null?"Timer":"I/O")+" Handler");
-			stop();
+			stopSynchronously();
 		}
 	}
 
-	// ChannelMonitors must bookend all their activity on each channel between this call and deregisterlIO().
-	// In between, they can can call monitorIO() multiple times to commence listening for specific I/O events.
+	// ChannelMonitors must bookend all their activity between a single call to this method and another one
+	// to deregisterlIO().
+	// In between, they can can call monitorIO() multiple times to stop and start listening for specific I/O events.
 	void registerIO(ChannelMonitor cm) throws java.io.IOException
 	{
 		if (activechannels.put(cm.cm_id, cm) != null) {
@@ -411,16 +409,14 @@ public final class Dispatcher
 		if (activechannels.containsKey(cm.cm_id)) deregisterIO(cm);
 	}
 
-	// If remote party disconnects before we enter here, the chan.register() call will throw, so callers have to be prepared to handle
-	// exceptions without treating them as an error, but rather as a routine disconnect event
 	void monitorIO(ChannelMonitor cm, int ops) throws java.nio.channels.ClosedChannelException
 	{
 		if (shutdownPerformed) return;
-		if (cm.iochan.isRegistered()) {
-			cm.regkey.interestOps(ops);
-		} else {
+		if (cm.regkey == null) { //equivalent to !cm.iochan.isRegistered(), but obviously cheaper
 			//3rd arg has same effect as calling attach(handler) on returned SelectionKey
 			cm.regkey = cm.iochan.register(slct, ops, cm);
+		} else {
+			cm.regkey.interestOps(ops);
 		}
 	}
 
@@ -485,19 +481,21 @@ public final class Dispatcher
 	private void activateTimer(Timer tmr)
 	{
 		int pos = 0; // will insert new timer at head of list, if we don't find any earlier timers
-		
-		for (int idx = activetimers.size() - 1; idx != -1; idx--) {
-			if (tmr.expiry >= activetimers.get(idx).expiry) {
-				// insert tmr AFTER this node
-				pos = idx + 1;
-				break;
+		if (tmr.interval != 0) {
+			//zero-sec timers go straight to front of queue, even ahead of other zero-sec ones
+			for (int idx = activetimers.size() - 1; idx != -1; idx--) {
+				if (tmr.expiry >= activetimers.get(idx).expiry) {
+					// insert tmr AFTER this node
+					pos = idx + 1;
+					break;
+				}
 			}
 		}
 		activetimers.insert(pos, tmr);
 	}
 
 	@Override
-	public void producerIndication(Producer<?> p) throws java.io.IOException
+	public void producerIndication(Producer<Object> p) throws java.io.IOException
 	{
 		Object event;
 		while ((event = apploader.consume()) != null) {
@@ -505,8 +503,9 @@ public final class Dispatcher
 				String evtname = (String)event;
 				if (evtname.equals(STOPCMD)) {
 					// we're being asked to stop this entire dispatcher, not just a naflet
-					stop();
+					stopSynchronously();
 				} else {
+					// the received item is a Naflet name, to be stopped
 					com.grey.naf.Naflet app = getNaflet(evtname);
 					if (app == null) {
 						logger.info("Discarding stop request for Naflet="+evtname+" - unknown Naflet");
@@ -531,17 +530,17 @@ public final class Dispatcher
 	// This method can be (and is meant to be) called by other threads.
 	// The Naflet is expected to be merely constructed, and we will call its start() method from
 	// within the Dispatcher thread once it's been loaded.
-	public void loadNaflet(com.grey.naf.Naflet app, Dispatcher d) throws com.grey.base.ConfigException, java.io.IOException
+	public void loadNaflet(com.grey.naf.Naflet app) throws com.grey.base.ConfigException, java.io.IOException
 	{
 		if (app.naflet_name.charAt(0) == '_') {
 			throw new com.grey.base.ConfigException("Invalid Naflet name (starts with underscore) - "+app.naflet_name);
 		}
-		apploader.produce(app, d);
+		apploader.produce(app);
 	}
 
-	public void unloadNaflet(String naflet_name, Dispatcher d) throws java.io.IOException
+	public void unloadNaflet(String naflet_name) throws java.io.IOException
 	{
-		apploader.produce(naflet_name, d);
+		apploader.produce(naflet_name);
 	}
 
 	@Override
@@ -695,14 +694,21 @@ public final class Dispatcher
 	}
 
 
-	public static Dispatcher getDispatcher(String dispatcher_name)
+	public static Dispatcher getDispatcher(String dname)
 	{
-		return activedispatchers.get(dispatcher_name);
+		synchronized (activedispatchers) {
+			for (int idx = 0; idx != activedispatchers.size(); idx++) {
+				if (activedispatchers.get(idx).name.equals(dname)) return activedispatchers.get(idx);
+			}
+		}
+		return null;
 	}
 
 	public static Dispatcher[] getDispatchers()
 	{
-		return activedispatchers.values().toArray(new Dispatcher[activedispatchers.size()]);
+		synchronized (activedispatchers) {
+			return activedispatchers.toArray(new Dispatcher[activedispatchers.size()]);
+		}
 	}
 
 	public static Dispatcher create(com.grey.naf.DispatcherDef def, com.grey.naf.Config nafcfg, com.grey.logging.Logger log)
@@ -728,12 +734,12 @@ public final class Dispatcher
 		}
 		Dispatcher d;
 
-		synchronized (Dispatcher.class) {
-			if (activedispatchers.containsKey(def.name)) {
+		synchronized (activedispatchers) {
+			if (getDispatcher(def.name) != null) {
 				throw new com.grey.base.ConfigException("Duplicate Dispatcher="+def.name);
 			}
 			d =  new Dispatcher(nafcfg, def, log);
-			activedispatchers.put(def.name, d);
+			activedispatchers.add(d);
 		}
 		return d;
 	}
@@ -781,17 +787,18 @@ public final class Dispatcher
 
 	public static String dumpConfig()
 	{
-		String txt = "Dispatchers="+activedispatchers.size()+":";
-		java.util.Iterator<String> it = activedispatchers.keySet().iterator();
-		while (it.hasNext()) {
-			String name = it.next();
-			Dispatcher d = activedispatchers.get(name);
-			if (d == null) continue; //must have just exited
-			txt += "\n- "+name+": NAFlets="+d.naflets.size();
-			String dlm = " - ";
-			for (int idx = 0; idx != d.naflets.size(); idx++) {
-				txt += dlm + d.naflets.get(idx).naflet_name;
-				dlm = ", ";
+		String txt = "";
+		synchronized (activedispatchers) {
+			txt += "Dispatchers="+activedispatchers.size()+":";
+			for (int idx = 0; idx != activedispatchers.size(); idx++) {
+				Dispatcher d = activedispatchers.get(idx);
+				if (d == null) continue; //must have just exited
+				txt += "\n- "+d.name+": NAFlets="+d.naflets.size();
+				String dlm = " - ";
+				for (int idx2 = 0; idx2 != d.naflets.size(); idx2++) {
+					txt += dlm + d.naflets.get(idx2).naflet_name;
+					dlm = ", ";
+				}
 			}
 		}
 		String[] lnames = Listener.getNames();

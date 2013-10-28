@@ -137,12 +137,8 @@ public class CramMD5Test
 		client.init();
 		server.init();
 		if (nonce != null) {
-			try {
-				ByteChars srvnonce = (ByteChars)DynLoader.getField(server, "srvnonce");
-				srvnonce.set(nonce);
-			} catch (Exception ex) {
-				throw new RuntimeException("Failed to obtain nonce field - "+ex, ex);
-			}
+			ByteChars srvnonce = (ByteChars)DynLoader.getField(server, "srvnonce");
+			srvnonce.set(nonce);
 		}
 		username = new ByteChars(usrnam);
 		if (usrnam.toString().equals("baduser")) {

@@ -123,7 +123,7 @@ public class IOExecReaderTest
 				chanreader.endReceive();
 				disconnect();
 				disconnect();//make sure twice is safe
-				dsptch.stop(dsptch);
+				dsptch.stop();
 				break;
 			default:
 				throw new RuntimeException("Missing case for phase="+phase);

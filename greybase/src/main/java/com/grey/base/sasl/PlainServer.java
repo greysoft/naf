@@ -33,8 +33,8 @@ public final class PlainServer
 	protected boolean verifyDecodedResponse(com.grey.base.utils.ArrayRef<byte[]> msg)
 	{
 		int dlm1 = ByteOps.indexOf(msg.ar_buf, msg.ar_off, msg.ar_len, (byte)0);
-		int dlm2 = ByteOps.indexOf(msg.ar_buf, dlm1+1, msg.ar_len - (dlm1 - msg.ar_off + 1), (byte)0);
-		if (dlm1 == -1 || dlm2 == -1) return false;
+		int dlm2 = (dlm1 == -1 ? -1 : ByteOps.indexOf(msg.ar_buf, dlm1+1, msg.ar_len - (dlm1 - msg.ar_off + 1), (byte)0));
+		if (dlm2 == -1) return false;
 		auth_rolename.pointAt(msg.ar_buf, msg.ar_off, dlm1 - msg.ar_off);
 		auth_username.pointAt(msg.ar_buf, dlm1 + 1, dlm2 - dlm1 - 1);
 		com.grey.base.utils.ByteChars role = (auth_rolename.ar_len == 0 || auth_rolename.equals(auth_username) ? null : auth_rolename);

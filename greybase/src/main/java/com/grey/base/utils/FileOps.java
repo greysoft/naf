@@ -21,24 +21,39 @@ public class FileOps
 
 	public static class Filter_EndsWith implements java.io.FileFilter
 	{
-		private final String sfx;
+		private final String[] sfx;
 		private final boolean nocase;
-		private final boolean allowdirs;
+		private final boolean invert;
+		private final boolean recursive;
 
-		public Filter_EndsWith(CharSequence s, boolean nc, boolean dirs)
+		public Filter_EndsWith(CharSequence s) {this(new String[]{s.toString()}, false, false);}
+		public Filter_EndsWith(CharSequence[] s, boolean nc, boolean inv) {this(s, nc, inv, true);}
+
+		public Filter_EndsWith(CharSequence[] s, boolean nc, boolean inv, boolean dirs)
 		{
-			sfx = (nc ? s.toString().toLowerCase() : s.toString());
 			nocase = nc;
-			allowdirs = dirs;
+			invert = inv;
+			recursive = dirs;
+			sfx = new String[s.length];
+			for (int idx = 0; idx != sfx.length; idx++) {
+				sfx[idx] = (nocase ? s[idx].toString().toLowerCase() : s[idx].toString());
+			}
 		}
 
 		@Override
 		public boolean accept(java.io.File fh)
 		{
-			if (allowdirs && fh.isDirectory()) return true;
+			if (fh.isDirectory()) return recursive;
 			String filename = fh.getName();
 			if (nocase) filename = filename.toLowerCase();
-			return filename.endsWith(sfx);
+			boolean ok = false;
+			for (int idx = 0; idx != sfx.length; idx++) {
+				if (filename.endsWith(sfx[idx])){
+					ok = true;
+					break;
+				}
+			}
+			return (invert ? !ok :ok);
 		}
 	}
 
@@ -358,6 +373,11 @@ public class FileOps
 	public static int countFiles(java.io.File dirh, boolean recursive)
 	{
 		return countFiles(dirh, (java.io.FileFilter)null, false, recursive);
+	}
+
+	public static int countFiles(java.io.File dirh, boolean stopOnFirst, boolean recursive)
+	{
+		return countFiles(dirh, (java.io.FileFilter)null, stopOnFirst, recursive);
 	}
 
 	public static int countFiles(java.io.File dirh, java.io.FileFilter filter, boolean stopOnFirst, boolean recursive)

@@ -10,7 +10,7 @@ public class DynLoader
 {
 	// classpath is delimited by standard OS separator, eg ":" on UNIX, "," on Windows
 	static public final String CPDLM = SysProps.get("grey.path.separator", ":");
-	static public final String SYSPROP_CLDHACK = "grey.classloader.hack";
+	static public final boolean CLDHACK = SysProps.get("grey.classloader.hack", false);
 
 	// Note that the naive Class.forName(classname) uses the class loader that loaded the current class (probably the system classloader),
 	// which may produce unexpected results in alien managed environments.
@@ -110,9 +110,6 @@ public class DynLoader
 			throws java.io.IOException, NoSuchMethodException,
 				IllegalAccessException, java.lang.reflect.InvocationTargetException
 	{
-		// check this on every call, to make testing easier
-		boolean hackflag = com.grey.base.config.SysProps.get(SYSPROP_CLDHACK, false);
-
 		ClassLoader cld = getClassLoader();
 		java.util.HashSet<java.net.URL> cp_existing = getClassPath(cld);
 		java.util.ArrayList<java.net.URL> cp_extra = new java.util.ArrayList<java.net.URL>();
@@ -126,7 +123,7 @@ public class DynLoader
 		if (cp_extra.size() == 0) return null;
 
 		// Dynamically add the URLs to our existing classpath
-		if (hackflag) {
+		if (CLDHACK) {
 			// popular but presumptious procedure - allow it to be enabled for troubleshooting.
 			// In fact, it turns out SLF4J won't find bridging JARs loaded without this hack.
 			// Also note that this breaks our unit tests.
@@ -163,29 +160,38 @@ public class DynLoader
 	}
 
 	public static Object getField(Class<?> clss, String fldnam, Object obj)
-			throws NoSuchFieldException, IllegalAccessException
 	{
-		java.lang.reflect.Field fld = clss.getDeclaredField(fldnam);
-		fld.setAccessible(true);
-		return fld.get(obj);
+		try {
+			java.lang.reflect.Field fld = clss.getDeclaredField(fldnam);
+			fld.setAccessible(true);
+			return fld.get(obj);
+		} catch (Exception ex) {
+			throw new RuntimeException("Failed to get field="+clss.getName()+":"+fldnam+", Object="+obj, ex);
+		}
 	}
 
 	public static void setField(Class<?> clss, String fldnam, Object fldval, Object obj)
-			throws NoSuchFieldException, IllegalAccessException
 	{
-		java.lang.reflect.Field fld = clss.getDeclaredField(fldnam);
-		fld.setAccessible(true);
-		fld.set(obj, fldval);
+		try {
+			java.lang.reflect.Field fld = clss.getDeclaredField(fldnam);
+			fld.setAccessible(true);
+			java.lang.reflect.Field meta = java.lang.reflect.Field.class.getDeclaredField("modifiers");
+			if ((fld.getModifiers() & java.lang.reflect.Modifier.FINAL) != 0) {
+				meta.setAccessible(true);
+				meta.setInt(fld, fld.getModifiers() & ~java.lang.reflect.Modifier.FINAL);
+			}
+			fld.set(obj, fldval);
+		} catch (Exception ex) {
+			throw new RuntimeException("Failed to set field="+clss.getName()+":"+fldnam+", Object="+obj, ex);
+		}
 	}
 
 	public static Object getField(Object obj, String fldnam)
-			throws NoSuchFieldException, IllegalAccessException
 	{
 		return getField(obj.getClass(), fldnam, obj);
 	}
 
 	public static void setField(Object obj, String fldnam, Object fldval)
-			throws NoSuchFieldException, IllegalAccessException
 	{
 		setField(obj.getClass(), fldnam, fldval, obj);
 	}
@@ -216,7 +222,7 @@ public class DynLoader
 
 	private static java.io.File[] getJARs(java.io.File dh)
 	{
-		FileOps.Filter_EndsWith filter = new FileOps.Filter_EndsWith(".jar", true, false);
+		FileOps.Filter_EndsWith filter = new FileOps.Filter_EndsWith(new String[]{".jar"}, true, false, false);
 		java.io.File[] jarfiles = dh.listFiles(filter);
 		if (jarfiles != null && jarfiles.length == 0) jarfiles = null;
 		return jarfiles;

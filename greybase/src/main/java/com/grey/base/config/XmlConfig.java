@@ -4,6 +4,8 @@
  */
 package com.grey.base.config;
 
+import com.grey.base.utils.StringOps;
+
 /**This class treats an XML file as a structured config file.
  * <br/>
  * Calling applications just see this as a config structure, so to spare them from the underlying XML intricacies, we
@@ -186,8 +188,8 @@ public class XmlConfig
 	
 	public boolean getBool(String xpath, boolean dflt) throws com.grey.base.ConfigException
 	{
-		String str = getValue(xpath, false, com.grey.base.utils.StringOps.boolAsString(dflt));
-		return com.grey.base.utils.StringOps.stringAsBool(str);
+		String str = getValue(xpath, false, StringOps.boolAsString(dflt));
+		return StringOps.stringAsBool(str);
 	}
 
 	public long getTime(String xpath, String dflt) throws com.grey.base.ConfigException
@@ -210,6 +212,21 @@ public class XmlConfig
 	{
 		String str = getValue(xpath, false, Long.toString(dflt));
 		return com.grey.base.utils.ByteOps.parseByteSize(str);
+	}
+
+	// Note that the eraseString() call wipes clean the String object within the XmConfig DOM as
+	// well, as getValue() returns its reference
+	public char[] getPassword(String xpath, char[] dflt) throws com.grey.base.ConfigException
+	{
+		String s_dflt = (dflt == null ? null : new String(dflt));
+		String s_passwd = null;
+		try {
+			s_passwd = getValue(xpath, false, s_dflt);
+			return (s_passwd == null ? null : s_passwd.toCharArray());
+		} finally {
+			if (s_passwd != null) StringOps.erase(s_passwd);
+			if (s_dflt != null) StringOps.erase(s_dflt);
+		}
 	}
 
 	public String[] getTuple(String xpath, String dlm, boolean mdty, String dflt, int min, int max) throws com.grey.base.ConfigException

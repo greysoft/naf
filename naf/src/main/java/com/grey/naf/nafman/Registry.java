@@ -98,20 +98,20 @@ public final class Registry
 	}
 	public static Registry get() {return SingletonHolder.instance;}
 
-	private final java.util.HashMap<String, java.util.ArrayList<CommandHandlerReg>> handlers
+	private final java.util.HashMap<String, java.util.ArrayList<CommandHandlerReg>> cmd_handlers
 								= new java.util.HashMap<String, java.util.ArrayList<CommandHandlerReg>>();
-	private java.util.HashSet<com.grey.naf.reactor.Dispatcher> inviolate_handlers
+	private final java.util.HashSet<com.grey.naf.reactor.Dispatcher> inviolate_handlers
 								= new java.util.HashSet<com.grey.naf.reactor.Dispatcher>();
-	private final java.util.HashMap<String, DefCommand> commands = new java.util.HashMap<String, DefCommand>();
-	private final java.util.HashMap<String, DefResource> resources = new java.util.HashMap<String, DefResource>();
+	private final java.util.HashMap<String, DefCommand> active_commands = new java.util.HashMap<String, DefCommand>();
+	private final java.util.HashMap<String, DefResource> active_resources = new java.util.HashMap<String, DefResource>();
 	private String homepage;
 
 	synchronized public String getHomePage() {return homepage;}
 	synchronized public boolean isCommandRegistered(String code) {return isCommandRegistered(code, null);}
-	synchronized DefCommand getCommand(String code) {return commands.get(code);}
-	synchronized DefResource getResource(String name) {return resources.get(name);}
-	synchronized java.util.Collection<DefCommand> getCommands() {return commands.values();}
-	synchronized java.util.Set<String> getResourceNames() {return resources.keySet();}
+	synchronized DefCommand getCommand(String code) {return active_commands.get(code);}
+	synchronized DefResource getResource(String name) {return active_resources.get(name);}
+	synchronized java.util.Collection<DefCommand> getCommands() {return active_commands.values();}
+	synchronized java.util.Set<String> getResourceNames() {return active_resources.keySet();}
 
 	private Registry()
 	{
@@ -134,9 +134,9 @@ public final class Registry
 	{
 		for (int idx = 0; idx != defs.length; idx++) {
 			DefCommand def = defs[idx];
-			if (commands.containsKey(def.code)) throw new com.grey.base.ConfigException("NAFMAN: Duplicate cmd="+def.code);
-			if (resources.containsKey(def.code)) throw new com.grey.base.ConfigException("NAFMAN: Command="+def.code+" conflicts with Resources");
-			commands.put(def.code, def);
+			if (active_commands.containsKey(def.code)) throw new com.grey.base.ConfigException("NAFMAN: Duplicate cmd="+def.code);
+			if (active_resources.containsKey(def.code)) throw new com.grey.base.ConfigException("NAFMAN: Command="+def.code+" conflicts with Resources");
+			active_commands.put(def.code, def);
 		}
 	}
 
@@ -146,14 +146,14 @@ public final class Registry
 	{
 		for (int idx = 0; idx != defs.length; idx++) {
 			DefResource def = defs[idx];
-			if (commands.containsKey(def.name)) throw new com.grey.base.ConfigException("NAFMAN: Resource="+def.path+" conflicts with cmd="+def.name);
-			resources.put(def.name, def);
+			if (active_commands.containsKey(def.name)) throw new com.grey.base.ConfigException("NAFMAN: Resource="+def.path+" conflicts with cmd="+def.name);
+			active_resources.put(def.name, def);
 		}
 	}
 
 	synchronized boolean isCommandRegistered(String code, com.grey.naf.reactor.Dispatcher d)
 	{
-		java.util.ArrayList<CommandHandlerReg> lst = handlers.get(code);
+		java.util.ArrayList<CommandHandlerReg> lst = cmd_handlers.get(code);
 		if (lst == null) return false;
 		if (d == null) return true;  //just wanted to know if it was registered by anybody
 		for (int idx = 0; idx != lst.size(); idx++) {
@@ -180,40 +180,53 @@ public final class Registry
 				return false;
 			}
 		}
-		if (!commands.containsKey(cmdcode)) {
+		if (!active_commands.containsKey(cmdcode)) {
 			dsptch.logger.warn("NAFMAN discarding undefined cmd="+cmdcode+" for handler="+dsptch.name+"/"+handler.getClass().getName());
 			return false;
 		}
-		java.util.ArrayList<CommandHandlerReg> lst = handlers.get(cmdcode);
+		java.util.ArrayList<CommandHandlerReg> lst = cmd_handlers.get(cmdcode);
 		if (lst != null) {
-			//this list can hold multiple unconditional (zero-preference) handlers in different Dispatchers, or one conditional one
+			// this list can hold multiple unconditional (zero-preference) handlers, or one conditional one
 			for (int idx = 0; idx != lst.size(); idx++) {
 				CommandHandlerReg def = lst.get(idx);
-				if (pref != 0 && pref >= def.pref) return false; //existing handler has higher priority
-				if (pref == 0 && def.pref == 0 && dsptch != def.dsptch) continue; //new handler can co-exist with this one
+				if (dsptch == def.dsptch && handler == def.handler) {
+					throw new com.grey.base.ConfigException("Duplicate handler for cmd="+cmdcode+" in Dispatcher="+dsptch.name);
+				}
+				if (pref == 0) {
+					if (def.pref == 0) continue; //new handler can co-exist with existing one
+				} else {
+					if (pref >= def.pref) return false; //existing handler has higher priority
+				}
 				// new handler has higher priority, so displace existing one
 				if (inviolate_handlers.contains(def.dsptch)) return false; //but existing handler has been marked permanent
 				lst.remove(idx);
-				break; //any further handlers can only be unconditional ones in different Dispatchers, so can co-exist
+				break; //any further handlers can only be unconditional ones, so can co-exist
 			}
 		} else {
 			lst = new java.util.ArrayList<CommandHandlerReg>();
-			handlers.put(cmdcode, lst);
+			cmd_handlers.put(cmdcode, lst);
 		}
 		CommandHandlerReg def = new CommandHandlerReg(handler, dsptch, pref);
 		lst.add(def);
 		return true;
 	}
 
-	synchronized void getHandlers(com.grey.naf.reactor.Dispatcher d, com.grey.base.utils.HashedMap<String, Command.Handler> h)
+	synchronized void getHandlers(com.grey.naf.reactor.Dispatcher d,
+			com.grey.base.utils.HashedMap<String, java.util.ArrayList<Command.Handler>> h)
 	{
-		java.util.Iterator<String> it = handlers.keySet().iterator();
+		java.util.Iterator<String> it = cmd_handlers.keySet().iterator();
 		while (it.hasNext()) {
 			String cmdcode = it.next();
-			java.util.ArrayList<CommandHandlerReg> lst = handlers.get(cmdcode);
-			for (int idx = 0; idx != lst.size(); idx++) {
-				CommandHandlerReg def = lst.get(idx);
-				if (def.dsptch == d) h.put(cmdcode, def.handler);
+			java.util.ArrayList<CommandHandlerReg> reglst = cmd_handlers.get(cmdcode);
+			for (int idx = 0; idx != reglst.size(); idx++) {
+				CommandHandlerReg def = reglst.get(idx);
+				if (def.dsptch != d) continue;
+				java.util.ArrayList<Command.Handler> dlst = h.get(cmdcode);
+				if (dlst == null) {
+					dlst = new java.util.ArrayList<Command.Handler>();
+					h.put(cmdcode, dlst);
+				}
+				dlst.add(def.handler);
 			}
 		}
 		inviolate_handlers.add(d); //now that we've propagated its handlers, this Dispatcher becomes inviolate
@@ -222,16 +235,18 @@ public final class Registry
 	synchronized CharSequence dumpState(StringBuilder sb, boolean xml)
 	{
 		if (sb == null) sb = new StringBuilder();
+		int hcnt = 0;
 		if (xml) {
 			sb.append("<commands>");
 		} else {
-			sb.append("NAFMAN registered commands=").append(handlers.size()).append('/').append(commands.size());
+			sb.append("NAFMAN registered commands=").append(cmd_handlers.size()).append('/').append(active_commands.size());
 		}
-		java.util.Iterator<String> it = handlers.keySet().iterator();
+		java.util.Iterator<String> it = cmd_handlers.keySet().iterator();
 		while (it.hasNext()) {
 			String cmdcode = it.next();
 			DefCommand cdef = getCommand(cmdcode);
-			java.util.ArrayList<CommandHandlerReg> lst = handlers.get(cmdcode);
+			java.util.ArrayList<CommandHandlerReg> lst = cmd_handlers.get(cmdcode);
+			hcnt += lst.size();
 			if (xml) {
 				sb.append("<command code=\"").append(cmdcode).append("\"");
 				sb.append(" family=\"").append(cdef.family).append("\">");
@@ -257,7 +272,19 @@ public final class Registry
 		if (xml) {
 			sb.append("</commands>");
 		} else {
-			sb.append("\nNAFMAN registered resources=").append(resources.size()).append(", Home=").append(homepage);
+			sb.append("\nTotal handlers=").append(hcnt);
+			if (cmd_handlers.size() != active_commands.size()) {
+				sb.append("\nUnused Commands");
+				String dlm = ": ";
+				java.util.Iterator<String> itcmd = active_commands.keySet().iterator();
+				while (itcmd.hasNext()) {
+					String cmdcode = itcmd.next();
+					if (cmd_handlers.containsKey(cmdcode)) continue;
+					sb.append(dlm).append(cmdcode);
+					dlm = ", ";
+				}
+			}
+			sb.append("\nNAFMAN registered resources=").append(active_resources.size()).append(", Home=").append(homepage);
 		}
 		return sb;
 	}

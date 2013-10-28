@@ -8,11 +8,10 @@ import com.grey.base.utils.StringOps;
 import com.grey.logging.Logger;
 
 public abstract class Agent
-	implements Command.Handler,
-		com.grey.naf.reactor.Producer.Consumer
+	implements Command.Handler
 {
 	public final com.grey.naf.reactor.Dispatcher dsptch;
-	protected final com.grey.base.utils.HashedMap<String, Command.Handler> handlers;
+	protected final com.grey.base.utils.HashedMap<String, java.util.ArrayList<Command.Handler>> handlers;
 	protected boolean in_shutdown;
 	//temp objects pre-allocated merely for efficiency
 	private final StringBuilder sbtmp = new StringBuilder();
@@ -25,7 +24,7 @@ public abstract class Agent
 	protected Agent(com.grey.naf.reactor.Dispatcher d, com.grey.base.config.XmlConfig cfg) throws com.grey.base.ConfigException
 	{
 		dsptch = d;
-		handlers = new com.grey.base.utils.HashedMap<String, Command.Handler>();
+		handlers = new com.grey.base.utils.HashedMap<String, java.util.ArrayList<Command.Handler>>();
 		Registry reg = Registry.get();
 		reg.registerHandler(Registry.CMD_STOP, 0, this, dsptch);
 		reg.registerHandler(Registry.CMD_DSHOW, 0, this, dsptch);
@@ -42,27 +41,36 @@ public abstract class Agent
 
 	protected void commandReceived(Command cmd) throws com.grey.base.FaultException, java.io.IOException
 	{
-		if (!cmd.attached(this)) return;
+		// See Primary's calls to Command.detach() to see why we might find ourselves unattached here.
+		// Very unlikely, but not impossible, especially during shutdown.
+		if (!cmd.attached(this)) {
+			return;
+		}
+
 		try {
 			processCommand(cmd);
 		} finally {
-			if (cmd.detach(this) == Command.DETACH_FINAL) getPrimary().commandCompleted(cmd, dsptch);
+			if (cmd.detach(this) == Command.DETACH_FINAL) getPrimary().commandCompleted(cmd);
 		}
 	}
 
 	protected void processCommand(Command cmd) throws com.grey.base.FaultException, java.io.IOException
 	{
-		Command.Handler handler = handlers.get(cmd.def.code);
+		java.util.ArrayList<Command.Handler> lst = handlers.get(cmd.def.code);
 		sbtmp.setLength(0);
 		sbtmp.append("NAFMAN=").append(dsptch.name).append(" received command=").append(cmd.def.code);
-		if (handler == null) {
-			sbtmp.append(" - no Handler");
+		if (lst == null) {
+			sbtmp.append(" - no Handlers");
 			dsptch.logger.log(Logger.LEVEL.TRC3, sbtmp);
 		} else {
-			sbtmp.append(" - Handler=").append(handler.getClass().getName());
-			dsptch.logger.log(Logger.LEVEL.TRC2, sbtmp);
-			CharSequence rsp = handler.handleNAFManCommand(cmd);
-			if (rsp != null && rsp.length() != 0) cmd.addHandlerResponse(dsptch, rsp);
+			sbtmp.append(" - Handlers=").append(lst.size());
+			for (int idx = 0; idx != lst.size(); idx++) {
+				Command.Handler handler = lst.get(idx);
+				sbtmp.append(idx==0?": ":", ").append(handler.getClass().getName());
+				dsptch.logger.log(Logger.LEVEL.TRC2, sbtmp);
+				CharSequence rsp = handler.handleNAFManCommand(cmd);
+				if (rsp != null && rsp.length() != 0) cmd.addHandlerResponse(dsptch, handler, rsp);
+			}
 		}
 	}
 
@@ -109,7 +117,7 @@ public abstract class Agent
 			if (d == null) {
 				sbtmp.append("Unrecognised Dispatcher="+dname);
 			} else {
-				d.unloadNaflet(naflet, dsptch);
+				d.unloadNaflet(naflet);
 				sbtmp.append("NAFlet=").append(naflet).append(" has been told to stop");
 			}
 		} else {
@@ -155,6 +163,6 @@ public abstract class Agent
 	protected boolean stopDispatcher()
 	{
 		if (in_shutdown) return true;  //Dispatcher has already told us to stop
-		return dsptch.stop(dsptch);
+		return dsptch.stop();
 	}
 }
