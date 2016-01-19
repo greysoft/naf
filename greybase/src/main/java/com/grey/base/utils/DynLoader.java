@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2013 Yusef Badri - All rights reserved.
+ * Copyright 2010-2016 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -12,13 +12,14 @@ public class DynLoader
 	static public final String CPDLM = SysProps.get("grey.path.separator", ":");
 	static public final boolean CLDHACK = SysProps.get("grey.classloader.hack", false);
 
+	private static final boolean THROW_ON_GETFAIL = com.grey.base.config.SysProps.get("grey.dynload.get_throw", false);
+
 	// Note that the naive Class.forName(classname) uses the class loader that loaded the current class (probably the system classloader),
 	// which may produce unexpected results in alien managed environments.
 	// More precisely: Class.forName("foo") = Class.forName("Foo", true, this.getClass().getClassLoader())
 	// The difference between this and ClassLoader.loadClass() is that the latter delays initialisation (ie. execution of static initialisers)
 	// until the class is used for the first time.
-	public static Class<?> loadClass(String targetclass)
-			throws java.net.MalformedURLException, ClassNotFoundException
+	public static Class<?> loadClass(String targetclass) throws ClassNotFoundException
 	{
 		ClassLoader cld = getClassLoader();
 		return Class.forName(targetclass, true, cld);
@@ -127,7 +128,7 @@ public class DynLoader
 			// popular but presumptious procedure - allow it to be enabled for troubleshooting.
 			// In fact, it turns out SLF4J won't find bridging JARs loaded without this hack.
 			// Also note that this breaks our unit tests.
-		    cld = (java.net.URLClassLoader)ClassLoader.getSystemClassLoader();
+		    cld = ClassLoader.getSystemClassLoader();
 			Class<?> clss = java.net.URLClassLoader.class;
 		    java.lang.reflect.Method method = clss.getDeclaredMethod("addURL", new Class[]{java.net.URL.class});
 		    method.setAccessible(true);
@@ -139,6 +140,7 @@ public class DynLoader
 			cld = new java.net.URLClassLoader(arr, cld);
 			Thread.currentThread().setContextClassLoader(cld);
 		}
+		System.out.println("Loaded ClassPaths="+cp_extra.size()+"/"+cp_extra+" with classloader="+cld.getClass().getName());
 		return cp_extra;
 	}
 
@@ -162,19 +164,18 @@ public class DynLoader
 	public static Object getField(Class<?> clss, String fldnam, Object obj)
 	{
 		try {
-			java.lang.reflect.Field fld = clss.getDeclaredField(fldnam);
-			fld.setAccessible(true);
+			java.lang.reflect.Field fld = getFieldDef(clss, fldnam);
 			return fld.get(obj);
 		} catch (Exception ex) {
-			throw new RuntimeException("Failed to get field="+clss.getName()+":"+fldnam+", Object="+obj, ex);
+			if (THROW_ON_GETFAIL) throw new RuntimeException("Failed to get field="+clss.getName()+":"+fldnam+", Object="+obj, ex);
+			return null;
 		}
 	}
 
 	public static void setField(Class<?> clss, String fldnam, Object fldval, Object obj)
 	{
 		try {
-			java.lang.reflect.Field fld = clss.getDeclaredField(fldnam);
-			fld.setAccessible(true);
+			java.lang.reflect.Field fld = getFieldDef(clss, fldnam);
 			java.lang.reflect.Field meta = java.lang.reflect.Field.class.getDeclaredField("modifiers");
 			if ((fld.getModifiers() & java.lang.reflect.Modifier.FINAL) != 0) {
 				meta.setAccessible(true);
@@ -184,6 +185,23 @@ public class DynLoader
 		} catch (Exception ex) {
 			throw new RuntimeException("Failed to set field="+clss.getName()+":"+fldnam+", Object="+obj, ex);
 		}
+	}
+
+	private static java.lang.reflect.Field getFieldDef(Class<?> clss, String fldnam) throws NoSuchFieldException
+	{
+		java.lang.reflect.Field fld = null;
+		while (fld == null) {
+			try {
+				fld = clss.getDeclaredField(fldnam);
+				fld.setAccessible(true);
+			} catch (NoSuchFieldException ex) {
+				clss = clss.getSuperclass();
+				if (clss == null) throw ex;
+			} catch (Exception ex) {
+				throw ex;
+			}
+		}
+		return fld;
 	}
 
 	public static Object getField(Object obj, String fldnam)
@@ -245,5 +263,65 @@ public class DynLoader
 		} catch (Exception ex) {
 			throw new RuntimeException("Failed to convert resource="+clss+"/"+path+" to text"+ex, ex);
 		}
+	}
+
+	public static String[] generateSymbolNames(Class<?> clss, String pfx, int maxval)
+	{
+		String[] symbols = new String[maxval+1];
+		for (int idx = 0; idx != symbols.length; idx++) {
+			symbols[idx] = Integer.toString(idx);
+		}
+		java.lang.reflect.Field[] flds = clss.getDeclaredFields();
+		int cnt = (flds == null ? 0 : flds.length);
+		int symcnt = 0;
+		for (int idx = 0; idx != cnt; idx++) {
+			java.lang.reflect.Field fld = flds[idx];
+			String fldname = fld.getName();
+			boolean is_static = java.lang.reflect.Modifier.isStatic(fld.getModifiers());
+			if (!is_static || !fldname.startsWith(pfx)) continue;
+			fld.setAccessible(true);
+			String symbol = fldname.substring(pfx.length());
+			Class<?> fldtype = fld.getType();
+			int val;
+			try {
+				if (fldtype == byte.class) {
+					val = fld.getByte(null) & 0xff;
+				} else if (fldtype == short.class) {
+					val = fld.getShort(null) & ByteOps.SHORTMASK;
+				} else {
+					val = fld.getInt(null);
+				}
+			} catch (Exception ex) {
+				throw new RuntimeException("Failed to generate "+clss.getName()+":"+pfx+" symbol for ["+fld+"] in range 0-"+maxval, ex);
+			}
+			symbols[val] = symbol;
+			symcnt++;
+		}
+		if (symcnt == 0) throw new IllegalArgumentException("No symbols found matching "+clss.getName()+":"+pfx+" in range 0-"+maxval);
+		return symbols;
+	}
+
+	public static com.grey.base.collections.HashedMapIntKey<String> generateSymbolNamess(Class<?> clss, String pfx)
+	{
+		com.grey.base.collections.HashedMapIntKey<String> symbols = new com.grey.base.collections.HashedMapIntKey<String>();
+		java.lang.reflect.Field[] flds = clss.getDeclaredFields();
+		int cnt = (flds == null ? 0 : flds.length);
+		for (int idx = 0; idx != cnt; idx++) {
+			java.lang.reflect.Field fld = flds[idx];
+			String fldname = fld.getName();
+			boolean is_static = java.lang.reflect.Modifier.isStatic(fld.getModifiers());
+			if (!is_static || !fldname.startsWith(pfx)) continue;
+			fld.setAccessible(true);
+			String symbol = fldname.substring(pfx.length());
+			int val;
+			try {
+				val = fld.getInt(null);
+			} catch (Exception ex) {
+				throw new RuntimeException("Failed to generate "+clss.getName()+":"+pfx+" symbol for ["+fld+"]", ex);
+			}
+			symbols.put(val, symbol);
+		}
+		if (symbols.size() == 0) throw new IllegalArgumentException("No symbols found matching "+clss.getName()+":"+pfx);
+		return symbols;
 	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -38,6 +38,8 @@ public class IntValueTest
 		org.junit.Assert.assertTrue("Verifying Equals", iv1.equals(iv2));
 		org.junit.Assert.assertFalse("Verifying Not-Equals", iv1.equals(iv3));
 		org.junit.Assert.assertFalse("Verifying Not-Equals-ByClass", iv1.equals("blah"));
+		org.junit.Assert.assertFalse(iv1.equals(null));
+		org.junit.Assert.assertFalse(iv1.equals(Integer.valueOf(iv1.val)));
 	}
 
 	@org.junit.Test
@@ -46,6 +48,7 @@ public class IntValueTest
 		IntValue iv2 = new IntValue(9);
 		org.junit.Assert.assertTrue("Verifying CompareTo", iv1.compareTo(iv2) < 0);
 		org.junit.Assert.assertTrue("Verifying CompareTo", iv1.compareTo(Integer.valueOf(3)) > 0);
+		org.junit.Assert.assertTrue(iv1.compareTo((IntValue)null) > 0);
 	}
 
 	@org.junit.Test
@@ -67,15 +70,42 @@ public class IntValueTest
 		num = IntValue.parseDecimal(Long.toString(orignum));
 		org.junit.Assert.assertEquals(orignum, num);
 
+		str = "+9";
+		num = IntValue.parseDecimal(str);
+		org.junit.Assert.assertEquals(9, num);
+		str = "-9";
+		num = IntValue.parseDecimal(str);
+		org.junit.Assert.assertEquals(-9, num);
+		str = "-98";
+		num = IntValue.parseDecimal(str);
+		org.junit.Assert.assertEquals(-98, num);
+		str = "";
+		num = IntValue.parseDecimal(str);
+		org.junit.Assert.assertEquals(0, num);
+		str = "+";
+		num = IntValue.parseDecimal(str);
+		org.junit.Assert.assertEquals(0, num);
+		str = "-";
+		num = IntValue.parseDecimal(str);
+		org.junit.Assert.assertEquals(0, num);
+
 		try {
 			char[] arr = new char[]{'1', '0'-1, '3'};
 			IntValue.parseDecimal(new String(arr));
 			org.junit.Assert.fail("Failed to trap bad Decimal digit - low: "+new String(arr));
-		} catch (NumberFormatException ex) {}
+		} catch (NumberFormatException ex) {System.out.println("Expected error - "+ex);}
 		try {
 			char[] arr = new char[]{'1', '9'+1, '3'};
 			IntValue.parseDecimal(new String(arr));
 			org.junit.Assert.fail("Failed to trap bad Decimal digit - high: "+new String(arr));
+		} catch (NumberFormatException ex) {System.out.println("Expected error - "+ex);}
+		try {
+			IntValue.parseDecimal("x");
+			org.junit.Assert.fail("Failed to trap bad sole char");
+		} catch (NumberFormatException ex) {System.out.println("Expected error - "+ex);}
+		try {
+			IntValue.parseDecimal("x9");
+			org.junit.Assert.fail("Failed to trap bad char in leading position");
 		} catch (NumberFormatException ex) {}
 	}
 
@@ -117,5 +147,54 @@ public class IntValueTest
 			IntValue.parseHex(new String(arr));
 			org.junit.Assert.fail("Failed to trap bad Hex digit - above Hex: "+new String(arr));
 		} catch (NumberFormatException ex) {}
+	}
+
+	@org.junit.Test
+	public void testEncodeHex() {
+		StringBuilder sb = IntValue.encodeHex(0x987e0f, false, null);
+		org.junit.Assert.assertEquals("987e0f", sb.toString());
+		sb = IntValue.encodeHex(0x987e0f, true, null);
+		org.junit.Assert.assertEquals("987E0F", sb.toString());
+		sb = IntValue.encodeHexLeading(0x987e0f, true, null);
+		org.junit.Assert.assertEquals("00987E0F", sb.toString());
+		sb = IntValue.encodeHex(0, true, null);
+		org.junit.Assert.assertEquals("0", sb.toString());
+		sb = IntValue.encodeHex(1, true, null);
+		org.junit.Assert.assertEquals("1", sb.toString());
+		
+		sb = IntValue.encodeHex(Short.MAX_VALUE, true, null);
+		org.junit.Assert.assertEquals("7FFF", sb.toString());
+		sb = IntValue.encodeHex(Short.MAX_VALUE-1, true, null);
+		org.junit.Assert.assertEquals("7FFE", sb.toString());
+		sb = IntValue.encodeHex(Short.MIN_VALUE, true, null);
+		org.junit.Assert.assertEquals("8000", sb.toString());
+		sb = IntValue.encodeHex((short)-1, true, null);
+		org.junit.Assert.assertEquals("FFFF", sb.toString());		
+		sb = IntValue.encodeHex((short)0, true, null);
+		org.junit.Assert.assertEquals("0", sb.toString());
+		sb = IntValue.encodeHex((short)1, true, null);
+		org.junit.Assert.assertEquals("1", sb.toString());	
+		sb = IntValue.encodeHexLeading((short)0, true, null);
+		org.junit.Assert.assertEquals("0000", sb.toString());
+		sb = IntValue.encodeHexLeading((short)1, true, null);
+		org.junit.Assert.assertEquals("0001", sb.toString());
+
+		sb = IntValue.encodeHex((byte)-1, true, null);
+		org.junit.Assert.assertEquals("FF", sb.toString());
+		sb = IntValue.encodeHex((byte)1, true, null);
+		org.junit.Assert.assertEquals("1", sb.toString());
+		sb = IntValue.encodeHex((byte)0xad, true, null);
+		org.junit.Assert.assertEquals("AD", sb.toString());
+		sb = IntValue.encodeHexLeading((byte)0xad, true, null);
+		org.junit.Assert.assertEquals("AD", sb.toString());
+
+		String long_fs = "0xffffffffffffffff";
+		sb = new StringBuilder("0x");
+		StringBuilder sb2 = IntValue.encodeHex((long)-1, false, sb);
+		org.junit.Assert.assertTrue(sb2 == sb);
+		org.junit.Assert.assertEquals(long_fs, sb.toString());
+		org.junit.Assert.assertEquals("0x"+Long.toHexString(-1), sb.toString()); //just to sanity-check the above Fs
+		sb = IntValue.encodeHexLeading((long)-1, false, null);
+		org.junit.Assert.assertEquals(long_fs.substring(2), sb.toString());
 	}
 }

@@ -1,14 +1,15 @@
 /*
- * Copyright 2012-2013 Yusef Badri - All rights reserved.
+ * Copyright 2012-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.sasl;
 
-// The SASL Plain mechanism is defined in RFC-4422 Appendix A.
+// The SASL External mechanism is defined in RFC-4422 Appendix A.
 // See RFC-4959 for some more examples based on the email protocols.
 public final class ExternalServer
 	extends SaslServer
 {
+	private final com.grey.base.utils.ByteChars auth_rolename = new com.grey.base.utils.ByteChars(-1);
 	private java.security.cert.X509Certificate clientcert;
 
 	public ExternalServer(Authenticator authenticator, boolean base64)
@@ -19,6 +20,7 @@ public final class ExternalServer
 	public ExternalServer init(java.security.cert.Certificate cert)
 	{
 		init();
+		auth_rolename.clear();
 		clientcert = (java.security.cert.X509Certificate)cert;
 		return this;
 	}
@@ -29,10 +31,9 @@ public final class ExternalServer
 		String cn = (clientcert == null ? null : com.grey.base.crypto.SSLCertificate.getCN(clientcert));
 		if (cn == null) return false;
 		auth_username.set(cn);
-		if (msg.ar_len != 0) {
-			if (!auth_username.equalsBytes(msg.ar_buf, msg.ar_off, msg.ar_len)) return false;
-		}
-		com.grey.base.utils.ByteChars passwd = authenticator.saslPassword(null, auth_username);
-		return (passwd != null);  //just need to establish that user is known
+		auth_rolename.pointAt(msg.ar_buf, msg.ar_off, msg.ar_len); //authzid
+		boolean is_valid = authenticator.saslAuthenticate(auth_username, null);
+		if (is_valid) is_valid = authorise(auth_rolename);
+		return is_valid;
 	}
 }

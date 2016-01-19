@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2013 Yusef Badri - All rights reserved.
+ * Copyright 2010-2016 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -8,198 +8,112 @@ import com.grey.base.config.SysProps;
 import com.grey.base.utils.TimeOps;
 import com.grey.logging.Logger.LEVEL;
 
+/**
+ * This is the base class for all entities who wish to monitor an NIO-based I/O channel, and receive
+ * event callbacks for it.
+ */
 public abstract class ChannelMonitor
 {
 	static final boolean halfduplex = SysProps.get("greynaf.io.halfduplex", false);
+	private static final long minbootdiff = SysProps.getTime("greynaf.dumpcm.minbootdiff", 5000);
 
-	private static final int S_ISCONN = 1 << 0; //the iochan endpoint is connected to its remote peer
-	private static final int S_APPCONN = 1 << 1; //the application has been notified that we are connected
-	private static final int S_WECLOSE = 1 << 2;
-	private static final int S_CLOSELINGER = 1 << 3;
-	private static final int S_INREAD = 1 << 4;
-	private static final int S_INWRITE = 1 << 5;
-	private static final int S_UDP = 1 << 6;
-	private static final int S_INDISC = 1 << 7;
-	private static final int S_BRKPIPE = 1 << 8;
+	static final int S_ISCONN = 1 << 0; //the iochan endpoint is connected to its remote peer
+	static final int S_APPCONN = 1 << 1; //the application has been notified that we are connected
+	static final int S_WECLOSE = 1 << 2;
+	static final int S_CLOSELINGER = 1 << 3;
+	static final int S_INREAD = 1 << 4;
+	static final int S_INWRITE = 1 << 5;
+	static final int S_INDISC = 1 << 6;
+	static final int S_BRKPIPE = 1 << 7;
+	static final int S_INIT = 1 << 8;
 
-	public final int cm_id;
 	public final Dispatcher dsptch;
-	public java.nio.channels.SelectableChannel iochan;
-	protected IOExecReader chanreader;
-	protected IOExecWriter chanwriter;
+	java.nio.channels.SelectableChannel iochan;
 	java.nio.channels.SelectionKey regkey;
-	SSLConnection sslconn;
 
-	private short cmstate;  //records which of the S_... state flags above are in effect
-	private byte regOps;   //JDK flags - shadows/mirrors regkey.interestOps()
-	private com.grey.naf.EntityReaper reaper;
+	private final int cm_id;
+	private short cmstate; //records which of the S_... state flags above are in effect
+	private byte regOps; //JDK flags - shadows/mirrors regkey.interestOps()
 	private long start_time;
+	private com.grey.naf.EntityReaper reaper;
 
-	// Most of our virtual methods are conditionally optional. That is, the subclass doesn't have to implement them unless it makes
-	// use of functionality which invokes them.
-	// For example: If monitoring for Read, then ioIndication() must be provided if the subclass has not defined an IOExecReader,
-	// and ioReceived() must be defined if it has.
-	// It wouldn't make sense to use this class if you weren't interested in monitoring anything at all, whether that be Read events,
-	// incoming connections, or the conclusion of outgoing connections, hence this class has been declared as abstract even though no
-	// particular method is actually abstract.
-	protected void ioReceived(com.grey.base.utils.ArrayRef<byte[]> rcvdata, java.net.InetSocketAddress remaddr)
-			throws com.grey.base.FaultException, java.io.IOException {throw new Error("UDP CM.ioReceived() not implemented");}
-	protected void ioReceived(com.grey.base.utils.ArrayRef<byte[]> rcvdata)
-			throws com.grey.base.FaultException, java.io.IOException {ioReceived(rcvdata, null);}
-	protected void ioIndication(int ops)
-			throws com.grey.base.FaultException, java.io.IOException {throw new Error("CM.ioIndication() not implemented - Ops=0x"+Integer.toHexString(ops));}
-	// client mode - this indicates the completion of a connect() call by us
-	protected void connected(boolean success, CharSequence diagnostic, Throwable ex)
-			throws com.grey.base.FaultException, java.io.IOException {throw new Error("Client-CM.connected() not implemented");}
-	// server mode - this indicates we've accepted a connection from a remote client
-	protected void connected()
-			throws com.grey.base.FaultException, java.io.IOException {throw new Error("Server-CM.connected() not implemented");}
+	abstract void ioIndication(int readyOps)
+			throws com.grey.base.FaultException, java.io.IOException;
 
-	protected void ioDisconnected(CharSequence diagnostic)
-			throws java.io.IOException {disconnect(false);}
-	protected void eventError(Throwable ex)
-			throws java.io.IOException {failed(true, ex);}
+	boolean shutdownChannel(boolean linger) {return true;}
+	protected void ioDisconnected(CharSequence diagnostic) throws java.io.IOException {disconnect();}
+	protected void eventError(Throwable ex) throws java.io.IOException {failed(true, ex);}
+	protected StringBuilder dumpAppState(StringBuilder sb) {return sb;}
 
-	protected void initServer() {} //called before connected() for TCP servers, irrelevant for all other entities
-	protected void disconnectLingerDone(boolean ok, CharSequence info, Throwable ex) {} //called later, if disconnect() returns False
-	protected void dumpAppState(StringBuilder sb) {}
-
-	public final boolean isUDP() {return isFlagSet(S_UDP);}
-	public final boolean isConnected() {return isFlagSet(S_ISCONN);}
+	public final int getCMID() {return cm_id;}
+	public final java.nio.channels.SelectableChannel getChannel() {return iochan;}
 	public final long getStartTime() {return start_time;}
-	public final boolean isBrokenPipe() {return isFlagSet(S_BRKPIPE);}
+	public final com.grey.naf.EntityReaper getReaper() {return reaper;}
+	public final void setReaper(com.grey.naf.EntityReaper rpr) {reaper = rpr;}
+
 	public final boolean disconnect() {return disconnect(true);}
-	protected final void setReaper(com.grey.naf.EntityReaper rpr) {reaper = rpr;}
-	final boolean canKill() {return (isConnected() && getClass() != Producer.AlertsPipe.class);}
+	public final boolean disconnect(boolean linger) {return disconnect(linger, false);}
 
-	protected final boolean usingSSL() {return sslconn != null;}
-	protected final java.security.cert.Certificate[] getPeerChain() {return sslconn == null ? null : sslconn.getPeerChain();}
-	protected final java.security.cert.X509Certificate getPeerCertificate() {return sslconn == null ? null : sslconn.getPeerCertificate();}
-	protected void startedSSL() throws com.grey.base.FaultException, java.io.IOException {}
-	protected com.grey.naf.SSLConfig getSSLConfig() {return null;}
+	final boolean isFlagSet(int f) {return ((cmstate & f) != 0);}
+	final void setFlag(int f) {cmstate |= f;}
+	final void clearFlag(int f) {cmstate &= ~f;}
 
-	private final boolean isFlagSet(int f) {return ((cmstate & f) != 0);}
-	private void setFlag(int f) {cmstate |= f;}
-	private void clearFlag(int f) {cmstate &= ~f;}
-
-	protected ChannelMonitor(Dispatcher d)
+	ChannelMonitor(Dispatcher d)
 	{
 		dsptch = d;
 		cm_id = dsptch.allocateChannelId();
 	}
 
-	// NB: Every type of ChannelMonitor is guaranteed to call this - client, server, Listener, etc
-	protected final void initChannel(java.nio.channels.SelectableChannel chan, boolean takeOwnership, boolean isconn) throws java.io.IOException
+	// This can optionally be called before registerChannel() and some subclasses might choose to insist on it.
+	// A typical user would be a subclass that does some preparatory work before calling registerChannel() and can fail
+	// before ever making that call, such that it ends up calling disconnect() without ever having attempted to connect.
+	// Calling this method first ensures that it at least arrives in disconnect() in a properly initialised state.
+	protected final void initChannelMonitor()
 	{
-		iochan = chan;
-		sslconn = null;
+		start_time = dsptch.getSystemTime();
+		iochan = null;
 		regkey = null;
 		regOps = 0;
-		cmstate = (isconn ? (byte)S_ISCONN : 0);
+		cmstate = S_INIT;
+	}
+
+	//Note that setReaper() can be called before this
+	final void registerChannel(java.nio.channels.SelectableChannel chan, boolean takeOwnership)
+		throws java.io.IOException
+	{
+		if (!isFlagSet(S_INIT)) initChannelMonitor();
+		iochan = chan;
 		if (takeOwnership) setFlag(S_WECLOSE);
-		if (iochan instanceof java.nio.channels.DatagramChannel) setFlag(S_UDP);
 		iochan.configureBlocking(false);
 		dsptch.registerIO(this);
-		if (chanreader != null) chanreader.initChannel(this);
-		if (chanwriter != null) chanwriter.initChannel(this);
-		start_time = dsptch.systime();
 	}
 
-	public final void connect(java.net.InetSocketAddress remaddr) throws com.grey.base.FaultException, java.io.IOException
+	final boolean disconnect(boolean linger, boolean no_reap)
 	{
-		if (iochan != null) {
-			// We're being reused to make a new connection - probably means initial connection attempt failed
-			com.grey.naf.EntityReaper rpr = reaper;
-			reaper = null;
-			disconnect(false);
-			reaper = rpr;
-		}
-		java.nio.channels.SocketChannel sockchan = java.nio.channels.SocketChannel.open();
-		initChannel(sockchan, true, false);
-
-		// NB: This bloody method can only report connection failure by throwing - either here or in finishConnect()
-		if (sockchan.connect(remaddr)) {
-			clientConnected(true, null);
-			return;
-		}
-		monitorIO(regOps | java.nio.channels.SelectionKey.OP_CONNECT);
-	}
-
-	private final void clientConnected(boolean success, Throwable ex) throws com.grey.base.FaultException, java.io.IOException
-	{
-		if (success) {
-			setFlag(S_ISCONN);
-			if (isPureSSL()) {
-				startSSL();
-			} else {
-				indicateConnection(true);
-			}
-		} else {
-			connected(false, null, ex);
-		}
-	}
-
-	final void accepted(java.nio.channels.SocketChannel sockchan, com.grey.naf.EntityReaper rpr)
-			throws com.grey.base.FaultException, java.io.IOException
-	{
-		initChannel(sockchan, true, true);
-		setReaper(rpr);
-		initServer();
-
-		if (isPureSSL()) {
-			startSSL();
-		} else {
-			indicateConnection(false);
-		}
-	}
-
-	private final void indicateConnection(boolean isClient)
-			throws com.grey.base.FaultException, java.io.IOException
-	{
-		setFlag(S_APPCONN);
-		if (isClient) {
-			connected(true, null, null);
-		} else {
-			connected();
-		}
-	}
-
-	public final boolean disconnect(boolean linger)
-	{
+		clearFlag(S_INIT); //in case we never got as far as calling CM_Client.connect()
 		//avoid re-entrancy, ie. calling ourself recursively due to a failure in these disconnect ops
-		if (isFlagSet(S_INDISC)) return false;
+		if (isFlagSet(S_INDISC)) return true; //we have already completed a disconnect
 		setFlag(S_INDISC);
 
 		if (iochan != null) {
-			if (sslconn != null) {
-				sslconn.close();
-				sslconn = null;
+			if (!shutdownChannel(linger)) {
+				clearFlag(S_INDISC); //enable future disconnect() call when linger completes
+				return false;
 			}
-			if (chanwriter != null) {
-				if (linger && chanwriter.isBlocked() && !isFlagSet(S_CLOSELINGER | S_BRKPIPE)) {
-					// Still waiting for a write to complete, so linger-on-close till it does.
-					// This is irrespective of the S_WECLOSE setting.
-					// If we were already lingering, then the repeated disconnect call means no-linger.
-					setFlag(S_CLOSELINGER);
-					clearFlag(S_INDISC); //enable future call when writer has drained
-					return false;
-				}
-				chanwriter.clearChannel();
-			}
-			if (chanreader != null) chanreader.clearChannel();
-
 			try {
 				dsptch.deregisterIO(this);
-				if (isFlagSet(S_WECLOSE)) iochan.close();
+				if (isFlagSet(S_WECLOSE)) {
+					iochan.close();
+					clearFlag(S_ISCONN);
+				}
 			} catch (Exception ex) {
 				dsptch.logger.log(LEVEL.ERR, ex, true, "Dispatcher="+dsptch.name+": Failed to close ChannelMonitor=E"+cm_id+"/"+iochan
 						+" in state=0x"+Integer.toHexString(cmstate));
 			}
 			iochan = null;
 		}
-		cmstate = 0; //need to reset this, as isConnected() may subsequently get called
 
-		if (reaper != null) {
+		if (reaper != null && !no_reap) {
 			com.grey.naf.EntityReaper rpr = reaper;
 			reaper = null;
 			rpr.entityStopped(this);
@@ -212,64 +126,16 @@ public abstract class ChannelMonitor
 		if (isFlagSet(S_CLOSELINGER)) {
 			// This entity is already in shutdown mode waiting to flush its final transmissions.
 			// Time to discard any blocked sends and terminate it immediately.
+			LEVEL lvl = (ex instanceof RuntimeException ? LEVEL.ERR : LEVEL.TRC2);
+			dsptch.logger.log(lvl, ex, lvl==LEVEL.ERR, "Failed during close-linger on "+iochan);
 			disconnect(false);
 		} else {
 			if (disconnect) {
 				// Tell the application to initiate the disconnect
-				ioDisconnected(ex==null ? null : ex.getMessage());
+				ioDisconnected(ex==null ? "ChannelMonitor failed" : ex.toString());
 			} else {
 				eventError(ex);
 			}
-		}
-	}
-
-	public final void startSSL() throws com.grey.base.FaultException, java.io.IOException
-	{
-		if (!isFlagSet(S_APPCONN)) {
-			// This is just to register as a reader with the Dispatcher.
-			// If the application is already connected, we don't want to interfere with its chanreader settings.
-			chanreader.receive(0);
-		}
-		sslconn = new SSLConnection(this);
-		sslconn.start();
-	}
-
-	final void sslStarted() throws com.grey.base.FaultException, java.io.IOException
-	{
-		if (isFlagSet(S_APPCONN)) {
-			//the application must have switched into SSL mode after it established the connection
-			startedSSL();
-		} else {
-			//a pure SSL connection has now established the SSL layer
-			indicateConnection(getSSLConfig().isClient);
-		}
-	}
-
-	final void sslDisconnected(CharSequence diag) throws com.grey.base.FaultException, java.io.IOException
-	{
-		if (!getSSLConfig().isClient || isFlagSet(S_APPCONN)) {
-			ioDisconnected(diag);
-		} else {
-			connected(false, diag, null);
-		}
-	}
-
-	private final boolean isPureSSL()
-	{
-		com.grey.naf.SSLConfig sslcfg = getSSLConfig();
-		return (sslcfg != null && !sslcfg.latent);
-	}
-
-	// The I/O operation is already over, so just swallow any exceptions.
-	// They are probably due to a remote disconnect, and we can handle that later if/when we do any more I/O on this channel
-	final void transmitCompleted() throws BrokenPipeException
-	{
-		disableWrite();
-
-		if (isFlagSet(S_CLOSELINGER)) {
-			disconnectLingerDone(true, null, null); //notify app first
-			disconnect(false); //now disconnect
-			return;
 		}
 	}
 
@@ -282,97 +148,96 @@ public abstract class ChannelMonitor
 	// call, in case its handler drastically changes our state.
 	final void handleIO(int readyOps) throws com.grey.base.FaultException, java.io.IOException
 	{
-		final int validReadyOps = readyOps & regOps;
-
-		if ((validReadyOps & java.nio.channels.SelectionKey.OP_READ) != 0) {
-			if (sslconn != null) {
-				sslconn.handleIO();
-				return;
-			}
-			if (chanreader != null) {
-				chanreader.handleIO();
-				return;
-			}
-		}
-
-		if (chanwriter != null && ((validReadyOps & java.nio.channels.SelectionKey.OP_WRITE) != 0)) {
-			chanwriter.handleIO();
-			return;
-		}
-
-		if ((validReadyOps & java.nio.channels.SelectionKey.OP_CONNECT) != 0) {
-			boolean success = true;
-			Throwable exconn = null;
-			try {
-				java.nio.channels.SocketChannel sock = (java.nio.channels.SocketChannel)iochan;
-				if (!sock.finishConnect()) return;  // don't expect False return to ever happen, but do the check anyway
-				monitorIO(regOps & ~java.nio.channels.SelectionKey.OP_CONNECT);
-			} catch (Throwable ex) {
-				success = false;
-				exconn = ex;
-			}
-			clientConnected(success, exconn);
-			return;
-		}
-
-		if (validReadyOps != 0) ioIndication(validReadyOps);
+		readyOps &= regOps;
+		if (readyOps != 0) ioIndication(readyOps);
 	}
 
-	public final boolean enableRead() throws java.io.IOException
+	final boolean enableRead() throws java.io.IOException
 	{
 		setFlag(S_INREAD);
 		if (halfduplex && isFlagSet(S_INWRITE)) return false;
-		return monitorIO(regOps | java.nio.channels.SelectionKey.OP_READ);
+		return monitorIO_HandleError(regOps | java.nio.channels.SelectionKey.OP_READ, false, "register-Read");
 	}
 
-	public final boolean disableRead() throws java.io.IOException
+	// The I/O operation is already over, so just swallow any exceptions.
+	// They are probably due to a remote disconnect, and we can handle that later if/when we do any more I/O on this channel.
+	final void disableRead()
 	{
 		clearFlag(S_INREAD);
-		return monitorIO(regOps & ~java.nio.channels.SelectionKey.OP_READ);
+		try {
+			monitorIO_HandleError(regOps & ~java.nio.channels.SelectionKey.OP_READ, true, "deregister-Read");
+		} catch (Exception ex) {
+			throw new RuntimeException("Unexpected Exception on disableRead for "+getClass().getName()+"/E"+cm_id+"/"+iochan, ex);
+		}
 	}
 
-	final boolean enableWrite() throws BrokenPipeException
+	// Note that enableWrite() and disableWrite() only apply to CM_Stream, but they're defined here because they rely
+	// on private ChannelMonitor members.
+	final void enableWrite() throws java.io.IOException
 	{
 		setFlag(S_INWRITE);
 		int opflags = (regOps | java.nio.channels.SelectionKey.OP_WRITE);
 		if (halfduplex) opflags &= ~java.nio.channels.SelectionKey.OP_READ;
-		try {
-			return monitorIO(opflags);
-		} catch (Exception ex) {
-			//this typically means the remote party has closed the connection.
-			brokenPipe(LEVEL.TRC2, "I/O error on Write registration", "IOExec: failed to enable Write", ex);
-			return false;
-		}
+		monitorIO_HandleError(opflags, false, "register-Write");
 	}
 
 	// if in half-duplex mode, we restore the read that was disabled by the OP_WRITE
-	private final boolean disableWrite() throws BrokenPipeException
+	final void disableWrite()
 	{
 		clearFlag(S_INWRITE);
 		int opflags = regOps & ~java.nio.channels.SelectionKey.OP_WRITE;
 		if (halfduplex && isFlagSet(S_INREAD)) opflags |= java.nio.channels.SelectionKey.OP_READ;
 		try {
+			monitorIO_HandleError(opflags, true, "deregister-Write");
+		} catch (Exception ex) {
+			throw new RuntimeException("Unexpected Exception on disableWrite for "+getClass().getName()+"/E"+cm_id+"/"+iochan, ex);
+		}
+	}
+
+	final void enableListen() throws java.nio.channels.ClosedChannelException
+	{
+		monitorIO(regOps | java.nio.channels.SelectionKey.OP_ACCEPT);
+	}
+
+	final void disableListen() throws java.nio.channels.ClosedChannelException
+	{
+		monitorIO(regOps & ~java.nio.channels.SelectionKey.OP_ACCEPT);
+	}
+
+	final void enableConnect() throws java.nio.channels.ClosedChannelException
+	{
+		monitorIO(regOps | java.nio.channels.SelectionKey.OP_CONNECT);
+	}
+
+	final void disableConnect() throws java.nio.channels.ClosedChannelException
+	{
+		monitorIO(regOps & ~java.nio.channels.SelectionKey.OP_CONNECT);
+	}
+
+	private boolean monitorIO_HandleError(int opflags, boolean nothrow, String opdesc) throws java.io.IOException
+	{
+		try {
 			return monitorIO(opflags);
 		} catch (Exception ex) {
-			LEVEL lvl = LEVEL.TRC2;
-			if (dsptch.logger.isActive(lvl)) {
-				dsptch.logger.log(lvl, ex, false, "IOExec: failed to disable Write on "+getClass().getName()+"/E"+cm_id+"/"+iochan);
+			LEVEL lvl = (ex instanceof RuntimeException ? LEVEL.ERR : LEVEL.TRC2);
+			if (nothrow) {
+				if (dsptch.logger.isActive(lvl)) {
+					String errmsg = "Dispatcher failed on "+opdesc+" for "+getClass().getName()+"/E"+cm_id+"/"+iochan;
+					dsptch.logger.log(lvl, ex, lvl==LEVEL.ERR, errmsg);
+				}
+			} else {
+				String errmsg = "Dispatcher failed on "+opdesc+" for "+getClass().getName()+"/E"+cm_id+"/"+iochan;
+				if (this instanceof CM_Stream) {
+					((CM_Stream)this).brokenPipe(lvl, "Error on "+opdesc, errmsg, ex);
+				} else {
+					throw new java.io.IOException(errmsg);
+				}
 			}
 			return false;
 		}
 	}
 
-	public final boolean enableListen() throws java.io.IOException
-	{
-		return monitorIO(regOps | java.nio.channels.SelectionKey.OP_ACCEPT);
-	}
-
-	public final boolean disableListen() throws java.io.IOException
-	{
-		return monitorIO(regOps & ~java.nio.channels.SelectionKey.OP_ACCEPT);
-	}
-
-	private final boolean monitorIO(int opflags) throws java.io.IOException
+	private boolean monitorIO(int opflags) throws java.nio.channels.ClosedChannelException
 	{
 		if (opflags == regOps || iochan == null) return false;
 		regOps = (byte)opflags;	
@@ -380,71 +245,58 @@ public abstract class ChannelMonitor
 		return true;
 	}
 
-	public int getLocalPort() {
-		if (isFlagSet(S_UDP)) return ((java.nio.channels.DatagramChannel)iochan).socket().getLocalPort();
-		return ((java.nio.channels.SocketChannel)iochan).socket().getLocalPort();
-	}
-	public int getRemotePort() {
-		if (isFlagSet(S_UDP)) return ((java.nio.channels.DatagramChannel)iochan).socket().getPort();
-		return ((java.nio.channels.SocketChannel)iochan).socket().getPort();
-	}
-	public java.net.InetAddress getLocalIP() {
-		if (isFlagSet(S_UDP)) return ((java.nio.channels.DatagramChannel)iochan).socket().getLocalAddress();
-		return ((java.nio.channels.SocketChannel)iochan).socket().getLocalAddress();
-	}
-	public java.net.InetAddress getRemoteIP() {
-		if (isFlagSet(S_UDP)) return ((java.nio.channels.DatagramChannel)iochan).socket().getInetAddress();
-		return ((java.nio.channels.SocketChannel)iochan).socket().getInetAddress();
-	}
-
-	final void dumpState(StringBuilder sb, boolean verbose)
+	final StringBuilder dumpState(StringBuilder sb, boolean verbose)
 	{
 		final Class<?> clss = getClass();
-		boolean is_producer = false;
+		if (sb == null) sb = new StringBuilder();
 		int prevlen = sb.length();
 		sb.append("ID=").append(cm_id).append(": ");
-		if (Listener.class.isInstance(this)) {
-			sb.append(clss.getSimpleName()).append('/').append(((Listener)this).getServerType().getName());
+		if (this instanceof CM_Listener) {
+			sb.append(clss.getSimpleName()).append('/').append(((CM_Listener)this).getServerType().getName());
 		} else if (clss == Producer.AlertsPipe.class) {
 			if (!verbose) {
+				//omit this object altogether
 				sb.setLength(prevlen);
-				return;
+				return sb;
 			}
-			is_producer = true;
 			sb.append("Producer/").append(((Producer.AlertsPipe<?>)this).producer.consumerType);
 		} else {
+			if (this instanceof CM_UDP) {
+				sb.append("UDP/");
+			} else if (this instanceof CM_TCP) {
+				sb.append("TCP/");
+			} else if (this instanceof CM_Stream) {
+				sb.append("Stream/");
+			}
 			sb.append(clss.getName());
 		}
+		if (start_time - dsptch.timeboot > minbootdiff) {
+			//we don't show start-time if this CM apparently dates back to the birth of this Dispatcher
+			dsptch.dtcal.setTimeInMillis(start_time);
+			sb.append(" - ");
+			TimeOps.makeTimeLogger(dsptch.dtcal, sb, true, true);
+		}
+		String dlm = "; ";
 		sb.append("<br/>State=");
-		if (isFlagSet(S_UDP)) sb.append('U');
-		if (isFlagSet(S_ISCONN)) sb.append('C');
-		if (isFlagSet(S_INDISC)) sb.append('D');
-		if (isFlagSet(S_BRKPIPE)) sb.append('P');
-		if (isFlagSet(S_APPCONN)) sb.append('A');
-		if (isFlagSet(S_WECLOSE)) sb.append('X');
-		if (isFlagSet(S_CLOSELINGER)) sb.append('L');
-		if (isFlagSet(S_INREAD)) sb.append('R');
-		if (isFlagSet(S_INWRITE)) sb.append('W');
-		if (chanwriter != null && chanwriter.isBlocked()) sb.append("/blocked");
-		if (usingSSL()) sb.append("/SSL");
+		dumpMonitorState(false, sb);
 		int jdkOps = 0;
-		sb.append(" Ops=");
+		sb.append(dlm).append("Ops=");
 		if (regkey == null) {
 			sb.append("Null");
 		} else {
-			jdkOps = regkey.interestOps();
-			dumpInterestOps(jdkOps, sb);
+			if (regkey.isValid()) {
+				jdkOps = regkey.interestOps();
+				dumpInterestOps(jdkOps, sb);
+			} else {
+				sb.append("CANCELLED");
+			}
 		}
 		if (regOps != jdkOps) {
 			//should never happen
 			sb.append("/RegOps=");
 			dumpInterestOps(regOps, sb);
 		}
-		sb.append(" Exec=").append(chanreader==null?"":"R").append(chanwriter==null?"":"W");
-		if (is_producer) return; //remainder of info is boring and repetitive
-
-		sb.append("<br/>Endpoint: ").append(iochan);
-		if (isFlagSet(S_UDP)) sb.append("/UDP-Port=").append(getLocalPort()); //JDK toString() not very helpful in this case
+		dumpChannelState(sb, dlm);
 
 		int prevlen1 = sb.length();
 		sb.append("<br/><span class=\"cmapp\">App: ");
@@ -455,58 +307,48 @@ public abstract class ChannelMonitor
 		} else {
 			sb.append("</span>");
 		}
-		sb.append("<br/>Since ");
-		dsptch.dtcal.setTimeInMillis(start_time);
-		TimeOps.makeTimeLogger(dsptch.dtcal, sb, true, false);
+		return sb;
 	}
 
-	final void brokenPipe(LEVEL lvl, CharSequence discmsg, CharSequence errmsg, Throwable ex) throws BrokenPipeException
+	StringBuilder dumpChannelState(StringBuilder sb, String dlm)
 	{
-		if (dsptch.logger.isActive(lvl)) {
-			dsptch.logger.log(lvl, ex, false, getClass().getName()+"/E"+cm_id+" "+errmsg
-					+" - cmstate=0x"+Integer.toHexString(cmstate)
-					+"; blocked="+(chanwriter != null && chanwriter.isBlocked()));
-		}
-		setFlag(S_BRKPIPE);
-
-		if (isFlagSet(S_CLOSELINGER)) {
-			//Connection has been lost while we're lingering on close to flush a blocked IOExcWriter.
-			//Clearly no point lingering now that connnection is lost (or we'd get stuck in infinite loop).
-			//First, notify app that the connection it thought was closed has in fact failed.
-			disconnectLingerDone(false, discmsg, ex);
-			disconnect(false);
-			return;
-		}
-		if (!isFlagSet(S_INDISC)) throw new BrokenPipeException(this, discmsg);
+		if (sb == null) sb = new StringBuilder();
+		sb.append("<br/>Endpoint: ").append(iochan);
+		return sb;
 	}
 
-	private static void dumpInterestOps(int ops, StringBuilder sb)
+	CharSequence dumpMonitorState(boolean hex, StringBuilder sb)
 	{
+		if (hex) {
+			String str = "0x"+Integer.toHexString(cmstate);
+			if (sb == null) return str;
+			sb.append(str);
+		} else {
+			if (sb == null) sb = new StringBuilder();
+			if (isFlagSet(S_ISCONN)) sb.append('C');
+			if (isFlagSet(S_INDISC)) sb.append('D');
+			if (isFlagSet(S_BRKPIPE)) sb.append('P');
+			if (isFlagSet(S_APPCONN)) sb.append('A');
+			if (isFlagSet(S_WECLOSE)) sb.append('X');
+			if (isFlagSet(S_CLOSELINGER)) sb.append('L');
+			if (isFlagSet(S_INREAD)) sb.append('R');
+			if (isFlagSet(S_INWRITE)) sb.append('W');
+		}
+		return sb;
+	}
+
+	private static StringBuilder dumpInterestOps(int ops, StringBuilder sb)
+	{
+		if (sb == null) sb = new StringBuilder();
 		if ((ops & java.nio.channels.SelectionKey.OP_READ) != 0) sb.append('R');
 		if ((ops & java.nio.channels.SelectionKey.OP_WRITE) != 0) sb.append('W');
 		if ((ops & java.nio.channels.SelectionKey.OP_ACCEPT) != 0) sb.append('A');
 		if ((ops & java.nio.channels.SelectionKey.OP_CONNECT) != 0) sb.append('C');
+		return sb;
 	}
 
-	public static boolean isBrokenPipe(Throwable ex, ChannelMonitor cm)
-	{
-		if (ex == null || ex.getClass() != BrokenPipeException.class) return false;
-		return ((BrokenPipeException)ex).cm == cm;
-	}
-
-
-	/*
-	 * This exception tells the Dispatcher to call handler's eventError() AFTER unwinding the call chain, and
-	 * without logging a big ugly stack dump.
-	 * It is thrown in places where we used to call chanmon.ioDisconnected(), but that allowed the application to
-	 * continue processing without being aware of the deeply nested re-entrant disconnect indication, and proved
-	 * almost impossible to guard against - certainly not without inserting state checks after every call to
-	 * IOExecWriter and IOExecReader.
-	 */
-	public static final class BrokenPipeException extends java.io.IOException
-	{
-		private static final long serialVersionUID = 1L;
-		public final ChannelMonitor cm;
-		public BrokenPipeException(ChannelMonitor c, CharSequence msg) {super(msg.toString()); cm=c;}
+	@Override
+	public String toString() {
+		return getClass().getName()+"/E"+cm_id+" - iochan="+iochan;
 	}
 }

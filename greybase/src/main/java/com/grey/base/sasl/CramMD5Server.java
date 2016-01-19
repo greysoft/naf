@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2013 Yusef Badri - All rights reserved.
+ * Copyright 2012-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.sasl;
@@ -51,10 +51,9 @@ public final class CramMD5Server
 	{
 		int dlm = ByteOps.indexOf(msg.ar_buf, msg.ar_off, msg.ar_len, (byte)' ');
 		if (dlm == -1) return false;
-		auth_username.pointAt(msg.ar_buf, msg.ar_off, dlm - msg.ar_off);
-		if (auth_username.ar_len == 0) return false;
+		auth_username.set(msg.ar_buf, msg.ar_off, dlm - msg.ar_off);
 		int digest_len = msg.ar_len - auth_username.ar_len - 1;
-		com.grey.base.utils.ByteChars passwd = (digest_len == 0 ? null : authenticator.saslPassword(null, auth_username));
+		com.grey.base.utils.ByteChars passwd = (digest_len == 0 ? null : authenticator.saslPasswordLookup(auth_username));
 		if (passwd == null) return false;
 		return hashfunc.matches(passwd, srvnonce, msg.ar_buf, dlm + 1, digest_len);
 	}
@@ -66,12 +65,14 @@ public final class CramMD5Server
 		private char[] hexbuf;
 		private int hexlen;
 
-		public SecureHash() throws java.security.NoSuchAlgorithmException {km = new com.grey.base.crypto.HMAC.KeyMaterial("MD5", null);}
+		public SecureHash() throws java.security.NoSuchAlgorithmException {
+			km = new com.grey.base.crypto.HMAC.KeyMaterial("MD5", null);
+		}
 
 		private void calculate(com.grey.base.utils.ByteChars secret, com.grey.base.utils.ArrayRef<byte[]> data)
 		{
 			km.reset(secret.ar_buf, secret.ar_off, secret.ar_len);
-			byte[] hash = com.grey.base.crypto.HMAC.encode(km, data.ar_buf, data.ar_off, data.ar_len);
+			byte[] hash = km.encode(data.ar_buf, data.ar_off, data.ar_len);
 			hexbuf = Ascii.hexEncode(hash, 0, hash.length, hexbuf);
 			hexlen = Ascii.hexEncodeLength(hash.length);
 		}

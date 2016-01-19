@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2013 Yusef Badri - All rights reserved.
+ * Copyright 2011-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.logging;
@@ -20,9 +20,9 @@ public class Parameters
 	public static final String SYSPROP_BUFSIZ = "grey.logger.bufsiz";
 	public static final String SYSPROP_ROTFREQ = "grey.logger.rotfreq";
 	public static final String SYSPROP_SHOWTID = "grey.logger.tid";
+	public static final String SYSPROP_SHOWTHRDNAME = "grey.logger.threadname";
 	public static final String SYSPROP_SHOWDELTA = "grey.logger.delta";
 	public static final String SYSPROP_FORCE_STDOUT = "grey.logger.stdout";
-	public static final String SYSPROP_TIDPLUSNAME = "grey.logger.threadname";  //this one defaults to True
 
 	public static final String TOKEN_LOGSDIR = "%DIRLOG%";
 	public static final String TOKEN_TID = "%TID%";
@@ -43,6 +43,7 @@ public class Parameters
 	public String pthnam = null;	// pathname template for logfile
 	public int maxsize;
 	public boolean withTID = true;
+	public boolean tidPlusName = false;
 	public boolean withDelta = false;
 	public String mode;
 
@@ -52,6 +53,7 @@ public class Parameters
 		logclass = SysProps.get(SYSPROP_LOGCLASS, logclass);
 		loglevel = Logger.LEVEL.valueOf(SysProps.get(SYSPROP_LOGLEVEL, loglevel.name()).toUpperCase());
 		withTID = SysProps.get(SYSPROP_SHOWTID, withTID);
+		tidPlusName = SysProps.get(SYSPROP_SHOWTHRDNAME, tidPlusName);
 		withDelta = SysProps.get(SYSPROP_SHOWDELTA, withDelta);
 		flush_interval = SysProps.getTime(SYSPROP_FLUSHINTERVAL, flush_interval);
 		bufsiz = SysProps.get(SYSPROP_BUFSIZ, bufsiz);
@@ -68,6 +70,7 @@ public class Parameters
 		logclass = cfg.getValue("@class", false, logclass);
 		loglevel = Logger.LEVEL.valueOf(cfg.getValue("@level", false, loglevel.name()).toUpperCase());
 		withTID = cfg.getBool("@tid", withTID);
+		tidPlusName = cfg.getBool("@tname", tidPlusName);
 		withDelta = cfg.getBool("@delta", withDelta);
 		flush_interval = cfg.getTime("@flush", flush_interval);
 		bufsiz = (int)cfg.getSize("@buffer", bufsiz);
@@ -81,15 +84,15 @@ public class Parameters
 	public Parameters(Logger.LEVEL max, String path)
 	{
 		this();
-		loglevel = max;
-		pthnam = path;
+		if (max != null) loglevel = max;
+		if (path != null) pthnam = path;
 	}
 
 	public Parameters(Logger.LEVEL max, java.io.OutputStream s)
 	{
 		this();
-		loglevel = max;
-		strm = s;
+		if (max != null) loglevel = max;
+		if (s != null) strm = s;
 	}
 
 	// NB: We deliberately don't take a static final reading of SYSPROP_LOGSDIR, in order to allow callers

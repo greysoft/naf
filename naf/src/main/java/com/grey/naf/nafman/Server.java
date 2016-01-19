@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2013 Yusef Badri - All rights reserved.
+ * Copyright 2010-2016 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.nafman;
@@ -16,7 +16,7 @@ import com.grey.base.utils.TimeOps;
  * prescribed function very well, and works with all known browsers.
  */
 public final class Server
-	extends com.grey.naf.reactor.ConcurrentListener.Server
+	extends com.grey.naf.reactor.CM_Server
 	implements com.grey.naf.reactor.Timer.Handler
 {
 	private static final int S_PREHEADERS = 1;  //initial state, upon new connection
@@ -24,12 +24,33 @@ public final class Server
 	private static final int S_BODY = 3;  //receiving content
 	private static final int S_PROC = 4; //command has been accepted and is being processed
 
+	public static final class Factory
+		implements com.grey.naf.reactor.ConcurrentListener.ServerFactory
+	{
+		private final com.grey.naf.reactor.CM_Listener lstnr;
+		private final SharedFields shared;
+
+		public Factory(com.grey.naf.reactor.CM_Listener l, com.grey.base.config.XmlConfig cfg)
+			throws com.grey.base.GreyException, java.io.IOException, javax.xml.transform.TransformerConfigurationException
+		{
+			lstnr = l;
+			shared = new SharedFields(Primary.class.cast(l.controller), cfg);
+		}
+
+		@Override
+		public Server factory_create() {return new Server(lstnr, shared);}
+		@Override
+		public Class<Server> getServerClass() {return Server.class;}
+		@Override
+		public void shutdown() {}
+	}
+
 	private static final class SharedFields
 	{
 		final Primary primary;
 		final HTTP http;
 		final ResourceManager rsrcmgr;
-		final com.grey.base.utils.ObjectWell<Command> cmdstore;
+		final com.grey.base.collections.ObjectWell<Command> cmdstore;
 		final com.grey.naf.BufferSpec bufspec;
 		final java.nio.ByteBuffer httprsp400;
 		final java.nio.ByteBuffer httprsp404;
@@ -38,19 +59,18 @@ public final class Server
 		java.nio.ByteBuffer tmpniobuf; //temp work area, pre-allocated for efficiency
 
 		SharedFields(Primary p, com.grey.base.config.XmlConfig cfg)
-				throws com.grey.base.ConfigException, java.io.IOException, java.net.URISyntaxException,
-					javax.xml.transform.TransformerConfigurationException
+				throws com.grey.base.ConfigException, java.io.IOException, javax.xml.transform.TransformerConfigurationException
 		{
 			primary = p;
-			com.grey.base.config.XmlConfig cfg_rsrc = new com.grey.base.config.XmlConfig(cfg, "resources");
+			com.grey.base.config.XmlConfig cfg_rsrc = cfg.getSection("resources");
 			tmt_idle = cfg.getTime("timeout", com.grey.base.utils.TimeOps.parseMilliTime("30s"));
 			long permcache = cfg.getTime("permcache", com.grey.base.utils.TimeOps.parseMilliTime("1d"));
 			long dyncache = cfg.getTime("dyncache", "5s");
 			bufspec = new com.grey.naf.BufferSpec(cfg, "niobuffers", 1024, 4*1024);
-			cmdstore = new com.grey.base.utils.ObjectWell<Command>(Command.class, "NAFMAN_"+primary.dsptch.name);
+			cmdstore = new com.grey.base.collections.ObjectWell<Command>(Command.class, "NAFMAN_"+primary.dsptch.name);
 			http = new HTTP(bufspec, permcache);
 			rsrcmgr = new ResourceManager(cfg_rsrc, primary, http, dyncache);
-			httprsp400 = http.buildErrorResponse("400 Unexpected body");
+			httprsp400 = http.buildErrorResponse("400 Bad request");
 			httprsp404 = http.buildErrorResponse("404 Unknown resource");
 			httprsp405 = http.buildErrorResponse("405 Method not supported");
 			String pfx = "NAFMAN-Server: ";
@@ -69,35 +89,10 @@ public final class Server
 	private String ctype;
 	private int contlen;
 
-	// This is the prototype object which the Listener uses to create the rest
-	public Server(com.grey.naf.reactor.ConcurrentListener l, com.grey.base.config.XmlConfig cfg)
-			throws com.grey.base.GreyException, java.io.IOException, java.net.URISyntaxException,
-				javax.xml.transform.TransformerConfigurationException
+	Server(com.grey.naf.reactor.CM_Listener l, SharedFields s)
 	{
-		super(l);
-		shared = new SharedFields(Primary.class.cast(lstnr.controller), cfg);
-	}
-
-	// This is (or will be) an active Server object
-	private Server(Server proto)
-	{
-		super(proto.lstnr);
-		shared = proto.shared;
-		chanreader = new com.grey.naf.reactor.IOExecReader(shared.bufspec);
-		chanwriter = new com.grey.naf.reactor.IOExecWriter(shared.bufspec);
-	}
-
-	@Override
-	public com.grey.base.utils.PrototypeFactory.PrototypeObject prototype_create()
-	{
-		return new Server(this);
-	}
-
-	// This is called by the Listener - we will signal it when we naturally complete this connection
-	@Override
-	public boolean stopServer()
-	{
-		return false;
+		super(l, s.bufspec, s.bufspec);
+		shared = s;
 	}
 
 	@Override
@@ -131,6 +126,7 @@ public final class Server
 	@Override
 	public void ioReceived(com.grey.base.utils.ArrayRef<byte[]> data) throws com.grey.base.FaultException, java.io.IOException
 	{
+		LEVEL lvl = LEVEL.TRC;
 		int len_eol = (data.ar_len > 1 && data.ar_buf[data.ar_off+data.ar_len-2] == '\r' ? 2 : 1);
 		data.ar_len -= len_eol;
 		if (state == S_PREHEADERS) {
@@ -140,16 +136,25 @@ public final class Server
 				sendResponse(shared.httprsp405); //probably garbage, no point continuing
 				return;
 			}
-			String url = shared.http.parseURL(data);
-			cmdcode = shared.http.getURLPath(url);
+			String url;
+			try {
+				url = shared.http.parseURL(data);
+				cmdcode = shared.http.getURLPath(url);
+			} catch (Exception e) {
+				//most likely cause is an invalid hex number in HTTP.decodeURL() - doesn't merit an ugly stack dump
+				if (dsptch.logger.isActive(lvl)) {
+					dsptch.logger.log(lvl, "NAFMAN Server E"+getCMID()+" rejecting bad URL - "+new com.grey.base.utils.ByteChars(data));
+				}
+				sendResponse(shared.httprsp400);
+				return;
+			}
 			Registry.DefCommand def = Registry.get().getCommand(cmdcode);
 			if (def == null) def = Registry.get().getCommand(cmdcode.toUpperCase()); //just to be nice
 			cmd = shared.cmdstore.extract().init(def, this);
 			shared.http.parseQS(url, cmd, true);
 			state = S_HEADERS;
-			LEVEL lvl = LEVEL.TRC;
 			if (dsptch.logger.isActive(lvl)) {
-				dsptch.logger.log(lvl, "NAFMAN Server E"+cm_id+" received "+http_method+" "+url);
+				dsptch.logger.log(lvl, "NAFMAN Server E"+getCMID()+" received "+http_method+"="+url+" - cmd="+def);
 			}
 		} else if (state == S_HEADERS) {
 			if (data.ar_len == 0) {
@@ -189,7 +194,7 @@ public final class Server
 			if (httprsp == null) httprsp = shared.httprsp404;
 			LEVEL lvl = LEVEL.TRC2;
 			if (dsptch.logger.isActive(lvl)) {
-				dsptch.logger.log(lvl, "NAFMAN Server E"+cm_id+" response="+(httprsp==shared.httprsp404?"404":"resource"));
+				dsptch.logger.log(lvl, "NAFMAN Server E"+getCMID()+" response="+(httprsp==shared.httprsp404?"404":"resource"));
 			}
 			sendResponse(httprsp);
 			return;
@@ -244,9 +249,11 @@ public final class Server
 	public void eventError(com.grey.naf.reactor.Timer tmr, com.grey.naf.reactor.Dispatcher d, Throwable ex) {}
 
 	@Override
-	public void dumpAppState(StringBuilder sb)
+	public StringBuilder dumpAppState(StringBuilder sb)
 	{
+		if (sb == null) sb = new StringBuilder();
 		sb.append("Command=").append(cmdcode).append("/state=").append(state);
 		sb.append(" - ").append(http_method).append('/').append(ctype).append('/').append(contlen);
+		return sb;
 	}
 }

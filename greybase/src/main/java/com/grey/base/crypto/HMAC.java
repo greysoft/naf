@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Yusef Badri - All rights reserved.
+ * Copyright 2012-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.crypto;
@@ -9,7 +9,6 @@ package com.grey.base.crypto;
  */
 public final class HMAC
 {
-
 	// This class contains pre-computed and pre-allocated objects tailored to a given key.
 	// If you're going to repeatedly apply the same key to various data, it is more efficient
 	// to do so with the aid of this class.
@@ -69,19 +68,30 @@ public final class HMAC
 			}
 			return this;
 		}
+
+		public byte[] encode(byte[] data)
+		{
+			return encode(data, 0, data.length);
+		}
+
+		public byte[] encode(byte[] data, int off, int len)
+		{
+			byte[] hash = hashWithPad(ipadxor, data, off, len);
+			hash = hashWithPad(opadxor, hash, 0, hash.length);
+			return hash;
+		}
+
+		private byte[] hashWithPad(byte[] pad, byte[] data, int data_off, int data_len)
+		{
+			int len = pad.length + data_len;
+			if (workbuf.length < len) workbuf = new byte[len];
+			System.arraycopy(pad, 0, workbuf, 0, pad.length);
+			System.arraycopy(data, data_off, workbuf, pad.length, data_len);
+			hashfunc.update(workbuf, 0, len);
+			return hashfunc.digest();
+		}
 	}
 
-	public static byte[] encode(KeyMaterial km, byte[] data)
-	{
-		return encode(km, data, 0, data.length);
-	}
-
-	public static byte[] encode(KeyMaterial km, byte[] data, int off, int len)
-	{
-		byte[] hash = hashWithPad(km, km.ipadxor, data, off, len);
-		hash = hashWithPad(km, km.opadxor, hash, 0, hash.length);
-		return hash;
-	}
 
 	// Convenience method. Unless this is a one-off call, the canonical HMAC.encode(byte[], KeyMaterial)
 	// method (with calls to KeyMaterial.reset() whenever the key changes) is more efficient, as it
@@ -96,16 +106,6 @@ public final class HMAC
 	public static byte[] encode(java.security.MessageDigest hashfunc, byte[] key, byte[] data)
 	{
 		KeyMaterial km = new KeyMaterial(hashfunc, key);
-		return encode(km, data);
-	}
-
-	private static byte[] hashWithPad(KeyMaterial km, byte[] pad, byte[] data, int data_off, int data_len)
-	{
-		int len = pad.length + data_len;
-		if (km.workbuf.length < len) km.workbuf = new byte[len];
-		System.arraycopy(pad, 0, km.workbuf, 0, pad.length);
-		System.arraycopy(data, data_off, km.workbuf, pad.length, data_len);
-		km.hashfunc.update(km.workbuf, 0, len);
-		return km.hashfunc.digest();
+		return km.encode(data);
 	}
 }

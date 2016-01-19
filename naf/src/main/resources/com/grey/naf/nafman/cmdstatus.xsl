@@ -34,7 +34,7 @@
 	<hr class="sectbreak"/>
 	<p>
 		<span class="subtitle">
-			Dispatcher&#160;<xsl:value-of select="@dname"/>:&#160;<xsl:value-of select="@hname"/>
+			<xsl:value-of select="@dname"/>&#160;&#187;&#160;<xsl:value-of select="@hclass"/>&#160;&#187;&#160;<xsl:value-of select="@hname"/>
 		</span>
 		<br/>
 		<xsl:copy-of select="* | text()"/>

@@ -1,16 +1,18 @@
 /*
- * Copyright 2012-2013 Yusef Badri - All rights reserved.
+ * Copyright 2012-2014 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
 
 import com.grey.base.utils.FileOps;
+import com.grey.base.utils.TimeOps;
 
 public class IOExecReaderTest
 {
 	private static final String rootdir = DispatcherTest.initPaths(IOExecReaderTest.class);
 
-	private static class CMR extends ChannelMonitor
+	private static class CMR
+		extends CM_Stream
 	{
 		private final com.grey.naf.BufferSpec bufspec;
 		private final java.nio.channels.WritableByteChannel wchan;
@@ -24,11 +26,10 @@ public class IOExecReaderTest
 		public CMR(Dispatcher d, java.nio.channels.SelectableChannel r, java.nio.channels.WritableByteChannel w,
 					com.grey.naf.BufferSpec bufspec)
 				throws com.grey.base.FaultException, java.io.IOException {
-			super(d);
+			super(d, bufspec, null);
 			wchan = w;
 			this.bufspec = bufspec;
-			chanreader = new IOExecReader(bufspec);
-			initChannel(r, true, true);
+			registerConnectedChannel(r, true);
 			chanreader.receive(0);
 		}
 
@@ -40,7 +41,7 @@ public class IOExecReaderTest
 		}
 
 		@Override
-		protected void ioReceived(com.grey.base.utils.ArrayRef<byte[]> rcvdata)
+		public void ioReceived(com.grey.base.utils.ArrayRef<byte[]> rcvdata)
 				throws com.grey.base.FaultException, java.io.IOException
 		{
 			bc.set(rcvdata.ar_buf, rcvdata.ar_off, rcvdata.ar_len);
@@ -158,8 +159,10 @@ public class IOExecReaderTest
 		org.junit.Assert.assertTrue(cm.isConnected());
 		cm.write("abcdexyz1234567890");  //has to be shorter than CMR.rcvcap
 		dsptch.start();
-		dsptch.waitStopped();
 		// make sure the Dispatcher didn't bomb out on an error
+		Dispatcher.STOPSTATUS stopsts = dsptch.waitStopped(TimeOps.MSECS_PER_SECOND * 10, true);
+		org.junit.Assert.assertEquals(Dispatcher.STOPSTATUS.STOPPED, stopsts);
+		org.junit.Assert.assertTrue(dsptch.completedOK());
 		synchronized (cm) {
 			org.junit.Assert.assertTrue(cm.completed);
 		}

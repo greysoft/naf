@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Yusef Badri - All rights reserved.
+ * Copyright 2012-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.crypto;
@@ -23,10 +23,10 @@ public class HMACTest
 		java.util.Arrays.fill(keybuf, (byte)125);
 		System.arraycopy(key, 0, keybuf, offset, key.length);
 		km.reset(keybuf, offset, key.length);
-		byte[] hash = HMAC.encode(km, data);
+		byte[] hash = km.encode(data);
 		org.junit.Assert.assertEquals(hexhash, hexEncode(hash));
 		//make sure consecutive calls work
-		hash = HMAC.encode(km, data);
+		hash = km.encode(data);
 		org.junit.Assert.assertEquals(hexhash, hexEncode(hash));
 		//test the convenience method
 		hash = HMAC.encode(algname, key, data);
@@ -84,11 +84,11 @@ public class HMACTest
 	        byte[] jdkhash = mac.doFinal(data);
 	        //verify our HMAC code gives same answer
 			HMAC.KeyMaterial km = new HMAC.KeyMaterial(algname, key);
-			byte[] hash = HMAC.encode(km, data);
+			byte[] hash = km.encode(data);
 			org.junit.Assert.assertTrue(algname, java.util.Arrays.equals(hash, jdkhash));
 			// test repeat call
 			km.reset(key);
-			byte[] hash2 = HMAC.encode(km, data);
+			byte[] hash2 = km.encode(data);
 			org.junit.Assert.assertTrue(algname+"-repeat", java.util.Arrays.equals(hash, hash2));
 		}
 	}

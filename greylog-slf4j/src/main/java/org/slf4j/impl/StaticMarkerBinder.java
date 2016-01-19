@@ -16,11 +16,13 @@ public class StaticMarkerBinder
 
 	private StaticMarkerBinder() {}
 
+	@Override
 	public org.slf4j.IMarkerFactory getMarkerFactory()
 	{
 		return markerFactory;
 	}
 
+	@Override
 	public String getMarkerFactoryClassStr()
 	{
 		return getMarkerFactory().getClass().getName();

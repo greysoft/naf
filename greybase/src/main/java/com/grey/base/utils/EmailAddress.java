@@ -1,10 +1,11 @@
 /*
- * Copyright 2010-2013 Yusef Badri - All rights reserved.
+ * Copyright 2010-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
 
 public final class EmailAddress
+	implements Comparable<EmailAddress>
 {
 	public static final char DLM_DOM = '@';
 	public static final char DLM_RT = '%'; //preferred delimiter for source-routing (there is no standard)
@@ -12,6 +13,8 @@ public final class EmailAddress
 	public final ByteChars domain = new ByteChars(-1);  // lightweight object without own storage
 	public final ByteChars mailbox = new ByteChars(-1);  // lightweight object without own storage
 	public final ByteChars full;
+
+	public EmailAddress decompose() {return decompose(false);}
 
 	public EmailAddress()
 	{
@@ -33,20 +36,24 @@ public final class EmailAddress
 
 	public EmailAddress set(CharSequence addr)
 	{
+		reset();
 		full.set(addr);
-		domain.ar_len = 0;
-		mailbox.ar_len = 0;
 		return this;
 	}
 
-	public EmailAddress decompose()
+	public EmailAddress decompose(boolean bare_is_domain)
 	{
-		if (mailbox.ar_len != 0) return this; //already broken down
+		if (mailbox.ar_len != 0 || domain.ar_len != 0) return this; //already broken down
 		int off = full.lastIndexOf((byte)DLM_DOM);
 
 		if (off == -1) {
-			mailbox.pointAt(full);
-			domain.ar_len = 0;
+			if (bare_is_domain) {
+				domain.pointAt(full);
+				mailbox.ar_len = 0;
+			} else {
+				mailbox.pointAt(full);
+				domain.ar_len = 0;
+			}
 		} else {
 			mailbox.pointAt(full, 0, off);
 			domain.pointAt(full, off + 1);
@@ -114,6 +121,14 @@ public final class EmailAddress
 		full.ensureCapacity(len);
 		full.ar_len = len;
 		System.arraycopy(dbuf, doff, full.ar_buf, full.ar_off, len);
+	}
+
+	@Override
+	public int compareTo(EmailAddress em2)
+	{
+		if (em2 == this) return 0;
+		if (em2 == null) return 1;
+		return full.compareTo(em2.full);
 	}
 
 	@Override

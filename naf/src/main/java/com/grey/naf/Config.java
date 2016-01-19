@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2013 Yusef Badri - All rights reserved.
+ * Copyright 2010-2016 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf;
@@ -34,17 +34,17 @@ public class Config
 	private static final int DFLT_BASEPORT = SysProps.get(SYSPROP_BASEPORT, 13000);
 	public static final int RSVPORT_NAFMAN = 0;
 	private static final int RSVPORT_MAX = 5;
-	public static final int RSVPORT_ANON = -1;  //not reserved at all
+	public static final int RSVPORT_ANON = -1; //not reserved at all
 
 	public final String path_root;
 	public final String path_conf;
 	public final String path_var;
 	public final String path_logs;
-	public final String path_tmp;  //NB: Diverges from SysProps.TMPDIR, unless SYSPROP_DIRPATH_TMP is set
+	public final String path_tmp; //NB: Diverges from SysProps.TMPDIR, unless SYSPROP_DIRPATH_TMP is set
 	public XmlConfig cfgroot;
 
-	private final int baseport;  // base port
-	private int nextport;  // next port number to assign
+	public final int baseport; //base port
+	private int nextport; //next port number to assign
 
 	// The param is the naf.xml config filename
 	public static Config load(String cfgpath) throws com.grey.base.ConfigException, java.io.IOException
@@ -68,7 +68,7 @@ public class Config
 	{
 		cfgroot = cfg;
 
-		XmlConfig cfgpaths = new XmlConfig(cfgroot, "dirpaths");
+		XmlConfig cfgpaths = getNode("dirpaths");
 		path_root = getPath(cfgpaths, "root", SYSPROP_DIRPATH_ROOT, false, ".", null);
 		path_conf = getPath(cfgpaths, "config", SYSPROP_DIRPATH_CONF, false, path_root+"/conf", null);
 		path_var = getPath(cfgpaths, "var", SYSPROP_DIRPATH_VAR, false, path_root+"/var", null);
@@ -76,7 +76,7 @@ public class Config
 		path_tmp = getPath(cfgpaths, "tmp", SYSPROP_DIRPATH_TMP, false, path_var+"/tmp", null);
 
 		baseport = cfgroot.getInt("baseport", true, port == 0 ? DFLT_BASEPORT : port);
-		nextport = baseport + RSVPORT_MAX + 1;
+		nextport = (baseport == RSVPORT_ANON ? 0 : baseport + RSVPORT_MAX + 1); //will never get used if baseport is ANON
 
 		// JARs that are required to bootstrap this JVM (such as the logging framework) have to be
 		// specified in Properties (see App.SYSPROP_CP) but NAFlet code can be loaded either via
@@ -103,7 +103,7 @@ public class Config
 	public XmlConfig[] getDispatchers() throws com.grey.base.ConfigException
 	{
 		String xpath = "dispatchers/dispatcher"+XmlConfig.XPATH_ENABLED;
-		return cfgroot.subSections(xpath);
+		return cfgroot.getSections(xpath);
 	}
 
 	public XmlConfig getDispatcher(String name) throws com.grey.base.ConfigException
@@ -113,18 +113,18 @@ public class Config
 			return (all != null && all.length == 1 ? all[0] : null);
 		}
 		String xpath = "dispatchers/dispatcher[@name='"+name+"']"+XmlConfig.XPATH_ENABLED;
-		XmlConfig cfg = new XmlConfig(cfgroot, xpath);
+		XmlConfig cfg = getNode(xpath);
 		return (cfg.exists() ? cfg : null);
 	}
 
 	public XmlConfig getNafman() throws com.grey.base.ConfigException
 	{
-		return new XmlConfig(cfgroot, "nafman");
+		return getNode("nafman");
 	}
 
 	public XmlConfig getDNS() throws com.grey.base.ConfigException
 	{
-		return new XmlConfig(cfgroot, "dnsresolver");
+		return getNode("dnsresolver");
 	}
 
 	public String get(XmlConfig cfg, String xpath, String propnam, boolean mdty, String dflt)
@@ -138,7 +138,7 @@ public class Config
 	public XmlConfig getNode(String xpath)
 			throws com.grey.base.ConfigException
 	{
-		return new XmlConfig(cfgroot, xpath);
+		return cfgroot.getSection(xpath);
 	}
 
 	public String getPath(XmlConfig cfg, String xpath, String propname, boolean mdty, String dflt, Class<?> clss)
@@ -149,7 +149,7 @@ public class Config
 	}
 
 	public String getPath(String path, Class<?> clss)
-			throws com.grey.base.ConfigException, java.io.IOException
+			throws java.io.IOException
 	{
 		if (path != null && path.startsWith(PFX_CLASSPATH)) {
 			java.net.URL url = DynLoader.getResource(path.substring(PFX_CLASSPATH.length()), clss);
@@ -164,14 +164,17 @@ public class Config
 		String path = getPath(cfg, xpath, propname, mdty, dflt, clss);
 		if (path == null) return null;
 		java.net.URL url = FileOps.makeURL(path);
-		if (url == null) url = new java.io.File(path).toURI().toURL();  // must be a straight pathname, so convert to URL syntax
+		if (url == null) url = new java.io.File(path).toURI().toURL(); //must be a straight pathname, so convert to URL syntax
 		return url;
 	}
 
 	public Class<?> getClass(XmlConfig cfg, Class<?> clss) throws com.grey.base.ConfigException
 	{
 		String cfgclass = null;
-		if (cfg != null) cfgclass = cfg.getValue("@class", clss==null, null);
+		if (cfg != null) {
+			cfgclass = cfg.getValue("@factory", false, null);
+			if (cfgclass == null) cfgclass = cfg.getValue("@class", clss==null, null);
+		}
 		try {
 			if (cfgclass != null) clss = DynLoader.loadClass(cfgclass);
 		} catch (Exception ex) {
@@ -198,10 +201,11 @@ public class Config
 		}
 	}
 
-	// in reality, if we really don't care which port gets assigned, ephemeral ports assigned by the OS will always be preferred to this
+	// if we really don't care which port gets assigned, ephemeral ports assigned by the OS will often be preferred to this
 	public int assignPort(int id)
 	{
-		if (id == RSVPORT_ANON) {
+		if (baseport == RSVPORT_ANON) return 0; //want to bind to a totally random port
+		if (id == RSVPORT_ANON) { //want to bind to a random port within the defined baseport range
 			synchronized (Config.class) {
 				return nextport++;
 			}
@@ -209,8 +213,10 @@ public class Config
 		return getPort(id);
 	}
 
+	// This should be called by clients to discover where to connect to, while assignPort() is called by listeners to bind to
 	public int getPort(int id)
 	{
+		if (baseport == RSVPORT_ANON) return 0; //should fail - if baseport is random, we must be in test mode, and clients should be aware
 		return baseport + id;
 	}
 

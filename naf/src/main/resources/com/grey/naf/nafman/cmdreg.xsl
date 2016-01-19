@@ -25,7 +25,7 @@
 		There is a total of <xsl:value-of select="count($cmdnodes)"/> registered commands,
 		with <xsl:value-of select="count(//handlers/handler)"/> handlers.
 		<br/>
-		An alphabetic listing follows, giving the registered handler objects and their owner Dispatcher.
+		An alphabetic listing follows, giving the registered handler objects and their Dispatcher.
 	</p>
 	<xsl:apply-templates select="$cmdnodes">
 		<xsl:sort select="@code"/>
@@ -59,12 +59,12 @@
 <xsl:template match="handler">
 	<tr>
 		<td>
-			Dispatcher: <xsl:value-of select="@dispatcher"/>
+			Dispatcher:&#160;<xsl:value-of select="@dispatcher"/>
 		</td>
 		<td>
-			<xsl:value-of select="."/>
+			<xsl:value-of select="."/>&#160;&#187;&#160;<xsl:value-of select="@hid"/>
 			<xsl:if test="@pref!=0">
-				(preference=<xsl:value-of select="@pref"/>)
+				<br/>preference=<xsl:value-of select="@pref"/>
 			</xsl:if>
 		</td>
 	</tr>

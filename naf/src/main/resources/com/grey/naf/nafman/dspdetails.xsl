@@ -78,10 +78,10 @@
 			title="Set new logging level for this Dispatcher"/>
 		&#160;&#160;
 		<select name="log">
-			<option value="TRC3" selected="selected">TRC3</option>
-			<option value="TRC2">TRC2</option>
+			<option value="INFO" selected="selected">INFO</option>
 			<option value="TRC">TRC</option>
-			<option value="INFO">INFO</option>
+			<option value="TRC2">TRC2</option>
+			<option value="TRC3">TRC3</option>
 			<option value="WARN">WARN</option>
 			<option value="ERR">ERR</option>
 		</select>

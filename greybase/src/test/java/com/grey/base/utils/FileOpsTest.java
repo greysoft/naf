@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2013 Yusef Badri - All rights reserved.
+ * Copyright 2011-2016 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -21,7 +21,7 @@ public final class FileOpsTest
 	}
 	private static final String RSRC_NAME = "file1.txt";
 	private static final String RSRC_TEXT = "Hello there!";
-	private final String workdir = SysProps.TMPDIR+"/utest/"+getClass().getSimpleName();
+	private final String workdir = SysProps.TMPDIR+"/utest/greybase/"+getClass().getSimpleName();
 
 	@org.junit.Test
 	public void basicIO() throws java.io.IOException
@@ -31,7 +31,7 @@ public final class FileOpsTest
 		String filepath1 = workdir+"/file1";
 		String filepath2 = workdir+"/file2";
 		String filepath3 = workdir+"/file3";
-		String filepath4 = dirpath2+"/file1";
+		String filepath4 = dirpath2+"/file21";
 		String filepath5 = workdir+"/file4";
 		String filepath5b = workdir+"/file4b";
 
@@ -40,11 +40,10 @@ public final class FileOpsTest
 		FileOps.deleteDirectory(workdir);
 
 		// directory creation
-		boolean sts = FileOps.ensureDirExists(workdir);
-		org.junit.Assert.assertTrue(sts);
+		org.junit.Assert.assertFalse(dirh.exists());
+		FileOps.ensureDirExists(workdir);
 		org.junit.Assert.assertTrue(dirh.exists());
-		sts = FileOps.ensureDirExists(workdir);
-		org.junit.Assert.assertFalse(sts);
+		FileOps.ensureDirExists(workdir);
 		org.junit.Assert.assertTrue(dirh.exists());
 
 		// text-file I/O
@@ -62,29 +61,31 @@ public final class FileOpsTest
 		org.junit.Assert.assertTrue(origtxt.equals(rtxt));
 
 		// file copy
-		java.io.File fh2 = new java.io.File(filepath2);
+		final java.io.File fh1 = new java.io.File(filepath1);
+		final java.io.File fh2 = new java.io.File(filepath2);
+		org.junit.Assert.assertFalse(fh2.exists());
 		long nbytes = FileOps.copyFile(filepath1, filepath2);
 		org.junit.Assert.assertEquals(origtxt.length(), nbytes);
-		org.junit.Assert.assertEquals(fh2.length(), nbytes);
-		nbytes = FileOps.copyFile(filepath1, filepath2);  //make sure this doesn't append
-		org.junit.Assert.assertEquals(origtxt.length(), nbytes);
-		org.junit.Assert.assertEquals(fh2.length(), nbytes);
+		org.junit.Assert.assertEquals(nbytes, fh2.length());
+		org.junit.Assert.assertFalse(java.nio.file.Files.isSameFile(fh1.toPath(), fh2.toPath()));
+		//make sure copy-to-existing overwrites
+		FileOps.writeTextFile(filepath1, origtxt.substring(1));
+		nbytes = FileOps.copyFile(fh1.toPath(), fh2.toPath());
+		org.junit.Assert.assertEquals(origtxt.length() - 1, nbytes);
+		org.junit.Assert.assertEquals(nbytes, fh2.length());
+		org.junit.Assert.assertFalse(java.nio.file.Files.isSameFile(fh1.toPath(), fh2.toPath()));
 
 		try {
 			FileOps.copyFile(filepath1+"x", filepath2);
 			org.junit.Assert.fail("Copy didn't fail as expected on absent input file");
-		} catch (java.io.IOException ex) {
-			//ok - expected
-		}
-
+		} catch (java.io.IOException ex) {} //ok - expected
 		try {
 			FileOps.copyFile(filepath1, filepath2+"/x");
 			org.junit.Assert.fail("Copy didn't fail as expected on absent invalid file");
-		} catch (java.io.IOException ex) {
-			//ok - expected
-		}
+		} catch (java.io.IOException ex) {} //ok - expected
 
 		// repeat for the other Copy variant
+		FileOps.writeTextFile(filepath1, origtxt);
 		java.io.File fh3 = new java.io.File(filepath3);
 		java.io.FileOutputStream fout = null;
 		java.io.FileInputStream fin = new java.io.FileInputStream(filepath1);
@@ -153,22 +154,25 @@ public final class FileOpsTest
 		// now count with a filter
 		FileOps.Filter_EndsWith filter = new FileOps.Filter_EndsWith("e1");
 		cnt = FileOps.countFiles(dirh, filter, false, true);
+		org.junit.Assert.assertEquals(1, cnt);
+		filter = new FileOps.Filter_EndsWith("1");
+		cnt = FileOps.countFiles(dirh, filter, false, true);
 		org.junit.Assert.assertEquals(2, cnt);
 		filter = new FileOps.Filter_EndsWith("E1");
 		cnt = FileOps.countFiles(dirh, filter, false, true);
 		org.junit.Assert.assertEquals(0, cnt);
 		filter = new FileOps.Filter_EndsWith(new String[]{"e1"}, false, false);
 		cnt = FileOps.countFiles(dirh, filter, false, true);
-		org.junit.Assert.assertEquals(2, cnt);
+		org.junit.Assert.assertEquals(1, cnt);
 		filter = new FileOps.Filter_EndsWith(new String[]{"e1"}, true, false);
 		cnt = FileOps.countFiles(dirh, filter, false, true);
-		org.junit.Assert.assertEquals(2, cnt);
+		org.junit.Assert.assertEquals(1, cnt);
 		filter = new FileOps.Filter_EndsWith(new String[]{"E1"}, false, false);
 		cnt = FileOps.countFiles(dirh, filter, false, true);
 		org.junit.Assert.assertEquals(0, cnt);
 		filter = new FileOps.Filter_EndsWith(new String[]{"E1"}, true, false);
 		cnt = FileOps.countFiles(dirh, filter, false, true);
-		org.junit.Assert.assertEquals(2, cnt);
+		org.junit.Assert.assertEquals(1, cnt);
 		filter = new FileOps.Filter_EndsWith(new String[]{"e2"}, false, false);
 		cnt = FileOps.countFiles(dirh, filter, false, true);
 		org.junit.Assert.assertEquals(1, cnt);
@@ -187,6 +191,64 @@ public final class FileOpsTest
 		cnt = FileOps.countFiles(dirh, filter, false, true);
 		org.junit.Assert.assertEquals(0, cnt);
 
+		//test the NIO listing methods
+		java.util.ArrayList<String> namlst = FileOps.directoryListSimple(dirh.toPath());
+		org.junit.Assert.assertEquals(4, namlst.size());
+		java.util.Collections.sort(namlst);
+		org.junit.Assert.assertEquals("dir2", namlst.get(0));
+		org.junit.Assert.assertEquals("file1", namlst.get(1));
+		org.junit.Assert.assertEquals("file2", namlst.get(2));
+		org.junit.Assert.assertEquals("file3", namlst.get(3));
+		java.util.ArrayList<java.nio.file.Path> lst = FileOps.directoryList(dirh.toPath(), true);
+		java.util.Collections.sort(lst);
+		org.junit.Assert.assertEquals(4, lst.size());
+		org.junit.Assert.assertEquals("file21", lst.get(0).getFileName().toString());
+		org.junit.Assert.assertEquals("file1", lst.get(1).getFileName().toString());
+		org.junit.Assert.assertEquals("file2", lst.get(2).getFileName().toString());
+		org.junit.Assert.assertEquals("file3", lst.get(3).getFileName().toString());
+		java.nio.file.Path nulldir = java.nio.file.Paths.get(dirh.getAbsolutePath()+"/nosuchdir");
+		namlst = FileOps.directoryListSimple(nulldir);
+		org.junit.Assert.assertNull(namlst); //Directory listing on non-existing file returns null
+		nulldir = java.nio.file.Paths.get(dirh.getAbsolutePath()+"/nosuchdir1/nisuchdir2"); //try deeper missing tree
+		namlst = FileOps.directoryListSimple(nulldir);
+		org.junit.Assert.assertNull(namlst);
+		java.nio.file.Path path1 = java.nio.file.Paths.get(dirh.getAbsolutePath()+"/file1");
+		try {
+			namlst = FileOps.directoryListSimple(path1);
+			org.junit.Assert.fail("Directory listing on non-directory is expected to fail - ="+namlst);
+		} catch (java.nio.file.NotDirectoryException ex) {}//expected
+		java.nio.file.Files.createDirectories(nulldir);
+		namlst = FileOps.directoryListSimple(nulldir);
+		org.junit.Assert.assertEquals(0, namlst.size()); //Directory listing on empty directory returns empty list
+		java.nio.file.Files.delete(nulldir);
+		namlst = FileOps.directoryListSimple(nulldir);
+		org.junit.Assert.assertNull(namlst);
+
+		org.junit.Assert.assertTrue(fh1.exists());
+		FileOps.deleteFile(fh1);
+		org.junit.Assert.assertFalse(fh1.exists());
+		FileOps.deleteFile(fh1);
+		org.junit.Assert.assertFalse(fh1.exists());
+		java.io.File dh = new java.io.File(workdir+"/dir9");
+		org.junit.Assert.assertFalse(dh.exists());
+		FileOps.ensureDirExists(dh);
+		org.junit.Assert.assertTrue(dh.exists());
+		FileOps.ensureDirExists(dh);
+		org.junit.Assert.assertTrue(dh.exists());
+		java.io.File fh = new java.io.File(dh, "file9");
+		FileOps.writeTextFile(fh, "blah", false);
+		org.junit.Assert.assertTrue(fh.exists());
+		try {
+			FileOps.ensureDirExists(fh);
+			org.junit.Assert.fail("mkdir is expected to fail if it conflicts with existing file");
+		} catch (java.io.IOException ex) {}
+		try {
+			FileOps.deleteFile(dh);
+			org.junit.Assert.fail("deleteFile is expected to fail on non-empty directory");
+		} catch (java.io.IOException ex) {}
+		org.junit.Assert.assertTrue(fh.exists());
+		org.junit.Assert.assertTrue(dh.exists());
+
 		// recursive directory deletes
 		cnt = FileOps.deleteDirectory(workdir);
 		org.junit.Assert.assertFalse("workdir="+workdir, dirh.exists());
@@ -196,9 +258,51 @@ public final class FileOpsTest
 		cnt = FileOps.countFiles(dirh, false, true);
 		org.junit.Assert.assertEquals(0, cnt);
 
+		java.nio.file.Path pth_root = java.nio.file.Paths.get("/");
+		java.nio.file.Path pth = java.nio.file.Paths.get("/dir1");
+		org.junit.Assert.assertEquals(pth_root, FileOps.parentDirectory(pth));
+		org.junit.Assert.assertEquals("dir1", FileOps.getFilename(pth));
+		try {
+			java.nio.file.Path pth2 = FileOps.parentDirectory(pth_root);
+			org.junit.Assert.fail("parentDirectory is expected to throw on null - "+pth2);
+		} catch (IllegalStateException ex) {}
+		try {
+			String fname = FileOps.getFilename(pth_root);
+			org.junit.Assert.fail("getFilename is expected to throw on null - "+fname);
+		} catch (IllegalStateException ex) {}
+
 		// miscellaenous
 		org.junit.Assert.assertFalse(FileOps.flush(origtxt));
 		org.junit.Assert.assertFalse(FileOps.close(origtxt));
+	}
+
+	@org.junit.Test
+	public void filenameSort()
+	{
+		java.util.ArrayList<java.nio.file.Path> lst = new java.util.ArrayList<java.nio.file.Path>();
+		lst.add(java.nio.file.Paths.get("/dir1/file2"));
+		lst.add(java.nio.file.Paths.get("/"));
+		lst.add(java.nio.file.Paths.get("/dir2/file1"));
+		lst.add(java.nio.file.Paths.get("/dir1/file1"));
+		lst.add(null);
+		lst.add(null);
+		lst.add(java.nio.file.Paths.get("/"));
+		int siz = lst.size();
+		java.nio.file.Path[] arr = lst.toArray(new java.nio.file.Path[siz]);
+		FileOps.sortByFilename(lst);
+		FileOps.sortByFilename(arr);
+		org.junit.Assert.assertEquals(siz, lst.size());
+		int pos = 0;
+		org.junit.Assert.assertNull(lst.get(pos++));
+		org.junit.Assert.assertNull(lst.get(pos++));
+		org.junit.Assert.assertEquals(java.io.File.separator, lst.get(pos++).toString());
+		org.junit.Assert.assertEquals(java.io.File.separator, lst.get(pos++).toString());
+		org.junit.Assert.assertEquals(java.io.File.separator+"dir1"+java.io.File.separator+"file1", lst.get(pos++).toString());
+		org.junit.Assert.assertEquals(java.io.File.separator+"dir2"+java.io.File.separator+"file1", lst.get(pos++).toString());
+		org.junit.Assert.assertEquals(java.io.File.separator+"dir1"+java.io.File.separator+"file2", lst.get(pos++).toString());
+		for (int idx = 0; idx != siz; idx++) {
+			org.junit.Assert.assertEquals(lst.get(idx), arr[idx]);
+		}
 	}
 
 	@org.junit.Test
@@ -249,19 +353,19 @@ public final class FileOpsTest
 		org.junit.Assert.assertEquals(fh.length(), buf.length);
 		org.junit.Assert.assertTrue(RSRC_TEXT.equals(rtxt.trim()));
 
-		int seglen = 5;  //must be shorter than resource-file contents, AFTER stripping newline
+		int seglen = 5; //must be shorter than resource-file contents, AFTER stripping newline
 		buf = FileOps.read(fh, seglen, null);
 		rtxt = new String(buf, StringOps.DFLT_CHARSET);
 		org.junit.Assert.assertEquals(seglen, buf.length);
-		org.junit.Assert.assertTrue(RSRC_TEXT.substring(0,  seglen).equals(rtxt.trim()));
+		org.junit.Assert.assertTrue(RSRC_TEXT.substring(0, seglen).equals(rtxt.trim()));
 
-		seglen = 1;  //similiar to above test, but more of a boundary condition
+		seglen = 1; //similiar to above test, but more of a boundary condition
 		buf = FileOps.read(fh, seglen, null);
 		rtxt = new String(buf, StringOps.DFLT_CHARSET);
 		org.junit.Assert.assertEquals(seglen, buf.length);
-		org.junit.Assert.assertTrue(RSRC_TEXT.substring(0,  seglen).equals(rtxt.trim()));
+		org.junit.Assert.assertTrue(RSRC_TEXT.substring(0, seglen).equals(rtxt.trim()));
 
-		buf = FileOps.read(fh, 0, null);  //a special boundary condition
+		buf = FileOps.read(fh, 0, null); //a special boundary condition
 		org.junit.Assert.assertNull(buf);
 
 		// now test with an ArrayRef param: equal-to, greater-than and less-than file size
@@ -374,11 +478,11 @@ public final class FileOpsTest
 	@org.junit.Test
 	public void lineReader() throws java.io.IOException, java.net.URISyntaxException
 	{
-		int cnt = FileOps.readTextLines(getClass().getResource(RSRC_NAME), this, 0, null, 8192);
+		int cnt = FileOps.readTextLines(getClass().getResource(RSRC_NAME), this, 8192, null, 0, null);
 		org.junit.Assert.assertEquals(2, cnt);
 
 		java.io.File fh = getResource(RSRC_NAME, getClass());
-		cnt = FileOps.readTextLines(fh, this, 0, null, 8192);
+		cnt = FileOps.readTextLines(fh, this, 8192, null, 0, null);
 		org.junit.Assert.assertEquals(2, cnt);
 	}
 

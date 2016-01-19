@@ -29,7 +29,7 @@ public class GreyException extends Exception
 			java.io.PrintWriter pw = new java.io.PrintWriter(sw, false);
 	        ex.printStackTrace(pw);
 	        pw.close();
-	        strbuf.append(com.grey.base.config.SysProps.EOL).append(sw.toString());
+	        strbuf.append(sw);
 		}
 		else
 		{
@@ -41,7 +41,7 @@ public class GreyException extends Exception
 			ex = ex.getCause();
 			if (ex != null) strbuf.append(com.grey.base.config.SysProps.EOL).append("\tCaused by: ").append(summary(ex, level+1, withstack));	
 		}
-		return strbuf.toString();
+		return strbuf.toString().trim();
 	}
 
 	public GreyException() {super();}

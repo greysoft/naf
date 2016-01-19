@@ -1,8 +1,13 @@
 /*
- * Copyright 2010-2013 Yusef Badri - All rights reserved.
+ * Copyright 2010-2016 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
+
+import java.nio.file.StandardOpenOption;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.LinkOption;
+import java.nio.file.attribute.FileAttribute;
 
 import com.grey.base.config.SysProps;
 
@@ -12,12 +17,52 @@ public class FileOps
 	public static final String URLPFX_HTTPS = "https:";
 	public static final String URLPFX_JAR = "jar:";
 	public static final String URLPFX_FILE = "file:";
+
+	// declare any option combinations we need in advance, to save creating auto-boxed arrays when calling an NIO method
+	public static final StandardOpenOption[] OPENOPTS_NONE = new StandardOpenOption[0];
+	public static final StandardCopyOption[] COPYOPTS_NONE = new StandardCopyOption[0];
+	public static final LinkOption[] LINKOPTS_NONE = new LinkOption[0];
+	public static final FileAttribute<?>[] FATTR_NONE = new FileAttribute[0];
+	public static final StandardOpenOption[] OPENOPTS_CREATE = new StandardOpenOption[]{StandardOpenOption.CREATE};
+	public static final StandardOpenOption[] OPENOPTS_CREATNEW = new StandardOpenOption[]{StandardOpenOption.CREATE_NEW};
+	public static final StandardOpenOption[] OPENOPTS_READ = new StandardOpenOption[]{StandardOpenOption.READ};
+	public static final StandardOpenOption[] OPENOPTS_DSYNC = new StandardOpenOption[]{StandardOpenOption.DSYNC};
+	public static final StandardOpenOption[] OPENOPTS_CREATE_DSYNC = new StandardOpenOption[]{StandardOpenOption.CREATE, StandardOpenOption.DSYNC};
+	public static final StandardOpenOption[] OPENOPTS_CREATNEW_DSYNC = new StandardOpenOption[]{StandardOpenOption.CREATE_NEW, StandardOpenOption.DSYNC};
+	public static final StandardOpenOption[] OPENOPTS_CREATE_WRITE = new StandardOpenOption[]{StandardOpenOption.CREATE, StandardOpenOption.WRITE};
+	public static final StandardOpenOption[] OPENOPTS_CREATE_WRITE_TRUNC = new StandardOpenOption[]{StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING};
+	public static final StandardCopyOption[] COPYOPTS_REPLACE = new StandardCopyOption[]{StandardCopyOption.REPLACE_EXISTING};
+	public static final StandardCopyOption[] COPYOPTS_ATOMIC = new StandardCopyOption[]{StandardCopyOption.ATOMIC_MOVE};
+
 	protected static final int RDBUFSIZ = SysProps.get("grey.fileio.rdbufsiz", 1024); //min buffer for unknown stream size
 
 	public interface LineReader
 	{
 		public boolean processLine(String line, int line_number, int mode, Object cbdata) throws Exception;
 	}
+
+	private static class PathComparator_ByFilename
+		implements java.util.Comparator<java.nio.file.Path>, java.io.Serializable
+	{
+		private static final long serialVersionUID = 1L;
+		public PathComparator_ByFilename() {} //eliminate warning about synthetic accessor
+		@Override
+		public int compare(java.nio.file.Path p1, java.nio.file.Path p2) {
+			if (p1 == null) return (p2 == null ? 0 : -1);
+			if (p2 == null) return 1;
+			java.nio.file.Path f1 = p1.getFileName();
+			java.nio.file.Path f2 = p2.getFileName();
+			if (f1 == null) {
+				if (f2 != null) return -1;
+				return p1.compareTo(p2);
+			}
+			if (f2 == null) return 1;
+			int cmp = f1.compareTo(f2);
+			if (cmp == 0) cmp = p1.compareTo(p2);
+			return cmp;
+		}
+	}
+	private static final PathComparator_ByFilename cmp_filename = new PathComparator_ByFilename();
 
 	public static class Filter_EndsWith implements java.io.FileFilter
 	{
@@ -58,10 +103,13 @@ public class FileOps
 	}
 
 
+	public static byte[] read(java.io.File fh) throws java.io.IOException {return read(fh, -1, null);}
 	public static void writeTextFile(String pthnam, String txt) throws java.io.IOException {writeTextFile(new java.io.File(pthnam), txt, false);}
 	public static int deleteDirectory(String pthnam) throws java.io.IOException {return deleteDirectory(new java.io.File(pthnam));}
-	public static boolean ensureDirExists(String pthnam) throws java.io.IOException  {return ensureDirExists(new java.io.File(pthnam));}
-	public static void deleteFile(java.io.File fh) throws java.io.IOException {deleteFile(fh, "");}
+	public static void ensureDirExists(String pthnam) throws java.io.IOException {ensureDirExists(java.nio.file.Paths.get(pthnam));}
+	public static void ensureDirExists(java.io.File dirh) throws java.io.IOException {ensureDirExists(dirh.toPath());}
+	public static java.util.ArrayList<String> directoryListSimple(java.nio.file.Path dirh) throws java.io.IOException {return directoryListSimple(dirh, 0, null);}
+	public static void sortByFilename(java.nio.file.Path[] paths) {sortByFilename(paths, 0, paths.length);}
 
 
 	// Read requested number of bytes from stream, and return as byte array.
@@ -85,7 +133,7 @@ public class FileOps
 			bufcap = istrm.available();
 			if (bufcap < RDBUFSIZ) bufcap = RDBUFSIZ;
 		}
-		byte[] rdbuf = alloc(bufh, bufcap);  // this is the intermediate read buffer, a staging area between istrm and ostrm
+		byte[] rdbuf = alloc(bufh, bufcap); //this is the intermediate read buffer, a staging area between istrm and ostrm
 		int off = (bufh == null ? 0 : bufh.ar_off);
 		java.io.ByteArrayOutputStream ostrm = null;
 		int totaldata = 0;
@@ -104,7 +152,7 @@ public class FileOps
 				buflen = 0;
 			}
 			int nbytes = istrm.read(rdbuf, off + buflen, bufcap - buflen);
-			if (nbytes == -1) break;  //end of input stream
+			if (nbytes == -1) break; //end of input stream
 
 			// accumulate data in 'buf' if there's space, to avoid copying into the byte-stream on every single read
 			buflen += nbytes;
@@ -115,7 +163,7 @@ public class FileOps
 		{
 			// NB: This means totaldata == buflen
 			// Either the caller provided enough storage, or we allocated an intermediate read buffer that was sufficient
-			if (totaldata == 0) return null;  // there was no data
+			if (totaldata == 0) return null; //there was no data
 
 			if (bufh == null && totaldata != bufcap)
 			{
@@ -129,13 +177,13 @@ public class FileOps
 		else
 		{
 			// the caller didn't provide enough storage (or maybe any storage), so return a copy of the ByteArrayOutputStream's buffer
-			if (buflen != 0) ostrm.write(rdbuf, off, buflen);  // append the final batch of data to the byte stream first
+			if (buflen != 0) ostrm.write(rdbuf, off, buflen); //append the final batch of data to the byte stream first
 			rdbuf = ostrm.toByteArray();
 		}
 
 		if (bufh != null)
 		{
-			if (bufh.ar_buf != rdbuf) bufh.ar_off = 0;  // we allocated a new backing array, and it has no offset
+			if (bufh.ar_buf != rdbuf) bufh.ar_off = 0; //we allocated a new backing array, and it has no offset
 			bufh.ar_buf = rdbuf;
 			bufh.ar_len = totaldata;
 		}
@@ -196,13 +244,13 @@ public class FileOps
 
 	public static String readAsText(java.net.URL url, String charset) throws java.io.IOException
 	{
-		byte[] buf = read(url, -1, (ArrayRef<byte[]>)null);
+		byte[] buf = read(url, -1, null);
 		return StringOps.convert(buf, charset);
 	}
 
 	public static String readAsText(CharSequence pthnam_cs, String charset) throws java.io.IOException
 	{
-		byte[] buf = read(pthnam_cs, -1, (ArrayRef<byte[]>)null);
+		byte[] buf = read(pthnam_cs, -1, null);
 		return StringOps.convert(buf, charset);
 	}
 
@@ -212,11 +260,12 @@ public class FileOps
 		try {
 			cstrm.append(txt);
 		} finally {
-			cstrm.close();  // this flushes its own buffer and closes the underlying stream
+			cstrm.close(); //this flushes its own buffer and closes the underlying stream
 		}
 	}
 
-	public static int readTextLines(java.io.InputStream strm, LineReader consumer, int mode, Object cbdata, int bufsiz) throws java.io.IOException
+	public static int readTextLines(java.io.InputStream strm, LineReader consumer, int bufsiz, String cmnt,
+			int mode, Object cbdata) throws java.io.IOException
 	{
 		java.io.InputStreamReader cstrm = new java.io.InputStreamReader(strm);
 		java.io.BufferedReader bstrm = new java.io.BufferedReader(cstrm, bufsiz);
@@ -225,9 +274,15 @@ public class FileOps
 		try {
 			while ((line = bstrm.readLine()) != null) {
 				try {
+					if (cmnt != null) {
+						int pos = line.indexOf(cmnt);
+						if (pos != -1) line = line.substring(0, pos);
+						line = line.trim();
+						if (line.length() == 0) continue;
+					}
 					if (consumer.processLine(line, ++lno, mode, cbdata)) break;
 				} catch (Exception ex) {
-					throw new RuntimeException("LineReader callback failed on line="+lno+": "+line, ex);
+					throw new java.io.IOException("LineReader callback failed on line="+lno+": "+line+" - "+ex, ex);
 				}
 			}
 		} finally {
@@ -236,40 +291,43 @@ public class FileOps
 		return lno;
 	}
 
-	public static int readTextLines(java.io.File fh, LineReader consumer, int mode, Object cbdata, int bufsiz) throws java.io.IOException
+	public static int readTextLines(java.io.File fh, LineReader consumer, int bufsiz, String cmnt,
+			int mode, Object cbdata) throws java.io.IOException
 	{
 		java.io.InputStream strm = new java.io.FileInputStream(fh);
-		return readTextLines(strm, consumer, mode, cbdata, bufsiz);
+		return readTextLines(strm, consumer, bufsiz, cmnt, mode, cbdata);
 	}
 
-	public static int readTextLines(java.net.URL path, LineReader consumer, int mode, Object cbdata, int bufsiz) throws java.io.IOException
+	public static int readTextLines(java.net.URL path, LineReader consumer, int bufsiz, String cmnt,
+			int mode, Object cbdata) throws java.io.IOException
 	{
 		java.io.InputStream strm = path.openStream();
-		return readTextLines(strm, consumer, mode, cbdata, bufsiz);
+		return readTextLines(strm, consumer, bufsiz, cmnt, mode, cbdata);
 	}
 
-	public static long copyFile(java.io.File srcfile, java.io.File dstfile) throws java.io.IOException
+	public static long copyFile(java.nio.file.Path srcfile, java.nio.file.Path dstfile) throws java.io.IOException
 	{
-		java.io.FileInputStream fin = new java.io.FileInputStream(srcfile);
-		java.io.FileOutputStream fout = null;
+		java.nio.channels.FileChannel inchan = java.nio.channels.FileChannel.open(srcfile, OPENOPTS_READ);
+		java.nio.channels.FileChannel outchan = null;
 		long nbytes = 0;
+		long filesize;
 
 		try {
-			fout = new java.io.FileOutputStream(dstfile);
-			java.nio.channels.FileChannel inchan = fin.getChannel();
-			java.nio.channels.FileChannel outchan = fout.getChannel();
+			filesize = inchan.size();
+			outchan = java.nio.channels.FileChannel.open(dstfile, OPENOPTS_CREATE_WRITE_TRUNC);
 			nbytes = outchan.transferFrom(inchan, 0, inchan.size());
 		} finally {
-			try {fin.close();} catch (Exception ex) {}
-			if (fout != null) try {fout.close();} catch (Exception ex) {}
+			try {inchan.close();} catch (Exception ex) {}
+			if (outchan != null) try {outchan.close();} catch (Exception ex) {}
 		}
+		if (nbytes != filesize) throw new java.io.IOException("file-copy="+nbytes+" vs "+filesize+" for "+srcfile+" => "+dstfile);
 		return nbytes;
 	}
 
 	public static long copyFile(CharSequence srcpath, CharSequence dstpath) throws java.io.IOException
 	{
-		java.io.File srcfile = new java.io.File(srcpath.toString());
-		java.io.File dstfile = new java.io.File(dstpath.toString());
+		java.nio.file.Path srcfile = java.nio.file.Paths.get(srcpath.toString());
+		java.nio.file.Path dstfile = java.nio.file.Paths.get(dstpath.toString());
 		return copyFile(srcfile, dstfile);
 	}
 
@@ -282,8 +340,9 @@ public class FileOps
 		if (srcfile.renameTo(dstfile)) {
 			return;
 		}
-		copyFile(srcfile, dstfile);
-		deleteFile(srcfile, "MoveFile: ");
+		java.nio.file.Path srcpath = srcfile.toPath();
+		copyFile(srcpath, dstfile.toPath());
+		deleteFile(srcpath);
 	}
 
 	public static void moveFile(CharSequence srcpath, CharSequence dstpath) throws java.io.IOException
@@ -293,15 +352,20 @@ public class FileOps
 		moveFile(srcfile, dstfile);
 	}
 
-	private static void deleteFile(java.io.File fh, String tag) throws java.io.IOException
+	public static void deleteFile(java.io.File fh) throws java.io.IOException
 	{
-		if (!fh.delete()) {
-			//we didn't delete the file - but maybe that's because another thread or process got there first
-			if (fh.exists()) {
-				//... no, it's definitely the case that we have failed to delete this file
-				throw new java.io.IOException(tag+"Failed to delete "+(fh.isDirectory()?"directory":"file")+"="+fh.getAbsolutePath());
-			}
+		java.io.IOException ex = deleteFile(fh.toPath());
+		if (ex != null) throw new java.io.IOException("Failed to delete "+(fh.isDirectory()?"directory":"file")+"="+fh.getAbsolutePath());
+	}
+
+	public static java.io.IOException deleteFile(java.nio.file.Path fh)
+	{
+		try {
+			java.nio.file.Files.delete(fh);
+		} catch (java.io.IOException ex) {
+			if (java.nio.file.Files.exists(fh, LINKOPTS_NONE)) return ex; //genuine error
 		}
+		return null;
 	}
 
 	public static int copyStream(java.io.InputStream istrm, java.io.OutputStream ostrm) throws java.io.IOException
@@ -339,7 +403,7 @@ public class FileOps
 	public static java.io.PrintStream redirectStdio(CharSequence pthnam, boolean autoflush, boolean stdout, boolean stderr) throws java.io.IOException
 	{
 		java.io.File fh = new java.io.File(pthnam.toString());
-		java.io.File dirh = fh.getParentFile();  // incredibly, beware that this will be null, if filename is specified without directory slashes
+		java.io.File dirh = fh.getParentFile(); //incredibly, beware that this will be null, if filename is specified without directory slashes
 		if (dirh != null) ensureDirExists(dirh);
 		java.io.FileOutputStream fstrm = new java.io.FileOutputStream(fh, true);
 		java.io.PrintStream pstrm = null;
@@ -367,6 +431,61 @@ public class FileOps
 			return null;
 		}
 		return new java.net.URL(pthnam);
+	}
+
+	public static java.util.ArrayList<java.nio.file.Path> directoryList(java.nio.file.Path dirh, boolean recursive) throws java.io.IOException
+	{
+		java.util.ArrayList<java.nio.file.Path> lst = new java.util.ArrayList<java.nio.file.Path>();
+		try (java.nio.file.DirectoryStream<java.nio.file.Path> ds = java.nio.file.Files.newDirectoryStream(dirh)) {
+			for (java.nio.file.Path fpath : ds) {
+				if (!recursive || !java.nio.file.Files.isDirectory(fpath, LINKOPTS_NONE)) {
+					lst.add(fpath);
+				} else {
+					java.util.ArrayList<java.nio.file.Path> lst2 = directoryList(fpath, true);
+					lst.addAll(lst2);
+				}
+			}
+		} catch (java.nio.file.NoSuchFileException ex) {
+			return null; //exists() test below could return true by now, due to race conditions
+		} catch (java.io.IOException ex) {
+			if (!java.nio.file.Files.exists(dirh, LINKOPTS_NONE)) return null;
+			throw ex;
+		}
+		return lst;
+	}
+
+	public static java.util.ArrayList<String> directoryListSimple(java.nio.file.Path dirh, int max, java.util.ArrayList<String> lst)
+		throws java.io.IOException
+	{
+		if (lst == null) lst = new java.util.ArrayList<String>();
+		try (java.nio.file.DirectoryStream<java.nio.file.Path> ds = java.nio.file.Files.newDirectoryStream(dirh)) {
+			for (java.nio.file.Path fpath : ds) {
+				if (max != 0 && lst.size() == max) break;
+				lst.add(getFilename(fpath));
+			}
+		} catch (java.nio.file.NoSuchFileException ex) {
+			return null; //exists() test below could return true by now, due to race conditions
+		} catch (java.io.IOException ex) {
+			if (!java.nio.file.Files.exists(dirh, LINKOPTS_NONE)) return null;
+			throw ex;
+		}
+		return lst;
+	}
+
+	// This avoids FindBugs warnings for cases where we know Path.getParent() can't return null
+	public static java.nio.file.Path parentDirectory(java.nio.file.Path fh)
+	{
+		java.nio.file.Path dh = fh.getParent();
+		if (dh == null) throw new IllegalStateException("Non-null parent dir was expected for "+fh);
+		return dh;
+	}
+
+	// This avoids FindBugs warnings for cases where we know Path.getFilename() can't return null
+	public static String getFilename(java.nio.file.Path fh)
+	{
+		java.nio.file.Path name = fh.getFileName();
+		if (name == null) throw new IllegalStateException("Non-null filename was expected for "+fh);
+		return name.toString();
 	}
 
 	// Beware that this literally does count only files, not directories
@@ -417,11 +536,6 @@ public class FileOps
 		return cnt;
 	}
 
-	public static int deleteDirectory(java.io.File dirh) throws java.io.IOException
-	{
-		return deleteOlderThan(dirh, -1, null, true);
-	}
-
 	public static int deleteOlderThan(java.io.File dirh, long min_age, java.io.FileFilter filter, boolean recursive)
 		throws java.io.IOException
 	{
@@ -444,13 +558,24 @@ public class FileOps
 		return cnt;
 	}
 
-	public static boolean ensureDirExists(java.io.File dirh) throws java.io.IOException
+	public static int deleteDirectory(java.io.File dirh) throws java.io.IOException
 	{
-		if (dirh.exists()) return false;
-		if (!dirh.mkdirs()) {
-			if (!dirh.exists() || !dirh.isDirectory()) throw new java.io.IOException("Failed to create directory: "+dirh.getAbsoluteFile());
-		}
-		return true;
+		return deleteOlderThan(dirh, -1, null, true);
+	}
+
+	public static void ensureDirExists(java.nio.file.Path dirh) throws java.io.IOException
+	{
+		java.nio.file.Files.createDirectories(dirh, FATTR_NONE);
+	}
+
+	public static void sortByFilename(java.util.ArrayList<java.nio.file.Path> paths)
+	{
+		java.util.Collections.sort(paths, cmp_filename);
+	}
+
+	public static void sortByFilename(java.nio.file.Path[] paths, int off, int len)
+	{
+		java.util.Arrays.sort(paths, off, off+len, cmp_filename);
 	}
 
 	public static String getFileType(String filename)

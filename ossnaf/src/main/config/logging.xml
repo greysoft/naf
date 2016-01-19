@@ -4,7 +4,7 @@
 		<file level="all">%stdout%</file>
 	</logger>
 	<logger name="dnsbatch">
-		<file level="trc" class="com.grey.logging.LatinLogger">dnsbatchresolver.log</file>
+		<file level="trc" class="com.grey.logging.LatinLogger">%stdout%</file>
 	</logger>
 	<logger name="portfwd">
 		<file level="trc" rot="daily" class="com.grey.logging.LatinLogger">%DIRLOG%/portfwd.log</file>

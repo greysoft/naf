@@ -1,20 +1,32 @@
 /*
- * Copyright 2013 Yusef Badri - All rights reserved.
+ * Copyright 2013-2014 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
 
 import com.grey.base.utils.FileOps;
 import com.grey.base.utils.IP;
+import com.grey.base.utils.TimeOps;
 
 // This tests the UDP mode of IOExecReader
 public class UDPReaderTest
 {
 	private static final String rootdir = DispatcherTest.initPaths(UDPReaderTest.class);
-	private static final String[] iomessages = new String[]{"Message 1", "Message 2", "Here is another message", "The final message"};
+	static final String[] iomessages = new String[]{"Message 1", "Message 2", "Here is another message", "The final message"};
 
 	@org.junit.Test
-	public void test() throws com.grey.base.GreyException, java.io.IOException
+	public void testDirect() throws com.grey.base.GreyException, java.io.IOException
+	{
+		runtest(true);
+	}
+
+	@org.junit.Test
+	public void testHeap() throws com.grey.base.GreyException, java.io.IOException
+	{
+		runtest(false);
+	}
+
+	private void runtest(boolean directbufs) throws com.grey.base.GreyException, java.io.IOException
 	{
 		FileOps.deleteDirectory(rootdir);
 
@@ -25,63 +37,74 @@ public class UDPReaderTest
 		Dispatcher dsptch = Dispatcher.create(def, null, com.grey.logging.Factory.getLogger("no-such-logger"));
 
 		// set up UDP reader
-		Reader rdr = new Reader(dsptch);
-		org.junit.Assert.assertFalse(rdr.isConnected());
+		Reader rdr = new Reader(dsptch, directbufs);
 
 		// queue up incoming messages on the UDP reader
 		java.net.DatagramSocket wsock = new java.net.DatagramSocket();
-        byte[] ipbytes = IP.ip2net(IP.IP_LOCALHOST, null, 0);
-        java.net.InetAddress ipaddr = java.net.InetAddress.getByAddress(ipbytes);
-		java.net.DatagramPacket pkt = new java.net.DatagramPacket(new byte[0], 0, ipaddr, rdr.getLocalPort());
-		wsock.send(pkt);
+		java.net.DatagramPacket pkt = new java.net.DatagramPacket(new byte[0], 0, rdr.getLocalIP(), rdr.getLocalPort());
+		wsock.send(pkt); //should not get sent
 		for (int idx = 0; idx != iomessages.length; idx++) {
 			pkt.setData(iomessages[idx].getBytes());
 			wsock.send(pkt);
 		}
-		int senderPort = wsock.getLocalPort();
-		rdr.senderPort = senderPort;
+		rdr.senderPort = wsock.getLocalPort();
+		wsock.close();
 
 		// launch
 		dsptch.start();
-		dsptch.waitStopped();
+		Dispatcher.STOPSTATUS stopsts = dsptch.waitStopped(TimeOps.MSECS_PER_SECOND * 10, true);
+		org.junit.Assert.assertEquals(Dispatcher.STOPSTATUS.STOPPED, stopsts);
+		org.junit.Assert.assertTrue(dsptch.completedOK());
 		org.junit.Assert.assertTrue(rdr.completed);
-		org.junit.Assert.assertFalse(rdr.isConnected());
+		org.junit.Assert.assertFalse(rdr.disc_flag);
 	}
 
 
 	private static class Reader
-		extends ChannelMonitor
+		extends CM_UDP
 	{
-		public boolean completed;
 		private final java.nio.channels.DatagramChannel udpchan;
 		private int msgcnt;
-		private int senderPort;
+		public boolean completed;
+		public boolean disc_flag;
+		public int senderPort;
 
-		public Reader(Dispatcher d) throws com.grey.base.GreyException, java.io.IOException
+		public Reader(Dispatcher d, boolean directbufs) throws com.grey.base.GreyException, java.io.IOException
 		{
-			super(d);
+			super(d, new com.grey.naf.BufferSpec(1024, 0, directbufs));
+	        byte[] ipbytes = IP.ip2net(IP.IP_LOCALHOST, null, 0);
+	        java.net.InetAddress ipaddr_localhost = java.net.InetAddress.getByAddress(ipbytes);
+
 			udpchan = java.nio.channels.DatagramChannel.open();
 			java.net.DatagramSocket sock = udpchan.socket();
-			sock.bind(null);
+	        java.net.InetSocketAddress saddr = new java.net.InetSocketAddress(ipaddr_localhost, 0);
+			sock.bind(saddr);
 
-			com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(1024, 0);
-			chanreader = new IOExecReader(bufspec);
-			initChannel(udpchan, true, false);
-			chanreader.receive(0);
+			registerConnectionlessChannel(udpchan, true);
+			udpreader.receive();
 		}
 
 		@Override
 		public void ioReceived(com.grey.base.utils.ArrayRef<byte[]> data, java.net.InetSocketAddress remaddr)
 				throws com.grey.base.FaultException, java.io.IOException
 		{
-			org.junit.Assert.assertEquals(iomessages[msgcnt++], new String(data.ar_buf, data.ar_off, data.ar_len));
+			String msg = iomessages[msgcnt++];
+			org.junit.Assert.assertEquals(msg.length(), data.ar_len);
+			org.junit.Assert.assertEquals(msg, new String(data.ar_buf, data.ar_off, data.ar_len));
 			org.junit.Assert.assertEquals(IP.IP_LOCALHOST, IP.convertIP(remaddr.getAddress()));
 			org.junit.Assert.assertEquals(senderPort, remaddr.getPort());
+			udpreader.endReceive();
+			udpreader.receive();
 			if (msgcnt == iomessages.length) {
-				completed = true;
 				disconnect();
 				dsptch.stop();
+				completed = true;
 			}
+		}
+
+		@Override
+		protected void ioDisconnected(CharSequence diagnostic) {
+			disc_flag = true;
 		}
 	}
 }

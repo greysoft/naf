@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2013 Yusef Badri - All rights reserved.
+ * Copyright 2010-2014 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -7,48 +7,38 @@ package com.grey.naf.reactor;
 import com.grey.logging.Logger.LEVEL;
 
 public final class ConcurrentListener
-	extends Listener
+	extends CM_Listener
 {
 	/**
-	 * Servers that are spawned by the ConcurrentListener must be subclasses of this base class.
-	 * <br/>
-	 * In addition to overriding its explicit methods, the subclass must also provide a constructor
-	 * with this signature:<br/>
-	 * <code>classname(com.grey.naf.reactor.ConcurrentListener, com.grey.base.config.XmlConfig)</code><br/>
-	 * That subclass constructor must in turn call the
-	 * <code>Server(ConcurrentListener)</code>
-	 * constructor shown below.
+	 * In addition to providing the explicit interface methods, factory classes must also provide a constructor
+	 * with this signature:<br>
+	 * <code>classname(com.grey.naf.reactor.CM_Listener, com.grey.base.config.XmlConfig)</code>
 	 */
-	public static abstract class Server
-		extends ChannelMonitor
-		implements com.grey.base.utils.PrototypeFactory.PrototypeObject
+	public interface ServerFactory
+		extends com.grey.base.collections.ObjectWell.ObjectFactory
 	{
-		public final ConcurrentListener lstnr;
-		public Server(ConcurrentListener l) {super(l.dsptch); lstnr=l;}
-		public boolean stopServer() {return false;}
-		@Override
-		protected com.grey.naf.SSLConfig getSSLConfig() {return lstnr.sslconfig;}
+		public Class<? extends CM_Server> getServerClass();
+		public void shutdown();
 	}
 
-	private final Server protoServer;  //prototype object used to create actual connection handlers
-	private final Class<?> serverType;
-	private final com.grey.base.utils.HashedSet<Server> activeservers = new com.grey.base.utils.HashedSet<Server>();
-	private final com.grey.base.utils.ObjectWell<Server> spareservers;
+	private final ServerFactory serverFactory;
+	private final com.grey.base.collections.HashedSet<CM_Server> activeservers = new com.grey.base.collections.HashedSet<CM_Server>();
+	private final com.grey.base.collections.ObjectWell<CM_Server> spareservers;
 	private boolean in_sync_stop;
 
 	@Override
-	public Class<?> getServerType() {return serverType;}
+	public Class<?> getServerType() {return serverFactory.getServerClass();}
 
 	public ConcurrentListener(String lname, Dispatcher d, Object controller, com.grey.naf.EntityReaper rpr,
-			com.grey.base.config.XmlConfig cfg, Class<?> srvclass, String iface, int port)
-					throws com.grey.base.GreyException, java.io.IOException
+			com.grey.base.config.XmlConfig cfg, Class<?> factclass, String iface, int port)
+		throws com.grey.base.GreyException, java.io.IOException
 	{
-		this(lname, d, controller, rpr, cfg, makeDefaults(srvclass, iface, port));
+		this(lname, d, controller, rpr, cfg, makeDefaults(factclass, iface, port));
 	}
 
 	public ConcurrentListener(String lname, Dispatcher d, Object controller, com.grey.naf.EntityReaper rpr,
 			com.grey.base.config.XmlConfig cfg, java.util.Map<String,Object> cfgdflts)
-					throws com.grey.base.GreyException, java.io.IOException
+		throws com.grey.base.GreyException, java.io.IOException
 	{
 		super(lname, d, controller, rpr, cfg, cfgdflts);
 
@@ -56,15 +46,20 @@ public final class ConcurrentListener
 		// delving into the contents of its Server config block.
 		if (cfg != null) {
 			String linkname = cfg.getValue("@configlink", false, null);
-			if (linkname != null) cfg = new com.grey.base.config.XmlConfig(cfg, "../listener[@name='"+linkname+"']");
+			if (linkname != null) cfg = cfg.getSection("../listener[@name='"+linkname+"']");
 		}
-		Class<?> srvclss = (cfgdflts == null ? null : (Class<?>)cfgdflts.get(CFGMAP_CLASS));
-		com.grey.base.config.XmlConfig servercfg = (cfg == null ? null : new com.grey.base.config.XmlConfig(cfg, "server"));
-		Object s = dsptch.nafcfg.createEntity(servercfg, srvclss, Server.class, false,
-				new Class<?>[]{ConcurrentListener.class, com.grey.base.config.XmlConfig.class},
+		Class<?> clss_fact = (cfgdflts == null ? null : (Class<?>)cfgdflts.get(CFGMAP_FACTCLASS));
+		com.grey.base.config.XmlConfig servercfg = (cfg == null ? null : cfg.getSection("server"));
+		Object f = dsptch.nafcfg.createEntity(servercfg, clss_fact, ServerFactory.class, false,
+				new Class<?>[]{CM_Listener.class, com.grey.base.config.XmlConfig.class},
 				new Object[]{this, servercfg});
-		protoServer = Server.class.cast(s);
-		serverType = protoServer.getClass();
+		serverFactory = ServerFactory.class.cast(f);
+
+		if (!CM_Server.class.isAssignableFrom(serverFactory.getServerClass())) {
+			throw new com.grey.base.ConfigException("Listener="+name+": Factory="+serverFactory.getClass().getName()
+					+" has incompatible server-type="+serverFactory.getServerClass().getName()
+					+" - require subclass of "+CM_Server.class.getName());
+		}
 
 		int srvmin = getInt(cfgdflts, CFGMAP_INITSPAWN, 0);
 		int srvmax = getInt(cfgdflts, CFGMAP_MAXSPAWN, 0);
@@ -74,23 +69,23 @@ public final class ConcurrentListener
 			srvmax = cfg.getInt("@maxservers", false, srvmax);
 			srvincr = cfg.getInt("@incrservers", false, srvincr);
 		}
-		com.grey.base.utils.PrototypeFactory fact = new com.grey.base.utils.PrototypeFactory(protoServer);
-		spareservers = new com.grey.base.utils.ObjectWell<Server>(protoServer.getClass(), fact,
-				"Listener_"+name+":"+getLocalPort()+"_Servers", srvmin, srvmax, srvincr);
+		spareservers = new com.grey.base.collections.ObjectWell<CM_Server>(serverFactory.getServerClass(), serverFactory,
+				"Listener_"+name+":"+getPort()+"_Servers", srvmin, srvmax, srvincr);
 
-		log.info("Listener="+name+": Server is "+protoServer.getClass().getName()
+		log.info("Listener="+name+": Server="+serverFactory.getServerClass().getName()
+				+", Factory="+serverFactory.getClass().getName()
 				+" - init/max/incr="+spareservers.size()+"/"+srvmax+"/"+srvincr);
 	}
 
 	@Override
-	public boolean stopListener()
+	protected boolean stopListener()
 	{
-		//cannot iterate on activeservers as it may get modified by stopServer(), so take a copy
+		//cannot iterate on activeservers as it gets modified during the loop, so take a copy
 		in_sync_stop = true;
-		Server[] arr = activeservers.toArray(new Server[activeservers.size()]);
+		CM_Server[] arr = activeservers.toArray(new CM_Server[activeservers.size()]);
 		for (int idx = 0; idx != arr.length; idx++) {
-			Server srvr = arr[idx];
-			boolean stopped = srvr.stopServer();
+			CM_Server srvr = arr[idx];
+			boolean stopped = srvr.abortServer();
 			if (stopped || !dsptch.isRunning()) deallocateServer(srvr);
 		}
 		log.info("Listener="+name+" stopped "+(arr.length - activeservers.size())+"/"+arr.length+" servers");
@@ -101,19 +96,22 @@ public final class ConcurrentListener
 	@Override
 	protected void listenerStopped()
 	{
-		protoServer.stopServer();
+		serverFactory.shutdown();
 	}
 
 	@Override
 	public void entityStopped(Object obj)
 	{
-		boolean not_dup = deallocateServer(Server.class.cast(obj));
+		CM_Server srvr = (CM_Server)obj;
+		if (reporter != null) reporter.listenerNotification(Reporter.EVENT.STOPPED, srvr);
+		boolean not_dup = deallocateServer(srvr);
 		if (not_dup && inShutdown && !in_sync_stop && activeservers.size() == 0) stopped(true);
 	}
 
+	// We know that the readyOps argument must indicate an Accept (that's all we registered for), so don't bother checking it.
 	// NB: Can't loop on SelectionKey.isAcceptable(), as it will remain True until we return to Dispatcher
 	@Override
-	protected void connectionReceived() throws java.io.IOException
+	void ioIndication(int readyOps) throws java.io.IOException
 	{
 		java.nio.channels.ServerSocketChannel srvsock = (java.nio.channels.ServerSocketChannel)iochan;
 		java.nio.channels.SocketChannel connsock;
@@ -122,36 +120,42 @@ public final class ConcurrentListener
 			try {
 				handleConnection(connsock);
 			} catch (Throwable ex) {
-				log.log(LEVEL.TRC, ex, true, "Listener="+name+": Error fielding connection");
+				if (!(ex instanceof CM_Stream.BrokenPipeException)) { //BrokenPipe already logged
+					boolean routine = ex instanceof java.io.IOException;
+					log.log(routine ? LEVEL.TRC : LEVEL.INFO, ex, !routine, "Listener="+name+": Error fielding connection="+connsock);
+				}
 				connsock.close();
 			}
 		}
 	}
 
-	private void handleConnection(java.nio.channels.SocketChannel connsock) throws com.grey.base.FaultException, java.io.IOException
+	private void handleConnection(java.nio.channels.SocketChannel connsock)
+		throws com.grey.base.FaultException, java.io.IOException
 	{
-		ChannelMonitor srvr = spareservers.extract();
+		CM_Server srvr = spareservers.extract();
 		if (srvr == null) {
 			// we're at max capacity - can't allocate any more server objects
 			log.info("Listener=" + name + " dropping connection - no spare servers");
 			connsock.close();
 			return;
 		}
+		activeservers.add(srvr);
+		if (reporter != null) reporter.listenerNotification(Reporter.EVENT.STARTED, srvr);
 		boolean ok = false;
-		activeservers.add((Server)srvr);
 
 		try {
 			srvr.accepted(connsock, this);
 			ok = true;
 		} finally {
 			if (!ok) {
-				dsptch.conditionalDeregisterIO(srvr);
 				entityStopped(srvr);
+				dsptch.conditionalDeregisterIO(srvr);
+				connsock.close();
 			}
 		}
 	}
 
-	private boolean deallocateServer(Server srvr)
+	private boolean deallocateServer(CM_Server srvr)
 	{
 		//guard against duplicate entityStopped() notifications
 		if (!activeservers.remove(srvr)) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Yusef Badri - All rights reserved.
+ * Copyright 2013-2014 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.nafman;
@@ -12,8 +12,10 @@ final class Resource
 {
 	public final Registry.DefResource def;
 	private final HTTP http;
-	private final javax.xml.transform.Transformer xslproc;
 	private final boolean staticrsp; //statically configured response
+	private final javax.xml.transform.TransformerFactory xslfact;
+	private final byte[] rsrcdata;
+	private javax.xml.transform.Transformer xslproc;
 
 	private java.nio.ByteBuffer httprsp;
 	private byte[] srcdata;
@@ -22,20 +24,24 @@ final class Resource
 	//preallocated purely for efficiency
 	private final java.util.Date dt = new java.util.Date();
 
-	public Resource(Registry.DefResource d, HTTP h, javax.xml.transform.Transformer xsl, java.nio.ByteBuffer buf)
+	public Resource(Registry.DefResource d, HTTP h, java.nio.ByteBuffer buf,
+			javax.xml.transform.TransformerFactory fact, byte[] data)
+		throws javax.xml.transform.TransformerConfigurationException
 	{
 		def = d;
 		http = h;
-		xslproc = xsl;
 		httprsp = buf;
-		staticrsp = (httprsp != null); //httprsp has to be non-null to start with
+		staticrsp = (httprsp != null);
+		xslfact = fact;
+		rsrcdata = data;
+		if (xslfact != null) createXSL();
 	}
 
 	public java.nio.ByteBuffer getContent(long cachetime, Primary primary) throws com.grey.base.FaultException, java.io.IOException
 	{
 		if (httprsp != null) {
 			if (staticrsp) return httprsp;
-			if (srctime + cachetime > primary.dsptch.systime()) return httprsp; //cached response
+			if (srctime + cachetime > primary.dsptch.getSystemTime()) return httprsp; //cached response
 		}
 
 		// not cached, but check if source data has changed before we have to go to the expense of XSL transforms
@@ -49,12 +55,16 @@ final class Resource
 		// create the NIO response buffer
 		httprsp = http.buildDynamicResponse(rspdata, httprsp);
 		srcdata = newdata;
-		srctime = primary.dsptch.systime();
+		srctime = primary.dsptch.getSystemTime();
 		return httprsp;
 	}
 
-	public byte[] formatData(byte[] indata, com.grey.base.utils.HashedMap<String, String> params) throws com.grey.base.FaultException
+	public byte[] formatData(byte[] indata, com.grey.base.collections.HashedMap<String, String> params) throws com.grey.base.FaultException
 	{
+		if (xslproc == null) {
+			throw new com.grey.base.FaultException("XSL processor not available for resource="+def.name);
+		}
+
 		//transform the data via our XSLT stylesheet - we are expected to have one if this method is called
 		java.io.ByteArrayInputStream ibstrm = new java.io.ByteArrayInputStream(indata);
 		java.io.ByteArrayOutputStream obstrm = new java.io.ByteArrayOutputStream();
@@ -70,8 +80,16 @@ final class Resource
 		}
 		try {
 			xslproc.transform(istrm, ostrm);
-		} catch (Exception ex) {
-			throw new com.grey.base.FaultException(ex, "XSLT transform failed for resource="+def.name+"- "+ex);
+		} catch (Throwable ex) {
+			//have observed XSL processor getting stuck on next call after out-of-mem errors
+			String errmsg = "XSLT transform failed for resource="+def.name+"- "+ex;
+			try {
+				createXSL();
+			} catch (Throwable ex2) {
+				errmsg += " ... and we failed to recreate XSL processor - "+ex2;
+				xslproc = null;
+			}
+			throw new com.grey.base.FaultException(ex, errmsg);
 		}
 		return obstrm.toByteArray();
 	}
@@ -85,7 +103,7 @@ final class Resource
 		CharSequence xml_dispatchers = d.nafman.listDispatchers();
 		com.grey.base.utils.ByteChars bc = new com.grey.base.utils.ByteChars();
 		long timeboot = d.timeboot;
-		long uptime = d.systime() - timeboot;
+		long uptime = d.getSystemTime() - timeboot;
 		dt.setTime(timeboot);
 		StringBuilder sb = TimeOps.expandMilliTime(uptime, null, true, " ");
 		bc.set("<nafman>");
@@ -106,5 +124,12 @@ final class Resource
 		}
 		bc.append("</commands></nafman>");
 		return bc.toByteArray();
+	}
+
+	private void createXSL() throws javax.xml.transform.TransformerConfigurationException
+	{
+		java.io.ByteArrayInputStream bstrm = new java.io.ByteArrayInputStream(rsrcdata);
+		javax.xml.transform.stream.StreamSource src = new javax.xml.transform.stream.StreamSource(bstrm);
+		xslproc = xslfact.newTransformer(src);
 	}
 }

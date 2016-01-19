@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2013 Yusef Badri - All rights reserved.
+ * Copyright 2010-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.nafman;
@@ -13,10 +13,11 @@ public final class Primary
 {
 	private static final long shutdown_delay = SysProps.getTime("greynaf.nafman.shutdown.delay", 500);
 
-	private final com.grey.naf.reactor.Listener lstnr;
+	private final com.grey.naf.reactor.CM_Listener lstnr;
 	private final java.util.ArrayList<Secondary> secondaries = new java.util.ArrayList<Secondary>();
 	private final java.util.ArrayList<Command> activecmds = new java.util.ArrayList<Command>();
 	private final com.grey.naf.reactor.Producer<Object> events;
+	private final boolean surviveDownstream;
 
 	//preallocated purely for efficiency
 	private final java.util.ArrayList<Agent> tmpagents = new java.util.ArrayList<Agent>();
@@ -37,17 +38,19 @@ public final class Primary
 	@Override
 	public Primary getPrimary() {return this;}
 	@Override
-	public int getPort() {return lstnr.getLocalPort();}
+	public int getPort() {return lstnr.getPort();}
 
-	public Primary(com.grey.naf.reactor.Dispatcher d, com.grey.base.config.XmlConfig cfg)
+	public Primary(com.grey.naf.reactor.Dispatcher d, com.grey.base.config.XmlConfig cfg, com.grey.naf.DispatcherDef def)
 			throws com.grey.base.GreyException, java.io.IOException
 	{
 		super(d, cfg);
+		surviveDownstream = def.surviveDownstream;
 		events = new com.grey.naf.reactor.Producer<Object>(Object.class, dsptch, this);
+		dsptch.logger.info("NAFMAN="+dsptch.name+": survive_downstream="+surviveDownstream);
 
 		int lstnport = d.nafcfg.assignPort(com.grey.naf.Config.RSVPORT_NAFMAN);
-		com.grey.base.config.XmlConfig lstncfg = new com.grey.base.config.XmlConfig(cfg, "listener");
-		lstnr = new com.grey.naf.reactor.ConcurrentListener("NAFMAN-Primary", dsptch, this, null, lstncfg, Server.class, null, lstnport);
+		com.grey.base.config.XmlConfig lstncfg = cfg.getSection("listener");
+		lstnr = new com.grey.naf.reactor.ConcurrentListener("NAFMAN-Primary", dsptch, this, null, lstncfg, Server.Factory.class, null, lstnport);
 
 		// these commands are only fielded by the Primary NAFMAN agent
 		Registry reg = Registry.get();
@@ -59,7 +62,7 @@ public final class Primary
 	@Override
 	public void start() throws com.grey.base.FaultException, java.io.IOException
 	{
-		if (dsptch.logger.isActive(LEVEL.TRC)) System.out.println(Registry.get().dumpState(null, false));
+		if (dsptch.logger.isActive(LEVEL.TRC)) dsptch.logger.trace(Registry.get().dumpState(null, false));
 		super.start();
 		lstnr.start();
 	}
@@ -127,7 +130,7 @@ public final class Primary
 			commandCompleted(cmd);
 		}
 
-		if (deadsecs && !dsptch.surviveDownstream) {
+		if (deadsecs && !surviveDownstream) {
 			stopDispatcher();
 		}
 	}
@@ -144,10 +147,15 @@ public final class Primary
 				secondaries.add(agent);
 			} else if (clss == String.class) {
 				Secondary agent = getSecondary((String)event);
+				if (agent == null) {
+					//can't see how this could happen in reality
+					dsptch.logger.warn("NAFMAN="+dsptch.name+" received unsubscription from unidentified Secondary="+event);
+					continue;
+				}
 				dsptch.logger.info("NAFMAN="+dsptch.name+" received unsubscription from Secondary="+agent.dsptch.name);
 				discardSecondary(agent);
 				secondaries.remove(agent);
-				if (!dsptch.surviveDownstream) stopDispatcher();
+				if (!surviveDownstream) stopDispatcher();
 			} else {
 				Command cmd = (Command)event;
 				activecmds.remove(cmd);

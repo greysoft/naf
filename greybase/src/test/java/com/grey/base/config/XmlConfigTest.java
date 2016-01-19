@@ -225,7 +225,7 @@ public class XmlConfigTest
 		strval = cfg.getValue("tag15", false, "dflt1");
 		org.junit.Assert.assertTrue(strval.equals("dflt1"));
 
-		com.grey.base.config.XmlConfig[] arrcfg = cfg.subSections("list1/innernodes2");
+		com.grey.base.config.XmlConfig[] arrcfg = cfg.getSections("list1/innernodes2");
 		org.junit.Assert.assertEquals(1, arrcfg.length);
 
 	}
@@ -235,34 +235,34 @@ public class XmlConfigTest
 	{
 		com.grey.base.config.XmlConfig maincfg = com.grey.base.config.XmlConfig.makeSection(cfgxml, "/root");
 
-		com.grey.base.config.XmlConfig cfg = new com.grey.base.config.XmlConfig(maincfg, "innernode");
+		com.grey.base.config.XmlConfig cfg = maincfg.getSection("innernode");
 		org.junit.Assert.assertTrue(cfg.exists());
 		String strval = cfg.getValue("tag1", true, "dflt1");
 		org.junit.Assert.assertTrue(strval.equals("tagval21"));
 
-		cfg = new com.grey.base.config.XmlConfig(maincfg, "MissingBlock");
+		cfg = maincfg.getSection("MissingBlock");
 		org.junit.Assert.assertFalse(cfg.exists());
-		cfg = new com.grey.base.config.XmlConfig(cfg, "MissingBlock2");
+		cfg = cfg.getSection("MissingBlock2");
 		org.junit.Assert.assertFalse(cfg.exists());
 
-		com.grey.base.config.XmlConfig[] arrcfg = maincfg.subSections("list1/innernodes");
+		com.grey.base.config.XmlConfig[] arrcfg = maincfg.getSections("list1/innernodes");
 		org.junit.Assert.assertEquals(2, arrcfg.length);
 		strval = arrcfg[0].getValue("tag1", true, "dflt1");
 		org.junit.Assert.assertTrue(strval.equals("tagval31"));
 		strval = arrcfg[1].getValue("tag1", true, "dflt1");
 		org.junit.Assert.assertTrue(strval.equals("tagval41"));
 
-		arrcfg = maincfg.subSections("list1/innernodes2");
+		arrcfg = maincfg.getSections("list1/innernodes2");
 		org.junit.Assert.assertNull(arrcfg);
 
-		arrcfg = maincfg.subSections("list1");
+		arrcfg = maincfg.getSections("list1");
 		org.junit.Assert.assertEquals(1, arrcfg.length);
-		arrcfg = maincfg.subSections("tag2");
+		arrcfg = maincfg.getSections("tag2");
 		org.junit.Assert.assertEquals(1, arrcfg.length);
 
-		arrcfg = XmlConfig.BLANKCFG.subSections("list1");
+		arrcfg = XmlConfig.BLANKCFG.getSections("list1");
 		org.junit.Assert.assertNull(arrcfg);
-		arrcfg = XmlConfig.NULLCFG.subSections("list1");
+		arrcfg = XmlConfig.NULLCFG.getSections("list1");
 		org.junit.Assert.assertNull(arrcfg);
 	}
 
@@ -350,9 +350,9 @@ public class XmlConfigTest
 		cfg = com.grey.base.config.XmlConfig.makeSection(cfgxml_minimal2, "/");
 		org.junit.Assert.assertTrue(cfg.exists());
 
-		cfg = new com.grey.base.config.XmlConfig(maincfg, tag_minimal1);
+		cfg = maincfg.getSection(tag_minimal1);
 		org.junit.Assert.assertTrue(cfg.exists());
-		cfg = new com.grey.base.config.XmlConfig(maincfg, tag_minimal2);
+		cfg = maincfg.getSection(tag_minimal2);
 		org.junit.Assert.assertTrue(cfg.exists());
 
 		try {

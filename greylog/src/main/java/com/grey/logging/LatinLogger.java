@@ -7,7 +7,7 @@ package com.grey.logging;
 /**
  * This logger optimises away some relatively expensive character handling by assuming the log messages are all 8-bit charsets,
  * and can be mapped to 1-to-1 to a byte stream.
- * <br/>
+ * <br>
  * This assumption allows it to map the characters to bytes on a 1-to-1 basis, and write out a byte stream via the more efficient
  * JDK OutputStream classes (that is, more efficient than the char-oriented java.io.Writer classes).
  * <p>
@@ -26,12 +26,12 @@ public class LatinLogger
 
 	private java.io.OutputStream logstrm;
 
-	protected LatinLogger(Parameters params, String logname) throws java.io.IOException
+	protected LatinLogger(Parameters params, String logname)
 	{
 		this(params, logname, false);
 	}
 
-	protected LatinLogger(Parameters params, String logname, boolean is_mt) throws java.io.IOException
+	protected LatinLogger(Parameters params, String logname, boolean is_mt)
 	{
 		super(params, logname, is_mt);
 	}
@@ -50,7 +50,7 @@ public class LatinLogger
 	}
 
 	@Override
-	protected void closeStream(boolean isOwner) throws java.io.IOException
+	protected void closeStream(boolean is_owner) throws java.io.IOException
 	{
 		if (logstrm != null)
 		{

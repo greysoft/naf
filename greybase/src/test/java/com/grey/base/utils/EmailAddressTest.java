@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2013 Yusef Badri - All rights reserved.
+ * Copyright 2010-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -38,6 +38,11 @@ public class EmailAddressTest
 		emaddr.decompose();
 		org.junit.Assert.assertEquals(emaddr.mailbox, new ByteChars(MBXPART));
 		org.junit.Assert.assertEquals(0, emaddr.domain.length());
+
+		emaddr = new EmailAddress(MBXPART);
+		emaddr.decompose(true);
+		org.junit.Assert.assertEquals(emaddr.domain, new ByteChars(MBXPART));
+		org.junit.Assert.assertEquals(0, emaddr.mailbox.length());
 	}
 
 	@org.junit.Test

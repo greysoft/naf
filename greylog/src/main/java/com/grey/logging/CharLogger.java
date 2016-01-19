@@ -6,7 +6,7 @@ package com.grey.logging;
 
 /**
  * This logger faithfully writes out the log message as is, preserving the character-set encoding.
- * <br/>
+ * <br>
  * As such, it is a universal logger, but this may come at a potential performance cost if we know there are no characters
  * larger than 8 bits (see LatinLogger).
  */
@@ -19,12 +19,12 @@ public class CharLogger
 	private char[] logmsg_chars = new char[1024];  // should be large enough for most log messages
 	private java.io.BufferedWriter logstrm;
 
-	protected CharLogger(Parameters params, String logname) throws java.io.IOException
+	protected CharLogger(Parameters params, String logname)
 	{
 		this(params, logname, false);
 	}
 
-	protected CharLogger(Parameters params, String logname, boolean is_mt) throws java.io.IOException
+	protected CharLogger(Parameters params, String logname, boolean is_mt)
 	{
 		super(params, logname, is_mt);
 	}
@@ -43,7 +43,7 @@ public class CharLogger
 	}
 
 	@Override
-	protected void closeStream(boolean isOwner) throws java.io.IOException
+	protected void closeStream(boolean is_owner) throws java.io.IOException
 	{
 		if (logstrm != null)
 		{

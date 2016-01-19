@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Yusef Badri - All rights reserved.
+ * Copyright 2012-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf;
@@ -21,6 +21,7 @@ public class DispatcherDef
 	public com.grey.base.config.XmlConfig[] naflets;
 
 	public DispatcherDef() {}
+	public DispatcherDef(String n) {name=n;}
 
 	public DispatcherDef(com.grey.base.config.XmlConfig cfg) throws com.grey.base.ConfigException
 	{
@@ -34,6 +35,6 @@ public class DispatcherDef
 		flush_interval = cfg.getTime("@flush", flush_interval);
 
 		String xpath = "naflets/naflet"+com.grey.base.config.XmlConfig.XPATH_ENABLED;
-		naflets = cfg.subSections(xpath);
+		naflets = cfg.getSections(xpath);
 	}
 }

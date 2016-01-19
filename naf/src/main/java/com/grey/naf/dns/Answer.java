@@ -1,12 +1,12 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns;
 
 public final class Answer
 {
-	public enum STATUS {OK, NODOMAIN, BADNAME, TIMEOUT, ERROR, INPROGRESS}
+	public enum STATUS {OK, NODOMAIN, BADNAME, BADRESPONSE, ERROR, TIMEOUT, DEADLOCK, SHUTDOWN}
 
 	// Query info
 	public byte qtype;
@@ -16,45 +16,53 @@ public final class Answer
 	// Query result
 	// rrdata is guaranteed non-empty if result=OK (unless FLAG_NOQRY or FLAG_SYNTAXONLY was set)
 	public STATUS result;
-	public final java.util.ArrayList<ResourceData> rrdata = new java.util.ArrayList<ResourceData>();
+	final java.util.ArrayList<ResourceData> rrdata = new java.util.ArrayList<ResourceData>();
+	int ip_responder;
 
-	// set result for domain-based query - caller still has to set rrdata afterwards
-	public Answer set(STATUS result, byte qtype, com.grey.base.utils.ByteChars qname)
+	public int size() {return rrdata.size();}
+	public ResourceData get(int index) {return rrdata.get(index);} //generic getter
+	public ResourceData.RR_A getA() {return (ResourceData.RR_A)rrdata.get(0);}
+	public ResourceData.RR_PTR getPTR() {return (ResourceData.RR_PTR)rrdata.get(0);}
+	public ResourceData.RR_NS getNS(int index) {return (ResourceData.RR_NS)rrdata.get(index);}
+	public ResourceData.RR_SOA getSOA() {return (ResourceData.RR_SOA)rrdata.get(0);}
+	public ResourceData.RR_MX getMX(int index) {return (ResourceData.RR_MX)rrdata.get(index);}
+	public ResourceData.RR_TXT getTXT() {return (ResourceData.RR_TXT)rrdata.get(0);}
+	public ResourceData.RR_SRV getSRV(int index) {return (ResourceData.RR_SRV)rrdata.get(index);}
+	public ResourceData.RR_AAAA getAAAA() {return (ResourceData.RR_AAAA)rrdata.get(0);}
+
+	// set result for non-IP query - caller still has to set rrdata afterwards
+	public Answer set(STATUS res, byte qt, com.grey.base.utils.ByteChars qn)
 	{
-		this.qname = qname;
+		qname = qn;
 		qip = 0;
-		return reset(result, qtype);
+		return reset(res, qt);
 	}
 
 	// set result for IP-based query - caller still has to set rrdata afterwards
-	public Answer set(STATUS result, byte qtype, int qip)
+	public Answer set(STATUS res, byte qt, int ip)
 	{
-		this.qip = qip;
+		qip = ip;
 		qname = null;
-		return reset(result, qtype);
+		return reset(res, qt);
 	}
 
-	public Answer set(Answer answer1)
+	public Answer set(Answer ans2)
 	{
-		if (answer1.qname == null) {
-			set(answer1.result, answer1.qtype, answer1.qip);
+		if (ans2.qname == null) {
+			set(ans2.result, ans2.qtype, ans2.qip);
 		} else {
-			set(answer1.result, answer1.qtype, answer1.qname);
+			set(ans2.result, ans2.qtype, ans2.qname);
 		}
-		rrdata.addAll(answer1.rrdata);
+		for (int idx = 0; idx != ans2.rrdata.size(); idx++) {
+			rrdata.add(ans2.rrdata.get(idx));
+		}
 		return this;
 	}
 
-	public Answer initQuery(byte qtype, com.grey.base.utils.ByteChars qname, int qip)
+	private Answer reset(STATUS res, byte qt)
 	{
-		if (qname == null) return set(STATUS.INPROGRESS, qtype, qip);
-		return set(STATUS.INPROGRESS, qtype, qname);
-	}
-
-	private Answer reset(STATUS result, byte qtype)
-	{
-		this.result = result;
-		this.qtype = qtype;
+		result = res;
+		qtype = qt;
 		rrdata.clear();
 		return this;
 	}
@@ -62,12 +70,12 @@ public final class Answer
 	@Override
 	public String toString()
 	{
-		return toString(new StringBuilder(512)).toString();
+		return toString(new StringBuilder(200)).toString();
 	}
 
 	public StringBuilder toString(StringBuilder sb)
 	{
-		sb.append("Result=").append(result).append("/QTYPE=").append(qtype & 0xff).append('/');
+		sb.append("Result=").append(result).append("/Type=").append(Resolver.getQTYPE(qtype)).append('/');
 		if (qname == null) {
 			sb.append("IP=");
 			com.grey.base.utils.IP.displayDottedIP(qip, sb);
@@ -75,12 +83,13 @@ public final class Answer
 			sb.append(qname);
 		}
 		if (result == STATUS.OK) sb.append("/RRs=").append(rrdata.size());
-		if (rrdata.size() != 0) {
-			for (int idx = 0; idx != rrdata.size(); idx++) {
-				sb.append(' ');
-				rrdata.get(idx).toString(sb);
-			}
+		String dlm = " {";
+		for (int idx = 0; idx != rrdata.size(); idx++) {
+			sb.append(dlm);
+			rrdata.get(idx).toString(sb);
+			dlm = "; ";
 		}
+		if (rrdata.size() != 0) sb.append('}');
 		return sb;
 	}
 }

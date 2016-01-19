@@ -44,7 +44,6 @@ final class HTTP
 	private final com.grey.base.utils.ByteChars tmplightbc = new com.grey.base.utils.ByteChars(-1); //lightweight object without own storage
 
 	public HTTP(com.grey.naf.BufferSpec bufspec, long permcache)
-		throws com.grey.base.ConfigException
 	{
 		this.bufspec = bufspec;
 		this.permcache = permcache;

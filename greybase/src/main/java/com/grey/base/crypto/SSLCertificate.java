@@ -15,7 +15,7 @@ public class SSLCertificate
 	private static final String FACTORY_X509 = "X.509";
 
 	public static java.security.cert.Certificate load(java.security.cert.CertificateFactory fact, java.io.InputStream fin)
-			throws java.io.IOException, java.security.cert.CertificateException
+			throws java.security.cert.CertificateException
 	{
 		if (fact == null) {
 			fact = java.security.cert.CertificateFactory.getInstance(FACTORY_X509);

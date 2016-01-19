@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2013 Yusef Badri - All rights reserved.
+ * Copyright 2010-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf;
@@ -7,10 +7,10 @@ package com.grey.naf;
 /**
  * This class defines a NAF application, aka a NAF task. It aggregates one or more fragments of callback code
  * into a coherent whole.
- * <br/>
+ * <p>
  * In addition to overriding the explicit methods of this interface, subclasses must also provide a constructor
- * with this signature:<br/>
- * <code>classname(String naflet_name, com.grey.naf.reactor.Dispatcher, com.grey.base.config.XmlConfig)</code><br/>
+ * with this signature:<br>
+ * <code>classname(String naflet_name, com.grey.naf.reactor.Dispatcher, com.grey.base.config.XmlConfig)</code><br>
  * That subclass constructor must in turn call the
  * <code>Naflet(String naflet_name, com.grey.naf.reactor.Dispatcher, com.grey.base.config.XmlConfig)</code>
  * constructor shown below.
@@ -20,24 +20,23 @@ abstract public class Naflet
 	public final String naflet_name;
 	public final java.util.Map<String,Object> cfgdflts = new java.util.HashMap<String,Object>();
 	public final com.grey.naf.reactor.Dispatcher dsptch;
-	protected final com.grey.logging.Logger log;
 	protected final String cfgfile;
-	protected com.grey.base.config.XmlConfig appcfg;
+	private com.grey.base.config.XmlConfig appcfg;
 	private com.grey.naf.EntityReaper reaper;
 	private boolean aborted_startup;
 
 	abstract protected void startNaflet() throws java.io.IOException;
 	protected boolean stopNaflet() {return true;}
 	protected void abortOnStartup() {aborted_startup = true;}
+	public com.grey.base.config.XmlConfig taskConfig() {return appcfg;}
 
 	public Naflet(String name, com.grey.naf.reactor.Dispatcher dsptch_p, com.grey.base.config.XmlConfig cfg)
 			throws com.grey.base.GreyException, java.io.IOException
 	{
 		naflet_name = name;
 		dsptch = dsptch_p;
-		log = dsptch.logger;
 		cfgfile = dsptch.nafcfg.getPath(cfg, "configfile", null, false, null, null);
-		log.info("Naflet="+naflet_name+": Initialising "+getClass().getName()+" - config="+cfgfile);
+		dsptch.logger.info("Naflet="+naflet_name+": Initialising "+getClass().getName()+" - config="+cfgfile);
 
 		if (cfgfile != null) {
 			String cfgroot = cfg.getValue("configfile/@root", false, null);
@@ -52,17 +51,17 @@ abstract public class Naflet
 		appcfg = null; //hand memory back to the GC
 		reaper = rpr;
 		if (aborted_startup) {
-			log.info("Naflet="+naflet_name+": Aborting startup");
+			dsptch.logger.info("Naflet="+naflet_name+": Aborting startup");
 			nafletStopped();
 			return;
 		}
-		log.info("Naflet="+naflet_name+": Starting - reaper="+reaper);
+		dsptch.logger.info("Naflet="+naflet_name+": Starting - reaper="+reaper);
 		startNaflet();
 	}
 
 	public final boolean stop()
 	{
-		log.info("Naflet="+naflet_name+": Received Stop request");
+		dsptch.logger.info("Naflet="+naflet_name+": Received Stop request");
 		boolean done = stopNaflet();
 		if (done) nafletStopped();
 		return done;
@@ -70,7 +69,7 @@ abstract public class Naflet
 	
 	protected final void nafletStopped()
 	{
-		log.info("Naflet="+naflet_name+" has terminated - reaper="+reaper);
+		dsptch.logger.info("Naflet="+naflet_name+" has terminated - reaper="+reaper);
 		if (reaper != null) reaper.entityStopped(this);
 	}
 }

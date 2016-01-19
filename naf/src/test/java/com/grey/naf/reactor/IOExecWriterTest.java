@@ -1,25 +1,25 @@
 /*
- * Copyright 2012-2013 Yusef Badri - All rights reserved.
+ * Copyright 2012-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
 
 import com.grey.base.utils.FileOps;
 import com.grey.base.utils.StringOps;
+import com.grey.base.utils.TimeOps;
 
 public class IOExecWriterTest
 {
 	private static final String rootdir = DispatcherTest.initPaths(IOExecWriterTest.class);
 
-	private static class CMW extends ChannelMonitor
+	private static class CMW extends CM_Stream
 	{
 		public boolean completed;
 
 		public CMW(Dispatcher d, java.nio.channels.SelectableChannel w, com.grey.naf.BufferSpec bufspec)
 				throws com.grey.base.ConfigException, com.grey.base.FaultException, java.io.IOException {
-			super(d);
-			chanwriter = new IOExecWriter(bufspec);
-			initChannel(w, true, true);
+			super(d, null, bufspec);
+			registerConnectedChannel(w, true);
 		}
 
 		public boolean write(CharSequence data) throws java.io.IOException {
@@ -52,6 +52,10 @@ public class IOExecWriterTest
 				completed = true;
 			}
 		}
+		
+		@Override //not used
+		public void ioReceived(com.grey.base.utils.ArrayRef<byte[]> rcvdata)
+				throws com.grey.base.FaultException, java.io.IOException {}
 	}
 
 	// Pipe seems to be 8K in size
@@ -103,15 +107,20 @@ public class IOExecWriterTest
 		expectdata += rdwrdata;
 		int xmitcnt = pipesize + expectdata.length();
 
-		// read the first pipe-load of data
+		// Read the first pipe-load of data.
+		// Even though we allocate a big enough rcvbuf, we're not guaranteed to read it all in one go.
 		java.nio.ByteBuffer rcvbuf = com.grey.base.utils.NIOBuffers.create(xmitcnt+10, false); //a few bytes to spare
-		int nbytes = rep.read(rcvbuf);
-		org.junit.Assert.assertEquals(pipesize, nbytes);
-		for (int idx = 0; idx != pipesize; idx++) {
-			org.junit.Assert.assertEquals(initialchar.charAt(0), rcvbuf.get(idx));
+		int rcvcnt = 0;
+		while (rcvcnt < pipesize) {
+			int nbytes = rep.read(rcvbuf);
+			rcvcnt += nbytes;
+			org.junit.Assert.assertTrue("Last read="+nbytes, rcvcnt <= pipesize);
+			for (int idx = 0; idx != nbytes; idx++) {
+				org.junit.Assert.assertEquals(initialchar.charAt(0), rcvbuf.get(idx));
+			}
 		}
 		//there will be no more data to read till Dispatcher triggers the Writer
-		nbytes = rep.read(rcvbuf);
+		int nbytes = rep.read(rcvbuf);
 		org.junit.Assert.assertEquals(0, nbytes);
 		org.junit.Assert.assertTrue(cm.chanwriter.isBlocked());
 		done = cm.disconnect(); //should be delayed by linger
@@ -185,32 +194,44 @@ public class IOExecWriterTest
 		org.junit.Assert.assertTrue(cm.isConnected());
 		java.nio.ByteBuffer rcvbuf = com.grey.base.utils.NIOBuffers.create(filesize, false);
 
-		// This send loop seems to block at different stages on different platforms, but it
-		// is always blocked by the end.
+		//keep pumping files out until writer blocks
 		int sendbytes = 0;
-		for (int idx = 0; idx != 3; idx++) {
-			java.io.FileInputStream istrm = new java.io.FileInputStream(fh);
+		while (!cm.chanwriter.isBlocked()) {
+			// istrm is closed by the transmit() call
+			@SuppressWarnings("resource") java.io.FileInputStream istrm = new java.io.FileInputStream(fh);
+			java.nio.channels.FileChannel fchan = istrm.getChannel();
+			cm.chanwriter.transmit(fchan);
+			sendbytes += filesize;
+		}
+		//and now send 2 more
+		for (int idx = 0; idx != 2; idx++) {
+			@SuppressWarnings("resource") java.io.FileInputStream istrm = new java.io.FileInputStream(fh);
 			java.nio.channels.FileChannel fchan = istrm.getChannel();
 			cm.chanwriter.transmit(fchan);
 			sendbytes += filesize;
 		}
 		org.junit.Assert.assertTrue(cm.chanwriter.isBlocked());
-		cm.chanwriter.transmit(fh);
+		//and two more sends via the other send-file methods
+		cm.chanwriter.transmit(fh.toPath());
 		sendbytes += filesize;
-		java.io.FileInputStream istrm = new java.io.FileInputStream(fh);
+		@SuppressWarnings("resource") java.io.FileInputStream istrm = new java.io.FileInputStream(fh);
 		java.nio.channels.FileChannel fchan = istrm.getChannel();
 		int off = (1024*1024*2)+100;
 		int lmt = (1024*1024*6)+200;
 		cm.chanwriter.transmitChunked(fchan, off, lmt, 900*1000, false);
 		sendbytes += (lmt - off);
-		boolean done = cm.disconnect(true); //should be delayed by linger
+		org.junit.Assert.assertTrue(cm.chanwriter.isBlocked());
+
+		// tell the writer to disconnect - linger-on-close will safely prevent it closing till we're finished
+		boolean done = cm.disconnect(true);
 		org.junit.Assert.assertFalse(done);
+		org.junit.Assert.assertTrue(cm.isConnected());
 
 		// start the Dispatcher and wait for writer to drain its backlog
 		dsptch.start();
+		rcvbuf.clear();
 		int rdbytes = 0;
 		int nbytes;
-		rcvbuf.clear();
 		while ((nbytes = rep.read(rcvbuf)) != -1) {
 			if (nbytes == 0) continue;
 			for (int idx = 0; idx != nbytes; idx++) {
@@ -220,12 +241,18 @@ public class IOExecWriterTest
 			rdbytes += nbytes;
 		}
 		org.junit.Assert.assertEquals(sendbytes, rdbytes);
-		dsptch.waitStopped();
+		Dispatcher.STOPSTATUS stopsts = dsptch.waitStopped(TimeOps.MSECS_PER_SECOND * 10, true);
+		org.junit.Assert.assertEquals(Dispatcher.STOPSTATUS.STOPPED, stopsts);
+		org.junit.Assert.assertTrue(dsptch.completedOK());
 		synchronized (cm) {
 			org.junit.Assert.assertTrue(cm.completed);
 		}
 		rep.close();
 		org.junit.Assert.assertFalse(cm.isConnected());
 		org.junit.Assert.assertFalse(dsptch.isRunning());
+		//delete the file just to make sure it has no dangling open streams
+		org.junit.Assert.assertTrue(fh.exists());
+		boolean ok = fh.delete();
+		org.junit.Assert.assertTrue(ok);
 	}
 }

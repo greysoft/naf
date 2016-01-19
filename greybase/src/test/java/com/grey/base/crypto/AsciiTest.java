@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Yusef Badri - All rights reserved.
+ * Copyright 2012-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.crypto;
@@ -8,6 +8,7 @@ import java.security.GeneralSecurityException;
 
 import com.grey.base.config.SysProps;
 import com.grey.base.utils.ByteOps;
+import com.grey.base.utils.DynLoader;
 
 public class AsciiTest
 {
@@ -49,18 +50,20 @@ public class AsciiTest
 		}
 
 		// miscellaneous
+		String armourbegin = (String)DynLoader.getField(Ascii.class, "ARMOUR_BEGIN", null);
+		String armourend = (String)DynLoader.getField(Ascii.class, "ARMOUR_END", null);
 		byte[] bdata = new byte[] {0, 1, 2, 127, (byte)128, (byte)255};
 		char[] cdata = Ascii.hexEncode(bdata);
 		byte[] bdata2 = Ascii.hexDecode(cdata);
 		org.junit.Assert.assertArrayEquals(bdata, bdata2);
 
-		cdata = Ascii.armourWrap(bdata, 0, bdata.length, Ascii.ARMOURTYPE.BASE64);
-		String embedded = "leading noise"+new String(cdata)+"trailing noise";
-		bdata2 = Ascii.armourUnwrap(embedded, Ascii.ARMOURTYPE.BASE64);
+		cdata = Ascii.armourWrap(bdata, 0, bdata.length, Ascii.ARMOURTYPE.HEX);
+		String embedded = "leading noise "+armourbegin+new String(cdata)+"trailing noise";
+		bdata2 = Ascii.armourUnwrap(embedded, Ascii.ARMOURTYPE.HEX);
 		org.junit.Assert.assertArrayEquals(bdata, bdata2);
 
 		cdata = Ascii.armourWrap(bdata, 0, bdata.length, Ascii.ARMOURTYPE.HEX);
-		embedded = "leading noise"+new String(cdata)+"trailing noise";
+		embedded = armourbegin+" leading noise"+new String(cdata);
 		bdata2 = Ascii.armourUnwrap(embedded, Ascii.ARMOURTYPE.HEX);
 		org.junit.Assert.assertArrayEquals(bdata, bdata2);
 
@@ -68,6 +71,11 @@ public class AsciiTest
 		org.junit.Assert.assertNull(Ascii.armourUnwrap("missing armour", Ascii.ARMOURTYPE.HEX));
 		org.junit.Assert.assertNull(Ascii.armourUnwrap(null, Ascii.ARMOURTYPE.BASE64));
 		org.junit.Assert.assertNull(Ascii.armourUnwrap(null, Ascii.ARMOURTYPE.HEX));
+
+		String emptysandwich = armourbegin+"\n"+armourend;
+		org.junit.Assert.assertEquals(0, Ascii.armourUnwrap(emptysandwich, Ascii.ARMOURTYPE.BASE64).length);
+		emptysandwich = armourbegin+"\r\n"+armourend;
+		org.junit.Assert.assertEquals(0, Ascii.armourUnwrap(emptysandwich, Ascii.ARMOURTYPE.HEX).length);
 	}
 
 	@org.junit.Test

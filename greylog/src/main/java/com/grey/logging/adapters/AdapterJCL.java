@@ -11,7 +11,7 @@ public class AdapterJCL
 {
 	private final org.apache.commons.logging.Log extlog;  //the external logger we're bridging to
 
-	protected AdapterJCL(com.grey.logging.Parameters params, String logname) throws java.io.IOException
+	protected AdapterJCL(com.grey.logging.Parameters params, String logname)
 	{
 		super(adjust(params), logname, false);
 		extlog = org.apache.commons.logging.LogFactory.getLog(logname);

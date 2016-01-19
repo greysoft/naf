@@ -15,11 +15,11 @@ public class LoggerAdapter
 	private static final boolean dumpStack = com.grey.base.config.SysProps.get("grey.logger.slf4j.dumpstack", true);
 
 	private com.grey.logging.Logger logger;
-	private String name;
+	private String lname;
 
-	protected LoggerAdapter(String name, com.grey.logging.Logger logger)
+	protected LoggerAdapter(String lname, com.grey.logging.Logger logger)
 	{
-		this.name = name;
+		this.lname = lname;
 		this.logger = logger;
 	}
 
@@ -27,7 +27,7 @@ public class LoggerAdapter
 	@Override
 	public String getName()
 	{
-		return name;
+		return lname;
 	}
 
 	@Override
@@ -85,7 +85,7 @@ public class LoggerAdapter
 	}
 
 	@Override
-	public void trace(String fmt, Object[] args)
+	public void trace(String fmt, Object... args)
 	{
 		formatAndLog(LEVEL.TRC2, fmt, args);
 	}
@@ -115,7 +115,7 @@ public class LoggerAdapter
 	}
 
 	@Override
-	public void debug(String fmt, Object[] args)
+	public void debug(String fmt, Object... args)
 	{
 		formatAndLog(LEVEL.TRC, fmt, args);
 	}
@@ -145,7 +145,7 @@ public class LoggerAdapter
 	}
 
 	@Override
-	public void info(String fmt, Object[] args)
+	public void info(String fmt, Object... args)
 	{
 		formatAndLog(LEVEL.INFO, fmt, args);
 	}
@@ -175,7 +175,7 @@ public class LoggerAdapter
 	}
 
 	@Override
-	public void warn(String fmt, Object[] args)
+	public void warn(String fmt, Object... args)
 	{
 		formatAndLog(LEVEL.WARN, fmt, args);
 	}
@@ -205,7 +205,7 @@ public class LoggerAdapter
 	}
 
 	@Override
-	public void error(String fmt, Object[] args)
+	public void error(String fmt, Object... args)
 	{
 		formatAndLog(LEVEL.ERR, fmt, args);
 	}

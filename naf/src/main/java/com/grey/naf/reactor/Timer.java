@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2013 Yusef Badri - All rights reserved.
+ * Copyright 2010-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -14,6 +14,11 @@ public final class Timer
 		public void eventError(Timer tmr, Dispatcher d, Throwable ex) throws com.grey.base.FaultException, java.io.IOException;
 	}
 
+	public interface TimeProvider
+	{
+		public long getSystemTime();
+	}
+
 	// dampens jitter - see reset() and nextExpiry() comments below
 	static final long JITTER_THRESHOLD = SysProps.getTime("greynaf.timers.jitter", 10L); //deliberately package-private
 
@@ -22,52 +27,56 @@ public final class Timer
 	public long interval;	// requested timer interval, in milliseconds
 	public long expiry;  // absolute system time of expiry (milliseconds since epoch)
 	public Handler handler;
-	public Object attachment;
+	private Object attachment;
 
 	private Dispatcher dsptch;
 	private long activated;  // absolute system time at which this timer was set (milliseconds since epoch)
 
-	public Timer init(Dispatcher d, Handler h, long interval, int type, int id)
+	public long age(Dispatcher d) {return d.getSystemTime() - activated;}
+	public Object getAttachment() {return attachment;}
+
+	Timer init(Dispatcher d, Handler h, long p_interval, int p_type, int p_id, Object attch)
 	{
 		dsptch = d;
 		handler = h;
-		this.interval = interval;
-		this.type = type;
-		this.id = id;
-		activated = dsptch.systime();
+		interval = p_interval;
+		type = p_type;
+		id = p_id;
+		activated = dsptch.getSystemTime();
 		expiry = activated + interval;
+		attachment = attch;
 		return this;
 	}
 
-	public Timer clear()
+	Timer clear()
 	{
 		handler = null;
 		attachment = null;
 		return this;
 	}
 
-	public void fire(Dispatcher d) throws com.grey.base.FaultException, java.io.IOException
+	void fire(Dispatcher d) throws com.grey.base.FaultException, java.io.IOException
 	{
 		handler.timerIndication(this, d);
 	}
 
-	public long reset()
+	public void reset()
 	{
-		if ((interval > JITTER_THRESHOLD) && (dsptch.systime() - activated < JITTER_THRESHOLD)) {
+		if ((interval > JITTER_THRESHOLD) && (dsptch.getSystemTime() - activated < JITTER_THRESHOLD)) {
 			// dampen excessive reset rates without affecting genuinely short intervals (especially zero-second timers!)
-			return dsptch.systime() - expiry;
+			return;
 		}
-		activated = dsptch.systime();
-		return dsptch.resetTimer(this);
+		activated = dsptch.getSystemTime();
+		dsptch.resetTimer(this);
 	}
 
-	public long reset(long new_interval)
+	public void reset(long new_interval)
 	{
 		if (new_interval != interval) {
 			interval = new_interval;
 			activated = 0;  // force the reset to go through, since we're changing the expiry interval
 		}
-		return reset();
+		reset();
 	}
 
 	public void cancel()
@@ -108,7 +117,7 @@ public final class Timer
 	@Override
 	public String toString()
 	{
-		String txt = id+":"+type+"/"+interval;
+		String txt = "Timer-"+System.identityHashCode(this)+"/"+id+":"+type+"/"+interval;
 		if (handler != null) txt += "/"+handler.getClass().getName();
 		if (attachment != null) txt += "/"+attachment.getClass().getName();
 		return txt;

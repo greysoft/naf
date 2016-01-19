@@ -11,7 +11,7 @@ public class AdapterSLF4J
 {
 	private final org.slf4j.Logger extlog;  //the external logger we're bridging to
 
-	protected AdapterSLF4J(com.grey.logging.Parameters params, String logname) throws java.io.IOException
+	protected AdapterSLF4J(com.grey.logging.Parameters params, String logname)
 	{
 		super(adjust(params), logname, false);
 		extlog = org.slf4j.LoggerFactory.getLogger(logname);

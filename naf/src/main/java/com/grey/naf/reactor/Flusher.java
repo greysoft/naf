@@ -85,5 +85,5 @@ public final class Flusher
 
 	//error already logged by Dispatcher so nothing more to do
 	@Override
-	public void eventError(Timer tmr, Dispatcher d, Throwable ex) {}
+	public void eventError(Timer t, Dispatcher d, Throwable ex) {}
 }

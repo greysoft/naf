@@ -28,6 +28,8 @@
 				<span class="infobutton">Refresh</span>
 			</xsl:element>
 			<br/><br/>
+			NAF Version: _SUBTOKEN_NAFVER_
+			<br/>
 			NAF kernel is running since
 			<xsl:value-of select="/nafman/timeboot"/>
 			<br/>

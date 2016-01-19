@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Yusef Badri - All rights reserved.
+ * Copyright 2012-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.crypto;
@@ -28,6 +28,14 @@ public class Base64Test
 		verifyAdvanced("foobarlisticcalidiciousxy", 3, 0);     // default line-size, will not get trigerred
 		verifyAdvanced("foobarlisticcalidiciousxy1", 3, -1);   // no linebreaks
 		verifyAdvanced("foobarlisticcalidiciousxy12", 3, 10);  // small line-size, will get trigerred
+
+		//ensure sensible results for various null/blank cases
+		byte[] plain = Base64.decode("".toCharArray());
+		org.junit.Assert.assertEquals(0, plain.length);
+		plain = Base64.decode("====".toCharArray());
+		org.junit.Assert.assertEquals(0, plain.length);
+		plain = Base64.decode(" ====  ".toCharArray());
+		org.junit.Assert.assertEquals(0, plain.length);
 	}
 
 	// test alternative line endings with an encoded block large enough to contain any
@@ -45,8 +53,14 @@ public class Base64Test
 		verifyBasicBytes(plaindata, null);
 		// now test the decode with alternative line endings
 		String encstr = new String(encdata).replace("\r\n", "\n");
-		final char[] encdata2 = encstr.toCharArray();
+		char[] encdata2 = encstr.toCharArray();
 		org.junit.Assert.assertFalse(java.util.Arrays.equals(encdata, encdata2));  //verify we modified the line endings
+		plaindata2 = Base64.decode(encdata2);
+		org.junit.Assert.assertArrayEquals(plaindata, plaindata2);
+		org.junit.Assert.assertEquals(str, new String(plaindata2));
+		// now test the decode with white space around the linebreaks
+		encstr = new String(encdata).replace("\n", " \n\t ");
+		encdata2 = encstr.toCharArray();
 		plaindata2 = Base64.decode(encdata2);
 		org.junit.Assert.assertArrayEquals(plaindata, plaindata2);
 		org.junit.Assert.assertEquals(str, new String(plaindata2));

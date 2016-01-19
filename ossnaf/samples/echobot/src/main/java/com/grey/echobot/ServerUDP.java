@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2013 Yusef Badri - All rights reserved.
+ * Copyright 2012-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.echobot;
@@ -10,16 +10,16 @@ package com.grey.echobot;
  * Dispatcher thread handling potentially thousands of connections.
  */
 public class ServerUDP
-	extends com.grey.naf.reactor.ChannelMonitor
+	extends com.grey.naf.reactor.CM_UDP
 {
 	private final App app;
 	private final java.nio.channels.DatagramChannel udpchan;
 	private java.nio.ByteBuffer niobuf;
 
 	public ServerUDP(App app, com.grey.naf.reactor.Dispatcher d, com.grey.base.utils.TSAP tsap, com.grey.naf.BufferSpec bufspec,
-			int sockbufsiz) throws com.grey.base.FaultException, java.io.IOException
+			int sockbufsiz) throws java.io.IOException
 	{
-		super(d);
+		super(d, bufspec);
 		this.app = app;
 
 		udpchan = java.nio.channels.DatagramChannel.open();
@@ -28,9 +28,11 @@ public class ServerUDP
 		sock.setSendBufferSize(sockbufsiz);
 		sock.bind(tsap.sockaddr);
 
-		chanreader = new com.grey.naf.reactor.IOExecReader(bufspec);
-		initChannel(udpchan, true, false);
-		chanreader.receive(0);
+		registerConnectionlessChannel(udpchan, true);
+	}
+	
+	public void start() throws java.io.IOException {
+		udpreader.receive();
 	}
 
 	@Override

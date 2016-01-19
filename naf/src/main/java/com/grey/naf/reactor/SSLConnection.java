@@ -1,24 +1,29 @@
 /*
- * Copyright 2012-2013 Yusef Badri - All rights reserved.
+ * Copyright 2012-2014 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
 
 import javax.net.ssl.SSLEngineResult;
+
+import com.grey.base.config.SysProps;
 import com.grey.logging.Logger.LEVEL;
 
 // See http://docs.oracle.com/javase/7/docs/technotes/guides/security/jsse/samples/sslengine/SSLEngineSimpleDemo.java
 final class SSLConnection
 	implements Timer.Handler
 {
+	private static final int BUFSIZ_SSL = SysProps.get("greynaf.ssl.bufsiz_ssl", 0);
+	private static final int BUFSIZ_APP = SysProps.get("greynaf.ssl.bufsiz_app", 0);
+
 	private static final int S_STARTED = 1 << 0;   //initial handshake completed
 	private static final int S_HANDSHAKE = 1 << 1; //currently in a handshake
 	private static final int S_CLOSING = 1 << 2;
 	private static final int S_ABORTED = 1 << 3;
+	private static final int S_CMSTALLED = 1 << 4;
 
 	private final javax.net.ssl.SSLEngine engine;
-	private final ChannelMonitor cm;
-	private final java.nio.channels.SocketChannel rawsock;
+	private final CM_Stream cm;
 	private final java.nio.ByteBuffer sslprotoXmtBuf;
 	private final java.nio.ByteBuffer sslprotoRcvBuf;
 	private final java.nio.ByteBuffer appdataRcvBuf;
@@ -35,21 +40,23 @@ final class SSLConnection
 	private boolean clearFlag(int f) {if (!isFlagSet(f)) return false; iostate &= ~f; return true;}
 	private boolean isFlagSet(int f) {return ((iostate & f) != 0);}
 
-	public SSLConnection(ChannelMonitor chanmon)
+	public SSLConnection(CM_Stream chanmon)
 	{
 		cm = chanmon;
-		rawsock = (java.nio.channels.SocketChannel)cm.iochan;
 		com.grey.naf.SSLConfig sslcfg = cm.getSSLConfig();
+		int peerport = (cm.iochan instanceof  java.nio.channels.SocketChannel ?
+				((java.nio.channels.SocketChannel)cm.iochan).socket().getPort()
+				: 0);
 		engine = sslcfg.isClient ?
-				sslcfg.ctx.createSSLEngine(sslcfg.peerCertName, rawsock.socket().getPort())
+				sslcfg.ctx.createSSLEngine(sslcfg.peerCertName, peerport)
 				: sslcfg.ctx.createSSLEngine();
 		javax.net.ssl.SSLSession sess = engine.getSession();
-		int netbufsiz = sess.getPacketBufferSize();
-		int appbufsiz = sess.getApplicationBufferSize(); //needs to be comparable to SSL bufsize rather than IOExecReader's
+		int netbufsiz = (BUFSIZ_SSL == 0 ? sess.getPacketBufferSize() : BUFSIZ_SSL);
+		int appbufsiz = (BUFSIZ_APP == 0 ? sess.getApplicationBufferSize() : BUFSIZ_APP);
 		sslprotoXmtBuf = com.grey.base.utils.NIOBuffers.create(netbufsiz, com.grey.naf.BufferSpec.directniobufs);
 		sslprotoRcvBuf = com.grey.base.utils.NIOBuffers.create(netbufsiz, com.grey.naf.BufferSpec.directniobufs);
 		appdataRcvBuf = com.grey.base.utils.NIOBuffers.create(appbufsiz, com.grey.naf.BufferSpec.directniobufs);
-		dummyShakeBuf = com.grey.base.utils.NIOBuffers.create(1, false);
+		dummyShakeBuf = com.grey.base.utils.NIOBuffers.create(1, false); //could possibly be static?
 		engine.setUseClientMode(sslcfg.isClient); //must call this in both modes - even if getUseClientMode() already seems correct
 
 		if (!sslcfg.isClient) {
@@ -89,8 +96,8 @@ final class SSLConnection
 			// send our close_notify, but no need to wait for incoming one (may even have received it already)
 			transmit(dummyShakeBuf, false);
 		} catch (Throwable ex) {
-			LEVEL lvl = LEVEL.TRC3;
-			if (cm.dsptch.logger.isActive(lvl)) cm.dsptch.logger.log(lvl, ex, false, logpfx+"close failed on "+cm.iochan);
+			LEVEL lvl = (ex instanceof RuntimeException ? LEVEL.ERR : LEVEL.TRC3);
+			if (cm.dsptch.logger.isActive(lvl)) cm.dsptch.logger.log(lvl, ex, lvl==LEVEL.ERR, logpfx+"SSL-close failed on "+cm+"/"+cm.iochan);
 		}
 		// This queue will only be populated if we're currently in a handshake, in which case we wouldn't be
 		// be able to flush it here anyway.
@@ -111,14 +118,15 @@ final class SSLConnection
 		ioReceived();
 	}
 
-	void handleIO() throws com.grey.base.FaultException, java.io.IOException
+	void handleRead() throws com.grey.base.FaultException, java.io.IOException
 	{
 		int nbytes = -1;
 		try {
-			nbytes = rawsock.read(sslprotoRcvBuf);
+			java.nio.channels.ReadableByteChannel chan = (java.nio.channels.ReadableByteChannel)cm.iochan;
+			nbytes = chan.read(sslprotoRcvBuf);
 		} catch (Exception ex) {
-			LEVEL lvl = LEVEL.TRC3;
-			if (cm.dsptch.logger.isActive(lvl)) cm.dsptch.logger.log(lvl, ex, false, logpfx+"read() failed on "+cm.iochan);
+			LEVEL lvl = (ex instanceof RuntimeException ? LEVEL.ERR : LEVEL.TRC3);
+			if (cm.dsptch.logger.isActive(lvl)) cm.dsptch.logger.log(lvl, ex, lvl==LEVEL.ERR, logpfx+"SSL-read() failed on "+cm+"/"+cm.iochan);
 		}
 		if (nbytes == 0) return;
 
@@ -128,16 +136,30 @@ final class SSLConnection
 		}
 		ioReceived();
 	}
+	
+	void deliver() throws com.grey.base.FaultException, java.io.IOException
+	{
+		if (!isFlagSet(S_CMSTALLED)) return;
+		// We were previously interrupted in mid-stream, so we may have buffered data sitting in both the application
+		// (decoded) and protocol (SSL) buffers.
+		// Deliver any decoded data first, and once we've emptied it (or as much as possible) we pull any data from the
+		// SSL-encoded buffer.
+		// Note that spurious calls to these two methods wouldn't break anything, but we use Stalled flag to avoid the
+		// unnecessary work.
+		forwardReceivedIO(); //pull from decoded-SSL-payload buffer
+		ioReceived(); //pull from encoded-SSL-protocol buffer
+	}
 
 	private void ioReceived() throws com.grey.base.FaultException, java.io.IOException
 	{
 		SSLEngineResult.Status engineStatus;
 		do {
+			int pos = appdataRcvBuf.position();
 			try {
 				engineStatus = decode();
 			} catch (Exception ex) {
-				LEVEL lvl = LEVEL.TRC3;
-				if (cm.dsptch.logger.isActive(lvl)) cm.dsptch.logger.log(lvl, ex, false, logpfx+"Unwrap failed on "+cm.iochan);
+				LEVEL lvl = (ex instanceof RuntimeException ? LEVEL.ERR : LEVEL.TRC3);
+				if (cm.dsptch.logger.isActive(lvl)) cm.dsptch.logger.log(lvl, ex, lvl==LEVEL.ERR, logpfx+"SSL-Unwrap failed on "+cm+"/"+cm.iochan);
 				disconnect(true, "SSL handshake failed");
 				return;
 			}
@@ -145,36 +167,60 @@ final class SSLConnection
 			switch (engineStatus)
 			{
 			case OK:
+				while (doHandshakeAction());
 				break;
-			case BUFFER_UNDERFLOW: //need to wait for more SSL protocol data
+			case BUFFER_OVERFLOW: //need to empty appdataRcvBuf a bit more before we can unwrap into it
+				if (pos == 0 || !isFlagSet(S_STARTED)) {
+					//buffer was empty or is too small to complete the handshake
+					throw new java.io.IOException("SSL OVERFLOW: appdata="+appdataRcvBuf+", sslproto="+sslprotoRcvBuf
+						+" - recommended="+engine.getSession().getApplicationBufferSize()+"/"+engine.getSession().getPacketBufferSize());
+				}
+				break; //give IOExecReader a chance to drain appdataRcvBuf
+			case BUFFER_UNDERFLOW: //need to wait for more SSL protocol data before we can decode sslprotoRcvBuf
 				return;
-			case CLOSED: //typically means we'received SSL close_notify
+			case CLOSED: //typically means we've received SSL close_notify
 				disconnect(false, "Remote SSL-disconnect");
 				return;
 			default:
 				throw new java.io.IOException("SSLConnection: engine-status="+engineStatus+" on Receive");
 			}
-			while (doHandshakeAction());
 
 			// note that we can still receive app data while re-handshaking
-			if (isFlagSet(S_STARTED) && appdataRcvBuf.position() != 0) {
-				forwardReceivedIO();
+			if (isFlagSet(S_STARTED)) {
+				if (!forwardReceivedIO()) break;
 			}
 		} while (engineStatus == SSLEngineResult.Status.OK && sslprotoRcvBuf.position() != 0);
 	}
 
-	public void forwardReceivedIO() throws com.grey.base.FaultException, java.io.IOException
+	private boolean forwardReceivedIO() throws com.grey.base.FaultException, java.io.IOException
 	{
-		appdataRcvBuf.limit(appdataRcvBuf.position());
-		appdataRcvBuf.position(0);
+		if (appdataRcvBuf.remaining() == 0) {
+			//theoretically impossible given that it is in the unflipped state, but anyway
+			appdataRcvBuf.clear();
+			return true;
+		}
+		appdataRcvBuf.flip();
+
 		while (appdataRcvBuf.remaining() != 0) {
-			if (!cm.chanreader.handleIO(appdataRcvBuf)) {
-				//IOExecReader can't consume any more right now, so leave the remainder of appdataRcvBuf pending
+			if (cm.chanreader.handleIO(appdataRcvBuf) == 0) {
+				// IOExecReader can't consume any more right now, so leave the remainder of appdataRcvBuf pending
+				// and prepare it to be appended to by our ioReceived() method.
+				// I don't think this can actually happen, as IOExecReader will always deliver something to the
+				// app if its own buffer fills up.
+				// NB: IOExecReader safely prevents this making reentrant calls to our deliver() method
+				LEVEL lvl = LEVEL.TRC2;
+				if (cm.dsptch.logger.isActive(lvl)) cm.dsptch.logger.log(lvl, logpfx+"SSL stalled on "+cm+"/"+cm.iochan+" - "+appdataRcvBuf);
+				setFlag(S_CMSTALLED);
 				appdataRcvBuf.compact();
-				return;
+				int nbytes = appdataRcvBuf.remaining();
+				appdataRcvBuf.limit(appdataRcvBuf.capacity());
+				appdataRcvBuf.position(nbytes);
+				return false;
 			}
 		}
 		appdataRcvBuf.clear();
+		clearFlag(S_CMSTALLED);
+		return true;
 	}
 
 	public void transmit(java.nio.ByteBuffer xmtbuf) throws java.io.IOException
@@ -186,12 +232,12 @@ final class SSLConnection
 		}
 	}
 
-	private boolean transmit(java.nio.ByteBuffer xmtbuf, boolean fromq) throws com.grey.base.FaultException, java.io.IOException
+	boolean transmit(java.nio.ByteBuffer xmtbuf, boolean fromq) throws com.grey.base.FaultException, java.io.IOException
 	{
 		if ((xmtbuf != dummyShakeBuf) && isFlagSet(S_HANDSHAKE)) {
 			//even though we can receive app data during a handshake, it seems we can't send any
 			if (!fromq) {
-				if (xmitq == null) xmitq = new XmitQueue(cm);
+				if (xmitq == null) xmitq = new XmitQueue(this, cm);
 				xmitq.enqueue(xmtbuf);
 			}
 			return false;
@@ -203,8 +249,8 @@ final class SSLConnection
 			try {
 				engineStatus = encode(xmtbuf);
 			} catch (Exception ex) {
-				LEVEL lvl = LEVEL.TRC3;
-				if (cm.dsptch.logger.isActive(lvl)) cm.dsptch.logger.log(lvl, ex, false, logpfx+"Wrap failed on "+cm.iochan);
+				LEVEL lvl = (ex instanceof RuntimeException ? LEVEL.ERR : LEVEL.TRC3);
+				if (cm.dsptch.logger.isActive(lvl)) cm.dsptch.logger.log(lvl, ex, lvl==LEVEL.ERR, logpfx+"SSL-Wrap failed on "+cm+"/"+cm.iochan);
 				disconnect(true, "SSL handshake failed");
 				return false;
 			}
@@ -241,11 +287,11 @@ final class SSLConnection
 			if (!clearFlag(S_HANDSHAKE)) {
 				// We are not (and were not) in a handshake - but maybe it's time we did one.
 				boolean force_handshake = false;
-				if (sslcfg.sessionTimeout != 0 && cm.dsptch.systime() - lastExpireTime > sslcfg.sessionTimeout) {
+				if (sslcfg.sessionTimeout != 0 && cm.dsptch.getSystemTime() - lastExpireTime > sslcfg.sessionTimeout) {
 					// Invalidate current SSL session, to force a full renegotiation.
 					engine.getSession().invalidate(); //this forces full handshake
 					force_handshake = true;
-				} else if (sslcfg.shakeFreq != 0 && cm.dsptch.systime() - lastShakeTime > sslcfg.shakeFreq) {
+				} else if (sslcfg.shakeFreq != 0 && cm.dsptch.getSystemTime() - lastShakeTime > sslcfg.shakeFreq) {
 					force_handshake = true;
 				}
 				if (force_handshake) {
@@ -265,13 +311,13 @@ final class SSLConnection
 					throw new com.grey.base.FaultException(ex, "Failed to parse certificate on "+cm.iochan);
 				}
 				if (!matches) {
-					cm.dsptch.logger.warn(logpfx+"Received cert ["+peercert.getSubjectDN().getName()+"] doesn't match target="+target+" on "+cm.iochan);
+					cm.dsptch.logger.warn(logpfx+"Received SSL-cert ["+peercert.getSubjectDN().getName()+"] doesn't match target="+target+" on "+cm+"/"+cm.iochan);
 					disconnect(false, "Invalid remote SSL-certificate ID");
 					return false;
 				}
 			}
 			lastExpireTime = engine.getSession().getCreationTime();
-			lastShakeTime = cm.dsptch.systime();
+			lastShakeTime = cm.dsptch.getSystemTime();
 
 			if (setFlag(S_STARTED)) {
 				// this was the initial handshake, so indicate that connection is now ready
@@ -283,8 +329,8 @@ final class SSLConnection
 			return false;
 
 		case NEED_TASK:
-			// TODO: Delegated tasks could be run in a static Dispatcher threadpool, and a timer could check on them every
-			// half second - or maybe 100ms, then every half sec. They could set a volatile flag to indicate they're done.
+			// TODO: Delegated tasks could be run in a Dispatcher threadpool, and a timer could check on them every half
+			// second - or maybe 100ms, then every half sec. They could set a volatile flag to indicate they're done.
 			setFlag(S_HANDSHAKE);
 			Runnable task;
 			while ((task = engine.getDelegatedTask()) != null) {
@@ -365,14 +411,16 @@ final class SSLConnection
 	 * We allocate and discard ByteBuffers as need be. There's enough memory churn in this class that
 	 * there's no point bothering with an ObjectWell to reuse them.
 	 */
-	private final class XmitQueue
+	private static final class XmitQueue
 	{
-		private final ChannelMonitor cm;
-		private final com.grey.base.utils.ObjectQueue<java.nio.ByteBuffer> bufq;
+		private final SSLConnection conn;
+		private final CM_Stream cm;
+		private final com.grey.base.collections.ObjectQueue<java.nio.ByteBuffer> bufq;
 
-		public XmitQueue(ChannelMonitor cm) {
+		public XmitQueue(SSLConnection conn, CM_Stream cm) {
+			this.conn = conn;
 			this.cm = cm;
-			bufq = new com.grey.base.utils.ObjectQueue<java.nio.ByteBuffer>(java.nio.ByteBuffer.class, 1, 1);
+			bufq = new com.grey.base.collections.ObjectQueue<java.nio.ByteBuffer>(java.nio.ByteBuffer.class, 1, 1);
 		}
 
 		public void enqueue(java.nio.ByteBuffer inbuf) {
@@ -386,7 +434,7 @@ final class SSLConnection
 		public void drain() throws com.grey.base.FaultException, java.io.IOException {
 			while (bufq.size() != 0) {
 				java.nio.ByteBuffer buf = bufq.peek();
-				if (!transmit(buf, true)) break; //buffer will be sent in full or not at all
+				if (!conn.transmit(buf, true)) break; //buffer will be sent in full or not at all
 				bufq.remove();
 			}
 		}

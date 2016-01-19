@@ -1,8 +1,10 @@
 /*
- * Copyright 2012-2013 Yusef Badri - All rights reserved.
+ * Copyright 2012-2014 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
+
+import com.grey.base.utils.TimeOps;
 
 public class TimerTest
 {
@@ -19,6 +21,8 @@ public class TimerTest
 		int tmr2_cnt;
 		int tmr3_cnt;
 		boolean completed;
+
+		Handler() {} //make explicit with non-private access, to eliminate synthetic accessor
 
 		@Override
 		public void timerIndication(Timer tmr, Dispatcher dsptch) throws java.io.IOException
@@ -51,10 +55,7 @@ public class TimerTest
 		}
 
 		@Override
-		public void eventError(Timer tmr, Dispatcher d, Throwable ex)
-		{
-			throw new RuntimeException("Throwing fatal error to halt Dispatcher");
-		}
+		public void eventError(Timer tmr, Dispatcher d, Throwable ex) {}
 	}
 
 	@org.junit.Test
@@ -71,7 +72,10 @@ public class TimerTest
 		dsptch.setTimer(0, 1, handler);
 
 		dsptch.start();
-		dsptch.waitStopped();
+		Dispatcher.STOPSTATUS stopsts = dsptch.waitStopped(TimeOps.MSECS_PER_SECOND * 10, true);
+		org.junit.Assert.assertEquals(Dispatcher.STOPSTATUS.STOPPED, stopsts);
+		org.junit.Assert.assertTrue(dsptch.completedOK());
+
 		org.junit.Assert.assertTrue(handler.completed);
 		org.junit.Assert.assertEquals(2, handler.tmr1_cnt);
 		org.junit.Assert.assertEquals(0, handler.tmr2_cnt);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2013 Yusef Badri - All rights reserved.
+ * Copyright 2010-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.logging;
@@ -11,12 +11,12 @@ import com.grey.base.utils.ScheduledTime;
 
 /**
  * Base class for a range of loggers offering basic log() interfaces, optimised for zero garbagae generation.
- * <br/>
+ * <br>
  * The subclasses are meant to be accessed via this type, and this class provides configurable logfile rotation.
  * <p>
  * This base class is MT-safe with respect to its public methods, and MT-safe concrete classes would need to synchronise access to
  * their log(CharSequence msg) and flush() methods.
- * <br/>
+ * <br>
  * This class makes some inexpensive provision for multi-threading, but the overridden log() and flush() methods need to be synchronized
  * to make it fully MT-safe.
  */
@@ -27,7 +27,6 @@ abstract public class Logger
 
 	public static final String SYSPROP_DIAG = "grey.logger.diagnostics";
 	private static final boolean diagtrace = SysProps.get(SYSPROP_DIAG, false);
-	private static final boolean TIDplusName = SysProps.get(Parameters.SYSPROP_TIDPLUSNAME, true);
 	private static final java.util.HashSet<Logger> loggers = new java.util.HashSet<Logger>();
 	private static Thread shutdown_hook;
 
@@ -39,6 +38,7 @@ abstract public class Logger
 	private final ScheduledTime rotsched;
 	private final int maxsize;
 	private final boolean withTID;
+	private final boolean tidPlusName;
 	private final boolean withDelta;
 	private final boolean withMillisecs;
 	private final boolean withLevel;
@@ -54,7 +54,7 @@ abstract public class Logger
 	// All access to these fields is MT-safe.
 	// They are rarely accessed, so synchronisation cost is not an issue.
 	private java.io.File fh_active;
-	private boolean isOwner;
+	boolean isOwner;
 
 	// This replaces maxLevel for MT loggers - all accesses to maxLevel are intercepted and redirected to here.
 	// Saves MT loggers having to provide boiler-plate code to override getLevel() and setLevel()
@@ -65,7 +65,7 @@ abstract public class Logger
 	// most subclasses would override these
 	protected void openStream(java.io.OutputStream strm) throws java.io.IOException {};
 	protected void openStream(String pthnam) throws java.io.IOException {};
-	protected void closeStream(boolean isOwner) throws java.io.IOException {};
+	protected void closeStream(boolean is_owner) throws java.io.IOException {};
 	@Override
 	public void flush() throws java.io.IOException {}
 
@@ -101,6 +101,7 @@ abstract public class Logger
 			}
 		}
 		withTID = with_tid;
+		tidPlusName = params.tidPlusName;
 		withMillisecs = with_milli;
 		withLevel = with_level;
 		withInitMark = with_initmark;
@@ -181,12 +182,12 @@ abstract public class Logger
 		// Instead, we just display then.
 		synchronized (loggers) {
 			if (shutdown_hook == null) {
+				final Logger[] openlogs = (diagtrace ? loggers.toArray(new Logger[loggers.size()]) : null);
 				shutdown_hook = new Thread() {
 					@Override
 					public void run() {
-						if (!diagtrace) return;
-						Logger[] openlogs = loggers.toArray(new Logger[loggers.size()]);
-						System.out.println("GreyLogger: Shutdown Thread=T"+Thread.currentThread().getId()+" - Open loggers="+openlogs.length);
+						if (openlogs == null || openlogs.length == 0) return;
+						System.out.println("\nGreyLogger: Shutdown Thread=T"+Thread.currentThread().getId()+" - Open loggers="+openlogs.length);
 						for (int idx = 0; idx != openlogs.length; idx++) {
 							Logger logger = openlogs[idx];
 							System.out.println("- GreyLogger: Logger #"+(idx+1)+"/"+openlogs.length+": IsOwner="+logger.isOwner+" - "+logger);
@@ -241,8 +242,9 @@ abstract public class Logger
 	{
 		if (!isActive(lvl)) return;
 		if (ex == null) {log(lvl, msg); return;}
-		if (ex instanceof java.lang.NullPointerException) dumpStack = true;
-		String exmsg = "EXCEPTION: "+msg+" - "+com.grey.base.GreyException.summary(ex, dumpStack);
+		if (ex instanceof java.lang.NullPointerException || ex instanceof java.lang.ArrayIndexOutOfBoundsException) dumpStack = true;
+		String conj = (dumpStack ? "\n\t" : " - ");
+		String exmsg = "EXCEPTION: "+msg+conj+com.grey.base.GreyException.summary(ex, dumpStack);
 		log(lvl, exmsg);
 	}
 
@@ -282,9 +284,9 @@ abstract public class Logger
 			Thread thrd = Thread.currentThread();
 			pfxbuf.append(intro).append('T').append(thrd.getId());
 			intro = 0;
-			if (TIDplusName) {
-				String name = thrd.getName();
-				if (name != null && name.length() != 0) pfxbuf.append('-').append(name);
+			if (tidPlusName) {
+				String tnam = thrd.getName();
+				if (tnam != null && tnam.length() != 0) pfxbuf.append('-').append(tnam);
 			}
 		}
 		if (intro != '[') pfxbuf.append("] ");

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Yusef Badri - All rights reserved.
+ * Copyright 2012-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.sasl;
@@ -9,9 +9,8 @@ import com.grey.base.utils.ByteChars;
 import com.grey.base.utils.DynLoader;
 
 public class ExternalTest
-	implements SaslServer.Authenticator
 {
-	private boolean known_user;
+	private final SaslAuthenticator saslauth = new SaslAuthenticator();
 
 	@org.junit.Test
 	public void test() throws java.io.IOException, java.security.cert.CertificateException
@@ -22,9 +21,9 @@ public class ExternalTest
 
 	private void runtests(boolean base64) throws java.io.IOException, java.security.cert.CertificateException
 	{
-		known_user = true;
+		saslauth.known_user = true;
 		ExternalClient client = new ExternalClient(base64);
-		ExternalServer server = new ExternalServer(this, base64);
+		ExternalServer server = new ExternalServer(saslauth, base64);
 		org.junit.Assert.assertTrue(server.requiresInitialResponse());
 		org.junit.Assert.assertFalse(server.sendsChallenge());
 		org.junit.Assert.assertFalse(verify(client, server, null, null));
@@ -36,37 +35,59 @@ public class ExternalTest
 		org.junit.Assert.assertTrue(verify(client, server, cert, null));
 		org.junit.Assert.assertTrue(verify(client, server, cert, ""));
 		org.junit.Assert.assertTrue(verify(client, server, cert, cn));
-		org.junit.Assert.assertFalse(verify(client, server, cert, cn+"x"));
-		known_user = false;
+		org.junit.Assert.assertTrue(verify(client, server, cert, SaslAuthenticator.ROLE_GOOD));
+		org.junit.Assert.assertFalse(verify(client, server, cert, "badrolename"));
+		saslauth.known_user = false;
 		org.junit.Assert.assertFalse(verify(client, server, cert, null));
 		org.junit.Assert.assertFalse(verify(client, server, cert, ""));
 		org.junit.Assert.assertFalse(verify(client, server, cert, cn));
-		org.junit.Assert.assertFalse(verify(client, server, cert, cn+"x"));
+		org.junit.Assert.assertFalse(verify(client, server, cert, "badrolename"));
 	}
 
-	private boolean verify(ExternalClient client, ExternalServer server, java.security.cert.Certificate cert, String reqname)
+	private boolean verify(ExternalClient client, ExternalServer server, java.security.cert.X509Certificate cert, CharSequence rolename)
 	{
-		boolean status1 = verify(client, server, cert, reqname, null);
-		boolean status2 = verify(client, server, cert, reqname, new ByteChars("Prefix "));
+		boolean status1 = verify(client, server, cert, rolename, null);
+		boolean status2 = verify(client, server, cert, rolename, new ByteChars("Prefix "));
 		org.junit.Assert.assertTrue(status1 == status2);
 		return status1;
 	}
 
-	private boolean verify(ExternalClient client, ExternalServer server, java.security.cert.Certificate cert, String reqname, ByteChars rspbuf)
+	private boolean verify(ExternalClient client, ExternalServer server, java.security.cert.X509Certificate cert, CharSequence rolename, ByteChars rspbuf)
 	{
 		server.init(cert);
 		int pfxlen = (rspbuf == null ? 0 : rspbuf.ar_len);
-		ByteChars rsp = client.setResponse(reqname, rspbuf);
+		ByteChars rsp = client.setResponse(rolename, rspbuf);
 		if (rspbuf != null) org.junit.Assert.assertTrue(rsp == rspbuf);
 		rsp.advance(pfxlen);
-		return server.verifyResponse(rsp);
+		boolean ok = server.verifyResponse(rsp);
+		if (ok) {
+			if (rolename != null && rolename.length() != 0) {
+				org.junit.Assert.assertEquals(new ByteChars(rolename), server.getUser());
+			} else {
+				String cn = com.grey.base.crypto.SSLCertificate.getCN(cert);
+				org.junit.Assert.assertEquals(new ByteChars(cn), server.getUser());
+			}
+		}
+		return ok;
 	}
 
-	@Override
-	public ByteChars saslPassword(ByteChars role, ByteChars user)
+
+	private static final class SaslAuthenticator
+		extends SaslServer.Authenticator
 	{
-		boolean is_valid = (role == null);
-		if (is_valid) is_valid = known_user;
-		return is_valid ? new ByteChars("any_old_password") : null;
+		static final ByteChars ROLE_GOOD = new ByteChars("goodrolename");
+		boolean known_user;
+		SaslAuthenticator() {} //defined purely to avoid synthetic accessor
+
+		//implement this rather than saslAuthenticate() so as to exercise the default version of the latter
+		@Override
+		public ByteChars saslPasswordLookup(ByteChars usrnam) {
+			return (known_user ? new ByteChars("anyoldpassword") : null);
+		}
+		@Override
+		public boolean saslAuthorise(ByteChars usrnam, ByteChars rolename) {
+			if (ROLE_GOOD.equals(rolename)) return true;
+			return super.saslAuthorise(usrnam, rolename);
+		}
 	}
 }

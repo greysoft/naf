@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2013 Yusef Badri - All rights reserved.
+ * Copyright 2011-2016 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -7,7 +7,7 @@ package com.grey.base.utils;
 public class ByteCharsTest
 {
 	@org.junit.Test
-	public void testConstructors()
+	public void testConstructors() throws Exception
 	{
 		byte[] src_arr = new byte[]{11, 12, 13, 14, 15};
 		String src_str = "ABCDE";
@@ -54,7 +54,7 @@ public class ByteCharsTest
 		org.junit.Assert.assertEquals(src_str.charAt(len), ah.byteAt(len-1));
 
 		ByteChars src_ah = new ByteChars(src_str);
-		ah = new ByteChars(src_ah);
+		ah = new ByteChars(src_ah, false);
 		verify(ah, src_ah.ar_off, src_ah.size(), src_ah.capacity());
 		org.junit.Assert.assertTrue(src_ah.ar_buf == ah.ar_buf);
 		ah = new ByteChars(src_ah, off, len, true);
@@ -63,7 +63,7 @@ public class ByteCharsTest
 		org.junit.Assert.assertEquals(src_ah.byteAt(1), ah.byteAt(0));
 		org.junit.Assert.assertEquals(src_ah.byteAt(len), ah.byteAt(len-1));
 
-		// This constructor call doesn't compile!  Just pass in ArrayRef<byte[]> via the byte[] constructors
+		// This constructor call doesn't compile! Just pass in ArrayRef<byte[]> via the byte[] constructors
 		ArrayRef<byte[]> ahbyte = new ArrayRef<byte[]>(src_arr);
 		ah = new ByteChars(ahbyte);
 		org.junit.Assert.assertTrue(src_arr == ahbyte.ar_buf);
@@ -71,6 +71,24 @@ public class ByteCharsTest
 		org.junit.Assert.assertEquals(src_arr.length, ah.length());
 		org.junit.Assert.assertEquals(src_arr[0], ah.byteAt(0));
 		org.junit.Assert.assertEquals(src_arr[src_arr.length-1], ah.byteAt(src_arr.length-1));
+
+		//not actually constructors, but test these here
+		ah = new ByteChars(-1);
+		byte[] ahbuf1 = ah.ar_buf;
+		byte[] b = new byte[4];
+		ah.pointAt(b);
+		verify(ah, 0, b.length, b.length);
+		org.junit.Assert.assertNotSame(ahbuf1, ah.ar_buf);
+		ah.pointAt((byte[])null);
+		verify(ah, 0, 0, 0);
+		org.junit.Assert.assertNull(ah.ar_buf);
+
+		java.security.MessageDigest hashproc = java.security.MessageDigest.getInstance("MD5");
+		ah = new ByteChars("1");
+		com.grey.base.utils.ByteChars digest = ah.digest(hashproc);
+		org.junit.Assert.assertNotSame(digest, ah);
+		org.junit.Assert.assertEquals(1, ah.length());
+		org.junit.Assert.assertEquals('1', ah.byteAt(0));
 	}
 
 	@org.junit.Test
@@ -181,6 +199,9 @@ public class ByteCharsTest
 		int siz = ah1.size();
 		int off = ah1.ar_off;
 		ah1.append((byte[])null);
+		org.junit.Assert.assertTrue(ah1.size() == siz && ah1.ar_off == off && str.equals(ah1.toString()));
+		ah1.append((char[])null);
+		org.junit.Assert.assertTrue(ah1.size() == siz && ah1.ar_off == off && str.equals(ah1.toString()));
 		ah1.append((CharSequence)null);
 		org.junit.Assert.assertTrue(ah1.size() == siz && ah1.ar_off == off && str.equals(ah1.toString()));
 		ah1.append("");
@@ -197,13 +218,26 @@ public class ByteCharsTest
 		ah1.set("xyz", 2, 1);
 		org.junit.Assert.assertEquals(1, ah1.size());
 		org.junit.Assert.assertEquals('z', ah1.byteAt(0));
+		ah1.set((CharSequence)null);
+		org.junit.Assert.assertEquals(0, ah1.size());
+		ah1.set("xyz");
+		org.junit.Assert.assertEquals(3, ah1.size());
+		ah1.set((byte[])null);
+		org.junit.Assert.assertEquals(0, ah1.size());
 
 		barr = new byte[]{1,2};
+		byte[] barr2 = new byte[]{3,4};
 		ah1.set("abcdefghijkl");
 		ah1.set(barr);
 		org.junit.Assert.assertEquals(barr.length, ah1.size());
 		org.junit.Assert.assertEquals(barr[0], ah1.byteAt(0));
-		org.junit.Assert.assertEquals(barr[barr.length - 1], ah1.byteAt(barr.length - 1));
+		org.junit.Assert.assertEquals(barr[1], ah1.byteAt(1));
+		ah1.append(barr2);
+		org.junit.Assert.assertEquals(barr.length+barr2.length, ah1.size());
+		org.junit.Assert.assertEquals(barr[0], ah1.byteAt(0));
+		org.junit.Assert.assertEquals(barr[1], ah1.byteAt(1));
+		org.junit.Assert.assertEquals(barr2[0], ah1.byteAt(2));
+		org.junit.Assert.assertEquals(barr2[1], ah1.byteAt(3));
 
 		char[] carr = "123".toCharArray();
 		ah1.set("a");
@@ -225,16 +259,33 @@ public class ByteCharsTest
 		// test pointers to same content in different memory buffers
 		ByteChars ah1 = new ByteChars(str);
 		ByteChars ah2 = new ByteChars(str);
+		ByteChars ah3 = new ByteChars();
 		org.junit.Assert.assertFalse(ah1.ar_buf == ah2.ar_buf);
 		org.junit.Assert.assertTrue(ah1.equals(ah2));
 		org.junit.Assert.assertTrue(ah1.hashCode() == ah2.hashCode());
+		org.junit.Assert.assertFalse(ah1.equals(str));
 
 		org.junit.Assert.assertTrue(ah1.equalsBytes(ah2.toByteArray()));
 		org.junit.Assert.assertFalse(ah1.equals(ah2.toByteArray()));
 		org.junit.Assert.assertFalse(ah1.equalsBytes(ah2.toByteArray(), 0, ah1.ar_len-1));
+		org.junit.Assert.assertTrue(ah1.equalsBytes(ByteOps.getBytes8(str)));
+		org.junit.Assert.assertFalse(ah1.equalsBytes(ByteOps.getBytes8("Test Mx"))); //same length
+		org.junit.Assert.assertFalse(ah1.equalsBytes(null));
+
 		org.junit.Assert.assertTrue(ah1.equalsChars(str.toCharArray()));
 		org.junit.Assert.assertFalse(ah1.equals(str.toCharArray()));
+		org.junit.Assert.assertFalse(ah1.equalsChars("Test Mx".toCharArray())); //same length
 		org.junit.Assert.assertFalse(ah1.equalsChars(ah2.toCharArray(), 0, ah1.ar_len-1));
+		org.junit.Assert.assertFalse(ah1.equalsChars(null));
+
+		org.junit.Assert.assertTrue(ah1.equalsIgnoreCase(str.toLowerCase()));
+		org.junit.Assert.assertTrue(ah1.equalsIgnoreCase(str.toUpperCase()));
+		org.junit.Assert.assertTrue(ah1.equalsIgnoreCase(str));
+		org.junit.Assert.assertFalse(ah1.equalsIgnoreCase("Test Mx")); //same length
+		org.junit.Assert.assertFalse(ah1.equalsIgnoreCase(str+"x"));
+		org.junit.Assert.assertFalse(ah1.equalsIgnoreCase(""));
+		org.junit.Assert.assertTrue(ah3.equalsIgnoreCase(""));
+		org.junit.Assert.assertFalse(ah1.equalsIgnoreCase(null));
 
 		ah2.ar_buf[ah2.ar_off + ah2.ar_len - 1]++;
 		org.junit.Assert.assertFalse(ah1.equals(ah2));
@@ -242,7 +293,6 @@ public class ByteCharsTest
 		// miscellaneous
 		org.junit.Assert.assertTrue(ah1.equals(ah1));
 		org.junit.Assert.assertFalse(ah1.equals(null));
-		org.junit.Assert.assertFalse(ah1.equals(str));
 
 		ah1.setByte(0, (byte)0);
 		org.junit.Assert.assertEquals(0, ah1.byteAt(0));
@@ -256,6 +306,21 @@ public class ByteCharsTest
 		ah1.setByte(0, (byte)255);
 		org.junit.Assert.assertEquals(255, ah1.byteAt(0));
 		org.junit.Assert.assertEquals(255, ah1.charAt(0));
+
+		ByteChars bc1 = new ByteChars("HELLO");
+		ByteChars bc2 = new ByteChars("hello");
+		org.junit.Assert.assertFalse(bc1.equals(bc2));
+		org.junit.Assert.assertTrue(bc1.equalsIgnoreCase(bc2));
+		org.junit.Assert.assertTrue(bc2.equalsIgnoreCase(bc1));
+		org.junit.Assert.assertNotEquals("hello", bc1.toString());
+		ByteChars bc = bc1.toLowerCase();
+		org.junit.Assert.assertTrue(bc == bc1);
+		org.junit.Assert.assertEquals("hello", bc1.toString());
+		org.junit.Assert.assertTrue(bc1.equals(bc2));
+		bc = bc2.toUpperCase();
+		org.junit.Assert.assertTrue(bc == bc2);
+		org.junit.Assert.assertEquals("HELLO", bc2.toString());
+		org.junit.Assert.assertFalse(bc1.equals(bc2));
 	}
 
 	@org.junit.Test
@@ -303,13 +368,15 @@ public class ByteCharsTest
 		// now look for a string
 		String str = "axabxwabc";
 		int correct = str.indexOf("abc");
-		org.junit.Assert.assertFalse(correct == 0 || correct == -1);  // to make sure we didn't mistype anything above
+		org.junit.Assert.assertFalse(correct == 0 || correct == -1); // to make sure we didn't mistype anything above
 		ah = new ByteChars(str);
 		off = ah.indexOf("abc");
 		org.junit.Assert.assertEquals(correct, off);
 		off = ah.indexOf(2, "abc");
 		org.junit.Assert.assertEquals(correct, off);
 		off = ah.indexOf("badpattern");
+		org.junit.Assert.assertEquals(-1, off);
+		off = ah.indexOf((CharSequence)null);
 		org.junit.Assert.assertEquals(-1, off);
 
 		// test some initial limits
@@ -323,6 +390,58 @@ public class ByteCharsTest
 		ah = new ByteChars(str);
 		off = ah.indexOf("abc");
 		org.junit.Assert.assertEquals(-1, off);
+
+		// test the byte[] scanners
+		ah = new ByteChars("x12345");
+		ah.advance(1);
+		byte[] seq = ah.toByteArray();
+		off = ah.indexOf(seq);
+		org.junit.Assert.assertEquals(0, off);
+		seq = ah.toByteArray(1, 3);
+		off = ah.indexOf(seq);
+		org.junit.Assert.assertEquals(1, off);
+		off = ah.indexOf(1, seq, 0, seq.length);
+		org.junit.Assert.assertEquals(1, off);
+		off = ah.indexOf(2, seq, 0, seq.length);
+		org.junit.Assert.assertEquals(-1, off);
+		seq[2] = 'x';
+		off = ah.indexOf(seq);
+		org.junit.Assert.assertEquals(-1, off);
+		off = ah.indexOf((byte[])null);
+		org.junit.Assert.assertEquals(-1, off);
+		off = ah.indexOf(new byte[0]);
+		org.junit.Assert.assertEquals(-1, off);
+
+		ah = new ByteChars("x12x2xx5x");
+		int cnt = ah.count('x');
+		org.junit.Assert.assertEquals(5, cnt);
+		cnt = ah.count(1, 'x');
+		org.junit.Assert.assertEquals(4, cnt);
+		seq = ByteOps.getBytes8("2x");
+		cnt = ah.count(seq);
+		org.junit.Assert.assertEquals(2, cnt);
+		org.junit.Assert.assertEquals(0, ah.count(null));
+
+		//test the convenience methods
+		String pfx = "123";
+		String mainpart = "abc xyz";
+		ah = new ByteChars(pfx+mainpart);
+		ByteChars bclight = new ByteChars(-1);
+		bclight.pointAt(ah.ar_buf, ah.ar_off+pfx.length(), ah.ar_len - pfx.length());
+		org.junit.Assert.assertTrue(bclight.startsWith(mainpart.subSequence(0, 3)));
+		org.junit.Assert.assertTrue(bclight.startsWith(mainpart));
+		org.junit.Assert.assertFalse(bclight.startsWith(mainpart.subSequence(0, 3)+"9"));
+		org.junit.Assert.assertFalse(bclight.startsWith("abc xy9"));
+		org.junit.Assert.assertFalse(bclight.startsWith(mainpart+"9"));
+		org.junit.Assert.assertTrue(bclight.startsWith("")); //String behaves this way
+		org.junit.Assert.assertFalse(bclight.startsWith(null)); //String throws NPE
+		org.junit.Assert.assertTrue(bclight.endsWith("xyz"));
+		org.junit.Assert.assertTrue(bclight.endsWith(mainpart));
+		org.junit.Assert.assertFalse(bclight.endsWith("xyz9"));
+		org.junit.Assert.assertFalse(bclight.endsWith("abc xy9"));
+		org.junit.Assert.assertFalse(bclight.endsWith(mainpart+"9"));
+		org.junit.Assert.assertTrue(bclight.endsWith("")); //String behaves this way
+		org.junit.Assert.assertFalse(bclight.endsWith(null)); //String throws NPE
 	}
 
 	@org.junit.Test
@@ -336,6 +455,13 @@ public class ByteCharsTest
 		ah.append(numval, strbuf);
 		int numval2 = (int)ah.parseDecimal();
 		org.junit.Assert.assertEquals(numval, numval2);
+		ah.set("+"+numval);
+		numval2 = (int)ah.parseDecimal();
+		org.junit.Assert.assertEquals(numval, numval2);
+		// negative
+		ah.set("-"+numval);
+		numval2 = (int)ah.parseDecimal();
+		org.junit.Assert.assertEquals(-numval, numval2);
 
 		// with surrounding text
 		ah.set("blah");
@@ -364,17 +490,27 @@ public class ByteCharsTest
 		off2 = ah.size();
 		numval2 = (int)ah.parseHexadecimal(off, off2 - off);
 		org.junit.Assert.assertEquals(numval, numval2);
-		// with minus sign - not allowed for hex digits, so treated as any other invalid char
+		//negative
 		ah.truncateTo(off);
 		ah.append('-');
 		ah.append(Long.toHexString(numval));
 		off2 = ah.size();
+		numval2 = (int)ah.parseHexadecimal(off, off2 - off);
+		org.junit.Assert.assertEquals(-numval, numval2);
+		ah.set("23blah");
 		try {
-			numval2 = (int)ah.parseHexadecimal(off, off2 - off);
-			org.junit.Assert.fail("parseHexadecimal failed to reject invalid number: -"+Long.toHexString(numval)+" - returned "+numval2);
-		} catch (NumberFormatException ex) {
-			// expected error - gets thrown for any invalid char
-		}
+			numval2 = (int)ah.parseHexadecimal();
+			org.junit.Assert.fail("parseHexadecimal failed to reject invalid number: "+ah+" - returned "+numval2);
+		} catch (NumberFormatException ex) {} //expected error - gets thrown for any invalid char
+		ah.set("-");
+		numval2 = (int)ah.parseDecimal();
+		org.junit.Assert.assertEquals(0, numval2);
+		ah.set("+");
+		numval2 = (int)ah.parseDecimal();
+		org.junit.Assert.assertEquals(0, numval2);
+		ah.ar_len = 0;
+		numval2 = (int)ah.parseDecimal();
+		org.junit.Assert.assertEquals(0, numval2);
 	}
 
 	@org.junit.Test
@@ -392,7 +528,7 @@ public class ByteCharsTest
 		org.junit.Assert.assertEquals(seq.toString(), src_seq1);
 		seq = ah.subSequence(1, ah.length() - 1);
 		org.junit.Assert.assertEquals(seq.toString(), src_seq2);
-		org.junit.Assert.assertFalse(((ByteChars)seq).ar_buf == ah.ar_buf);
+		if (seq instanceof ByteChars) org.junit.Assert.assertFalse(((ByteChars)seq).ar_buf == ah.ar_buf);
 
 		ah.advance(1);
 		org.junit.Assert.assertEquals(src.length() - 1, ah.length());
@@ -465,7 +601,6 @@ public class ByteCharsTest
 	{
 		byte[] src_arr = new byte[]{11, 12, 13, 14, 15};
 		String src_str = "ABCDE";
-		ByteChars src_ah = new ByteChars(src_arr);
 		int off = 1;
 
 		ByteChars ah = new ByteChars(src_arr);
@@ -481,9 +616,6 @@ public class ByteCharsTest
 
 		ah = new ByteChars(src_str);
 		verify(ah, 0, src_str.length(), src_str.length());
-
-		new ByteChars(src_ah, false);
-		new ByteChars(src_ah, 1, src_ah.size() - 1, true);
 	}
 
 	@org.junit.Test
@@ -527,10 +659,10 @@ public class ByteCharsTest
 		org.junit.Assert.assertTrue(StringOps.sameSeq("xyz", lst.get(2)));
 	}
 
-    private static java.util.ArrayList<ByteChars> parseTerms(CharSequence str)
-    {
-    	return ByteChars.parseTerms(str, 0, str==null?0:str.length(), (byte)'|', null, null, null);
-    }
+	private static java.util.ArrayList<ByteChars> parseTerms(CharSequence str)
+	{
+		return ByteChars.parseTerms(str, 0, str==null?0:str.length(), (byte)'|', null, null, null);
+	}
 
 	private static void verify(ByteChars ah, int off, int len, int cap)
 	{

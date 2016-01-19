@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2013 Yusef Badri - All rights reserved.
+ * Copyright 2010-2014 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf;
@@ -9,6 +9,7 @@ import com.grey.base.utils.CommandParser;
 import com.grey.base.utils.FileOps;
 import com.grey.base.utils.DynLoader;
 import com.grey.logging.Logger;
+import com.grey.naf.reactor.Dispatcher;
 
 public class Launcher
 {
@@ -18,7 +19,7 @@ public class Launcher
 	private static final int F_DUMPENV = 1 << 0;
 	private static final int F_QUIET = 1 << 1;  //mainly for the benefit of the unit tests
 
-	private static final String[] opts = new String[]{"c:", "cmd:", "remote:", "logger:", "dumpenv", "q"};
+	static final String[] options = new String[]{"c:", "cmd:", "remote:", "logger:", "dumpenv", "q"};
 
 	private static boolean announcedNAF;
 	static {
@@ -40,7 +41,7 @@ public class Launcher
 		public String logname;
 		public int flags;
 
-		public BaseOptsHandler() {super(opts, 0, -1);}
+		public BaseOptsHandler() {super(options, 0, -1);}
 		public void setFlag(int f) {flags |= f;}
 		public boolean isFlagSet(int f) {return ((flags & f) != 0);}
 
@@ -137,10 +138,10 @@ public class Launcher
 		com.grey.logging.Logger bootlog = createBootLogger(baseOptions);
 		bootlog.info("Created NAF Boot Logger");
 		nafcfg.announce(bootlog);
-		com.grey.naf.reactor.Dispatcher[] dispatchers;
+		java.util.ArrayList<Dispatcher> dispatchers;
 
 		try {
-			dispatchers = com.grey.naf.reactor.Dispatcher.launchConfigured(nafcfg, bootlog);
+			dispatchers = Dispatcher.launchConfigured(nafcfg, bootlog);
 			if (dispatchers == null) throw new com.grey.base.ConfigException("No Dispatchers are configured");
 		} catch (Throwable ex) {
 			String errmsg = "Failed to launch NAF - "+com.grey.base.GreyException.summary(ex, true);
@@ -148,11 +149,19 @@ public class Launcher
 			return;
 		}
         long systime2 = System.currentTimeMillis();
-		bootlog.info("NAF BOOTED - Dispatchers="+dispatchers.length+", Time="+(float)(systime2-systime_boot)/1000f+"s");
+		bootlog.info("NAF BOOTED - Dispatchers="+dispatchers.size()+", Time="+(systime2-systime_boot)/1000f+"s");
 		FileOps.flush(bootlog);
 
-		for (int idx = 0; idx != dispatchers.length; idx++) {
-			dispatchers[idx].waitStopped();
+		while (dispatchers.size() != 0) {
+			for (int idx = 0; idx != dispatchers.size(); idx++) {
+				Dispatcher d = dispatchers.get(idx);
+				Dispatcher.STOPSTATUS stopsts = d.waitStopped(5000, false);
+				if (stopsts != Dispatcher.STOPSTATUS.ALIVE) {
+					dispatchers.remove(d);
+					bootlog.info("Launcher has reaped Dispatcher="+d.name+" - remaining="+dispatchers.size());
+					break;
+				}
+			}
 		}
 		bootlog.info("All Dispatchers have exited - terminating\n\n");
 		FileOps.flush(bootlog);
@@ -168,7 +177,7 @@ public class Launcher
 		} else {
 			rsp = com.grey.naf.nafman.Client.submitLocalCommand(baseOptions.cmd, baseOptions.cfgpath, log);
 		}
-		System.out.println("NAFMAN Response="+rsp.length()+":\n\n"+rsp);
+		if (!baseOptions.isFlagSet(F_QUIET)) System.out.println("NAFMAN Response="+rsp.length()+":\n\n"+rsp);
 	}
 
 	// It's ultimately up to the user how they configure the logging framework, but some initialisation code

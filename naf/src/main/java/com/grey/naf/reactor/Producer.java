@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2013 Yusef Badri - All rights reserved.
+ * Copyright 2011-2014 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -24,8 +24,8 @@ public final class Producer<T>
 
 	public final String consumerType; //this is purely descriptive
 	private final Consumer<T> consumer;
-	private final com.grey.base.utils.Circulist<T> exchgq;  //MT queue, on which Dispatcher receives items from producer
-	private final com.grey.base.utils.Circulist<T> availq;  //non-MT staging queue, only accessed by the Dispatcher
+	private final com.grey.base.collections.Circulist<T> exchgq;  //MT queue, on which Dispatcher receives items from producer
+	private final com.grey.base.collections.Circulist<T> availq;  //non-MT staging queue, only accessed by the Dispatcher
 	private final AlertsPipe<T> alertspipe; //null means this Producer can only be used synchronously (not MT-safe)
 	private final com.grey.logging.Logger logger;
 	private boolean in_shutdown;
@@ -34,24 +34,24 @@ public final class Producer<T>
 	public void shutdown(){shutdown(false);}
 
 	public Producer(Class<T> clss, Dispatcher dsptch, Consumer<T> cons)
-			throws com.grey.base.ConfigException, com.grey.base.FaultException, java.io.IOException
+			throws com.grey.base.FaultException, java.io.IOException
 	{
 		this(clss, dsptch, cons, null);
 	}
 
 	public Producer(Class<T> clss, Consumer<T> cons, com.grey.logging.Logger log)
-			throws com.grey.base.ConfigException, com.grey.base.FaultException, java.io.IOException
+			throws com.grey.base.FaultException, java.io.IOException
 	{
 		this(clss, null, cons, log);
 	}
 
 	private Producer(Class<T> clss_item, Dispatcher dsptch, Consumer<T> cons, com.grey.logging.Logger log)
-			throws com.grey.base.ConfigException, com.grey.base.FaultException, java.io.IOException
+			throws com.grey.base.FaultException, java.io.IOException
 	{
 		consumer = cons;
 		consumerType = consumer.getClass().getName()+"/"+clss_item.getName();
-		exchgq = new com.grey.base.utils.Circulist<T>(clss_item);
-		availq = new com.grey.base.utils.Circulist<T>(clss_item);
+		exchgq = new com.grey.base.collections.Circulist<T>(clss_item);
+		availq = new com.grey.base.collections.Circulist<T>(clss_item);
 		logger = (log == null && dsptch != null ? dsptch.logger : log);
 		alertspipe = (dsptch == null ? null : new AlertsPipe<T>(dsptch, this));
 		if (logger != null) {
@@ -183,30 +183,31 @@ public final class Producer<T>
 	 * This class is non-private only because Dispatcher.dumpState() needs to be able to see it.
 	 */
 	static final class AlertsPipe<T>
-		extends ChannelMonitor
+		extends CM_Stream
 	{
 		public final Producer<T> producer;
-		private final java.nio.channels.Pipe.SinkChannel wep;  //Write end-point of pipe
+		private final java.nio.channels.Pipe.SinkChannel wep;   //Write end-point of pipe
+		private final java.nio.channels.Pipe.SourceChannel rep; //Read end-point of pipe
 		private final java.nio.ByteBuffer xmtbuf;
+		private final java.nio.ByteBuffer rcvbuf;
 
-		AlertsPipe(Dispatcher d, Producer<T> p) throws com.grey.base.ConfigException, com.grey.base.FaultException, java.io.IOException
+		AlertsPipe(Dispatcher d, Producer<T> p) throws com.grey.base.FaultException, java.io.IOException
 		{
-			super(d);
+			super(d, new com.grey.naf.BufferSpec(0, 0), null); //we will do our own reads
 			producer = p;
 
 			java.nio.channels.Pipe pipe = java.nio.channels.Pipe.open();
-			java.nio.channels.Pipe.SourceChannel rep = pipe.source(); //Read end-point
+			rep = pipe.source(); //Read end-point
 			wep = pipe.sink();
 			wep.configureBlocking(false); //guaranteed not to block in practice
 
 			java.nio.ByteBuffer niobuf = com.grey.base.utils.NIOBuffers.create(1, true);
 			niobuf.put((byte)1); //value doesn't matter
 			xmtbuf = niobuf.asReadOnlyBuffer();
+			rcvbuf = com.grey.base.utils.NIOBuffers.create(64, true);
 
 			// enable event notifications on the read (consumer) endpoint of our pipe
-			com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(64, 0);
-			chanreader = new IOExecReader(bufspec);
-			initChannel(rep, true, true);
+			registerConnectedChannel(rep, true);
 			chanreader.receive(0);
 		}
 
@@ -220,16 +221,19 @@ public final class Producer<T>
 		// We don't care if the write() returns zero because it's blocked. We are not sending data which the
 		// consumer has to read, but merely kicking it into action, and if the pipe is full, then the
 		// consumer will surely be signalled that I/O is pending.
-		void signalConsumer() throws java.io.IOException
+		synchronized void signalConsumer() throws java.io.IOException
 		{
 			xmtbuf.flip();
 			wep.write(xmtbuf);
 		}
 
 		// This happens within the Dispatcher (consumer) thread.
+		// We don't care what's in rcvbuf, we just read it off to clear the I/O notification.
+		// Note that 'rep' and 'CM_Stream.iochan' are one and the same, but recording using rep allows us to avoid casting iochan.
 		@Override
 		public void ioReceived(com.grey.base.utils.ArrayRef<byte[]> data) throws com.grey.base.FaultException, java.io.IOException
 		{
+			rep.read(rcvbuf);
 			producer.producerEvent();
 		}
 	}

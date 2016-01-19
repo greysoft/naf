@@ -9,12 +9,12 @@ package com.grey.logging;
 public class SinkLogger
 	extends Logger
 {
-	public SinkLogger(String logname) throws java.io.IOException
+	public SinkLogger(String logname)
 	{
 		this(new Parameters(), logname);
 	}
 
-	public SinkLogger(Parameters params, String logname) throws java.io.IOException
+	public SinkLogger(Parameters params, String logname)
 	{
 		super(adjust(params), logname, false);
 	}

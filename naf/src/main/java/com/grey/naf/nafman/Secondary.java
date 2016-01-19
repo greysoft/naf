@@ -18,7 +18,7 @@ public final class Secondary
 	@Override
 	public int getPort() {return primary.getPort();}
 
-	public Secondary(com.grey.naf.reactor.Dispatcher d, com.grey.base.config.XmlConfig cfg)
+	public Secondary(com.grey.naf.reactor.Dispatcher d, com.grey.base.config.XmlConfig cfg, com.grey.naf.DispatcherDef def)
 			throws com.grey.base.ConfigException, com.grey.base.FaultException, java.io.IOException
 	{
 		super(d, cfg);

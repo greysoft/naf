@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2013 Yusef Badri - All rights reserved.
+ * Copyright 2010-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -147,10 +147,16 @@ public final class ScheduledTime
 		return dtcal.getTimeInMillis();
 	}
 
-	public static long getBaseTime(FREQ freq, long systime)
+	public static long getBaseTime(FREQ freq, long systime, String tz)
 	{
-		java.util.Calendar dtcal = TimeOps.getCalendar(systime, null);
+		java.util.Calendar dtcal = TimeOps.getCalendar(systime, tz);
 		return getBaseTime(freq, dtcal);
+	}
+
+	public static long getNextTime(FREQ freq, long systime, String tz)
+	{
+		java.util.Calendar dtcal = TimeOps.getCalendar(systime, tz);
+		return getNextTime(freq, dtcal);
 	}
 
 	// Returns the start of the next interval, based on the given frequency
@@ -181,15 +187,9 @@ public final class ScheduledTime
 			dtcal.set(dtcal.MINUTE, dtcal.get(dtcal.MINUTE) + 1);
 			break;
 		default:
-			throw new IllegalArgumentException("INTERNAL ERROR - Unrecognised FREQ="+freq);  //switch statement must be out of sync with current enum def
+			throw new IllegalArgumentException("Unsupported FREQ="+freq);
 		}
 		return dtcal.getTimeInMillis();
-	}
-
-	public static long getNextTime(FREQ freq, long systime)
-	{
-		java.util.Calendar dtcal = TimeOps.getCalendar(systime, null);
-		return getNextTime(freq, dtcal);
 	}
 
 	// returns an appropriate SimpleDateFormat pattern for our frequency
@@ -215,7 +215,7 @@ public final class ScheduledTime
 			dtfmt = "yyyyMMdd_HHmm";
 			break;
 		default:
-			throw new IllegalArgumentException("INTERNAL ERROR - Unrecognised FREQ=" + freq);  // missing case label
+			throw new IllegalArgumentException("Unsupported FREQ="+freq);
 		}
 		return dtfmt;
 	}

@@ -9,7 +9,7 @@ package com.grey.logging;
 public class MTLatinLogger
 	extends LatinLogger
 {
-	protected MTLatinLogger(Parameters params, String logname) throws java.io.IOException
+	protected MTLatinLogger(Parameters params, String logname)
 	{
 		super(params, logname, true);
 	}

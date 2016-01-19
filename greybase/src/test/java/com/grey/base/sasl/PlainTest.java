@@ -1,20 +1,19 @@
 /*
- * Copyright 2012 Yusef Badri - All rights reserved.
+ * Copyright 2012-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.sasl;
 
-import com.grey.base.utils.ByteChars;
-import com.grey.base.utils.ObjectWell;
 import com.grey.base.utils.StringOps;
+import com.grey.base.utils.ByteChars;
+import com.grey.base.collections.ObjectWell;
 
 public class PlainTest
-	implements SaslServer.Authenticator
 {
+	private final SaslAuthenticator saslauth = new SaslAuthenticator();
 	private CharSequence req_role;
 	private CharSequence req_user;
 	private CharSequence req_passwd;
-	private CharSequence actual_passwd;
 
 	@org.junit.Test
 	public void testPlain()
@@ -26,14 +25,14 @@ public class PlainTest
 	}
 
 	@org.junit.Test
-	public void testBadResponse() throws java.security.NoSuchAlgorithmException
+	public void testBadResponse()
 	{
-		PlainServer server = new PlainServer(this, false, false);
+		PlainServer server = new PlainServer(saslauth, false);
 		org.junit.Assert.assertTrue(server.requiresInitialResponse());
 		org.junit.Assert.assertFalse(server.sendsChallenge());
+		req_user = SaslAuthenticator.USRNAM_GOOD;
+		req_passwd = SaslAuthenticator.PASSWD_GOOD;
 		req_role = "";
-		req_user = "userid1";
-		req_passwd = "password";
 		//only 1 delimiter
 		ByteChars rsp = new ByteChars(req_role).append((byte)0).append(req_user);
 		org.junit.Assert.assertFalse(server.init().verifyResponse(rsp));
@@ -47,25 +46,44 @@ public class PlainTest
 
 	private void runtests(boolean base64, boolean role_ok)
 	{
-		ServerFactory fact = (role_ok ? new ServerFactory(SaslEntity.MECH.PLAIN, this, base64, role_ok) : new ServerFactory(SaslEntity.MECH.PLAIN, this, base64));
+		ServerFactory fact = new ServerFactory(SaslEntity.MECH.PLAIN, saslauth, base64);
 		ObjectWell<PlainServer> servers = new ObjectWell<PlainServer>(null, fact, "utest_SaslPlain", 0, 0, 1);
 		PlainServer server = servers.extract().init();
 		PlainClient client = new PlainClient(base64);
-		req_role = "role1";
-		req_user = "userid1";
-		req_passwd = "password";
-		org.junit.Assert.assertEquals(role_ok, verify(client, server, null));
-		org.junit.Assert.assertEquals(role_ok, verify(client, server, new ByteChars("Prefix")));
+		req_user = SaslAuthenticator.USRNAM_GOOD;
+		req_passwd = SaslAuthenticator.PASSWD_GOOD;
+		req_role = (role_ok ? SaslAuthenticator.ROLE_GOOD : "role_bad");
+		org.junit.Assert.assertTrue(role_ok == verify(client, server, null));
+		org.junit.Assert.assertTrue(role_ok == verify(client, server, new ByteChars("Prefix")));
 		req_role = null;
+		org.junit.Assert.assertTrue(verify(client, server, null));
+		org.junit.Assert.assertTrue(verify(client, server, new ByteChars("Prefix")));
+		req_role = "";
 		org.junit.Assert.assertTrue(verify(client, server, null));
 		org.junit.Assert.assertTrue(verify(client, server, new ByteChars("Prefix")));
 		req_role = req_user;
 		org.junit.Assert.assertTrue(verify(client, server, null));
 		org.junit.Assert.assertTrue(verify(client, server, new ByteChars("Prefix")));
 
-		actual_passwd = "passwd2";
+		req_role = null;
+		req_passwd = "badpass";
 		org.junit.Assert.assertFalse(verify(client, server, null));
-		actual_passwd = "passwd2";
+		org.junit.Assert.assertFalse(verify(client, server, new ByteChars("Prefix")));
+		req_passwd = null;
+		org.junit.Assert.assertFalse(verify(client, server, null));
+		org.junit.Assert.assertFalse(verify(client, server, new ByteChars("Prefix")));
+		req_passwd = "";
+		org.junit.Assert.assertFalse(verify(client, server, null));
+		org.junit.Assert.assertFalse(verify(client, server, new ByteChars("Prefix")));
+		req_passwd = "badpass";
+		req_user = "nosuchuser";
+		org.junit.Assert.assertFalse(verify(client, server, null));
+		org.junit.Assert.assertFalse(verify(client, server, new ByteChars("Prefix")));
+		req_user = null;
+		org.junit.Assert.assertFalse(verify(client, server, null));
+		org.junit.Assert.assertFalse(verify(client, server, new ByteChars("Prefix")));
+		req_user = "";
+		org.junit.Assert.assertFalse(verify(client, server, null));
 		org.junit.Assert.assertFalse(verify(client, server, new ByteChars("Prefix")));
 		servers.store(server);
 	}
@@ -73,32 +91,40 @@ public class PlainTest
 	private boolean verify(PlainClient client, SaslServer server, ByteChars rspbuf)
 	{
 		client.init();
-		server.init();
 		int pfxlen = (rspbuf == null ? 0 : rspbuf.ar_len);
-		int off1 = (rspbuf == null ? 0 : rspbuf.ar_off);
 		ByteChars rsp = client.setResponse(req_role, req_user, req_passwd, rspbuf);
 		if (rspbuf != null) org.junit.Assert.assertTrue(rsp == rspbuf);
 		rsp.advance(pfxlen);
-		if (actual_passwd == null) actual_passwd = req_passwd;
-		boolean valid = server.verifyResponse(rsp);
-		actual_passwd = null;
-		if (rspbuf != null) {
-			rspbuf.ar_off = off1;
-			rspbuf.ar_len = pfxlen;
+		boolean ok = server.init().verifyResponse(rsp);
+		if (ok) {
+			if (req_role != null && req_role.length() != 0) {
+				org.junit.Assert.assertEquals(new ByteChars(req_role), server.getUser());
+			} else {
+				org.junit.Assert.assertEquals(new ByteChars(req_user), server.getUser());
+			}
 		}
-		return valid;
+		return ok;
 	}
 
-	@Override
-	public ByteChars saslPassword(ByteChars role, ByteChars user)
+
+	private static final class SaslAuthenticator
+		extends SaslServer.Authenticator
 	{
-		boolean is_valid = true;
-		if (req_role == null || req_role.equals(req_user)) {
-			is_valid = (role == null);
-		} else {
-			is_valid = StringOps.sameSeq(role, req_role);
+		static final CharSequence USRNAM_GOOD = "userid1";
+		static final ByteChars PASSWD_GOOD = new ByteChars("password1");
+		static final ByteChars ROLE_GOOD = new ByteChars("goodrolename");
+		SaslAuthenticator() {} //defined purely to avoid synthetic accessor
+
+		//implement this rather than saslAuthenticate() so as to exercise the default version of the latter
+		@Override
+		public ByteChars saslPasswordLookup(ByteChars usrnam) {
+			if (StringOps.sameSeq(usrnam, USRNAM_GOOD)) return PASSWD_GOOD;
+			return null;
 		}
-		if (is_valid) is_valid = StringOps.sameSeq(user, req_user);
-		return is_valid ? new ByteChars(actual_passwd) : null;
+		@Override
+		public boolean saslAuthorise(ByteChars usrnam, ByteChars rolename) {
+			if (ROLE_GOOD.equals(rolename)) return true;
+			return super.saslAuthorise(usrnam, rolename);
+		}
 	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2013 Yusef Badri - All rights reserved.
+ * Copyright 2010-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.nafman;
@@ -27,6 +27,7 @@ public final class Command
 	public interface Handler
 	{
 		CharSequence handleNAFManCommand(Command cmd) throws com.grey.base.FaultException, java.io.IOException;
+		CharSequence nafmanHandlerID();
 	}
 
 	public static final String ATTR_DISPATCHER = "d";
@@ -44,22 +45,22 @@ public final class Command
 	static final int DETACH_NONFINAL = 3;
 
 	private final java.util.ArrayList<Agent> routeTo = new java.util.ArrayList<Agent>();  //agents we'll be routed to
-	private final com.grey.base.utils.HashedMap<String, String> args = new com.grey.base.utils.HashedMap<String, String>();
+	private final com.grey.base.collections.HashedMap<String, String> args = new com.grey.base.collections.HashedMap<String, String>();
 	private final com.grey.base.utils.ByteChars response = new com.grey.base.utils.ByteChars();
 
 	public Registry.DefCommand def;
 	private Server srvr;
 
 	public String getArg(String nam) {return args.get(nam);}
-	com.grey.base.utils.HashedMap<String, String> getArgs() {return args;}
+	com.grey.base.collections.HashedMap<String, String> getArgs() {return args;}
 	void setArg(String nam, String val) {args.put(nam, val);}
 
-	Command init(Registry.DefCommand def, Server srvr)
+	Command init(Registry.DefCommand d, Server s)
 	{
 		clear();
-		this.def = def;
-		this.srvr = srvr;
-		response.append("<nafman><handlers>");
+		def = d;
+		srvr = s;
+		if (!isPlaintextResponse()) response.append("<nafman><handlers>");
 		return this;
 	}
 
@@ -77,7 +78,7 @@ public final class Command
 		//The response object is not contended here, but we do need to synchronise for the sake of memory visibility,
 		//so as to see updates performed by other threads.
 		synchronized (this) {
-			response.append("</handlers></nafman>");
+			if (!isPlaintextResponse()) response.append("</handlers></nafman>");
 		}
 		boolean ok = false;
 		try {
@@ -122,8 +123,13 @@ public final class Command
 	//can be called by any thread
 	synchronized void addHandlerResponse(com.grey.naf.reactor.Dispatcher dsptch, Handler handler, CharSequence msg)
 	{
+		if (isPlaintextResponse()) {
+			response.append(msg);
+			return;
+		}
 		response.append("<handler dname=\"").append(dsptch.name).append("\"");
-		response.append(" hname=\"").append(handler.getClass().getName()).append("\">");
+		response.append(" hname=\"").append(handler.nafmanHandlerID()).append("\"");
+		response.append(" hclass=\"").append(handler.getClass().getName()).append("\">");
 		response.append(msg).append("</handler>");
 	}
 
@@ -149,5 +155,9 @@ public final class Command
 		}
 		//all other commands which are not addressed to a specific Dispatcher can be sent to all of them
 		return true;
+	}
+
+	private boolean isPlaintextResponse() {
+		return (def != null && Registry.RSRC_PLAINTEXT.equals(def.autopublish));
 	}
 }

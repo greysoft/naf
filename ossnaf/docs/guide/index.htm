@@ -1,4 +1,8 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<!--
+Copyright 2010-2014 Yusef Badri - All rights reserved.
+NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
+-->
 <HTML>
 <HEAD>
 <TITLE>NAF - Programmer's Guide</TITLE>
@@ -10,7 +14,7 @@
 <div class="menu">
 <p>
 Programmer's Guide<br/>
-NAF v2.3.5
+NAF v2.4.0
 </p>
 <hr class="mline"/>
 <p>
@@ -44,10 +48,13 @@ NAF v2.3.5
 <a href="#greybase">10&nbsp;-&nbsp;GreyBase</a>
 </p>
 <p>
-<a href="#demo">11&nbsp;-&nbsp;Demo&nbsp;Apps</a>
+<a href="#batchresolver">11&nbsp;-&nbsp;DNS&nbsp;Batch-Resolver</a>
 </p>
 <p>
-<a href="#launch">12&nbsp;-&nbsp;Running&nbsp;NAF</a>
+<a href="#demo">12&nbsp;-&nbsp;Demo&nbsp;Apps</a>
+</p>
+<p>
+<a href="#launch">13&nbsp;-&nbsp;Running&nbsp;NAF</a>
 </p>
 <p>
 <a href="../../NOTICE.txt">COPYRIGHT</a>
@@ -97,10 +104,14 @@ NAF provides object reuse and minimises memory churn (ie. garbage generation), t
 NAF is intended to be easy to use and does not provide gratuitous layers of abstraction (which force you to learn excessively large custom APIs) over the familiar JDK interfaces that already do what most people need.
 <br/>
 What it does, is turn the raw NIO Selector and Channel interfaces into a functioning multiplexor based on the Reactor comms pattern, that performs the I/O ops for you, calls your code with the received data, and then gets out of the way to let your application handle the event.
+<br/>
+There are no data transformation pipelines, NAF presents received data as raw byte buffers and you can transmit as either byte[] buffers or NIO ByteByffer objects. The intention is to provide a frictionless low-level interface, that simplifies your code without imposing any extra processing overhead.
 <br/> <br/>
 NAF transparently handles non-blocking writes as you would expect, lets you schedule an unlimited number of arbitrary timed ops (and cancel or reschedule them before they trigger) as you would hope and also lets you specify whether reads should return after a fixed number of bytes, on receipt of a marker char (eg. a LineFeed) or just as soon as any data is available.
 <br/> <br/>
-NAF also provides the possibly unique feature of a non-blocking DNS resolver, which lets you perform hostname lookups, reverse-IP (PTR) lookups and MX (mailserver) lookups.
+NAF also provides the possibly unique feature of a non-blocking DNS-resolver API, which lets you perform hostname (A and AAAA), reverse-IP (PTR), MX (mailserver), NS (nameserver), SOA, SRV and TXT lookups.
+<br/>
+A more conventional blocking DNS-resolver API with all the same functionality is also provided as a convenience for non-NAF applications, ie. applications which have not been written for the NAF framework, but would appreciate having a utility API to call to perform DNS queries.
 <br/> <br/>
 In more detail, a NAF application (more precisely termed a "NAFlet", or sometimes a "NAF task") executes under the control of a single-threaded object called a <dfn>Dispatcher</dfn>, which acts as an NIO controller and invokes registered callbacks in your application, as triggered by I/O, Timer and DNS events.
 <br/>
@@ -111,7 +122,7 @@ As well as simplifying the code, the single-threaded reactor mode of operation p
 <p>
 An overview of the main NAF components follows.
 <br/>
-To find code-level documentation, you are urged to go to the example programs (see section &sect;11 below), along with the API Reference (which is included in the NAF download), and of course the source code itself, which is freely available.
+To find code-level documentation, you are urged to go to the example applications provided (see section &sect;12 below), along with the API Reference (which is included in the NAF download), and of course the NAF source code itself, which is freely available.
 </p>
 
 <hr class="pline"/>
@@ -128,9 +139,7 @@ file (though it is not necessarily named that).
 <br/>
 This config file defines the application's Dispatchers and provides a mechanism for automatically wiring in and launching all your application code without you having to provide the <span class="compcode">main()</span> method (<em>and</em> without the use of custom annotations).
 <br/>
-The top-level structure of a naf.xml file is outlined below (and the binary NAF distribution also contains working naf.xml files for the
-<span class="softname">portfwd</span>
-sample program and the DNS batch-resolver app embedded in NAF).
+The top-level structure of a naf.xml file is outlined below.
 </p>
 
 <table class="cfgbox">
@@ -138,23 +147,17 @@ sample program and the DNS batch-resolver app embedded in NAF).
 <pre>
 &lt;naf&gt;
     &lt;dirpaths&gt;
-        &lt;root&gt;.&lt;root&gt;
-        &lt;config&gt;%DIRTOP%/conf&lt;config&gt;
-        &lt;var&gt;%DIRTOP%/var&lt;var&gt;
-        &lt;logs&gt;%DIRVAR%/logs&lt;logs&gt;
-        &lt;tmp&gt;%DIRVAR%/tmp&lt;tmp&gt;
+        &lt;root&gt;.&lt;/root&gt;
+        &lt;config&gt;%DIRTOP%/conf&lt;/config&gt;
+        &lt;var&gt;%DIRTOP%/var&lt;/var&gt;
+        &lt;logs&gt;%DIRVAR%/logs&lt;/logs&gt;
+        &lt;tmp&gt;%DIRVAR%/tmp&lt;/tmp&gt;
     &lt;/dirpaths&gt;
     &lt;baseport&gt;13000&lt;/baseport&gt;
     &lt;dependjars&gt;app1.jar : app2.jar&lt;/dependjars&gt;
-    &lt;nafman&gt;
-        ...
-    &lt;/nafman&gt;
-    &lt;dnsresolver&gt;
-        ...
-    &lt;/dnsresolver&gt;
-    &lt;dispatchers&gt;
-        ...
-    &lt;/dispatchers&gt;
+    &lt;nafman&gt; ... &lt;/nafman&gt;
+    &lt;dnsresolver&gt; ... &lt;/dnsresolver&gt;
+    &lt;dispatchers&gt; ... &lt;/dispatchers&gt;
 &lt;/naf&gt;
 </pre>
 </td></tr>
@@ -339,7 +342,7 @@ The <span class="compcode">com.grey.naf.DispatcherDef</span> class is where thes
 
 <ul>
 <li><span class="cfgtitle">dns</span>:
-Boolean attribute which specifies whether a DNS Resolver will be installed in this Dispatcher.
+Boolean attribute which specifies whether a DNS Resolver will be enabled in this Dispatcher.
 Default is No.
 <br/>
 If any of the Dispatcher's installed NAFlets does use the DNS Resolver and this is set to No, then the application will simply crash, so this attribute can be seen as a way of declaring whether this Dispatcher contains any DNS users.
@@ -567,9 +570,9 @@ The second form illustrates how to connect to an arbitrary instance of NAFMAN, r
 </p>
 <div>
 <span class="vt220">
-java -jar lib/greynaf-2.3.5.jar -c conf/naf.xml -cmd showconns?nohttp=y&nbsp;
+java -jar lib/greynaf-2.4.0.jar -c conf/naf.xml -cmd showconns?nohttp=y&nbsp;
 <br/><br/><br/>
-&nbsp;java -jar lib/greynaf-2.3.5.jar -remote hostname:13000 -cmd showconns?nohttp=y
+&nbsp;java -jar lib/greynaf-2.4.0.jar -remote hostname:13000 -cmd showconns?nohttp=y
 </span>
 </div>
 <p>
@@ -595,11 +598,11 @@ Putting it all together, the following command-line invocation can be used to te
 </p>
 <div>
 <span class="vt220">
-java -jar lib/greynaf-2.3.5.jar -remote hostname:13000 -cmd appstop?d=dispname&amp;n=appname
+java -jar lib/greynaf-2.4.0.jar -remote hostname:13000 -cmd appstop?d=dispname&amp;n=appname
 </span>
 </div>
 <p>
-See section &sect;12 below for more general info on command-line usage.
+See section &sect;13 below for more general info on command-line usage.
 </p>
 
 <hr class="pline"/>
@@ -610,24 +613,41 @@ See section &sect;12 below for more general info on command-line usage.
 </h2>
 
 <p>
-The DNS Resolver offers a simple non-blocking API to NAF components, and supports A (hostname), MX (email domain) and PTR (reverse lookup on IP addresses) lookups.
+The DNS Resolver is a NAF library component that offers a non-blocking (aka asychronous) API to NAF applications and other NAF components.
+It supports A, AAAA, PTR, NS, SOA, MX, TXT and SRV lookups, and can work in recursive or non-recursive mode.
 <br/>
-It issues DNS queries to the nominated DNS servers,and calls back to your application code with the answers.
-The resolver caches the results so that future lookups on the same domain can be satisfied internally within NAF, without recourse to any more external queries.
+The Resolver caches the results so that future lookups on the same domain can be satisfied internally within NAF, without recourse to any more external queries.
 It also caches negative answers (ie. domain name not found).
+<br/> <br/>
+The API is provided by the
+<span class="compcode">com.grey.naf.dns.Resolver</span>
+class.
+Any application wishing to use the DNS resolver must implement the
+<span class="compcode">com.grey.naf.dns.Resolver.Client</span>
+interface, and the DNS resolver calls back to its
+<span class="compcode">dnsResolved()</span>
+method with the final result.
+<br/>
+The final result is represented by an instance of the
+<span class="compcode">com.grey.naf.dns.Answer</span>
+class, within which individual Resource Records are represented by the
+<span class="compcode">com.grey.naf.dns.ResourceData</span>
+class.
+<br/>
+If the answer was already cached, then it is returned by the Resolver API call, and there is no subsequent callback.
 
 <br/> <br/>
 NAF offers two alternative implementations of the DNS Resolver, namely the Embedded Resolver and the Distributed Resolver.
 </p>
 <ul>
 <li>
-The Embedded resolver effectively represents an independent resolver within each Dispatcher, each with its own results cache.
+The Embedded resolver effectively represents an independent resolver within each DNS-enabled Dispatcher thread, each with its own results cache.
 <br/>
 DNS users within a Dispatcher enjoy direct lock-free I/O-free access to its DNS cache.
 </li><li>
-The Distributed resolver is implemented as master and secondary parts, where the master component resides in one DNS-enabled Dispatcher, and all other DNS-enabled Dispatchers take on the secondary role.
+The Distributed resolver is implemented as a master and zero or more secondary parts, where the master component resides in one Dispatcher, and all other DNS-enabled Dispatchers take on the secondary role.
 <br/>
-What this means is that only one DNS cache exists and it is owned by the master resolver (which is essentially identical to the Embedded Resolver). The secondary resolvers incur a slight processing overhead in accessing it.
+What this means is that only one DNS cache exists within the JVM process and it is owned by the master resolver (which is essentially identical to the Embedded Resolver). The secondary resolvers incur a slight processing overhead in accessing it.
 <br/>
 For performance reasons therefore, if one of the Dispatchers is expected to be a heavier DNS user than the others, we recommend it takes on the master role, as it will have faster access to the DNS cache.
 <br/>
@@ -635,22 +655,21 @@ The master and secondary roles in the distributed resolver are sometimes referre
 </li>
 </ul>
 <p>
-So the trade-off between the EmbeddedResolver and the distributed clients is one of speed versus memory consumption, though the secondary distributed resolvers are still likely to be more than fast enough for most uses, and we recommend the distributed resolver if the DNS cache is expected to grow to a significant size.
+So the trade-off between the embedded resolver and the distributed clients is one of nominal speed versus memory consumption.
+However the overhead of the inter-thread communication is expected to have a negligible effect on overall throughput, and would be more than offset by the potential for less cache misses on the larger shared cache, so we recommend the distributed resolver.
+<br/>
+Despite the terminology, both resolvers are obviously embedded in your application, but the so-called "Embedded" one has an independent instance embedded in every Dispatcher thread.
 <br/> <br/>
-Note that the difference between the embedded and distributed resolvers, as well as the division of responsibility between the roles of the distributed resolver is internal to the DNS resolver, and user code within each Dispatcher accesses the resolver via a single API, represented by the
-<span class="compcode">com.grey.naf.dns.Resolver</span>
-class (see the
+Note that the difference between the various embedded and distributed resolvers is internal to the DNS resolver, and the application code within each Dispatcher accesses the resolver via a single API, represented by the
 <span class="compcode">Dispatcher.dnsresolv</span>
-field) and its
-<span class="compcode">Resolver.Client</span>
-callback interface.
-User code is unaware what underlying type of DNS resolver it is calling, and it has no effect on the final answer.
+field, which is an instance of the
+<span class="compcode">com.grey.naf.dns.Resolver</span>
+class.
+<br/>
+Application code is unaware what underlying type of DNS resolver it is calling, and it has no effect on the final answer.
 
 <br/> <br/>
-Each dispatcher may contain its own asynchronous (non-blocking) DNS resolver
-(see their
-<span class="cfgname">dns</span>
-attribute), but they're all controlled by one
+Although each Dispatcher thread contains its own asynchronous (non-blocking) DNS resolver, they're all controlled by one
 <span class="cfgname">dnsresolver</span>
 config block at the top level of the naf.xml file.
 <br/>
@@ -659,17 +678,24 @@ A resolver will still be created in all dispatchers that have their
 <span class="cfgname">dns</span>
 attribute set to Yes.
 <br/> <br/>
-Selected DNS config attributes are shown below.<br/>
-See the source of the <span class="compcode">com.grey.naf.dns.ResolverService</span> class for the full list
+The DNS config attributes are shown below.<br/>
 </p>
 
 <table class="cfgbox">
 <tr><td>
 <pre>
-&lt;dnsresolver class="com.grey.naf.dns.distributedresolver.Client" master="name" alwaystcp="N"&gt;
-    &lt;servers&gt;192.168.1.1 | 192.168.1.2&lt;/servers&gt;
-    &lt;query_mx fallback_a="N" maxrr="5"&gt;
-    &lt;cache negttl="1h" exitdump="N"&gt;
+&lt;dnsresolver class="com.grey.naf.dns.embedded.EmbeddedResolver" recursive="N"
+             validate_response_ip="N" nonbailiwick_glue="Y" partialprune="N" exitdump="Y"
+             minttl_initial="5m" minttl_lookup="1m" negttl="1h"&gt;
+    &lt;localservers&gt;192.168.1.12 | 192.168.1.13&lt;/localservers&gt;
+    &lt;udpsockets&gt;1&lt;/udpsockets&gt;
+    &lt;rootservers auto="Y"&gt;/path/to/file&lt;/rootservers&gt;
+    &lt;retry timeout="10s" backoff="3s" max="3"/&gt;
+    &lt;cache_a hiwater="2000" lowater="1000"/&gt;
+    &lt;cache_ptr hiwater="1000" lowater="500"/&gt;
+    &lt;cache_soa hiwater="1000" lowater="500"/&gt;
+    &lt;cache_ns hiwater="2000" lowater="1000" maxrr="5"/&gt;
+    &lt;cache_mx hiwater="1000" lowater="500" maxrr="5"/&gt;
 &lt;/dnsresolver&gt;
 </pre>
 </td></tr>
@@ -680,10 +706,10 @@ See the source of the <span class="compcode">com.grey.naf.dns.ResolverService</s
 NAF contains two alternative DNS resolvers.
 <br/>
 The default is
-<span class="compcode">com.grey.naf.dns.embedded.EmbeddedResolver</span>,
-for the embedded resolver, while the example above shows the class to use for the distributed resolver.
+<span class="compcode">com.grey.naf.dns.distributedresolver.Client.class</span>,
+for the distributed resolver, while the example above shows how to specify the embedded resolver.
 <br/>
-As explained above, these are plug-in alternatives which represent architectural choices, but are transparent to your code.
+As explained above, these are plug-in alternatives which represent architectural choices, but are transparent to the application code.
 </li>
 
 <li><span class="cfgtitle">master</span>:
@@ -692,8 +718,70 @@ This optional attribute only applies to the distributed resolver, and specifies 
 If absent, the first DNS-enabled Dispatcher in the naf.xml config file becomes the master resolver.
 </li>
 
-<li><span class="cfgtitle">servers</span>:
-This is the DNS parameter you're most likely to alter, and it specifies one or more local DNS servers (as hostnames or dotted IPs) which offer full recursive resolution.
+<li><span class="cfgtitle">recursive</span>:
+If set to Yes/True (which is the default) then the DNS-Resolver issues all its queries to the local DNS server(s) (as specified by the
+<span class="cfgname">localservers</span>
+config setting) in recursive mode, meaning the local DNS server will perform all the follow-on queries required to fulfil the request and respond to us with a single DNS response which concludes the request.
+<br/>
+Non-recursive mode means that the DNS-Resolver does not use any local DNS servers, and instead sends non-recursive queries directly to authoritive DNS domain servers around the world, performing all the required follow-on queries for itself, until the request has been answered in full.
+<br/>
+If the DNS-Resolver is behind a firewall, then it will obviously need outgoing DNS access for non-recursive mode.
+</li>
+
+<li><span class="cfgtitle">validate_response_ip</span>:
+If set to "Y", then we make sure that a response has come from the same IP to which we sent the request. If not, we ignore it.
+<br/>
+The default is "N".
+</li>
+
+<li><span class="cfgtitle">nonbailiwick_glue</span>:
+This controls how many glue records in the Additional-Info section of a DNS response are cached.
+<br/>
+The default of "Y" means all type-A RRs in the Additional-Info section are cached, while "N" means only those that lie within the domain being queried are cached.
+</li>
+
+<li><span class="cfgtitle">partialprune</span>:
+Boolean attribute which controls what happens to the list-based in-memory caches (NS, MX and SRV) when some of the RRs (resource records) have expired but not all.
+<br/>
+If set to "Y", then only the expired RRs are removed, and the reduced cache entry remains in place.
+<br/>
+The default of No means that the entire cache entry is purged, if any RRs have expired.
+<br/>
+RR expiry is based on their TTL field.
+</li>
+
+<li><span class="cfgtitle">minttl_initial</span>:
+This specifies an override TTL which is applied to all RRs (resource records) we cache. If a received RR has a shorter TTL than this value, then its TTL is replaced with this value.
+<br/>
+The default value is 5 minutes.
+</li>
+
+<li><span class="cfgtitle">minttl_lookup</span>:
+This specifies a minimum remaining lifetime that an RR must have, to be returned in a cache lookup.
+If it has less time to live than this threshold, it will be purged from the cache.
+<br/>
+The purpose of effectively timing out an RR before its TTL expires, is to prevent it's expiry time turning negative while the answer is being constructed, in case this should cause any problems.
+<br/>
+The default value is 1 minute, which should be long enough to permit any answer to be fully constructed and returned to the caller.
+</li>
+
+<li><span class="cfgtitle">exitdump</span>:
+Boolean attribute which defaults to No.
+<br/>
+If Yes, then the DNS Resolver will dump its state on exit, to a file under the under the
+<span class="pathname">var</span>
+directory (see
+<span class="cfgname">dirpaths</span>
+settings above).
+</li>
+
+<li><span class="cfgtitle">negttl</span>:
+NAF caches negative (domain doesn't exist) responses as well as positive ones, and this specifies the TTL (Time To Live) to apply to negative cache entries.<br/>
+Default is 1h (1 hour).
+</li>
+
+<li><span class="cfgtitle">localservers</span>:
+This specifies one or more local DNS servers (as hostnames or dotted IPs, separated by vertical bars) which offer full recursive resolution.
 <br/>
 If absent, NAF will automatically obtain the DNS servers configured into the underlying OS (see
 <span class="pathname">/etc/resolv.conf</span>
@@ -702,42 +790,114 @@ on Unix, or TCP Properties on Windows), and in the unlikely event that turns up 
 If NAF has multiple DNS servers available to it, it will round-robin DNS requests between them, which is desirable at times of high loading.
 </li>
 
-<li><span class="cfgtitle">alwaystcp</span>:
-Use TCP mode exclusively, rather than merely falling back to it when we received a truncated DNS reply.
+<li><span class="cfgtitle">udpsockets</span>:
+This determines how many UDP ports will be allocated to send and receive DNS requests and responses on.
+Outgoing requests are spread amongst them on a round-robin basis, so a larger number of ports spreads the load and reduces socket-buffer depletion under heavy traffic conditions.
 <br/>
-Default is No.
+The default is 2.
 </li>
 
-<li><span class="cfgtitle">fallback_a</span>:
-This enables what is known as the "Implicit MX" rule, whereby if an email domain has no MX RRs, we fall back to requesting the corresponding A RR.
+<li><span class="cfgtitle">rootservers</span>:
+This only applies in non-recursive mode, and identifies a filename that specifies root nameservers.
+Typically the global root servers of the public DNS, but it can also contain the nameservers for private local domains.
 <br/>
-The Implicit MX rule has been mandated by the SMTP standards ever since RFC 821 was first published in 1982, but the NAF resolver defaults this setting to No on the grounds that it's very unlikely a valid email domain of today would rely on it.
-To formally conform to the standard, you need to intervene and set this to Yes.
+This file consists of one server per line, in the form:
+<span class="cfgvalue">domain-name COLON hostname-or-IP COLON MANUAL|AUTO</span>
+<br/>
+For example:
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<b>. &nbsp;&nbsp;&nbsp; : &nbsp;&nbsp;&nbsp; A.ROOT-SERVERS.NET.</b>
+<br/>
+The domain name is simply a dot to indicate the global DNS root, as in the example above.
+<br/>
+The AUTO/MANUAL field is optional and defaults to AUTO.
+<br/>
+For AUTO lines, the resolver sends an NS query to the specified nameserver, to retrieve the nameservers for the specified domain.
+<br/>
+For MANUAL lines, the specified host name/IP is simpled added as a nameserver for the specified domain.
+<br/>
+AUTO lines for a domain are ignored if an earlier line (or the
+<span class="cfgname">rootservers/auto</span>
+setting) has already loaded at least one nameserver for that domain, whereas MANUAL lines always take effect and can therefore be used to specify multiple nameservers for the same domain.
+<br/>
+This means that if you have specified rootservers/auto=Y, there is no point having AUTO entries for the global root in the file, as they will be ignored.
+<br/>
+The main function of this file is that it allows you the resolver to load the root servers even if auto=Y is not possible (eg. because no local DNS server is available) and it also allows you to specify nameservers for private local domains that are not known to the public DNS.
+<br/>
+You will rarely need to specify root servers in this file (see the
+<span class="cfgname">rootservers/auto</span>
+attribute) but if you do, the appropriate data can be obtained from the standard InterNIC zone file at this URL (though you will have to edit out the excess fields):
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<a href="ftp://ftp.rs.internic.net/domain/db.cache">ftp://ftp.rs.internic.net/domain/db.cache</a>
+<br/>
+Can auto-download it with:
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<code>wget --user=ftp --password=ftp ftp://ftp.rs.internic.net/domain/db.cache</code>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<code>curl -u ftp:ftp ftp://ftp.rs.internic.net/domain/db.cache</code>
 </li>
 
-<li><span class="cfgtitle">maxrr</span>:
-All email domains specify one or more MX relays that serve them, and NAF caches the corresponding DNS RRs (Resource Records).
+<li><span class="cfgtitle">rootservers/auto</span>:
+This setting controls whether a non-recursive instance of the DNS Resolver will bootstrap itself by querying the local DNS servers for the global roots (in recursive mode).
 <br/>
-This lets you limit how many of RRs to cache per MX domain.
-<br/>
-The defaults is 5. Set to zero for no limit.
+It defaults to Yes, and if the local DNS servers respond, then any root-server hints in the
+<span class="cfgname">rootservers</span>
+file are ignored. The Resolver will still parse the rootservers file (if any) though, in case it contains any non-root domains.
 </li>
 
-<li><span class="cfgtitle">negttl</span>:
-NAF caches negative (RR doesn't exist) responses as well as positive, and this specifies the TTL (Time To Live) to apply to negative cache entries.<br/>
-Default is 1h (1 hour).
+<li><span class="cfgtitle">retry</span>:
+<br/>
+The 
+<span class="cfgtitle">timeout</span>
+parameter specifies how long to wait for a UDP response before we resend the request. Default is 10 seconds.
+<br/>
+The 
+<span class="cfgtitle">backoff</span>
+parameter specifies the randomised interval to add to the timeout period, before each resend.
+The default of 3 seconds means we wait an extra 0-3 seconds after each fixed timeout.
+<br/>
+The 
+<span class="cfgtitle">max</span>
+parameter specifies how many retries are allowed. The default of 3 allows 3 resends after the initial attempt.
 </li>
 
-<li><span class="cfgtitle">exitdump</span>:
-Boolean attribute which default to No.
+<li><span class="cfgtitle">hiwater & lowater</span>:
+The hiwater parameters specify how large each in-memory cache is allowed to grow, before it's pruned back to the lowater size.
 <br/>
-If Yes, then the DNS Resolver will dump its cache (somewhere under the
-<span class="pathname">var</span>
-directory - see
-<span class="cfgname">dirpaths</span>
-settings above) on exit.
+Both hi and lo default to zero, which means no upper limit.
+<br/>
+Note that the
+<span class="cfgname">cache_a</span> values also apply to the AAAA cache, and the
+<span class="cfgname">cache_soa</span> values also apply to the SRV and TXT caches.
 </li>
 </ul>
+
+<br/>
+<h4>Synchronous Resolver</h4>
+<p>
+The Resolver-API described above is an asynchronous one based on callbacks, and is intended to support NAF applications, ie. applications that are embedded within the NAF framework. The open-source Batch-Resolver described in section &sect;11 below provides an example.
+<br/>
+However, NAF also offers a synchronous Resolver API as a convenience for non-NAF applications, which consists of blocking calls to retrieve all the same info as returned by the asynchronous API.
+<br/>
+The ability to make simple blocking method calls means the synchronous Resolver API is a toolkit API available to applications of any stripe, rather than a framework API (like the asynchronous one) which requires your application to be structured in a particular manner.
+<br/> <br/>
+This API is provided by the
+<span class="compcode">com.grey.naf.dns.synchronous.SynchronousResolver</span>
+class, and it returns its results in the form of the same
+<span class="compcode">com.grey.naf.dns.Answer</span>
+class as the asynchronous API.
+<br/>
+The <code>SynchronousResolver</code> class launches a Dispatcher thread in the background and uses the asynchronous API behind the scenes.
+It offers constructors which let you either instantiate the asynchronous Resolver with its default settings, or allow you to supply a
+<span class="pathname">naf.xml</span>
+to customise any settings you require.
+<br/>
+The <code>SynchronousResolver</code> class is MT-safe (thread-safe) so the recommended usage is to create a single instance which is shared amongst all the caller threads in your application, to avoid launching excess Dispatcher threads.
+</p>
 
 <hr class="pline"/>
 <h2>
@@ -762,7 +922,7 @@ The Listener config block can be specified in arbitrary locations within the NAF
 &lt;listener name="webserver" port="80" interface="127.0.0.1"
           maxservers="1000" backlog="100"&gt;
     &lt;ssl ... /&gt;
-    &lt;server class="com.grey.http.Server"&gt;
+    &lt;server factory="com.grey.http.Server$Factory"&gt;
         ...
     &lt;/server&gt;
 &lt;/listener&gt;
@@ -821,21 +981,21 @@ config block depend on the particular server, but it's top-level attributes are 
 </p>
 
 <ul>
-<li><span class="cfgtitle">class</span>:
-This specifies the class to instantiate as a server, and pass incoming connections on to.
+<li><span class="cfgtitle">factory</span>:
+This specifies the factory class to instantiate to create the server instances.
 <br/>
-It is required to be a subclass of
-<span class="compcode">com.grey.naf.reactor.ConcurrentListener.Server</span>,
-so see its source code for further requirements in terms of constructor signature and abstract/override methods.
+It is required to implement the
+<span class="compcode">com.grey.naf.reactor.ConcurrentListener.ServerFactory</span>,
+interface, so see its source code for further requirements in terms of constructor signature and required methods.
 <br/>
 Like the Listener's
 <span class="cfgtitle">port</span>
-this class may be omitted if the controlling application programmatically sets a default.
+this attribute may be omitted if the controlling application programmatically sets a default.
 </ul>
 
 <p>
-Note that the Listener does not instantiate a Server for every incoming connection, as it stores server objects on an ObjectWell
-(see <span class="compcode">com.grey.base.utils.ObjectWell</span> for reuse, and will soon reach a steady state where it always has spare servers in reserve.
+Note that the Listener does not instantiate a Server for every incoming connection, as it stores spare server objects on an ObjectWell
+(see <span class="compcode">com.grey.base.utils.ObjectWell</span>) for reuse, and will soon reach a steady state where it always has spare servers in reserve.
 The
 <span class="softname">portfwd</span>
 example app is a good example of how this works, including the use of the prototype factory.
@@ -854,7 +1014,7 @@ This can be achieved by the use of an extra Listener attribute called
 &lt;listeners&gt;
     &lt;listener name="webserver" port="80" interface="127.0.0.1"
               iterative="N" backlog="100"&gt;
-        &lt;server class="com.grey.http.Server"&gt;
+        &lt;server factory="com.grey.http.Server$Factory"&gt;
             ...
         &lt;/server&gt;
     &lt;/listener&gt;
@@ -954,8 +1114,8 @@ attribute is used to identify the certificate supplied by this end of the connec
 attribute is used to authenticate the other end, and specifies a certificate name to expect.
 <br/>
 The specified name is matched against the peer certificate's
-<span class="softname">subjectAlternativeName</span> DNS-name
-attribute if present, else against its
+<span class="softname">subjectAlternativeName</span>
+DNS-name attribute if present, else against its
 <span class="softname">Common-Name</span>
 attribute.
 <br/>
@@ -1083,8 +1243,111 @@ GreyBase includes the following:<br/>
 
 <hr class="pline"/>
 <h2>
+<a name="batchresolver">
+11 - DNS Batch Resolver
+</a>
+</h2>
+
+<p>
+The
+<span class="softname">DNS Batch Resolver</span>
+is a built-in NAF application (technically a standalone <i>NAFlet</i>) that takes an input file containing a list of domain names and issues DNS queries to resolve them, writing out the answers. It is capable of rapidly resolving very large datasets.
+<br/>
+Although it also serves as an illustration of NAF's DNS API (see the
+<span class="compcode">com.grey.naf.dns.batchresolver</span>
+package) it is not intended as merely a sample app like the ones in section &sect;12, but is a fully functional application and is contained within the NAF JAR itself.
+<br/> <br/>
+Assuming you have downloaded and extracted the binary NAF distribution (or built your own and extracted the resulting ZIP/Tar file), you would run it as follows:
+</p>
+<div>
+<span class="vt220">
+java -jar lib/greynaf-2.4.0.jar -c conf/batchresolver.xml
+</span>
+</div>
+<p>
+The
+<span class="pathname">batchresolver.xml</span>
+config file as shipped specifies an input file called
+<span class="cfgvalue">infile.txt</span>
+and an output file called
+<span class="cfgvalue">outfile.txt</span>.
+<br/>
+The above command will also pick up the logger definition labelled
+<span class="cfgname">dnsbatch</span>
+in the provided
+<span class="pathname">conf/logging.xml</span>
+logging config file (the
+<span class="pathname">logging.xml</span>
+file might be under the
+<span class="pathname">samples</span>
+sub-directory initially, in which case just copy it to
+<span class="pathname">conf</span>).
+
+<br/> <br/>
+The input file should contain one record per line, but the type of the records depends on the
+<span class="cfgtitle">dnstype</span>
+setting in the batchresolver.xml config file.
+<br/>
+&bull; <span class="cfgvalue">A</span>:
+Hostname in FQDN (Fully Qualified Domain Name) form - gets resolved to IPv4 address
+<br/>
+&bull; <span class="cfgvalue">AAAA</span>:
+Hostname in FQDN (Fully Qualified Domain Name) form - gets resolved to IPv6 address
+<br/>
+&bull; <span class="cfgvalue">PTR</span>:
+Dotted IPv4 address - resolved to hostname
+<br/>
+&bull; <span class="cfgvalue">NS</span>:
+DNS domain name in FQDN form - resolved to the hostnames and addresses of the domain's name servers
+<br/>
+&bull; <span class="cfgvalue">SOA</span>:
+DNS domain name in FQDN form - resolved to the domain's SOA data
+<br/>
+&bull; <span class="cfgvalue">MX</span>:
+Email domain (mailbox part will be stripped if present) in FQDN form - resolved to hostnames and addresses of the domain's mail relays
+<br/>
+&bull; <span class="cfgvalue">SRV</span>:
+A service specification in the standard SRV <code>_service._proto.name.</code> notation - resolved to hostnames and addresses of its servers.
+<br/>
+&bull; <span class="cfgvalue">TXT</span>:
+DNS domain name in FQDN form - resolved to the domain's SRV data string
+<br/> <br/>
+The remaining config items are all set to appropriate defaults, and the source code can be viewed in the constructor of the
+<span class="softname">BatchResolver</span>
+class, but the most interesting ones are:
+<br/> <br/>
+&bull; <span class="cfgtitle">fullanswer</span>:<br/>
+A Y/N field determining whether we merely report the status (OK, NODOMAIN, etc) of each query in the output file, or the full set of Answer RRs (DNS Resource Records)
+<br/> <br/>
+&bull; <span class="cfgtitle">maxpending</span>:<br/>
+The max number of simultaneous DNS requests that can be outstanding, before the batch resolver pauses.
+<br/>
+It defaults to zero meaning no limit, but if a limit is specified, the batch resolver pauses until the pending requests fall to
+<span class="cfgname">maxpending_lowater</span>.
+<br/> <br/>
+&bull; <span class="cfgtitle">maxpending_lowater</span>:<br/>
+If
+<span class="cfgname">maxpending</span>
+is specified, this defaults to the greater of half its value, or maxpending minus 20.
+<br/> <br/>
+In terms of the standard
+<span class="cfgname">dnsresolver</span>
+attributes (see section &sect;6), you will note that the
+<span class="pathname">batchresolver.xml</span>
+comes with
+<span class="cfgname">recursive</span>
+set to No, which is recommended for large batches as it could well swamp a slow local DNS server.
+<br/>
+The
+<span class="cfgname">exitdump</span>
+attribute is also set, meaning that at the end, the batch resolver will dump the final state of its cache to
+<span class="pathname">var/DNSdump-dnsbatch.txt</span>.
+</p>
+
+<hr class="pline"/>
+<h2>
 <a name="demo">
-11 - Demo Apps
+12 - Demo Apps
 </a>
 </h2>
 
@@ -1110,20 +1373,12 @@ This demonstrates the alternative means of launching Dispatchers, as it programm
 The EchoBot contains full working examples of how to listen for or initiate TCP connections (with a programmatically created Listener), how to send and receive TCP data once connected, and how to send and receive UDP packets.
 <br/> <br/>
 </li>
-
-<li><span class="softname">DNS Batch Resolver</span>:
-Our third sample app is actually embedded within the NAF code, but is not really part of the library.
-It is a standalone NAFlet launched via a provided naf.xml config file
-- see the <span class="compcode">com.grey.naf.dns.batchresolver</span> package.
-<br/>
-This app serves to illustrate NAF's DNS API, and is a fully functioning application which can resolve large numbers of hostnames, IP addresses or MX domains in batch mode. It might be useful for validating large sets of domains.
-</li>
 </ul>
 
 <hr class="pline"/>
 <h2>
 <a name="launch">
-12 - Running NAF
+13 - Running NAF
 </a>
 </h2>
 
@@ -1196,7 +1451,7 @@ Run NAF directly with the -h option to see its built-in options.
 </p>
 <div>
 <span class="vt220">
-java -jar greynaf-2.3.5.jar -h
+java -jar greynaf-2.4.0.jar -h
 </span>
 </div>
 
@@ -1210,35 +1465,6 @@ config item or the
 <span class="cfgname">greynaf.cp</span>
 system property, and if so, you could launch your application by directly executing
 <span class="pathname">greynaf.jar</span>
-
-<br/> <br/>
-One case where you would execute NAF from its own JAR (and without having to specify any extra JAR dependencies) is when running the
-<span class="softname">DNS Batch Resolver</span>,
-NAF's sole built-in NAFlet.
-<br/>
-Assuming you have downloaded and extracted the binary NAF distribution (or built your own and extracted the resulting ZIP/Tar file), you would run it as follows:
-</p>
-<div>
-<span class="vt220">
-java -jar lib/greynaf-2.3.5.jar -c conf/batchresolver.xml -logger dnsbatch &lt; infile
-</span>
-</div>
-<p>
-The input file should contain one record per line, but the type of the records depends on the batchresolver.xml settings.
-<br/>
-&bull; <span class="cfgvalue">mode=A</span>:
-Hostnames in FQDN (Fully Qualified Domain Name) form
-<br/>
-&bull; <span class="cfgvalue">mode=PTR</span>:
-Dotted IP address
-<br/>
-&bull; <span class="cfgvalue">mode=MX</span>:
-Email domains (mailbox part will be stripped if present)
-<br/>
-The above command also assumes a
-<span class="pathname">logging.xml</span>
-GreyLog config file, which contains a logger entry called
-<span class="cfgvalue">dnsbatch</span>.
 </p>
 
 <br/>&nbsp;<br/>&nbsp;<br/>

@@ -6,9 +6,9 @@ package com.grey.base.crypto;
 
 /**
  * This class supports generic secret-key encryption, as well as PBE (Password-Based Encryption) specifically.
- * <br/>
+ * <br>
  * Note 1: IVs allow you to reuse the same key for multiple messages. Salts prevent dictionary attacks on the password that derived the key
- * <br/>
+ * <br>
  * Note 2: In the JCE (Java Cryptography Extension), Generators are used to generate brand new objects (eg. keys), whereas Factories are used to
  * convert data from one existing object type to another (eg. keys to key specs or vice versa).
  */

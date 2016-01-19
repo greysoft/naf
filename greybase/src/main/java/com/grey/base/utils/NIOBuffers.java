@@ -7,7 +7,7 @@ package com.grey.base.utils;
 public class NIOBuffers
 {
 	public static final class BufferFactory
-		implements ObjectWell.ObjectFactory
+		implements com.grey.base.collections.ObjectWell.ObjectFactory
 	{
 		private final int bufsiz;
 		private final boolean directbuf;

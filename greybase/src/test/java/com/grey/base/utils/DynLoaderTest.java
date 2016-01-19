@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2014 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -14,6 +14,63 @@ public final class DynLoaderTest
 	private static final int F_SYSLOAD = 1 << 1;
 
 	private final String workdir = SysProps.TMPDIR+"/utest/"+getClass().getSimpleName();
+
+	//these are for the testSymbolsArray() test - want mixture of public, private, static and fields/methods
+	private static final byte PREFIX1_ONE = 1;
+	private static final byte PREFIX1_TWO = 2;
+	private static final byte PREFIX1_TWELVE = 12;
+	private static final byte PREFIX1_maxminus1 = (byte)200;
+	public String PREFIX1_fld1;
+	public final int PREFIX1_fld2 = 99;
+	private static final int prefix1_maxval = 201;
+	private static final String[] prefix1_txt = DynLoader.generateSymbolNames(DynLoaderTest.class, "PREFIX1_", prefix1_maxval);
+	private static String PREFIX1_get(byte id) {return prefix1_txt[id & 0xff];}
+
+	//these are for the testSymbolsMap() test - want same mixture of types as above
+	private static final int PREFIX2_ZERO = 0;
+	private static final int PREFIX2_ONE = 1;
+	private static final int PREFIX2_BIG = 299;
+	private static final int PREFIX2_HUGE = Integer.MAX_VALUE;
+	private static final int PREFIX2_TINY = Integer.MIN_VALUE;
+	private static final int PREFIX2_NEG = -9001;
+	public String PREFIX2_fld1;
+	public final int PREFIX2_fld2 = 99;
+	private static final com.grey.base.collections.HashedMapIntKey<String> prefix2_txt = DynLoader.generateSymbolNamess(DynLoaderTest.class, "PREFIX2_");
+	private static String PREFIX2_get(int id) {return prefix2_txt.get(id);}
+
+	@org.junit.Test
+	public void testSymbolsArray()
+	{
+		org.junit.Assert.assertEquals(prefix1_maxval+1, prefix1_txt.length);
+		org.junit.Assert.assertEquals("0", PREFIX1_get((byte)0));
+		org.junit.Assert.assertEquals(Integer.toString(prefix1_maxval), PREFIX1_get((byte)prefix1_maxval));
+		org.junit.Assert.assertEquals("99", PREFIX1_get((byte)99));
+		org.junit.Assert.assertEquals("ONE", PREFIX1_get(PREFIX1_ONE));
+		org.junit.Assert.assertEquals("TWO", PREFIX1_get(PREFIX1_TWO));
+		org.junit.Assert.assertEquals("TWELVE", PREFIX1_get(PREFIX1_TWELVE));
+		org.junit.Assert.assertEquals("maxminus1", PREFIX1_get(PREFIX1_maxminus1));
+		int symcnt = 0;
+		for (int idx = 0; idx != prefix1_txt.length; idx++) {
+			org.junit.Assert.assertNotNull(prefix1_txt[idx]);
+			if (!Integer.toString(idx).equals(prefix1_txt[idx])) symcnt++;
+		}
+		org.junit.Assert.assertEquals(4, symcnt);
+	}
+
+	@org.junit.Test
+	public void testSymbolsMap()
+	{
+		org.junit.Assert.assertEquals(6, prefix2_txt.size());
+		org.junit.Assert.assertEquals("ZERO", PREFIX2_get(PREFIX2_ZERO));
+		org.junit.Assert.assertEquals("ONE", PREFIX2_get(PREFIX2_ONE));
+		org.junit.Assert.assertEquals("BIG", PREFIX2_get(PREFIX2_BIG));
+		org.junit.Assert.assertEquals("HUGE", PREFIX2_get(PREFIX2_HUGE));
+		org.junit.Assert.assertEquals("TINY", PREFIX2_get(PREFIX2_TINY));
+		org.junit.Assert.assertEquals("NEG", PREFIX2_get(PREFIX2_NEG));
+		org.junit.Assert.assertNull(PREFIX2_get(99));
+		org.junit.Assert.assertNull(PREFIX2_get(Integer.MAX_VALUE - 1));
+		org.junit.Assert.assertNull(PREFIX2_get(-3));
+	}
 
 	@org.junit.Test
 	public void testPath() throws java.net.MalformedURLException, ClassNotFoundException

@@ -5,20 +5,20 @@
 				<naflet name="portfwd" class="com.grey.portfwd.Task">
 					<listeners>
 						<listener name="portfwd-web" port="18001">
-							<server class="com.grey.portfwd.ClientSession">
+							<server factory="com.grey.portfwd.ClientSession$Factory">
 								<loadbalancer class="com.grey.portfwd.balance.RoundRobin"/>
 								<niobuffers recvsize="4096" xmitsize="2048"/>
 								<services>
 									<service address="80"/>
-									<service address="trout:80"/>
+									<service address="halibut.grey:80"/>
 								</services>
 							</server>
 						</listener>
 						<listener name="portfwd-telnet" port="18002">
-							<server class="com.grey.portfwd.ClientSession">
+							<server factory="com.grey.portfwd.ClientSession$Factory">
 								<services timeout="10s">
-									<service address="halibut:23"/>
-									<service address="trout:23"/>
+									<service address="halibut.grey:23"/>
+									<service address="192.168.101.99:23"/>
 								</services>
 							</server>
 						</listener>

@@ -1,9 +1,10 @@
 /*
- * Copyright 2010-2013 Yusef Badri - All rights reserved.
+ * Copyright 2010-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns;
 
+import com.grey.base.utils.DynLoader;
 import com.grey.base.utils.IP;
 import com.grey.base.utils.ByteChars;
 import com.grey.base.utils.StringOps;
@@ -12,21 +13,24 @@ public abstract class Resolver
 {
 	public interface Client
 	{
-		public void dnsResolved(com.grey.naf.reactor.Dispatcher dsptch, Answer answer, Object callerparam) throws java.io.IOException;
+		public void dnsResolved(com.grey.naf.reactor.Dispatcher dsptch, Answer answer, Object callerparam);
 	}
 
-	public static final int FLAG_NOQRY = 1 << 0;  //give up if answer not already in cache
+	private static final Class<?> DFLTCLASS = com.grey.naf.dns.distributedresolver.Client.class;
+
+	public static final int FLAG_NOQRY = 1 << 0; //give up if answer not already in cache
 	public static final int FLAG_SYNTAXONLY = 1 << 1; //don't do any lookup or query at all
 	public static final int FLAG_MUSTHAVEDOTS = 1 << 2;
 	public static final int FLAG_NODOTTEDIP = 1 << 3;
 
 	public static final int MAXDOMAIN = 255;
 	public static final int MAXNAMELABEL = 63;
+	public static final char DOMDLM = '.';
 
 	public static final byte QTYPE_A = 1;
 	public static final byte QTYPE_NS = 2;
-	public static final byte QTYPE_SOA = 6;
 	public static final byte QTYPE_CNAME = 5;
+	public static final byte QTYPE_SOA = 6;
 	public static final byte QTYPE_PTR = 12;
 	public static final byte QTYPE_MX = 15;
 	public static final byte QTYPE_TXT = 16;
@@ -36,13 +40,14 @@ public abstract class Resolver
 	public static final byte QTYPE_SRV = 33;
 	public static final byte QTYPE_CERT = 37;
 	public static final byte QTYPE_DNAME = 39;
+	public static final byte QTYPE_EDNSOPT = 41;
 	public static final byte QTYPE_SPF = 99;
 	public static final byte QTYPE_IXFR = (byte)251;
 	public static final byte QTYPE_AXFR = (byte)252;
 	public static final byte QTYPE_ALL = (byte)255;
-	public static final byte QTYPE_NEGATIVE = 68;  // pseudo-type invented by this package, to indicate that the expected RR does not exist in the DNS
-	
-	private static final Class<?> DFLTCLASS = com.grey.naf.dns.embedded.EmbeddedResolver.class;
+
+	private static final String[] qtype_txt = DynLoader.generateSymbolNames(Resolver.class, "QTYPE_", 255);
+	public static String getQTYPE(int qtype) {return qtype_txt[qtype & 0xff];}
 
 	abstract public void start() throws java.io.IOException;
 	abstract public void stop();
@@ -66,28 +71,27 @@ public abstract class Resolver
 				new Object[]{dsptch, cfg}));
 	}
 
-	public Resolver(com.grey.naf.reactor.Dispatcher d, com.grey.base.config.XmlConfig cfg)
-			throws com.grey.base.ConfigException, java.io.IOException
+	protected Resolver(com.grey.naf.reactor.Dispatcher d, com.grey.base.config.XmlConfig cfg)
 	{
 		dsptch = d;
 
 		answerA.set(Answer.STATUS.OK, QTYPE_A, null);
-		answerA.rrdata.add(new ResourceData(answerA.qtype, null, 0, Long.MAX_VALUE));
+		answerA.rrdata.add(new ResourceData.RR_A(new ByteChars(), 0, Long.MAX_VALUE));
 
 		answerLocalIP.set(Answer.STATUS.OK, QTYPE_PTR, IP.IP_LOCALHOST);
-		answerLocalIP.rrdata.add(new ResourceData(answerLocalIP.qtype, new ByteChars("localhost"), 0, Long.MAX_VALUE));
+		answerLocalIP.rrdata.add(new ResourceData.RR_PTR(new ByteChars("localhost"), IP.IP_LOCALHOST, Long.MAX_VALUE));
 	}
 
 	public final Answer resolveHostname(ByteChars hostname, Client caller, Object cbdata, int flags)
 			throws java.io.IOException
 	{
 		boolean allowDottedIP = ((flags & FLAG_NODOTTEDIP) == 0);
-		Answer answer = verifyQuery(QTYPE_A, hostname, flags);
-		if (answer != null) return answer;
 		boolean have_ip = false;
 		int ipaddr = 0;
 
-		if (StringOps.sameSeq("localhost", hostname)) {
+		if (StringOps.sameSeqNoCase("localhost", hostname)
+				|| StringOps.sameSeqNoCase("IPv6:::1", hostname) //Thunderbird uses this as HELO name - thanks Mozilla!
+				|| StringOps.sameSeqNoCase("::1", hostname)) {
 			ipaddr = IP.IP_LOCALHOST;
 			have_ip = true;
 		} else if (allowDottedIP) {
@@ -100,16 +104,19 @@ public abstract class Resolver
 
 		if (have_ip) {
 			answerA.qname = hostname;
-			answerA.rrdata.get(0).ipaddr = ipaddr;
+			answerA.rrdata.get(0).setIP(ipaddr);
+			answerA.rrdata.get(0).setName(answerA.qname);
 			return answerA;
 		}
-		return resolveDomain(QTYPE_A, hostname, caller, cbdata, flags);
+		Answer answer = verifyQuery(QTYPE_A, hostname, flags);
+		if (answer != null) return answer;
+		return resolveDomain(QTYPE_A, hostname, caller, cbdata, flags, false);
 	}
 
 	public final Answer resolveIP(int ipaddr, Client caller, Object cbdata, int flags)
 			throws java.io.IOException
 	{
-		if (ipaddr == 0 || ipaddr == 0xffffffff) return dnsAnswer.set(Answer.STATUS.BADNAME, QTYPE_PTR, ipaddr);
+		if (ipaddr == 0 || ipaddr == -1) return dnsAnswer.set(Answer.STATUS.BADNAME, QTYPE_PTR, ipaddr);
 		if (ipaddr == IP.IP_LOCALHOST) return answerLocalIP;
 		return resolve(QTYPE_PTR, ipaddr, caller, cbdata, flags);
 	}
@@ -117,14 +124,46 @@ public abstract class Resolver
 	public final Answer resolveMailDomain(ByteChars maildom, Client caller, Object cbdata, int flags)
 			throws java.io.IOException
 	{
-		Answer answer = verifyQuery(QTYPE_MX, maildom, flags);
-		if (answer != null) return answer;
-		return resolveDomain(QTYPE_MX, maildom, caller, cbdata, flags);
+		return resolveDomain(QTYPE_MX, maildom, caller, cbdata, flags, true);
 	}
 
-	private Answer resolveDomain(byte qtype, ByteChars qname, Client caller, Object cbdata, int flags)
+	public final Answer resolveNameServer(ByteChars domnam, Client caller, Object cbdata, int flags)
 			throws java.io.IOException
 	{
+		return resolveDomain(QTYPE_NS, domnam, caller, cbdata, flags, true);
+	}
+
+	public final Answer resolveSOA(ByteChars domnam, Client caller, Object cbdata, int flags)
+			throws java.io.IOException
+	{
+		return resolveDomain(QTYPE_SOA, domnam, caller, cbdata, flags, true);
+	}
+
+	public final Answer resolveSRV(ByteChars domnam, Client caller, Object cbdata, int flags)
+			throws java.io.IOException
+	{
+		return resolveDomain(QTYPE_SRV, domnam, caller, cbdata, flags, true);
+	}
+
+	public final Answer resolveTXT(ByteChars domnam, Client caller, Object cbdata, int flags)
+			throws java.io.IOException
+	{
+		return resolveDomain(QTYPE_TXT, domnam, caller, cbdata, flags, true);
+	}
+
+	public final Answer resolveAAAA(ByteChars domnam, Client caller, Object cbdata, int flags)
+			throws java.io.IOException
+	{
+		return resolveDomain(QTYPE_AAAA, domnam, caller, cbdata, flags, true);
+	}
+
+	private Answer resolveDomain(byte qtype, ByteChars qname, Client caller, Object cbdata, int flags, boolean verify)
+			throws java.io.IOException
+	{
+		if (verify) {
+			Answer answer = verifyQuery(qtype, qname, flags);
+			if (answer != null) return answer;
+		}
 		if ((flags & com.grey.naf.dns.Resolver.FLAG_SYNTAXONLY) != 0) return dnsAnswer.set(Answer.STATUS.OK, qtype, qname);
 		return resolve(qtype, qname, caller, cbdata, flags);
 	}
@@ -140,12 +179,12 @@ public abstract class Resolver
 		int limit = off + qname.ar_len;
 		int dotcnt = 0;
 
-		// don't allow leading or trailing (or consecutive - see below) dots - not possible to encode empty labels in DNS packets
-		if (buf[off] == '.' || buf[limit - 1] == '.') return dnsAnswer.set(Answer.STATUS.BADNAME, qtype, qname);
+		// don't allow leading (or consecutive - see below) dots - not possible to encode empty labels in DNS packets
+		if (buf[off] == DOMDLM) return dnsAnswer.set(Answer.STATUS.BADNAME, qtype, qname);
 
 		while (off != limit) {
-			if (buf[off] == '.') {
-				if (buf[off + 1] == '.') {
+			if (buf[off] == DOMDLM) {
+				if (off + 1 != limit && buf[off + 1] == DOMDLM) {
 					return dnsAnswer.set(Answer.STATUS.BADNAME, qtype, qname);
 				}
 				dotcnt++;
@@ -159,6 +198,10 @@ public abstract class Resolver
 		}
 
 		if ((dotcnt == 0) && ((flags & com.grey.naf.dns.Resolver.FLAG_MUSTHAVEDOTS) != 0)) {
+			return dnsAnswer.set(Answer.STATUS.BADNAME, qtype, qname);
+		}
+		if (qtype == QTYPE_SRV && dotcnt < 2) {
+			// format should be _service._proto.domain_name
 			return dnsAnswer.set(Answer.STATUS.BADNAME, qtype, qname);
 		}
 		return null;

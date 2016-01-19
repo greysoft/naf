@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2013 Yusef Badri - All rights reserved.
+ * Copyright 2011-2014 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -42,7 +42,10 @@ public class ProducerTest
 		setProducedItems("B");
 		dthrd = dsptch.start();
 		produce(prod);
-		dsptch.waitStopped(); //wait for Dispatcher to stop - we will have told it to once we finish consuming
+		//wait for Dispatcher to stop - we will have told it to once we finish consuming
+		Dispatcher.STOPSTATUS stopsts = dsptch.waitStopped(TimeOps.MSECS_PER_SECOND * 10, true);
+		org.junit.Assert.assertEquals(Dispatcher.STOPSTATUS.STOPPED, stopsts);
+		org.junit.Assert.assertTrue(dsptch.completedOK());
 		dthrd = null;
 		org.junit.Assert.assertEquals(produced_items.size(), consumed_cnt);
 
@@ -81,7 +84,9 @@ public class ProducerTest
 		}
 		long systime2 = System.currentTimeMillis();
 		d.stop();
-		d.waitStopped();
+		Dispatcher.STOPSTATUS stopsts = d.waitStopped(TimeOps.MSECS_PER_SECOND * 10, true);
+		org.junit.Assert.assertEquals(Dispatcher.STOPSTATUS.STOPPED, stopsts);
+		org.junit.Assert.assertTrue(d.completedOK());
 		p.shutdown(true);
 		System.out.println("BulkTest-"+benchsize+" = "+TimeOps.expandMilliTime(systime2 - systime1));
 		org.junit.Assert.assertEquals(benchsize, consumed_cnt);
@@ -100,7 +105,7 @@ public class ProducerTest
 
 		if (consumed_cnt == produced_items.size()) {
 			// we've finished consuming - just verify that excess calls retrieve null
-			String str = (String)p.consume();
+			String str = p.consume();
 			org.junit.Assert.assertEquals(null, str);
 			// stop Dispatcher, to allow test to complete
 			if (dthrd != null) dsptch.stop();

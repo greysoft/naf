@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Yusef Badri - All rights reserved.
+ * Copyright 2012-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -15,12 +15,15 @@ public final class CommandParser
 	{
 		private final java.util.Set<String> opts_solo = new java.util.HashSet<String>();
 		private final java.util.Set<String> opts_withval = new java.util.HashSet<String>();
-		private final int min_params;
-		private final int max_params;
+		final int min_params;
+		final int max_params;
 
 		public void setOption(String opt) {throw new RuntimeException("Missing handler for bool-option="+opt);}
 		public void setOption(String opt, String val) {throw new RuntimeException("Missing handler for option="+opt+"="+val);}
 		public String displayUsage() {return null;}
+
+		boolean containsSoloOption(String opt) {return opts_solo.contains(opt);}
+		boolean containsValueOption(String opt) {return opts_withval.contains(opt);}
 
 		public OptionsHandler(String[] opts, int min, int max)
 		{
@@ -39,11 +42,16 @@ public final class CommandParser
 	}
 
 	private final java.util.List<OptionsHandler> handlers = new java.util.ArrayList<OptionsHandler>();
+	private final boolean silent;
+
 	public void addHandler(OptionsHandler h) {handlers.add(0, h);}
 	private OptionsHandler mainHandler() {return handlers.get(0);}
+	
+	public CommandParser(OptionsHandler default_handler) {this(default_handler, false);}
 
-	public CommandParser(OptionsHandler default_handler)
+	public CommandParser(OptionsHandler default_handler, boolean silent)
 	{
+		this.silent = silent;
 		addHandler(default_handler);
 	}
 
@@ -63,16 +71,16 @@ public final class CommandParser
 			do {
 				if (idx == handlers.size()) {
 					if (opt.equals("h") || opt.equals("help")) {
-						usage();
+						if (!silent) System.out.print(usage());
 						return -1;
 					}
 					return fail(args, arg0, "Unrecognised option="+opt+" at pos="+arg);
 				}
 				OptionsHandler handler = handlers.get(idx++);
-				if (handler.opts_solo.contains(opt)) {
+				if (handler.containsSoloOption(opt)) {
 					handler.setOption(opt);
 					handled = true;
-				} else if (handler.opts_withval.contains(opt)) {
+				} else if (handler.containsValueOption(opt)) {
 					if (arg == args.length) {
 						return fail(args, arg0, "Missing value for option="+opt+" at pos="+arg);
 					}
@@ -89,26 +97,28 @@ public final class CommandParser
 		return arg;
 	}
 
-	public void usage(String[] args, int arg0, String errmsg)
+	public String usage(String[] args, int arg0, String errmsg)
 	{
-		System.out.print("\nInvalid parameters="+args.length+":");
-		for (int idx = arg0; idx != args.length; idx++) System.out.print(" "+args[idx]);
-		System.out.println();
-		System.out.println("*** "+errmsg);
-		usage();
+		String txt = "\nInvalid parameters="+args.length+":\n";
+		for (int idx = arg0; idx != args.length; idx++) txt += " "+args[idx];
+		txt += "\n*** "+errmsg+"\n";
+		txt += usage();
+		if (!silent) System.out.print(txt);
+		return txt;
 	}
 
-	public void usage(String[] args, String errmsg)
+	public String usage(String[] args, String errmsg)
 	{
-		usage(args, 0, errmsg);
+		return usage(args, 0, errmsg);
 	}
 
-	private void usage()
+	private String usage()
 	{
-		System.out.println("Command-line syntax:");
-		String txt = mainHandler().displayUsage();
-		if (txt == null) txt = "\tNo help available";
-		System.out.println(txt);
+		String txt = "Command-line syntax:\n";
+		String txt2 = mainHandler().displayUsage();
+		if (txt2 == null) txt2 = "\tNo help available";
+		txt += txt2+"\n";
+		return txt;
 	}
 
 	private int fail(String[] args, int arg0, String errmsg)

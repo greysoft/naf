@@ -1,5 +1,5 @@
 <!--
-  Copyright 2010-2013 Yusef Badri - All rights reserved.
+  Copyright 2010-2016 Yusef Badri - All rights reserved.
   NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -11,8 +11,8 @@
 	<name>Echo Bot</name>
 	<parent>
 		<groupId>com.grey.naf.samples</groupId>
-		<artifactId>grey-samples-agg</artifactId>
-		<version>1.0.0</version>
+		<artifactId>ossnaf-samples-agg</artifactId>
+		<version>${grey.version.naf}</version>
 	</parent>
 	<properties>
 		<grey.manifest.name>com/grey/echobot/</grey.manifest.name>

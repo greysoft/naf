@@ -47,7 +47,7 @@ public class DuplexPipe
 	public final java.net.Socket ep1;
 	public final java.net.Socket ep2;
 
-	private DuplexPipe(java.net.ServerSocket srvsock) throws java.io.IOException
+	DuplexPipe(java.net.ServerSocket srvsock) throws java.io.IOException
 	{
         ep1 = new java.net.Socket(srvsock.getInetAddress(), srvsock.getLocalPort());
         ep2 = srvsock.accept();

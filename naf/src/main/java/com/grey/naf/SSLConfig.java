@@ -184,7 +184,7 @@ public class SSLConfig
 		def.shakeFreq = cfg.getTime("@shake", def.shakeFreq);
 		def.shakeTimeout = cfg.getTime("@timeout", def.shakeTimeout);
 		def.latent = cfg.getBool("@latent", def.latent);
-		def.mdty = (def.latent ? cfg.getBool("@mandatory", def.mdty) : true);
+		def.mdty = (def.latent ? cfg.getBool("@mandatory", def.mdty) : false);
 
 		if (nafcfg == null) {
 			def.trustPath = makeURL(cfg.getValue("@tspath", false, def.trustPath == null ? null : def.trustPath.toString()));
@@ -227,7 +227,7 @@ public class SSLConfig
 		return store;
 	}
 
-	private static java.net.URL makeURL(String pthnam) {
+	static java.net.URL makeURL(String pthnam) {
 		if (pthnam == null) return null;
 		try {
 			java.net.URL url = FileOps.makeURL(pthnam);
@@ -239,8 +239,8 @@ public class SSLConfig
 		}
 	}
 
-	private static char[] makeChars(String str) {
-		if (str == null) return null;
+	static char[] makeChars(String str) {
+		if (str == null || str.length() == 0) return null;
 		return str.toCharArray();
 	}
 }

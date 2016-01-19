@@ -50,7 +50,7 @@ public class PkgInfo
 	public static void announceJAR(Class<?> memberclass, String nickname, String txt)
 	{
 		CharSequence official = com.grey.base.utils.PkgInfo.getSummary(memberclass, null);
-		System.out.println("Loaded "+(official==null ? nickname:official)+(txt==null ? "":": "+txt));
+		System.out.println("Loaded package="+(official==null ? nickname:official)+(txt==null ? "":": "+txt));
 
 		if (official != null) {
 			synchronized (loadedJARs) {

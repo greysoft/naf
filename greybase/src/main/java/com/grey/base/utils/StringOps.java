@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2013 Yusef Badri - All rights reserved.
+ * Copyright 2010-2016 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -13,7 +13,25 @@ public class StringOps
 	public static final String DFLT_CHARSET = dfltchset;
 	protected static final char DFLT_QUOTE = '"';
 
+	public static int count(CharSequence container, char target) {return count(container, 0, container == null ? 0 : container.length(), target);}
+	public static int indexOf(CharSequence container, char target) {return indexOf(container, 0, container == null ? 0 : container.length(), target);}
+	public static int indexOf(CharSequence container, int off, char target) {return indexOf(container, off, (container==null?0:container.length()) - off, target);}
+	public static int indexOf(CharSequence container, int coff, int clen, char target) {return indexOf(false, container, coff, clen, target);}
+	public static int indexOf(CharSequence container, CharSequence target) {return indexOf(container, 0, container == null ? 0 : container.length(), target);}
+	public static int indexOf(CharSequence container, int coff, int clen, CharSequence target) {return indexOf(false, container, coff, clen, target);}
+	public static int indexOfNoCase(CharSequence container, char target) {return indexOfNoCase(container, 0, container == null ? 0 : container.length(), target);}
+	public static int indexOfNoCase(CharSequence container, int off, char target) {return indexOfNoCase(container, off, (container==null?0:container.length()) - off, target);}
+	public static int indexOfNoCase(CharSequence container, int coff, int clen, char target) {return indexOf(true, container, coff, clen, target);}
+	public static int indexOfNoCase(CharSequence container, CharSequence target) {return indexOfNoCase(container, 0, container == null ? 0 : container.length(), target);}
+	public static int indexOfNoCase(CharSequence container, int coff, int clen, CharSequence target) {return indexOf(true, container, coff, clen, target);}
+	public static boolean sameSeq(CharSequence str1, CharSequence str2) {return sameSeq(str1, 0, str1 == null ? 0 : str1.length(), str2, 0, str2 == null ? 0 : str2.length());}
+	public static boolean sameSeq(CharSequence str1, int off1, int len1, CharSequence str2) {return sameSeq(str1, off1, len1, str2, 0, str2 == null ? 0 : str2.length());}
+	public static boolean sameSeq(CharSequence str1, int off1, int len1, CharSequence str2, int off2, int len2) {return sameSeq(false, str1, off1, len1, str2, off2, len2);}
+	public static boolean sameSeqNoCase(CharSequence str1, CharSequence str2) {return sameSeqNoCase(str1, 0, str1 == null ? 0 : str1.length(), str2, 0, str2 == null ? 0 : str2.length());}
+	public static boolean sameSeqNoCase(CharSequence str1, int off1, int len1, CharSequence str2) {return sameSeqNoCase(str1, off1, len1, str2, 0, str2 == null ? 0 : str2.length());}
+	public static boolean sameSeqNoCase(CharSequence str1, int off1, int len1, CharSequence str2, int off2, int len2) {return sameSeq(true, str1, off1, len1, str2, off2, len2);}
 	public static String stripQuotes(String str) {return stripQuotes(str, DFLT_QUOTE);}
+	public static long parseNumber(CharSequence cs, int radix) {return parseNumber(cs, 0, (cs == null ? 0 : cs.length()), radix);}
 
 	public static boolean stringAsBool(String strval)
 	{
@@ -29,104 +47,85 @@ public class StringOps
 		return (bval ? "Y" : "N");
 	}
 
-	public static String convert(byte[] buf, String charset) throws java.io.UnsupportedEncodingException
-	{
-		if (buf == null) return null;
-		return new String(buf, charset == null ? DFLT_CHARSET : charset);
-	}
-
-	public static boolean sameSeq(CharSequence str1, int off1, int len1, CharSequence str2, int off2, int len2)
+	private static boolean sameSeq(boolean nocase, CharSequence str1, int off1, int len1, CharSequence str2, int off2, int len2)
 	{
 		if (len1 != len2) return false;
 		int lmt = off1 + len1;
-
 		while (off1 != lmt) {
-			if (str1.charAt(off1++) != str2.charAt(off2++)) return false;
+			char ch1 = str1.charAt(off1++);
+			char ch2 = str2.charAt(off2++);
+			if (nocase) {
+				ch1 = Character.toUpperCase(ch1);
+				ch2 = Character.toUpperCase(ch2);
+			}
+			if (ch1 != ch2) return false;
 		}
 		return true;
 	}
 
-	public static boolean sameSeq(CharSequence str1, CharSequence str2)
+	public static int count(String container, String target)
 	{
-		if (str1 == null || str2 == null) return  (str1 == null && str2 == null);
-		return sameSeq(str1, 0, str1.length(), str2, 0, str2.length());
-	}
-
-	public static boolean sameSeq(CharSequence str1, int off1, int len1, CharSequence str2)
-	{
-		if (str2 == null) return (len1 == 0);
-		return sameSeq(str1, off1, len1, str2, 0, str2.length());
-	}
-
-	public static boolean sameSeqNoCase(CharSequence str1, int off1, int len1, CharSequence str2, int off2, int len2)
-	{
-		if (len1 != len2) return false;
-		int lmt = off1 + len1;
-
-		while (off1 != lmt) {
-			if (Character.toUpperCase(str1.charAt(off1++)) != Character.toUpperCase(str2.charAt(off2++))) return false;
+		if (target == null || target.length() == 0) return 0;
+		if (container == null) return 0;
+		int cnt = 0;
+		int idx = 0;
+		while ((idx = container.indexOf(target, idx)) != -1) {
+			cnt++;
+			idx += target.length();
 		}
-		return true;
+		return cnt;
 	}
 
-	public static boolean sameSeqNoCase(CharSequence str1, CharSequence str2)
+	public static int count(CharSequence container, int coff, int clen, char target)
 	{
-		if (str1 == null || str2 == null) return  (str1 == null && str2 == null);
-		return sameSeqNoCase(str1, 0, str1.length(), str2, 0, str2.length());
+		int cnt = 0;
+		int clmt = coff + clen;
+		for (int idx = coff; idx != clmt; idx++) {
+			if (container.charAt(idx) == target) cnt++;
+		}
+		return cnt;
 	}
 
-	public static boolean sameSeqNoCase(CharSequence str1, int off1, int len1, CharSequence str2)
+	private static int indexOf(boolean nocase, CharSequence container, int coff, int clen, char target)
 	{
-		if (str2 == null) return (len1 == 0);
-		return sameSeqNoCase(str1, off1, len1, str2, 0, str2.length());
+		if (nocase) target = Character.toLowerCase(target);
+		int clmt = coff + clen;
+		for (int idx = coff; idx != clmt; idx++) {
+			char cval = container.charAt(idx);
+			if (nocase) cval = Character.toLowerCase(cval);
+			if (cval == target) return idx;
+		}
+		return -1;
 	}
 
-	public static int indexOfNoCase(CharSequence str, int off, int len, CharSequence target)
+	private static int indexOf(boolean nocase, CharSequence container, int coff, int clen, CharSequence target)
 	{
-		int tlen = target.length();
-		if (tlen > len) return -1;
-		int lmt = off + len;
-		int maxpos = lmt - tlen;
+		int tlen = (target == null ? 0 : target.length());
+		if (tlen == 0) return -1;
+		int clmt = coff + clen;
+		int cmaxpos = clmt - tlen;
 		int toff = 0;
-		char tval = Character.toLowerCase(target.charAt(toff));
+		char tval = 0;
 
-		for (int idx = off; idx != lmt; idx++) {
-			if (Character.toLowerCase(str.charAt(idx)) == tval) {
+		for (int idx = coff; idx != clmt; idx++) {
+			if (tval == 0) {
+				tval = target.charAt(toff);
+				if (nocase) tval = Character.toLowerCase(tval);
+			}
+			char cval = container.charAt(idx);
+			if (nocase) cval = Character.toLowerCase(cval);
+			if (cval == tval) {
 				if (++toff == tlen) return idx - tlen + 1;
-				tval = Character.toLowerCase(target.charAt(toff));
+				tval = 0;
 			} else {
-				if (off == maxpos) return -1;
+				if (idx == cmaxpos) return -1;
 				if (toff != 0) {
 					toff = 0;
-					tval = Character.toLowerCase(target.charAt(toff));
+					tval = 0;
 				}
 			}
 		}
 		return -1;
-	}
-
-	public static int indexOfNoCase(CharSequence str, CharSequence target)
-	{
-		return indexOfNoCase(str, 0, str.length(), target);
-	}
-
-	public static int indexOf(CharSequence str, int off, int len, char ch)
-	{
-		int lmt = off + len;
-		for (int idx = off; idx != lmt; idx++) {
-			if (str.charAt(idx) == ch) return idx;
-		}
-		return -1;
-	}
-
-	public static int indexOf(CharSequence str, char ch)
-	{
-		return indexOf(str, 0, str.length(), ch);
-	}
-
-	public static int indexOf(CharSequence str, int off, char ch)
-	{
-		return indexOf(str, off, str.length() - off, ch);
 	}
 
 	// zero-pad numbers without generating any memory garbage
@@ -155,32 +154,22 @@ public class StringOps
 		return 10;
 	}
 
-	public static int occurrences(String main, String target)
-	{
-		int cnt = 0;
-		int idx = 0;
-		while ((idx = main.indexOf(target, idx)) != -1) {
-			cnt++;
-			idx += target.length();
-		}
-		return cnt;
-	}
-
-	public static int occurrences(CharSequence cs, int off, int len, char target)
-	{
-		int cnt = 0;
-		int lmt = off + len;
-		for (int idx = off; idx != lmt; idx++) {
-			if (cs.charAt(idx) == target) cnt++;
-		}
-		return cnt;
-	}
-
 	public static long parseNumber(CharSequence cs, int off, int len, int radix)
 	{
+		if (len == 0) return 0;
 		long numval = 0;
+		long sign = 1;
 		long power = 1;
-		for (int idx = off+len-1; idx >= off; idx--) {
+
+		char ch0 = cs.charAt(off);
+		if (ch0 == '-' || ch0 == '+') {
+			if (ch0 == '-') sign = -1;
+			off++;
+			len--;
+		}
+		int lmt = off - 1;
+
+		for (int idx = off+len-1; idx != lmt; idx--) {
 			long digit = Character.digit(cs.charAt(idx), radix);
 			if (digit == -1) {
 				throw new NumberFormatException(cs.charAt(idx)+"@"+idx+" in "+off+":"+len+" - "+cs.subSequence(off, off+len));
@@ -188,12 +177,7 @@ public class StringOps
 			numval += (digit * power);
 			power *= radix;
 		}
-		return numval;
-	}
-
-	public static long parseNumber(CharSequence cs, int radix)
-	{
-		return parseNumber(cs, 0, cs.length(), radix);
+		return numval * sign;
 	}
 
 	public static String leadingChars(String str, int cnt)
@@ -277,13 +261,22 @@ public class StringOps
 		return leadingChars(str, maxlen);
 	}
 
-	public static void erase(String str)
+	public static boolean erase(String str)
 	{
 		char[] value = (char[])DynLoader.getField(str, "value");
-		Integer offset = (Integer)DynLoader.getField(str, "offset");
-		int lmt = offset.intValue() + str.length();
+		if (value == null) return false; //this method is incompatible with this version of Java
+		Object raw_offset = DynLoader.getField(str, "offset");
+		int offset = (raw_offset == null ? 0 : (int)raw_offset);
+		int lmt = offset + str.length();
 		for (int idx = offset; idx != lmt; idx++) {
-			value[idx] = '?';
+			value[idx] = 0;
 		}
+		return true;
+	}
+
+	public static String convert(byte[] buf, String charset) throws java.io.UnsupportedEncodingException
+	{
+		if (buf == null) return null;
+		return new String(buf, charset == null ? DFLT_CHARSET : charset);
 	}
 }

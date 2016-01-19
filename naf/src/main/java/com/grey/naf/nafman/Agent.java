@@ -11,7 +11,7 @@ public abstract class Agent
 	implements Command.Handler
 {
 	public final com.grey.naf.reactor.Dispatcher dsptch;
-	protected final com.grey.base.utils.HashedMap<String, java.util.ArrayList<Command.Handler>> handlers;
+	protected final com.grey.base.collections.HashedMap<String, java.util.ArrayList<Command.Handler>> handlers;
 	protected boolean in_shutdown;
 	//temp objects pre-allocated merely for efficiency
 	private final StringBuilder sbtmp = new StringBuilder();
@@ -20,11 +20,14 @@ public abstract class Agent
 	public abstract Primary getPrimary();
 	public abstract int getPort();
 	public abstract void stop();
+	
+	@Override
+	public CharSequence nafmanHandlerID() {return "Agent";}
 
 	protected Agent(com.grey.naf.reactor.Dispatcher d, com.grey.base.config.XmlConfig cfg) throws com.grey.base.ConfigException
 	{
 		dsptch = d;
-		handlers = new com.grey.base.utils.HashedMap<String, java.util.ArrayList<Command.Handler>>();
+		handlers = new com.grey.base.collections.HashedMap<String, java.util.ArrayList<Command.Handler>>();
 		Registry reg = Registry.get();
 		reg.registerHandler(Registry.CMD_STOP, 0, this, dsptch);
 		reg.registerHandler(Registry.CMD_DSHOW, 0, this, dsptch);
@@ -63,11 +66,13 @@ public abstract class Agent
 			sbtmp.append(" - no Handlers");
 			dsptch.logger.log(Logger.LEVEL.TRC3, sbtmp);
 		} else {
-			sbtmp.append(" - Handlers=").append(lst.size());
+			Logger.LEVEL lvl = Logger.LEVEL.TRC2;
+			if (dsptch.logger.isActive(lvl)) {
+				sbtmp.append(" - Handlers=").append(lst.size()).append('/').append(lst);
+				dsptch.logger.log(lvl, sbtmp);
+			}
 			for (int idx = 0; idx != lst.size(); idx++) {
 				Command.Handler handler = lst.get(idx);
-				sbtmp.append(idx==0?": ":", ").append(handler.getClass().getName());
-				dsptch.logger.log(Logger.LEVEL.TRC2, sbtmp);
 				CharSequence rsp = handler.handleNAFManCommand(cmd);
 				if (rsp != null && rsp.length() != 0) cmd.addHandlerResponse(dsptch, handler, rsp);
 			}

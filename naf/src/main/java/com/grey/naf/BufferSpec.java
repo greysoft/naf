@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2013 Yusef Badri - All rights reserved.
+ * Copyright 2010-2014 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf;
@@ -12,40 +12,42 @@ public final class BufferSpec
 	public static final boolean directniobufs = SysProps.get("greynaf.nio.directbufs", false);
 
 	public final int rcvbufsiz;  //receive-buffer size
-	private final int xmtbufsiz;  //transmit buffer size - has no relevance any more, as IOExecWriter now uses SysProps for pool buffer sizes
 	public final boolean directbufs; //false by default, because direct buffers don't have a backing array in standard JDK implementation
-	public final com.grey.base.utils.ObjectWell<java.nio.ByteBuffer> xmtpool;
+	public final com.grey.base.collections.ObjectWell<java.nio.ByteBuffer> xmtpool; //NB: ignores xmtsiz
 	private final java.nio.charset.CharsetEncoder chenc;
 
 	public String charsetName() {return (chenc == null ? "n/a" : chenc.charset().displayName());}
 
-	public BufferSpec(int rcvsiz, int xmtsiz) throws com.grey.base.ConfigException
+	public BufferSpec(int rcvsiz, int xmtsiz)
 	{
 		this(null, null, rcvsiz, xmtsiz);
 	}
 
-	public BufferSpec(int rcvsiz, int xmtsiz, boolean direct) throws com.grey.base.ConfigException
+	public BufferSpec(int rcvsiz, int xmtsiz, boolean direct)
 	{
 		this(null, null, rcvsiz, xmtsiz, direct);
 	}
 
-	public BufferSpec(com.grey.base.config.XmlConfig cfg, String xpath, int rcvsiz, int xmtsiz) throws com.grey.base.ConfigException
+	public BufferSpec(com.grey.base.config.XmlConfig cfg, String xpath, int rcvsiz, int xmtsiz)
 	{
 		this(cfg, xpath, rcvsiz, xmtsiz, directniobufs);
 	}
 
-	public BufferSpec(com.grey.base.config.XmlConfig cfg, String xpath, int rcvsiz, int xmtsiz, boolean direct) throws com.grey.base.ConfigException
+	public BufferSpec(com.grey.base.config.XmlConfig cfg, String xpath, int rcvsiz, int xmtsiz, boolean direct)
 	{
 		String charset = null;
 		if (cfg != null) {
-			xpath = (xpath == null ? "" : xpath+"/");
-			rcvsiz = (int)cfg.getSize(xpath+"@recvsize", rcvsiz);
-			xmtsiz = (int)cfg.getSize(xpath+"@xmitsize", xmtsiz);
-			direct = cfg.getBool(xpath+"@direct", direct);
-			charset = cfg.getValue(xpath+"@charset", false, null);
+			try {
+				xpath = (xpath == null ? "" : xpath+"/");
+				rcvsiz = (int)cfg.getSize(xpath+"@recvsize", rcvsiz);
+				xmtsiz = (int)cfg.getSize(xpath+"@xmitsize", xmtsiz);
+				direct = cfg.getBool(xpath+"@direct", direct);
+				charset = cfg.getValue(xpath+"@charset", false, null);
+			} catch (com.grey.base.ConfigException ex) {
+				throw new RuntimeException(ex);
+			}
 		}
 		rcvbufsiz = rcvsiz;
-		xmtbufsiz = xmtsiz;
 		directbufs = direct;
 
 		// ISO-8859-1 should be ok, but best to omit, so we can default to direct byte-copy
@@ -56,13 +58,13 @@ public final class BufferSpec
 			chenc = null;
 		}
 
-		if (xmtbufsiz == 0) {
+		if (xmtsiz == 0) {
 			xmtpool = null;
 		} else {
 			// initial alloc of pool buffers should be as small as possible, since IOExecWriter will expand them on demand
 			com.grey.base.utils.NIOBuffers.BufferFactory factory = new com.grey.base.utils.NIOBuffers.BufferFactory(1, directbufs);
-			xmtpool = new com.grey.base.utils.ObjectWell<java.nio.ByteBuffer>(java.nio.ByteBuffer.class, factory,
-								"BufferSpecPool_"+rcvbufsiz+":"+xmtbufsiz+":"+directbufs, 0, 0, 1);
+			xmtpool = new com.grey.base.collections.ObjectWell<java.nio.ByteBuffer>(java.nio.ByteBuffer.class, factory,
+								"BufferSpecPool_"+rcvbufsiz+":"+xmtsiz+":"+directbufs, 0, 0, 1);
 		}
 	}
 
@@ -84,7 +86,7 @@ public final class BufferSpec
 	@Override
 	public String toString()
 	{
-		String txt = "rcvbuf="+rcvbufsiz+", xmtbuf="+xmtbufsiz+", directbufs="+directbufs+", xmtpool="+(xmtpool != null);
+		String txt = "rcvbuf="+rcvbufsiz+", directbufs="+directbufs+", xmtpool="+(xmtpool != null);
 		if (chenc != null) txt += " - charset="+chenc.charset().displayName();
 		return txt;
 	}

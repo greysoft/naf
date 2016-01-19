@@ -7,7 +7,7 @@ package com.grey.base.utils;
 /**
  * Handy array handle.&nbsp;Allows us to specify all or part of an array buffer without having to pass
  * around 3 separate parameters (buffer, offset, length).
- * <br/>
+ * <br>
  * Note that Java generics don't take primitive types like byte and char, so instances of this class have to be declared
  * with T as byte[], char[], Object[] etc.
  */
@@ -53,7 +53,7 @@ public class ArrayRef<T>
 
 	/**
 	 * Allocate the buffer, but leave it marked as empty (len=0).
-	 * <br/>
+	 * <br>
 	 * If size is -1 we don't even allocate the buffer, and this is equivalent to the basic ArrayRef() constructor
 	 */
 	public ArrayRef(Class<?> clss, int cap)
@@ -67,10 +67,10 @@ public class ArrayRef<T>
 
 	/**
 	 * Note that since this class is basically a glorified pointer, the Equals method merely checks that they both point to the same memory location.
-	 * <br/>
+	 * <br>
 	 * The fact that two ArrayRef objects point at different buffers does not mean that the pointed-to contents are unequal in terms of their own
 	 * object-class semantics, but they are unequal from the point of view of this class, so if you are interested in that sort of equality, then
-	 * you need to perform additional checks when this returns False (or just call something else or even override it).<br/>
+	 * you need to perform additional checks when this returns False (or just call something else or even override it).<br>
 	 * Subclasses of ArrayRef must override this method, if they are in a position to know what their array type is.
 	 */
 	@Override
@@ -88,6 +88,13 @@ public class ArrayRef<T>
 	{
 		if (ar_buf == null) return 0;
 		return ar_buf.hashCode() + ar_off + ar_len;
+	}
+
+	@Override
+	public String toString()
+	{
+		return getClass().getName()+"-"+System.identityHashCode(this)+" buf="+ar_buf
+				+" off="+ar_off+"/len="+ar_len+"/cap="+capacity();
 	}
 
 	// NB: These methods don't null the vacated array elements.

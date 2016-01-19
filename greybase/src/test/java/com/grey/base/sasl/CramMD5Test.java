@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2013 Yusef Badri - All rights reserved.
+ * Copyright 2012-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.sasl;
@@ -12,16 +12,14 @@ import com.grey.base.utils.DynLoader;
 	stackoverflow.com/questions/2077768/how-to-use-the-java-sasl-api-and-cram-md5
  */
 public class CramMD5Test
-	implements SaslServer.Authenticator
 {
-	private ByteChars username;
-	private ByteChars passwd;
+	private final SaslAuthenticator saslauth = new SaslAuthenticator();
 
 	@org.junit.Test
 	public void testBase64() throws java.security.NoSuchAlgorithmException
 	{
 		CramMD5Client client = new CramMD5Client(true);
-		CramMD5Server server = new CramMD5Server(this, true);
+		CramMD5Server server = new CramMD5Server(saslauth, true);
 		org.junit.Assert.assertFalse(server.requiresInitialResponse());
 		org.junit.Assert.assertTrue(server.sendsChallenge());
 
@@ -37,7 +35,7 @@ public class CramMD5Test
 		// RFC-2195 tests have succeeded - repeat with different challenges
 		nonce = new ByteChars("<time@localhost>"); //shorter challenge string
 		runtestGood(client, server, usrnam, secret, nonce, null, null);
-		nonce = new ByteChars("<longer_initial_challenge@localhost>");  //longest challenge
+		nonce = new ByteChars("<longer_initial_challenge@localhost>"); //longest challenge
 		runtestGood(client, server, usrnam, secret, nonce, null, null);
 
 		// simulate client specifying a bad user or password
@@ -51,7 +49,7 @@ public class CramMD5Test
 	public void testNon64() throws java.security.NoSuchAlgorithmException
 	{
 		CramMD5Client client = new CramMD5Client(false);
-		CramMD5Server server = new CramMD5Server(this, false);
+		CramMD5Server server = new CramMD5Server(saslauth, false);
 		org.junit.Assert.assertFalse(server.requiresInitialResponse());
 		org.junit.Assert.assertTrue(server.sendsChallenge());
 		String usrnam = "myname1";
@@ -69,7 +67,7 @@ public class CramMD5Test
 		// and once more
 		usrnam = "anothername3";
 		secret = new ByteChars("mypassword3");
-		nonce = new ByteChars("<longer_initial_challenge@localhost>");  //longest challenge
+		nonce = new ByteChars("<longer_initial_challenge@localhost>"); //longest challenge
 		runtestGood(client, server, usrnam, secret, nonce, null, null);
 
 		// simulate client specifying a bad user or password
@@ -82,9 +80,8 @@ public class CramMD5Test
 	@org.junit.Test
 	public void testBadResponse() throws java.security.NoSuchAlgorithmException
 	{
-		CramMD5Server server = new CramMD5Server(this, false);
-		username = new ByteChars("");
-		passwd = new ByteChars("password");
+		CramMD5Server server = new CramMD5Server(saslauth, false);
+		ByteChars username = new ByteChars("");
 		StringBuilder sbtmp = new StringBuilder();
 
 		//blank response
@@ -111,6 +108,7 @@ public class CramMD5Test
 		org.junit.Assert.assertFalse(server.verifyResponse(rsp));
 
 		//bad digest
+		saslauth.username_good = username;
 		server.init().setChallenge(null);
 		rsp.clear().append(username).append(" xyz");
 		org.junit.Assert.assertFalse(server.verifyResponse(rsp));
@@ -140,20 +138,20 @@ public class CramMD5Test
 			ByteChars srvnonce = (ByteChars)DynLoader.getField(server, "srvnonce");
 			srvnonce.set(nonce);
 		}
-		username = new ByteChars(usrnam);
+		saslauth.username_good = new ByteChars(usrnam);
 		if (usrnam.toString().equals("baduser")) {
-			passwd = new ByteChars("wrongpassword");
+			saslauth.passwd = new ByteChars("wrongpassword");
 		} else if (usrnam.toString().equals("badpass")) {
-			passwd = null;
+			saslauth.passwd = null;
 		} else {
-			passwd = new ByteChars(secret);
+			saslauth.passwd = new ByteChars(secret);
 		}
 		ByteChars sbuf = new ByteChars();
 		ByteChars msg = server.setChallenge(sbuf);
 		org.junit.Assert.assertTrue(msg == sbuf);
 		if (expected_challenge != null) org.junit.Assert.assertEquals(expected_challenge, msg.toString());
 		ByteChars cbuf = (usrnam.equals("tim") ? new ByteChars() : null);
-		msg = client.setResponse(username, secret, msg, cbuf);
+		msg = client.setResponse(usrnam, secret, msg, cbuf);
 		if (cbuf != null) org.junit.Assert.assertTrue(msg == cbuf);
 		if (msg.ar_off == 0) {
 			// shuffle buffer up to test offset handling
@@ -165,11 +163,17 @@ public class CramMD5Test
 		return server.verifyResponse(msg);
 	}
 
-	@Override
-	public ByteChars saslPassword(ByteChars role, ByteChars user)
+
+	private static final class SaslAuthenticator
+		extends SaslServer.Authenticator
 	{
-		if (role != null) return null;
-		if (!username.equals(user)) return null;
-		return passwd;
+		ByteChars username_good;
+		ByteChars passwd;
+		SaslAuthenticator() {} //defined purely to avoid synthetic accessor
+		@Override
+		public ByteChars saslPasswordLookup(ByteChars usrnam) {
+			if (!username_good.equals(usrnam)) return null;
+			return passwd;
+		}
 	}
 }

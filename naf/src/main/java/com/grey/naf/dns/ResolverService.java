@@ -1,256 +1,604 @@
 /*
- * Copyright 2010-2013 Yusef Badri - All rights reserved.
+ * Copyright 2010-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns;
 
 import com.grey.logging.Logger.LEVEL;
-import com.grey.base.config.SysProps;
 import com.grey.base.utils.StringOps;
 import com.grey.base.utils.FileOps;
 import com.grey.base.utils.IP;
 
-/*
- * As a general principle, this class seeks to reclaim stale objects for future use, such that it doesn't generate any garbage for the GC to collect.
- * The one area where that principle has to be abandoned is the RR caches, but the objects there expire on a timescale of hours and days rather than
- * milliseconds, so that's not the sort of memory churn that would affect performance.
- * Furthermore, unless we implement a complicated reference-counting scheme, obtaining RRDATA objects from an ObjectWell would probably result in double
- * the storage requirements, as the cache_mx (and CNAME) entries currently point at cache_a entries, so we'd need to generate independent RRDATA objects
- * for each reference, in order for it to be safe to return them to the ObjectWell.
- * TCP channels and sockets are also churned into garbage, but there's absolutely no choice about that, as we have to obtain them anew from the JDK for
- * each connection.
- */
 public final class ResolverService
-	implements com.grey.naf.reactor.Timer.Handler, com.grey.naf.nafman.Command.Handler
+	implements com.grey.naf.nafman.Command.Handler,
+		com.grey.naf.reactor.Timer.Handler
 {
 	//NAFMAN attributes
 	private static final String MATTR_QTYP = "qt";
 	private static final String MATTR_QVAL = "qv";
-	private static final String MATTR_NODOWNLOAD = "nodown";
-
-	// UDP max: add a small buffer at end to allow for sloppy encoding by remote host (NB: no reason to suspect that)
-	private static final int pktsizudp = SysProps.get("greynaf.dns.maxudp", Packet.UDPMAXMSG + 64);
-	// TCP max: allow for larger TCP messages (but we only really expect a fraction larger, not 4-fold)
-	private static final int pktsiztcp = SysProps.get("greynaf.dns.maxtcp", Packet.UDPMAXMSG * 4);
-	// max number of consecutive UDP reads, before yielding control back to framework (zero means unlimited)
-	private static final int udprcvmax = SysProps.get("greynaf.dns.udprcvmax", 100);
-
-	private static final int TMRTYPE_PRUNECACHE = 1;  // the routine DNS-request timeouts leave timer type set to zero
-
-	private final int retrymax;  // max UDP retries - 0 means try once, with no retries
-	private final long retrytmt;		// timeout on DNS/UDP requests
-	private final long retrytmt_tcp;  // UDP/TCP - make it long enough that we don't preempt server's idle-connection close
-	private final long retrystep;  // number of milliseconds to increment DNS timeout by on each retry
-	private final long negttl;	// how long to cache DNS no-domain answers (negative TTL)
-	private final long tmtcacheprune;   // interval for pruning expired RRs from DNS cache
-	private final int cache_hiwater;  //soft limit for A & PTR RR caches - they can get temporarily larger, but we prune them back
-	private final int cache_hiwater_mx;
-	private final boolean mx_fallback_a;  // MX queries fall back to simple hostname lookup (QTYPE=A) if no MX RRs exist - Default is No
-	private final int mx_maxrr;
-	private final boolean always_tcp;
-	private final boolean dump_on_exit;
+	private static final String MATTR_DUMPFILE = "df";
+	private static final String MATTR_DUMPHTML = "dh";
 
 	public final com.grey.naf.reactor.Dispatcher dsptch;
-	private final ServerHandle[] dnsservers;
+	final com.grey.logging.Logger logger;
+	final Config config;
+	final CacheManager cachemgr;
+	final CommsManager xmtmgr;
+	final java.util.Random rndgen = new java.util.Random(System.nanoTime());
 	private final java.io.File fh_dump;
 
-	private com.grey.naf.reactor.Timer tmr_prunecache;
-	private int next_qryid = new java.util.Random(System.nanoTime()).nextInt(0xffff);
-	private int next_dnssrv;
+	// short-lived caches tracking currently ongoing requests
+	private final com.grey.base.collections.HashedMap<com.grey.base.utils.ByteChars, QueryHandle> pendingdoms_a
+								= new com.grey.base.collections.HashedMap<com.grey.base.utils.ByteChars, QueryHandle>();
+	private final com.grey.base.collections.HashedMapIntKey<QueryHandle> pendingdoms_ptr
+								= new com.grey.base.collections.HashedMapIntKey<QueryHandle>();
+	private final com.grey.base.collections.HashedMap<com.grey.base.utils.ByteChars, QueryHandle> pendingdoms_ns
+								= new com.grey.base.collections.HashedMap<com.grey.base.utils.ByteChars, QueryHandle>();
+	private final com.grey.base.collections.HashedMap<com.grey.base.utils.ByteChars, QueryHandle> pendingdoms_mx
+								= new com.grey.base.collections.HashedMap<com.grey.base.utils.ByteChars, QueryHandle>();
+	private final com.grey.base.collections.HashedMap<com.grey.base.utils.ByteChars, QueryHandle> pendingdoms_soa
+								= new com.grey.base.collections.HashedMap<com.grey.base.utils.ByteChars, QueryHandle>();
+	private final com.grey.base.collections.HashedMap<com.grey.base.utils.ByteChars, QueryHandle> pendingdoms_srv
+								= new com.grey.base.collections.HashedMap<com.grey.base.utils.ByteChars, QueryHandle>();
+	private final com.grey.base.collections.HashedMap<com.grey.base.utils.ByteChars, QueryHandle> pendingdoms_txt
+								= new com.grey.base.collections.HashedMap<com.grey.base.utils.ByteChars, QueryHandle>();
+	private final com.grey.base.collections.HashedMap<com.grey.base.utils.ByteChars, QueryHandle> pendingdoms_aaaa
+								= new com.grey.base.collections.HashedMap<com.grey.base.utils.ByteChars, QueryHandle>();
 
-	// cache_a simply maps domain-name to type-A RR (contains IP address)
-	// cache_ptr maps IP address (as an integer value) to type-PTR RR (contains domain name)
-	// cache_mx maps domain name to list of type-A RR records, ie. it records the addresses of the MX hosts, not their MX RRs
-	// pendingreqs, pendingdoms_a, pendingdoms_ptr and pendingdoms_mx are short-lived caches tracking current requests
-	// The long-lived caches may grow very large, so use huge load factor to save on space - lookup time will still be more than fast enough
-	private final com.grey.base.utils.HashedMap<com.grey.base.utils.ByteChars, ResourceData> cache_a
-								= new com.grey.base.utils.HashedMap<com.grey.base.utils.ByteChars, ResourceData>(0, 10f);
-	private final com.grey.base.utils.HashedMapIntKey<ResourceData> cache_ptr
-								= new com.grey.base.utils.HashedMapIntKey<ResourceData>(0, 10f);
-	private final com.grey.base.utils.HashedMap<com.grey.base.utils.ByteChars, java.util.ArrayList<ResourceData>> cache_mx
-								= new com.grey.base.utils.HashedMap<com.grey.base.utils.ByteChars, java.util.ArrayList<ResourceData>>(0, 10f);
+	//activereqs tracks all requests, while pendingreqs tracks UDP ones only and maps them to their QID
+	private final com.grey.base.collections.HashedSet<QueryHandle> activereqs
+								= new com.grey.base.collections.HashedSet<QueryHandle>();
+	private final com.grey.base.collections.HashedMapIntKey<QueryHandle> pendingreqs
+								= new com.grey.base.collections.HashedMapIntKey<QueryHandle>();
 
-	private final com.grey.base.utils.HashedMap<com.grey.base.utils.ByteChars, QueryHandle> pendingdoms_a
-								= new com.grey.base.utils.HashedMap<com.grey.base.utils.ByteChars, QueryHandle>();
-	private final com.grey.base.utils.HashedMapIntKey<QueryHandle> pendingdoms_ptr
-								= new com.grey.base.utils.HashedMapIntKey<QueryHandle>();
-	private final com.grey.base.utils.HashedMap<com.grey.base.utils.ByteChars, QueryHandle> pendingdoms_mx
-								= new com.grey.base.utils.HashedMap<com.grey.base.utils.ByteChars, QueryHandle>();
+	// protects against QID wrap-around - only applies to UDP
+	private final com.grey.base.collections.HashedSet<QueryHandle> wrapblocked
+								= new com.grey.base.collections.HashedSet<QueryHandle>();
+	private com.grey.naf.reactor.Timer tmr_wrapblocked;
 
-	// Note that despite its name, this only tracks UDP requests
-	private final com.grey.base.utils.HashedMapIntKey<QueryHandle> pendingreqs
-								= new com.grey.base.utils.HashedMapIntKey<QueryHandle>();
-
-	// state which is required to persist across one callout from Dispatcher (or user)
-	private final Packet udpdnspkt;
-
-	// these represent non-persistent global state shared with subroutines - safe because w're single-threaded
-	private boolean inUserCall;  // True means we're still in the resolv() call chain
-	public boolean badquestion;
+	private int next_qryid = rndgen.nextInt();
 
 	//stats
-	private int stats_reqcnt; //number of DNS requests received
-	private int stats_udpxmt; //UDP packets sent
-	private int stats_udprcv; //UDP packets received
-	private int stats_tmt; //number of attempt timeouts (as opposed to final failure status)
-	private int stats_trunc; //truncated UDP responses necessitating a TCP follow-up
+	private final int[] stats_reqcnt = new int[256]; //number of user requests by qtype (we don't use qtype>255)
+	private final int[] stats_cachemiss = new int[256]; //cache misses by qtype
+	private int stats_ureqs;
+	private int stats_umiss;
+	int stats_trunc; //truncated UDP responses necessitating a TCP follow-up
+	int stats_udpxmt; //UDP packets sent
+	int stats_udprcv; //UDP packets received
+	int stats_tcpconns; //TCP connections attempted
+	int stats_tcpfail; //failed TCP connections (both connection refused and disconnect during session)
+	int stats_tmt; //number of individual query timeouts (as opposed to a final result of Timeout)
+	int caller_errors;
 
 	// We pre-allocate spare instances of these objects, for efficiency
-	final com.grey.base.utils.ObjectWell<com.grey.base.utils.ByteChars> bcstore;
-	final com.grey.base.utils.ObjectWell<Packet> pktstore;  //DNS/TCP packets
-	private final com.grey.base.utils.ObjectWell<ResourceData> rrstore;
-	private final com.grey.base.utils.ObjectWell<QueryHandle> qrystore;
+	private final com.grey.base.collections.ObjectWell<QueryHandle> qrystore;
+	private final com.grey.base.collections.ObjectWell<QueryHandle.WrapperRR> rrwstore;
+	private final com.grey.base.collections.ObjectWell<com.grey.base.utils.ByteChars> bcstore;
+
+	// We can't use dnsAnswer indiscriminately, as it would be corruped by callback chains between nested QueryHandles, so
+	// it is purely for the use of top-level callers to whom we have to synchronously return an Answer block. Internal
+	// DNS-Resolver code must allocate temp intances from anstore;
+	final com.grey.base.collections.ObjectWell<Answer> anstore;
+	private final Answer dnsAnswer = new Answer();
 
 	// these are just temporary work areas, pre-allocated for efficiency
-	private final Answer dnsAnswer = new Answer();
-	private final ResourceData tmprr = new ResourceData();
-	private final com.grey.base.utils.ByteChars tmpnam = new com.grey.base.utils.ByteChars(Resolver.MAXDOMAIN); //doesn't grow, so must be large enough
-	private final StringBuilder sbtmp = new StringBuilder();
 	private final com.grey.base.utils.ByteChars tmpbc_nafman = new com.grey.base.utils.ByteChars();
-	private final StringBuilder sbtmp_nafman = new StringBuilder();
+	private final com.grey.base.utils.ByteChars tmplightbc = new com.grey.base.utils.ByteChars(-1); //lightweight object without own storage
+	final StringBuilder sbtmp = new StringBuilder();
+	private final Packet pkt_tmp;
 
-	// already logged by Dispatcher, nothing more for us to do
+	boolean isActive(QueryHandle qh) {return activereqs.contains(qh);}
+	QueryHandle.WrapperRR allocWrapperRR(ResourceData rr) {return rrwstore.extract().set(rr);}
+	void freeWrapperRR(QueryHandle.WrapperRR rrw) {rrwstore.store(rrw.clear());}
+	com.grey.base.utils.ByteChars allocByteChars() {return bcstore.extract().clear();}
+	void freeByteChars(com.grey.base.utils.ByteChars bc) {bcstore.store(bc);}
+	@Override
+	public CharSequence nafmanHandlerID() {return "Resolver";}
 	@Override
 	public void eventError(com.grey.naf.reactor.Timer tmr, com.grey.naf.reactor.Dispatcher d, Throwable ex) {}
-
 
 	public ResolverService(com.grey.naf.reactor.Dispatcher d, com.grey.base.config.XmlConfig cfg)
 		throws com.grey.base.ConfigException, java.io.IOException, javax.naming.NamingException
 	{
 		dsptch = d;
-		bcstore = new com.grey.base.utils.ObjectWell<com.grey.base.utils.ByteChars>(com.grey.base.utils.ByteChars.class, "DNS_"+dsptch.name);
-		rrstore = new com.grey.base.utils.ObjectWell<ResourceData>(ResourceData.class, "DNS_"+dsptch.name);
+		logger = dsptch.logger;
+		config = new Config(cfg, logger);
+		cachemgr = new CacheManager(dsptch, config);
+		xmtmgr = new CommsManager(this);
 
-		String selectedservers = "";
-		String srvnames_sys = getSystemDnsServers();
-		if (srvnames_sys == null) srvnames_sys = "127.0.0.1";
-		String[] srvnames = cfg.getTuple("servers", "|", false, srvnames_sys);
-		dnsservers = new ServerHandle[srvnames.length];
+		bcstore = new com.grey.base.collections.ObjectWell<com.grey.base.utils.ByteChars>(com.grey.base.utils.ByteChars.class, "DNS_"+dsptch.name);
+		anstore = new com.grey.base.collections.ObjectWell<Answer>(Answer.class, "DNS_"+dsptch.name);
+		rrwstore = new com.grey.base.collections.ObjectWell<QueryHandle.WrapperRR>(QueryHandle.WrapperRR.class, "DNS_"+dsptch.name);
+		QueryHandle.Factory qryfact = new QueryHandle.Factory(this);
+		qrystore = new com.grey.base.collections.ObjectWell<QueryHandle>(qryfact, "DNS_"+dsptch.name);
+		pkt_tmp = new Packet(Math.max(Config.PKTSIZ_TCP, Config.PKTSIZ_UDP), Config.DIRECTNIOBUFS, config.minttl_initial);
 
-		always_tcp = cfg.getBool("@alwaystcp", false);
-		mx_fallback_a = cfg.getBool("query_mx/@fallback_a", false);
-		mx_maxrr = cfg.getInt("query_mx/@maxrr", false, 5);
-		retrymax = cfg.getInt("retry/@max", false, 3);
-		retrytmt = cfg.getTime("retry/@timeout", "10s");
-		retrytmt_tcp = cfg.getTime("retry/@timeout_tcp", "60s");
-		retrystep = cfg.getTime("retry/@step", "3s");
-		negttl = cfg.getTime("cache/@negttl", "1h");
-		cache_hiwater = cfg.getInt("cache/@hiwater", true, 5000);
-		cache_hiwater_mx = cfg.getInt("cache/@hiwater_mx", true, 2500);
-		tmtcacheprune = cfg.getTime("cache/@prune", "4h");
-		dump_on_exit = cfg.getBool("cache/@exitdump", false);
-		
-		com.grey.naf.BufferSpec bufspec_tcp = new com.grey.naf.BufferSpec(pktsiztcp, pktsiztcp);
-		com.grey.naf.BufferSpec bufspec_udp = new com.grey.naf.BufferSpec(pktsizudp, pktsizudp);
-
-		udpdnspkt = (always_tcp ? null : new Packet(false, bufspec_udp));
-
-		Packet.Factory pktfact = new Packet.Factory(true, bufspec_tcp);
-		pktstore = new com.grey.base.utils.ObjectWell<Packet>(pktfact, "DNS_"+dsptch.name);
-
-		QueryHandle.Factory qryfact = new QueryHandle.Factory(dsptch);
-		qrystore = new com.grey.base.utils.ObjectWell<QueryHandle>(qryfact, "DNS_"+dsptch.name);
-
-		String dlm = "";
-		for (int idx = 0; idx != dnsservers.length; idx++) {
-			dnsservers[idx] = new ServerHandle(srvnames[idx], Packet.INETPORT, this, dsptch, always_tcp, bufspec_udp, cfg);
-			selectedservers = selectedservers + dlm + srvnames[idx];
-			dlm = " | ";
-		}
 		fh_dump = new java.io.File(dsptch.nafcfg.path_var+"/DNSdump-"+dsptch.name+".txt");
-		FileOps.ensureDirExists(fh_dump.getParentFile());
+		FileOps.ensureDirExists(fh_dump.getParentFile()); //flush out any permissions issues right away
+
 		com.grey.naf.nafman.Registry reg = com.grey.naf.nafman.Registry.get();
 		reg.registerHandler(com.grey.naf.nafman.Registry.CMD_DNSDUMP, 0, this, dsptch);
 		reg.registerHandler(com.grey.naf.nafman.Registry.CMD_DNSPRUNE, 0, this, dsptch);
 		reg.registerHandler(com.grey.naf.nafman.Registry.CMD_DNSQUERY, 0, this, dsptch);
-
-		long tmt = 0;
-		for (int idx = 0; idx <= retrymax; idx++) {
-			tmt += retrytmt + (retrystep * idx);
-		}
-		dsptch.logger.info("DNS-Resolver: Selected DNS servers: "+dnsservers.length+" ["+selectedservers+"]");
-		if (always_tcp) dsptch.logger.info("DNS-Resolver: In always-TCP mode");
-		dsptch.logger.info("DNS-Resolver: MX-A-fallback="+mx_fallback_a+"; MX-maxrr="+mx_maxrr);
-		dsptch.logger.trace("DNS-Resolver: retry-timeout="+com.grey.base.utils.TimeOps.expandMilliTime(retrytmt)
-				+"/"+com.grey.base.utils.TimeOps.expandMilliTime(retrystep)
-				+"; max-retries="+retrymax+" (window="+com.grey.base.utils.TimeOps.expandMilliTime(tmt)
-				+") - timeout-TCP="+com.grey.base.utils.TimeOps.expandMilliTime(retrytmt_tcp));
-		dsptch.logger.trace("DNS-Resolver: negative-TTL="+com.grey.base.utils.TimeOps.expandMilliTime(negttl)
-				+"; prune-interval="+com.grey.base.utils.TimeOps.expandMilliTime(tmtcacheprune)
-				+"; hiwater="+cache_hiwater+"/MX="+cache_hiwater_mx);
-		dsptch.logger.trace("DNS-Resolver: direct-bufs="+bufspec_udp.directbufs+"; recv-limit="+udprcvmax
-				+"; udpsiz="+pktsizudp+"; tcpsiz="+pktsiztcp);
+		if (!config.recursive) reg.registerHandler(com.grey.naf.nafman.Registry.CMD_DNSLOADROOTS, 0, this, dsptch);
 	}
 
 	public void start() throws java.io.IOException
 	{
-		for (int idx = 0; idx != dnsservers.length; idx++) {
-			dnsservers[idx].start();
-		}
-		tmr_prunecache = dsptch.setTimer(tmtcacheprune, TMRTYPE_PRUNECACHE, this);
+		xmtmgr.start();
 	}
 
-	// We abort all outstanding requests without notifying the callers.
-	// It's up to whatever intelligence is stopping us to handle the implications of that (but this is probably being done as part of
-	// a system shutdown, so there'll be no other entities left to care).
+	// We abandon all outstanding requests without notifying the callers.
+	// It's up to whatever intelligence is stopping us to handle the implications of that, but this is probably being done
+	// as part of a Dispatcher shutdown (if not a JVM process termination), so there'll be nobody left to care).
 	public void stop()
 	{
-		dsptch.logger.info("DNS-Resolver received Stop request - pending="+pendingreqs.size());
+		logger.info("DNS-Resolver received shutdown request - active="+activereqs.size()+"/pending="+pendingreqs.size()
+				+"/wrapped="+wrapblocked.size());
+		if (config.dump_on_exit) {
+			cachemgr.prune(null);
+			logger.info("Dumping final cache to "+fh_dump.getAbsolutePath());
+			dumpState(fh_dump, "Dumping cache on exit");
+		}
+		xmtmgr.stop();
+		if (tmr_wrapblocked != null) tmr_wrapblocked.cancel();
+		tmr_wrapblocked = null;
 
-		if (dump_on_exit) {
-			pruneCache();
-			dsptch.logger.info("Dumping final cache to "+fh_dump.getAbsolutePath());
-			dumpCacheFile("Dumping cache on exit",  null);
+		java.util.ArrayList<QueryHandle> reqs = new java.util.ArrayList<QueryHandle>(activereqs);
+		for (int idx = 0; idx != reqs.size(); idx++) {
+			int callers = reqs.get(idx).cancelExternalCallers(Answer.STATUS.SHUTDOWN);
+			if (callers == 0) requestCompleted(reqs.get(idx));
 		}
-		com.grey.base.utils.IteratorInt iter = pendingreqs.keysIterator();
-		while (iter.hasNext()) {
-			int qid = iter.next();
-			QueryHandle qh = pendingreqs.get(qid);
-			if (qid == qh.qid) qrystore.store(qh.clear());  //main pendingreqs entry - be careful not to double-count for prevqids entries
-		}
-		pendingreqs.clear();
-		pendingdoms_a.clear();
-		pendingdoms_ptr.clear();
-		pendingdoms_mx.clear();
-		cache_a.clear();
-		cache_ptr.clear();
-		cache_mx.clear();
+	}
 
-		for (int idx = 0; idx != dnsservers.length; idx++) {
-			dnsservers[idx].stop();
-			dnsservers[idx] = null;
+	// This is expected to be a relatively rare event, and the number of pending requests is never expected to be very large,
+	// so make do with a simple iteration.
+	// We only cancel the caller (as in all notifications due to them), not the DNS requests themselves. Since we've already
+	// issued those, we might as well cache the results when they arrive.
+	public int cancel(Resolver.Client caller)
+	{
+		int reqs = 0;
+		java.util.Iterator<QueryHandle> it = activereqs.recycledIterator();
+		while (it.hasNext()) {
+			QueryHandle qh = it.next();
+			reqs += qh.removeCaller(caller);
 		}
-		if (tmr_prunecache != null) tmr_prunecache.cancel();
-		tmr_prunecache = null;
+		return reqs;
+	}
+
+	public Answer resolve(byte qtype, com.grey.base.utils.ByteChars qname, Resolver.Client caller, Object callerparam, int flags)
+	{
+		return resolve(qtype, qname, caller, callerparam, flags, 0, dnsAnswer);
+	}
+
+	public Answer resolve(byte qtype, int qip, Resolver.Client caller, Object callerparam, int flags)
+	{
+		return resolve(qtype, qip, caller, callerparam, flags, dnsAnswer);
+	}
+
+	Answer resolve(byte qtype, com.grey.base.utils.ByteChars qname, Resolver.Client caller, Object callerparam,
+			int flags, int server_ip, Answer answerbuf)
+	{
+		// check if answer is cached first
+		if (caller != null && caller.getClass() != QueryHandle.class) stats_ureqs++;
+		stats_reqcnt[qtype]++;
+		qname.toLowerCase();
+		Answer answer = lookupCache(qtype, qname, answerbuf);
+		if (answer != null) return answer; //answer was already in cache
+		if (caller != null && caller.getClass() != QueryHandle.class) stats_umiss++;
+		stats_cachemiss[qtype]++;
+
+		if ((flags & com.grey.naf.dns.Resolver.FLAG_NOQRY) != 0) {
+			// caller doesn't want to go any further if not cached
+			return answerbuf.set(Answer.STATUS.NODOMAIN, qtype, qname);
+		}
+
+		// A DNS request is required to satisfy this call, and the caller's dnsResolved() method will be called back later.
+		// If we encounter an immediate error though, we return that to the user now as our final answer.
+		// If a DNS request for this domain is already underway, then rather than duplicate that, we simply add this caller
+		// to the list of those waiting on the request.
+		QueryHandle qryh = null;
+		if (server_ip == 0) {
+			if (qtype == Resolver.QTYPE_A) {
+				qryh = pendingdoms_a.get(qname);
+			} else if (qtype == Resolver.QTYPE_NS) {
+				qryh = pendingdoms_ns.get(qname);
+			} else if (qtype == Resolver.QTYPE_MX) {
+				qryh = pendingdoms_mx.get(qname);
+			} else if (qtype == Resolver.QTYPE_SOA) {
+				qryh = pendingdoms_soa.get(qname);
+			} else if (qtype == Resolver.QTYPE_SRV) {
+				qryh = pendingdoms_srv.get(qname);
+			} else if (qtype == Resolver.QTYPE_TXT) {
+				qryh = pendingdoms_txt.get(qname);
+			} else if (qtype == Resolver.QTYPE_AAAA) {
+				qryh = pendingdoms_aaaa.get(qname);
+			} else {
+				throw new UnsupportedOperationException("qtype="+qtype+" - "+qname);
+			}
+		}
+		boolean newqry = (qryh == null);
+
+		if (qryh == null) {
+			// an associated DNS request is not currently underway, so we need to issue a new one
+			qryh = qrystore.extract().init(qtype, qname);
+			activereqs.add(qryh);
+			answer = issueQuery(qryh, server_ip, answerbuf);
+			if (answer != null) {
+				requestCompleted(qryh);
+				return answer;
+			}
+
+			if (qtype == Resolver.QTYPE_NS) {
+				pendingdoms_ns.put(qryh.qname, qryh);
+			} else if (qtype == Resolver.QTYPE_MX) {
+				pendingdoms_mx.put(qryh.qname, qryh);
+			} else if (qtype == Resolver.QTYPE_SOA) {
+				pendingdoms_soa.put(qryh.qname, qryh);
+			} else if (qtype == Resolver.QTYPE_SRV) {
+				pendingdoms_srv.put(qryh.qname, qryh);
+			} else if (qtype == Resolver.QTYPE_TXT) {
+				pendingdoms_txt.put(qryh.qname, qryh);
+			} else if (qtype == Resolver.QTYPE_AAAA) {
+				pendingdoms_aaaa.put(qryh.qname, qryh);
+			} else {
+				pendingdoms_a.put(qryh.qname, qryh);
+			}
+		}
+
+		if (caller != null) {
+			//Must check for deadlock even if qryh is newly allocated, as it could have added itself to another request's
+			//caller list inside issueQuery().
+			//However that can never happen if we specified an explicit server to send the query to.
+			if (caller.getClass() == QueryHandle.class && server_ip == 0) {
+				QueryHandle qhcaller = (QueryHandle)caller;
+				if (qhcaller.isCaller(qryh)) {
+					// Whoa! We're about to piggyback on qryh, but it's already piggybacking on our caller.
+					// This can happen with NS resolution and leads to infinite recursion during caller notification,
+					// so fail this query to break the loop.
+					if (logger.isActive(LEVEL.TRC2)) logger.log(LEVEL.TRC2, "DNS-Resolver: Request="+Resolver.getQTYPE(qtype)+"/"+qname
+							+" has deadlock with caller="+Resolver.getQTYPE(qhcaller.qtype)+"/"+qhcaller.qname);
+					if (newqry) requestCompleted(qryh);
+					return answerbuf.set(Answer.STATUS.DEADLOCK, qtype, qname);
+				}
+			}
+			// NB: There must be no steps in the synchronous resolve() call chain which can fail after this, as that
+			// means the caller would receive a failure callback as well as the synchronous error return code.
+			qryh.addCaller(caller, callerparam);
+		}
+		// the result is not yet available, so the caller will be notified later via callback.
+		return null;
+	}
+
+	// Same logic as above, but for an IP-based request.
+	// This is currently used for PTR requests only, and they never generate sub-queries or get issued as sub-queries.
+	Answer resolve(byte qtype, int qip, Resolver.Client caller, Object callerparam, int flags, Answer answerbuf)
+	{
+		if (caller != null && caller.getClass() != QueryHandle.class) stats_ureqs++;
+		stats_reqcnt[qtype]++;
+		Answer answer = lookupCache(qtype, qip, answerbuf);
+		if (answer != null) return answer;
+		if (caller != null && caller.getClass() != QueryHandle.class) stats_umiss++;
+		stats_cachemiss[qtype]++;
+
+		if ((flags & com.grey.naf.dns.Resolver.FLAG_NOQRY) != 0) {
+			return answerbuf.set(Answer.STATUS.NODOMAIN, qtype, qip);
+		}
+		QueryHandle qryh = pendingdoms_ptr.get(qip);
+
+		if (qryh == null) {
+			qryh = qrystore.extract().init(qtype, qip);
+			activereqs.add(qryh);
+			answer = issueQuery(qryh, 0, answerbuf);
+			if (answer != null) {
+				requestCompleted(qryh);
+				return answer;
+			}
+			pendingdoms_ptr.put(qip, qryh);
+		}
+		if (caller != null) qryh.addCaller(caller, callerparam);
+		return null;
+	}
+
+	private Answer issueQuery(QueryHandle qryh, int server_ip, Answer answerbuf)
+	{
+		java.net.InetSocketAddress nsaddr = null;
+		boolean sticky_ip = (server_ip != 0);
+
+		if (config.recursive) {
+			nsaddr = xmtmgr.nextServer();
+		} else {
+			if (server_ip != 0) {
+				nsaddr = cachemgr.createServerTSAP(server_ip);
+			} else {
+				nsaddr = getNameserver(qryh.qtype, qryh.qname);
+				if (nsaddr == null) {
+					//the nameserver for the target domain is not cached - issue a nested sub-query for it
+					com.grey.base.utils.ByteChars dom = getParentDomain(qryh.qtype, qryh.qname);
+					Answer answer = qryh.issueSubQuery(Resolver.QTYPE_NS, dom, 0, answerbuf);
+					if (answer == null) return null; //will resume once we know the nameserver
+					if (answer.result != Answer.STATUS.OK) return answerbuf.set(answer.result, qryh.qtype, qryh.qname);
+					//Query completed with success - nameserver will be cached now, so call self recursively
+					//I don't think this can actually happen as wasn't cached just above, but handle it.
+					dom = getParentDomain(qryh.qtype, qryh.qname); //parse again, as was probably overwritten
+					if (!dom.equals(answer.qname)) {
+						//the nameserver is actually several levels up, so use explicit IP to avoid infinite loop
+						int idx = rndgen.nextInt(answer.size());
+						server_ip = answer.getNS(idx).getIP();
+					}
+					return issueQuery(qryh, server_ip, answerbuf);
+				}
+				if (nsaddr.getPort() == 0) {
+					// the TSAP was negatively cached
+					return answerbuf.set(Answer.STATUS.NODOMAIN, qryh.qtype, qryh.qname);
+				}
+			}
+		}
+
+		if (!qryh.isTCP()) {
+			if (config.always_tcp) {
+				qryh.qid = 1; //we only issue one query on a TCP connection
+				Answer.STATUS result = qryh.switchTCP(nsaddr);
+				if (result == Answer.STATUS.OK) return null;
+				return answerbuf.set(result, qryh.qtype, qryh.qname);
+			}
+			if (qryh.qid == 0) {
+				//we use zero to indicate an unallocated QID
+				qryh.qid = (next_qryid++) & 0xFFFF;
+				if (qryh.qid == 0) qryh.qid = next_qryid++;
+
+				if (pendingreqs.containsKey(qryh.qid)) {
+					//we have issued so many requests so quickly that the QID has wrapped around before they're answered
+					wrapblocked.add(qryh);
+					if (tmr_wrapblocked == null) tmr_wrapblocked = dsptch.setTimer(config.wrapretryfreq, 0, this);
+					return null; //will resume later, when QID is no longer contended
+				}
+				pendingreqs.put(qryh.qid, qryh);
+			}
+		}
+		Answer.STATUS result = qryh.issueQuery(nsaddr, sticky_ip, pkt_tmp);
+		if (result == Answer.STATUS.OK) return null;
+		return answerbuf.set(result, qryh.qtype, qryh.qname);
+	}
+
+	Answer repeatQuery(QueryHandle qryh, int server_ip)
+	{
+		Answer answerbuf = anstore.extract();
+		try {
+			Answer answer;
+			if (qryh.qip != 0) {
+				answer = lookupCache(qryh.qtype, qryh.qip, answerbuf);
+			} else {
+				answer = lookupCache(qryh.qtype, qryh.qname, answerbuf);
+			}
+			if (answer == null) answer = issueQuery(qryh, server_ip, answerbuf);
+			if (answer != null) answer = qryh.endRequest(answer);
+			return answer;
+		} finally {
+			anstore.store(answerbuf);
+		}
+	}
+
+	void handleResponse(com.grey.base.utils.ArrayRef<byte[]> rcvdata, QueryHandle qryh, java.net.InetSocketAddress srvaddr)
+	{
+		boolean validresponse = false;
+		boolean mapped_qryh = false;
+		boolean is_tcp = (qryh != null);
+
+		Packet pkt = pkt_tmp;
+		pkt.resetDecoder(rcvdata.ar_buf, rcvdata.ar_off, rcvdata.ar_len);
+		int off = pkt.decodeHeader();
+
+		if (off != -1 && pkt.isResponse()) {
+			if (is_tcp) {
+				validresponse = (pkt.hdr_qid == qryh.qid);
+				mapped_qryh = true; //even if packet is wrong, we know we have the right qryh object
+			} else {
+				qryh = pendingreqs.get(pkt.hdr_qid);
+				validresponse = (qryh != null);
+			}
+		}
+
+		if (validresponse) {
+			// Even though QID matches a pending query, do belt-and-braces check that it matches the expected question
+			// Note that unmatched and duplicate responses both generally amount to the same thing, namely a duplicate
+			// response, in reply to timeout retransmissions by us.
+			if (pkt.hdr_qcnt != 1) {
+				validresponse = false;
+			} else {
+				off = pkt.parseQuestion(off, pkt.hdr_qcnt, srvaddr, qryh);
+				validresponse = (off != -1);
+			}
+			if (validresponse) {
+				mapped_qryh = true; //if this lined up, we've identified the UDP request handle
+				validresponse = (pkt.rcode() == 0);
+			}
+		}
+
+		if (!validresponse) {
+			if (logger.isActive(Config.DEBUGLVL)) {
+				String msg = (mapped_qryh ? "received rejection " : "discarding invalid ");
+				logger.log(Config.DEBUGLVL, "DNS-Resolver "+msg+(is_tcp?"TCP":"UDP")+" response="+pkt.hdr_qid
+						+(qryh==null? "" : "/"+Resolver.getQTYPE(qryh.qtype)+"/"+qryh.qname)
+						+" from "+srvaddr+" - ans="+pkt.hdr_anscnt+"/"+pkt.hdr_authcnt+"/"+pkt.hdr_infocnt
+						+"/auth="+pkt.isAuth()+"/trunc="+pkt.isTruncated()
+						+" - size="+rcvdata.ar_len+", mapped="+mapped_qryh+", rcode="+pkt.rcode());
+			}
+			if (mapped_qryh) {
+				if (pkt.rcode() == Packet.RCODE_NXDOM) {
+					qryh.endRequest(Answer.STATUS.NODOMAIN);
+				} else {
+					qryh.endRequest(Answer.STATUS.BADRESPONSE);
+				}
+			}
+			return;
+		}
+		if (qryh.haveResponse()) return;
+		qryh.handleResponse(pkt, off, srvaddr, rcvdata.ar_len);
+	}
+
+	void requestCompleted(QueryHandle qryh)
+	{
+		activereqs.remove(qryh);
+		if (qryh.qtype == Resolver.QTYPE_PTR) {
+			pendingdoms_ptr.remove(qryh.qip);
+		} else if (qryh.qtype == Resolver.QTYPE_NS) {
+			pendingdoms_ns.remove(qryh.qname);
+		} else if (qryh.qtype == Resolver.QTYPE_MX) {
+			pendingdoms_mx.remove(qryh.qname);
+		} else if (qryh.qtype == Resolver.QTYPE_SOA) {
+			pendingdoms_soa.remove(qryh.qname);
+		} else if (qryh.qtype == Resolver.QTYPE_SRV) {
+			pendingdoms_srv.remove(qryh.qname);
+		} else if (qryh.qtype == Resolver.QTYPE_TXT) {
+			pendingdoms_txt.remove(qryh.qname);
+		} else if (qryh.qtype == Resolver.QTYPE_AAAA) {
+			pendingdoms_aaaa.remove(qryh.qname);
+		} else {
+			pendingdoms_a.remove(qryh.qname);
+		}
+		if (pendingreqs.get(qryh.qid) == qryh) pendingreqs.remove(qryh.qid);
+		if (qryh.getSubQueryCount() != 0) cancel(qryh);
+		qrystore.store(qryh.clear());
+	}
+
+	private Answer lookupCache(byte qtype, com.grey.base.utils.ByteChars qname, Answer answerbuf)
+	{
+		java.util.ArrayList<ResourceData> rrlist = null;
+		ResourceData rr = null;
+
+		if (qtype == Resolver.QTYPE_NS || qtype == Resolver.QTYPE_MX || qtype == Resolver.QTYPE_SRV) {
+			rrlist = cachemgr.lookupList(qtype, qname);
+			if (rrlist != null) rr = rrlist.get(0);
+		} else {
+			rr = cachemgr.lookup(qtype, qname);
+		}
+		if (rr == null) return null;
+		Answer.STATUS sts = (rr.isNegative() ? Answer.STATUS.NODOMAIN : Answer.STATUS.OK);
+		if (qname == tmplightbc) qname = new com.grey.base.utils.ByteChars(qname); //make it permanent
+		answerbuf.set(sts, qtype, qname);
+		if (sts == Answer.STATUS.OK) {
+			if (rrlist != null) {
+				for (int idx = 0; idx != rrlist.size(); idx++) {
+					answerbuf.rrdata.add(rrlist.get(idx));
+				}
+			} else {
+				answerbuf.rrdata.add(rr);
+			}
+		}
+		return answerbuf;
+	}
+
+	private Answer lookupCache(byte qtype, int qip, Answer answerbuf)
+	{
+		ResourceData rr = cachemgr.lookup(qtype, qip);
+		if (rr == null) return null;
+		Answer.STATUS sts = (rr.isNegative() ? Answer.STATUS.NODOMAIN : Answer.STATUS.OK);
+		answerbuf.set(sts, qtype, qip);
+		if (sts == Answer.STATUS.OK) answerbuf.rrdata.add(rr);
+		return answerbuf;
+	}
+
+	// Throwing here results in a hanging request, but since rewinding past the root domain must be a bug, that's
+	// probably a better outcome than returning Answer=ERROR/NODOM
+	java.net.InetSocketAddress getNameserver(byte qtype, com.grey.base.utils.ByteChars qname)
+	{
+		java.net.InetSocketAddress nsaddr = null;
+		com.grey.base.utils.ByteChars dom = getParentDomain(qtype, qname);
+		if (dom.length() == 0) throw new IllegalStateException("DNS-Resolver: Root servers are missing!!");
+		do {
+			nsaddr = cachemgr.lookupNameServer(dom);
+			if (nsaddr == null || nsaddr.getPort() != 0) break;
+			int dotcnt = StringOps.count(dom, Resolver.DOMDLM);
+			if (dotcnt == 0) break;
+			if (dotcnt == 1) {
+				// certain TLDs are guaranteed to only delegate one level down
+				if (dom.endsWith(".com") || dom.endsWith(".org") || dom.endsWith(".net")) break;
+			}
+			dom = getParentDomain((byte)0, dom);
+		} while (nsaddr.getPort() == 0);
+
+		if (nsaddr == null) {
+			dom = getParentDomain(qtype, qname);
+			QueryHandle qhpending = pendingdoms_ns.get(dom);
+			if (qhpending != null) {
+				int ip = qhpending.getPartialAnswer();
+				if (ip != 0) nsaddr = cachemgr.createServerTSAP(ip);
+			}
+		}
+		return nsaddr;
+	}
+
+	com.grey.base.utils.ByteChars getParentDomain(byte qtype, com.grey.base.utils.ByteChars qname)
+	{
+		if (qtype == Resolver.QTYPE_SOA || qtype == Resolver.QTYPE_MX || qtype == Resolver.QTYPE_TXT) {
+			return qname; //target is already the parent domain
+		}
+		int pos = qname.indexOf((byte)Resolver.DOMDLM);
+		if (pos == -1) return Config.ROOTDOM_BC;
+		tmplightbc.pointAt(qname.ar_buf, qname.ar_off+pos+1, qname.ar_len-pos-1);
+		if (qtype == Resolver.QTYPE_SRV) return getParentDomain((byte)0, tmplightbc); //next level up is service-protocol, not parent domain
+		return tmplightbc;
+	}
+
+	@Override
+	public void timerIndication(com.grey.naf.reactor.Timer t, com.grey.naf.reactor.Dispatcher d)
+	{
+		tmr_wrapblocked = null;
+		int cnt1 = wrapblocked.size();
+		QueryHandle[] arr = wrapblocked.toArray(new QueryHandle[wrapblocked.size()]); //in case of concurrent mods
+
+		for (int idx = 0; idx != arr.length; idx++) {
+			QueryHandle qryh = arr[idx];
+			if (!pendingreqs.containsKey(qryh.qid)) {
+				pendingreqs.put(qryh.qid, qryh);
+				wrapblocked.remove(qryh);
+				qryh.repeatQuery(0);
+			}
+		}
+		LEVEL lvl = LEVEL.TRC;
+		if (logger.isActive(lvl)) {
+			String txt = "DNS-Resolver: "+cnt1+" requests blocked by QID-wraparound";
+			if (cnt1 != wrapblocked.size()) txt += " - reduced to "+wrapblocked.size();
+			logger.log(lvl, txt);
+		}
+		if (wrapblocked.size() != 0) tmr_wrapblocked = dsptch.setTimer(config.wrapretryfreq, 0, this);
+	}
+
+	com.grey.base.utils.ByteChars buildArpaDomain(int ip)
+	{
+		sbtmp.setLength(0);
+		IP.displayArpaDomain(ip, sbtmp);
+		return allocByteChars().append(sbtmp);
 	}
 
 	@Override
 	public CharSequence handleNAFManCommand(com.grey.naf.nafman.Command cmd)
 	{
-		StringBuilder sbrsp = sbtmp_nafman;
-		sbrsp.setLength(0);
+		//use temp StringBuilder, so that we don't hold onto a potentially huge block of memory
+		StringBuilder sbrsp = new StringBuilder();
 
 		if (cmd.def.code.equals(com.grey.naf.nafman.Registry.CMD_DNSDUMP)) {
-			StringBuilder sb = dumpCacheFile("NAFMAN-initiated dump", sbrsp);
-			if (sb == null) {
-				sbrsp.append("Failed to dump DNS cache");
-			} else {
-				if (!StringOps.stringAsBool(cmd.getArg(MATTR_NODOWNLOAD))) {
-					String html = sb.toString().replace("\n", "<br/>");
-					sbrsp.setLength(0);
-					sbrsp.append(html);
-				}
-				sbrsp.append("<br/>Dumped cache to ").append(fh_dump.getAbsolutePath());
+			String dh = cmd.getArg(MATTR_DUMPHTML);
+			String df = cmd.getArg(MATTR_DUMPFILE);
+			if (!"N".equalsIgnoreCase(dh)) dumpState("<br/>", sbrsp);
+			if (!"N".equalsIgnoreCase(df)) {
+				dumpState(fh_dump, "Dumping cache on NAFMAN="+cmd.def.code);
+				sbrsp.append("<br/><br/>Dumped cache to file "+fh_dump.getAbsolutePath());
 			}
 		} else if (cmd.def.code.equals(com.grey.naf.nafman.Registry.CMD_DNSPRUNE)) {
-			sbrsp.append("DNS cache has been pruned");
-			sbrsp.append("<br/>Cache sizes before: A=").append(cache_a.size());
-			sbrsp.append("; MX=").append(cache_mx.size());
-			sbrsp.append("; PTR=").append(cache_ptr.size());
-			pruneCache();
-			sbrsp.append("<br/>Cache sizes after: A=").append(cache_a.size());
-			sbrsp.append("; MX=").append(cache_mx.size());
-			sbrsp.append("; PTR=").append(cache_ptr.size());
+			cachemgr.prune(sbrsp);
+		} else if (cmd.def.code.equals(com.grey.naf.nafman.Registry.CMD_DNSLOADROOTS)) {
+			try {
+				if (config.recursive) {
+					sbrsp.append("DNS roots are not applicable, as Resolver is in recursive mode");
+				} else {
+					cachemgr.loadRootServers();
+				}
+			} catch (Exception ex) {
+				sbrsp.append("Failed to reload roots - "+ex);
+			}
 		} else if (cmd.def.code.equals(com.grey.naf.nafman.Registry.CMD_DNSQUERY)) {
 			String pqt = cmd.getArg(MATTR_QTYP);
 			String pqv = cmd.getArg(MATTR_QVAL);
@@ -259,19 +607,29 @@ public final class ResolverService
 			byte qt = 0;
 			if ("A".equalsIgnoreCase(pqt)) {
 				qt = Resolver.QTYPE_A;
+			} else if ("NS".equalsIgnoreCase(pqt)) {
+				qt = Resolver.QTYPE_NS;
 			} else if ("MX".equalsIgnoreCase(pqt)) {
 				qt = Resolver.QTYPE_MX;
+			} else if ("SOA".equalsIgnoreCase(pqt)) {
+				qt = Resolver.QTYPE_SOA;
+			} else if ("SRV".equalsIgnoreCase(pqt)) {
+				qt = Resolver.QTYPE_SRV;
+			} else if ("TXT".equalsIgnoreCase(pqt)) {
+				qt = Resolver.QTYPE_TXT;
+			} else if ("AAAA".equalsIgnoreCase(pqt)) {
+				qt = Resolver.QTYPE_AAAA;
 			} else if ("PTR".equalsIgnoreCase(pqt)) {
 				qt = Resolver.QTYPE_PTR;
+			} else {
+				return sbrsp.append("INVALID: Unsupported query type - ").append(MATTR_QTYP).append('=').append(pqt);
 			}
-			if (qt == Resolver.QTYPE_A || qt == Resolver.QTYPE_MX) {
-				ans = resolve(qt, tmpbc_nafman.set(pqv), null, null, 0);
-			} else if (qt == Resolver.QTYPE_PTR) {
+			if (qt == Resolver.QTYPE_PTR) {
 				int ip = IP.convertDottedIP(pqv);
 				if (!IP.validDottedIP(pqv, ip)) return sbrsp.append("INVALID: Not a valid dotted IP - ").append(pqv);
 				ans = resolve(qt, ip, null, null, 0);
 			} else {
-				return sbrsp.append("INVALID: Unsupported query type - ").append(MATTR_QTYP).append('=').append(pqt);
+				ans = resolve(qt, tmpbc_nafman.set(pqv), null, null, 0);
 			}
 			if (ans == null) {
 				sbrsp.append("Answer not in cache - query has been issued");
@@ -281,830 +639,107 @@ public final class ResolverService
 			}
 		} else {
 			// we've obviously registered for this command, so we must be missing a clause - clearly a bug
-			dsptch.logger.error("DNS-Resolver NAFMAN: Missing case for cmd="+cmd.def.code);
+			logger.error("DNS-Resolver NAFMAN: Missing case for cmd="+cmd.def.code);
 			return null;
 		}
 		return sbrsp;
 	}
 
-	public Answer resolve(byte qtype, com.grey.base.utils.ByteChars qname, Resolver.Client caller, Object callerparam, int flags)
+	private void dumpState(java.io.File fh, CharSequence msg)
 	{
-		// try to satisfy query from our local cache first
-		stats_reqcnt++;
-		inUserCall = true;
-		Answer answer = lookupCache(qtype, qname);
-
-		if (answer == null) {
-			if ((flags & com.grey.naf.dns.Resolver.FLAG_NOQRY) != 0) {
-				answer = dnsAnswer.set(Answer.STATUS.NODOMAIN, qtype, qname);
-			} else {
-				// A DNS request is required to satisfy this query, and the caller's dnsResolved() method will be called back later.
-				// If we encounter an error though, we return that to the user now as our final answer.
-				answer = resolveDNS(qtype, qname, caller, callerparam);
-			}
-		}
-		inUserCall = false;
-		return answer;
-	}
-
-	public Answer resolve(byte qtype, int qip, Resolver.Client caller, Object callerparam, int flags)
-	{
-		// try to satisfy query from our local cache first
-		stats_reqcnt++;
-		inUserCall = true;
-		Answer answer = lookupCache(qtype, qip);
-
-		if (answer == null) {
-			if ((flags & com.grey.naf.dns.Resolver.FLAG_NOQRY) != 0) {
-				answer = dnsAnswer.set(Answer.STATUS.NODOMAIN, qtype, qip);
-			} else {
-				// A DNS request is required to satisfy this query, and the caller's dnsResolved() method will be called back later.
-				// If we encounter an error though, we return that to the user now as our final answer.
-				answer = resolveDNS(qtype, qip, caller, callerparam);
-			}
-		}
-		inUserCall = false;
-		return answer;
-	}
-
-	private Answer resolveDNS(byte qtype, com.grey.base.utils.ByteChars qname, Resolver.Client caller, Object callerparam)
-	{
-		Answer answer = null;
-		QueryHandle qryh = null;
-
-		// If a DNS request for this domain is already underway, then rather than duplicate that, we simply add this caller to the list of those
-		// waiting on the request.
-		if (qtype == Resolver.QTYPE_MX) {
-			qryh = pendingdoms_mx.get(qname);
-		} else {
-			qryh = pendingdoms_a.get(qname);
-		}
-
-		if (qryh == null) {
-			// we need to issue a new DNS request
-			qryh = qrystore.extract().init(dsptch, this, caller, callerparam, nextServer(), qtype, qname);
-
-			if (issueRequest(qryh, qryh.qtype, qryh.qname) != 0) {
-				answer = dnsAnswer.set(Answer.STATUS.ERROR, qtype, qname);
-			} else {
-				if (qtype == Resolver.QTYPE_MX) {
-					pendingdoms_mx.put(qryh.qname, qryh);
-				} else {
-					pendingdoms_a.put(qryh.qname, qryh);
-				}
-			}
-		} else {
-			// Null caller means we want the request to happen, but don't want to be informed of result (of dubious usefulness)
-			if (caller != null) qryh.addCaller(caller, callerparam);
-		}
-		return answer;
-	}
-
-	private Answer resolveDNS(byte qtype, int qip, Resolver.Client caller, Object callerparam)
-	{
-		Answer answer = null;
-		QueryHandle qryh = pendingdoms_ptr.get(qip);
-
-		// If a DNS request for this domain is already underway, then rather than duplicate that, we simply add this caller to the list of those
-		// waiting on the request.
-		if (qryh == null) {
-			// we need to issue a new DNS request
-			qryh = qrystore.extract().init(dsptch, this, caller, callerparam, nextServer(), qtype, qip);
-
-			if (issueRequest(qryh, qryh.qtype, qryh.qname) != 0) {
-				answer = dnsAnswer.set(Answer.STATUS.ERROR, qtype, qip);
-			} else {
-				pendingdoms_ptr.put(qip, qryh);
-			}
-		} else {
-			// Null caller means we want the request to happen, but don't want to be informed of result (useful for testing)
-			if (caller != null) qryh.addCaller(caller, callerparam);
-		}
-		return answer;
-	}
-
-	// This is expected to be a relatively rare event, and the number of pending requests is never expected to be very large, so make do with
-	// a simple iteration.
-	// We only cancel the caller, not the DNS requests themselves. Since we've already issued them, we might as well cache the results when they
-	// arrive.
-	public int cancel(Resolver.Client caller)
-	{
-		int reqs = 0;
-		java.util.Iterator<QueryHandle> it = pendingreqs.valuesIterator();
-
-		while (it.hasNext()) {
-			QueryHandle qh = it.next();
-			reqs += qh.removeCaller(caller);
-		}
-		return reqs;
-	}
-
-	void endQuery(QueryHandle qryh, Answer.STATUS result)
-	{
-		if (result == Answer.STATUS.OK) {
-			if (qryh.rrdata.size() == 0) {
-				// this is different to other failures, as we will cache it
-				result = Answer.STATUS.NODOMAIN;
-				ResourceData negRR = new ResourceData(null, 0, Resolver.QTYPE_NEGATIVE, (byte)0, dsptch.systime() + negttl, 0, null);
-				qryh.rrdata.add(negRR);
-			}
-		} else {
-			qryh.rrdata.clear();
-		}
-		Answer answer = null;
-
-		if (qryh.qtype == Resolver.QTYPE_PTR) {
-			answer = dnsAnswer.set(result, qryh.qtype, qryh.qip);
-		} else {
-			answer = dnsAnswer.set(result, qryh.qtype, qryh.qname);
-		}
-
-		if (qryh.rrdata.size() != 0) {
-			// now cache the result
-			if (qryh.qtype == Resolver.QTYPE_MX) {
-				java.util.ArrayList<ResourceData> rrdata = new java.util.ArrayList<ResourceData>(qryh.rrdata);
-				cache_mx.put(qryh.qname, rrdata);
-			} else if (qryh.qtype == Resolver.QTYPE_PTR) {
-				cache_ptr.put(qryh.qip, qryh.rrdata.get(0));
-			} else {
-				// RR's domnam is left as null in this case.
-				// NB: RR's domnam might not even be the same as qryh.qname, if we've taken a CNAME as the answer.
-				cache_a.put(qryh.qname, qryh.rrdata.get(0));
-			}
-			answer.rrdata.addAll(qryh.rrdata);
-		}
-
-		if (qryh.qtype == Resolver.QTYPE_MX) {
-			pendingdoms_mx.remove(qryh.qname);
-		} else if (qryh.qtype == Resolver.QTYPE_PTR) {
-			pendingdoms_ptr.remove(qryh.qip);
-		} else {
-			pendingdoms_a.remove(qryh.qname);
-		}
-		queryCompleted(qryh, answer);
-	}
-
-	// Note that if inUserCall is true here, that invariably means we ended up in here because we failed to
-	// issue the request, so the top-level caller will get an error code back and synchronously return the
-	// bad result to the external caller.
-	private void queryCompleted(QueryHandle qryh, Answer answer)
-	{
-		if (answer.result != Answer.STATUS.OK) clearPendingQuery(qryh);  // ought to have been removed already, in non-error case
-		if (!inUserCall) qryh.notifyCallers(answer);
-		qrystore.store(qryh.clear());
-	}
-
-	private Answer lookupCache(byte qtype, com.grey.base.utils.ByteChars qname)
-	{
-		java.util.ArrayList<ResourceData> mxips = null;
-		ResourceData rr = null;
-
-		if (qtype == Resolver.QTYPE_MX) {
-			if ((mxips = cache_mx.get(qname)) != null) {
-				//preferred relay is at start of list
-				int expire_cnt = 0;
-				for (int idx = 0; idx != mxips.size(); idx++) {
-					rr = mxips.get(idx);
-					if (rr.ttl >= dsptch.systime()) break;
-					expire_cnt++;
-					rr = null;
-				}
-				if (rr == null) {
-					cache_mx.remove(qname); //all expired
-				} else {
-					for (int idx = expire_cnt - 1; idx >= 0; idx--) {
-						mxips.remove(idx);
-					}
-				}
-			}
-		} else {
-			rr = ipcacheGet(qname);
-		}
-		Answer answer = null;
-
-		if (rr != null) {
-			if (rr.rrtype == Resolver.QTYPE_NEGATIVE) {
-				answer = dnsAnswer.set(Answer.STATUS.NODOMAIN, qtype, qname);
-			} else {
-				answer = dnsAnswer.set(Answer.STATUS.OK, qtype, qname);
-				if (qtype == Resolver.QTYPE_MX) {
-					answer.rrdata.addAll(mxips);
-				} else {
-					answer.rrdata.add(rr);
-				}
-			}
-		}
-		return answer;
-	}
-
-	private Answer lookupCache(byte qtype, int qip)
-	{
-		ResourceData rr = cache_ptr.get(qip);
-
-		if (rr != null && rr.ttl < dsptch.systime()) {
-			// stale data, so remove it and say we found nothing
-			cache_ptr.remove(qip);
-			rr = null;
-		}
-		if (rr == null) return null;
-		Answer answer = dnsAnswer.set(Answer.STATUS.OK, qtype, qip);
-
-		if (rr.rrtype == Resolver.QTYPE_NEGATIVE) {
-			answer.result = Answer.STATUS.NODOMAIN;
-		} else {
-			answer.rrdata.add(rr);
-		}
-		return answer;
-	}
-
-	private ResourceData ipcacheGet(com.grey.base.utils.ByteChars domnam)
-	{
-		ResourceData rr = cache_a.get(domnam);
-
-		if (rr != null && rr.ttl < dsptch.systime()) {
-			// stale data, so remove it and act as if we never found it
-			cache_a.remove(domnam);
-			rr = null;
-		}
-		return rr;
-	}
-
-	// Unlike cache_a entries created by endQuery(), this sets the domnam field (since it also becomes the key)
-	private ResourceData ipcacheAdd(ResourceData rrtmp)
-	{
-		ResourceData rr = new ResourceData(rrtmp, true);
-		cache_a.put(rr.domnam, rr);
-		return rr;
-	}
-
-	void udpResponseReceived(ServerHandle srvr) throws java.io.IOException
-	{
-		int pktcnt = 0;
-		while (udpdnspkt.receive(true, srvr, null) > 0) {
-			stats_udprcv++;
-			processResponse(null);
-			if (++pktcnt == udprcvmax) break;
-		}
-	}
-
-	@Override
-	public void timerIndication(com.grey.naf.reactor.Timer tmr, com.grey.naf.reactor.Dispatcher d)
-	{
-		if (tmr.type == TMRTYPE_PRUNECACHE) {
-			tmr_prunecache = null;
-			pruneCache();
-			tmr_prunecache = dsptch.setTimer(tmtcacheprune, TMRTYPE_PRUNECACHE, this);
-			return;
-		}
-		QueryHandle qryh = (QueryHandle)tmr.attachment;
-		qryh.tmr = null;  // this timer is now expired, so we must not access it again
-		stats_tmt++;
-
-		LEVEL lvl = LEVEL.TRC3;
-		if (dsptch.logger.isActive(lvl)) {
-			dsptch.logger.log(lvl, "DNS-Resolver timeout "+(qryh.retrycnt+1)+"/"+(retrymax+1)+" on "+qryh.pktqtype+"/"+qryh.pktqname);
-		}
-
-		// one timeout is enough to fail a TCP query
-		if (qryh.isTCP() || (qryh.retrycnt == retrymax)) {
-			endQuery(qryh, Answer.STATUS.TIMEOUT);
-			return;
-		}
-
-		// record timed-out QID before issueRequest() sets new one, so that we can still recognise late responses that arrive before entire query ends
-		if (qryh.prevqid == null) qryh.prevqid = new int[retrymax];
-		qryh.prevqid[qryh.retrycnt++] = qryh.qid;
-
-		// now reissue previous query
-		issueRequest(qryh, qryh.pktqtype, qryh.pktqname);
-	}
-
-	private int switchTcp(QueryHandle qryh)
-	{
-		int errcod = 0;  // any non-zero value means error
-
-		try {
-			qryh.connect(retrytmt_tcp);  // TCP should time itself out long before retrytmt_tcp expires
-		} catch (Throwable ex) {
-			dsptch.logger.log(LEVEL.TRC2, ex, false, "Resolver: TCP connect failed");
-			endQuery(qryh, Answer.STATUS.ERROR);
-			errcod = 1;
-		}
-		return errcod;
-	}
-
-	// Regarding AXFR:
-	// This method is not exposed to callers outside this package, and the Resolver interface provides no means of calling
-	// in here with qtype=AXFR, so the facility is strictly experimental and its code path is not even complete. For instance,
-	// endQuery() makes no provision for it and would wrongly treat it as a type-A query.
-	// Strictly speaking, the Resolver interface only supports A, PRT and MX queries.
-	int issueRequest(QueryHandle qryh, byte qtype, com.grey.base.utils.ByteChars qname)
-	{
-		Packet pkt = qryh.getPacket(udpdnspkt);
-		long tmt = retrytmt + (retrystep * qryh.retrycnt);
-
-		if (qryh.isTCP()) {
-			tmt = retrytmt_tcp;
-		} else {
-			if (qryh.qtype == Resolver.QTYPE_AXFR || always_tcp) return switchTcp(qryh);
-		}
-		qryh.pktqtype = qtype;
-		qryh.pktqname = qname;
-
-		pkt.reset();
-		pkt.qid = ((next_qryid++) & 0xFFFF);
-		pkt.qcnt = 1;
-		if (qryh.qtype != Resolver.QTYPE_AXFR) pkt.wantRecursion();  //turning this bit on doesn't seem to upset BIND AXFR, but it's not strictly allowed
-		int off = pkt.encodeHeader();
-		off = pkt.encodeQuestion(off, qtype, qname);
-		pkt.endMessage(off);
-
-		// set the expected Response ID - for UDP responses, we rely on this to identify the associated query, but for TCP it's just a sanity check
-		qryh.qid = pkt.qid;
-		if (!pkt.isTCP) {
-			pendingreqs.put(qryh.qid, qryh);
-			stats_udpxmt++;
-		}
-		qryh.startTimer(this, tmt);
-
-		int errcod = qryh.send(pkt);
-		if (errcod != 0) endQuery(qryh, Answer.STATUS.ERROR);
-		return errcod;
-	}
-
-	void processResponse(QueryHandle qryh)
-	{
-		boolean validresponse = false;
-		Packet pkt = (qryh == null ? udpdnspkt : qryh.getPacket(null));  //non-null qryh means TCP, so getPacket() param will be ignored
-		int off = pkt.decodeHeader();  // Parse packet header. Don't bother checking RCODE, as presence or absence of answers is enough
-
-		if (pkt.isResponse()) {
-			if (pkt.isTCP) {
-				validresponse = (pkt.qid == qryh.qid);
-			} else {
-				validresponse = ((qryh = pendingreqs.get(pkt.qid)) != null);
-			}
-		}
-
-		if (validresponse) {
-			// Not quite done yet. Need to parse the question to be completely assured of response's validity.
-			// It can only fail this test due to QID wrap-around, a vanishingly rare event in normal circumstances.
-			badquestion = false;
-			off = pkt.parseSection(off, Packet.SECT_QUESTIONS, pkt.qcnt, qryh, tmprr, tmpnam);
-			validresponse = !badquestion;
-		}
-
-		if (!validresponse) {
-			LEVEL lvl = LEVEL.TRC;
-			if (dsptch.logger.isActive(lvl)) dsptch.logger.log(lvl, "DNS Resolver discarding unexpected packet: Response="+pkt.isResponse()
-					+", QID="+pkt.qid+" vs "+(qryh==null?-1:qryh.qid)+" - TCP="+pkt.isTCP);
-			if (pkt.isTCP) endQuery(qryh, Answer.STATUS.ERROR);  // no excuse for TCP connections, so abort it with failure
-			return;
-		}
-		clearPendingQuery(qryh);  // this is definitely the expected response for this QID, so clear from pending cache
-
-		if (pkt.isTrunc()) {
-			// Response is truncated, so reissue request via TCP.
-			// NB: We've already parsed the question, but that's ok because we always expect it to be present, even in a truncated packet.
-			if (pkt.isTCP) {
-				// already in TCP mode, so truncation shouldn't happen
-				endQuery(qryh, Answer.STATUS.ERROR);
-				return;
-			}
-			stats_trunc++;
-			switchTcp(qryh);
-			return;
-		}
-		
-		// valid response packet - parse Answers section
-		if (pkt.anscnt != 0) off = pkt.parseSection(off, Packet.SECT_ANSWERS, pkt.anscnt, qryh, tmprr, tmpnam);
-		boolean completed = true;
-
-		switch (qryh.qtype)
-		{
-		case Resolver.QTYPE_MX:
-			// If there's too much data, many DNS servers will send fewer Additional A RRs than Answer MX records, rather than marking the packet
-			// truncated and sending nothing (on the basis that something is better than nothing). Quite apart from that, the Additional Info section
-			// is only intended as a helpful supplement, and there's never a guarantee it will contain all the required info.
-			// We may therefore need to issue follow-on queries to retrieve the addresses of the outstanding MX hosts. "Queries" in the plural, because
-			// DNS only supports 1 question per query packet.
-			// I have considered simply repeating the query in TCP mode to get all the required data back in one response, but while that would enable
-			// this query to complete fractionally sooner, it would actually require more network traffic than a few more UDP requests, so overall
-			// system throughput would tend to be reduced.
-			if (qryh.mxquery == -1) {
-				// initial MX query
-				if (mx_fallback_a) {
-					// handle falling back to a simple A query (as per RFC-2821 Section 5 - the Implicit MX rule)
-					if (qryh.fallback_mx_a) {
-						// we've already fallen back to an A query, and this is the response
-						qryh.fallback_mx_a = false;
-					} else if (qryh.rrdata.size() == 0) {
-						// No MX answers (there might be a CNAME, which we ignore, so don't check pkt.anscnt), so
-						// fall back to a simple A query now.
-						qryh.fallback_mx_a = true;
-						issueRequest(qryh, Resolver.QTYPE_A, qryh.qname);
-					}
-				}
-
-				// Additional-Info section is usually required to qualify any MX answers we received
-				if (qryh.mxcount != 0) {
-					if (pkt.infocnt != 0) {
-						off = pkt.skipSection(off, Packet.SECT_AUTH, pkt.authcnt);
-						off = pkt.parseSection(off, Packet.SECT_INFO, pkt.infocnt, qryh, tmprr, tmpnam);
-					}
-					if (qryh.mxcount != 0) qryh.mxquery = 0; // still some unresolved MX answers - will have to issue follow-on A queries
-				}
-			} else {
-				// this is a follow-on query - if we didn't find the address of the current MX host, just discard it
-				if (qryh.rrdata.get(qryh.mxquery).rrtype == Resolver.QTYPE_MX) {
-					// mxquery still points at original MX record, so the A lookup must have failed
-					ResourceData rr = qryh.rrdata.remove(qryh.mxquery);
-					rrstore.store(rr);
-					qryh.mxcount--;
-				}
-			}
-			completed = (qryh.mxcount == 0 && !qryh.fallback_mx_a);
-
-			if (completed) {
-				if (mx_maxrr != 0) {
-					// if a limit was configured on how many MX RRs to store, discard the excess ones now
-					boolean trimmed = false;
-					while (qryh.rrdata.size() > mx_maxrr) {
-						qryh.rrdata.remove(qryh.rrdata.size() - 1);
-						trimmed = true;
-					}
-					if (trimmed) qryh.rrdata.trimToSize();
-				}
-			} else if (!qryh.fallback_mx_a) {
-				// scan forward to next unresolved MX host, and issue a follow-on A query
-				while (qryh.rrdata.get(qryh.mxquery).rrtype != Resolver.QTYPE_MX) qryh.mxquery++;
-				issueRequest(qryh, Resolver.QTYPE_A, qryh.rrdata.get(qryh.mxquery).domnam);
-			}
-			break;
-
-		case Resolver.QTYPE_AXFR:
-			// We can't tell when server has finished TCP responses, so wait for it to close the connection, or our own timer to fire.
-			completed = false;
-			break;
-
-		default: //no-op
-			break;
-		}
-		if (completed) endQuery(qryh, Answer.STATUS.OK);
-
-	}
-
-	// NB: despite the impression that may be given by the 'qnum' parameter, DNS only permits one question per query
-	void loadQuestion(QueryHandle qryh, byte qtype, byte qclass, int qnum, com.grey.base.utils.ByteChars qname)
-	{
-		if (qtype != qryh.pktqtype || !qname.equals(qryh.pktqname)) badquestion = true;
-	}
-
-	// If we made a type-A query for what turns out to be a CNAME, then this method depends on the CNAME's A record
-	// also being included in the answer. This is because we ignore CNAME RRs, but blindly accept any A RR in the Answer
-	// section of a type-A query.
-	// The cache entries will be long-lived, so it's not wasteful to create new RRs for them in here.
-	// Note that pktrr represents a temp object that will be reused after this call returns, so we need to take a copy
-	// of its fields if we want to keep them longer term.
-	void loadRR(QueryHandle qryh, ResourceData pktrr, int sectiontype, int rrnum)
-	{
-		if (pktrr.domnam.length() == 0) return;  //discard invalid RR domain names
-		ResourceData rr;
-
-		switch (pktrr.rrtype)
-		{
-		case Resolver.QTYPE_A:
-			// For hostname queries, we take the first A RR answer we get back as our final answer, and cache it.
-			// Cache it under the query name rather than it's own, as our query name may have been an alias, and if so we want to cache the A RR
-			// under that name, in order to satisfy the request. This means we would also get a CNAME RR elsewhere in this Answer section, and we
-			// will ignore it.
-			if (qryh.qtype == Resolver.QTYPE_A) {
-				if (qryh.rrdata.size() == 0) {
-					rr = new ResourceData(pktrr, false);
-					qryh.rrdata.add(rr);
-				}
-			} else if (qryh.qtype == Resolver.QTYPE_MX) {
-				int mxnum = qryh.mxquery;
-				if (mxnum == -1) {
-					// initial MX response
-					if (qryh.fallback_mx_a) {
-						// we've fallen back to an A query, so take the first A RR we get as the answer - it will be the sole entry in rrdata
-						if (qryh.rrdata.size() == 0) {
-							rr = ipcacheAdd(pktrr);
-							qryh.rrdata.add(rr);
-						}
-						break;
-					}
-
-					// this must be the Additional-Info section, so check if current A RR matches any MX hosts
-					for (int idx = 0; idx != qryh.rrdata.size(); idx++) {
-						if (qryh.rrdata.get(idx).rrtype == Resolver.QTYPE_MX) {
-							if (qryh.rrdata.get(idx).domnam.equals(pktrr.domnam)) {
-								mxnum = idx;
-								break;
-							}
-						}
-					}
-				}
-
-				// If in MX follow-on mode - this A RR resolves the MX RR at position 'mxnum' on the 'rrdata' list
-				// We only take the first AA RR we see, so check if we've already replaced the original MX RR with an A one.
-				// This will become a long-lived cache RR, so ok to do these allocations.
-				if (mxnum != -1 && qryh.rrdata.get(mxnum).rrtype != Resolver.QTYPE_A) {
-					rr = ipcacheAdd(pktrr);
-					ResourceData mxrr = qryh.rrdata.set(mxnum, rr);
-					rrstore.store(mxrr);
-					qryh.mxcount--;
-				}
-			}
-			break;
-
-		case Resolver.QTYPE_MX:
-			ResourceData iprr = ipcacheGet(pktrr.domnam);
-			int pref = pktrr.pref;
-			int pos = 0; // will insert new RR at head of list, if we don't find any lower preferences
-			if (iprr != null) {
-				if (pktrr.rrtype == Resolver.QTYPE_NEGATIVE) break;  // pseudo-RR which tells us this hostname is known not to exist - discard this MX host
-				rr = iprr;
-			} else {
-				// allocate temp MX RR on rrdata list, until we can obtain the A RR corresponding to its relay-hostname
-				rr = rrstore.extract().set(pktrr, true);
-				qryh.mxcount++;
-			}
-			for (int idx = qryh.rrdata.size() - 1; idx != -1; idx--) {
-				if (qryh.rrdata.get(idx).pref <= pref) {
-					// insert new RR after this node
-					pos = idx + 1;
-					break;
-				}
-			}
-			qryh.rrdata.add(pos, rr);
-			break;
-
-		case Resolver.QTYPE_PTR:
-			// presume that this was also the query type - like QTYPE_A, we only take the first answer we see
-			if (qryh.rrdata.size() == 0) {
-				rr = new ResourceData(pktrr, true);
-				qryh.rrdata.add(rr);
-			}
-			break;
-
-		default:  // ignore
-			break;
-		}
-	}
-
-	private void clearPendingQuery(QueryHandle qryh)
-	{
-		for (int idx = 0; idx != qryh.retrycnt; idx++) {
-			// clear any previously unanswered requests associated with this query as well
-			pendingreqs.remove(qryh.prevqid[idx]);
-		}
-		pendingreqs.remove(qryh.qid);
-		qryh.retrycnt = 0;
-	}
-
-	com.grey.base.utils.ByteChars buildReverseDomain(int ipaddr)
-	{
-		sbtmp.setLength(0);
-		int shift = 0;
-
-		for (int idx = 0; idx != IP.IPADDR_OCTETS; idx++) {
-			int bval = (ipaddr >> shift) & 0xFF;
-			shift += 8;
-			sbtmp.append(bval).append('.');
-		}
-		sbtmp.append("in-addr.arpa");
-
-		com.grey.base.utils.ByteChars nambuf = bcstore.extract();
-		nambuf = nambuf.set(sbtmp);
-		return nambuf;
-	}
-
-	private StringBuilder dumpCacheFile(CharSequence msg, StringBuilder sb)
-	{
-		sb = dumpCache(sb);
+		String eol = "\n";
+		StringBuilder sb = dumpState(eol, null);
 		java.io.OutputStream fout = null;
 		java.io.PrintWriter ostrm = null;
 		try {
-			FileOps.ensureDirExists(fh_dump.getParentFile());
-			fout = new java.io.FileOutputStream(fh_dump, true);
+			FileOps.ensureDirExists(fh.getParentFile());
+			fout = new java.io.FileOutputStream(fh, false);
 			ostrm = new java.io.PrintWriter(fout);
 			fout = null;
 			ostrm.print("===========================================================\n");
-			if (msg != null) ostrm.print(msg+"\n");
+			if (msg != null) ostrm.print(msg+eol);
 			ostrm.print(sb);
 			ostrm.close();
 			ostrm = null;
 		} catch (Exception ex) {
-			dsptch.logger.log(LEVEL.ERR, ex, false, "DNS-Resolver failed to create dumpfile="+fh_dump.getAbsolutePath()+" - strm="+fout);
-			sb = null;
+			logger.log(LEVEL.ERR, ex, false, "DNS-Resolver failed to create dumpfile="+fh.getAbsolutePath()+" - strm="+fout);
 		} finally {
 			try {
 				if (ostrm != null) ostrm.close();
 				if (fout != null) fout.close();
 			} catch (Exception ex) {
-				dsptch.logger.log(LEVEL.ERR, ex, false, "DNS-Resolver failed to close dumpfile="+fh_dump.getAbsolutePath());
-				sb = null;
+				logger.log(LEVEL.ERR, ex, false, "DNS-Resolver failed to close dumpfile="+fh.getAbsolutePath());
 			}
 		}
-		return sb;
 	}
 
-	private StringBuilder dumpCache(StringBuilder sb)
+	private StringBuilder dumpState(String eol, StringBuilder sb)
 	{
-		String eol = "\n";
+		int reqcnt = 0;
+		int cachemiss = 0;
+		for (int idx = 0; idx != stats_reqcnt.length; idx++) {
+			reqcnt += stats_reqcnt[idx];
+			cachemiss += stats_cachemiss[idx];
+		}
 		if (sb == null) sb = new StringBuilder();
-		sb.append("DNS-Resolver status as of ").append(new java.util.Date(dsptch.systime())).append(eol);
-		sb.append("Requests=").append(stats_reqcnt);
-		sb.append(", UDP send/receive=").append(stats_udpxmt).append('/').append(stats_udprcv);
-		sb.append(" - truncated=").append(stats_trunc).append(", timeouts=").append(stats_tmt).append(eol);
-		sb.append("Cache Sizes: A=").append(cache_a.size()).append("; MX=").append(cache_mx.size());
-		sb.append("; PTR=").append(cache_ptr.size()).append(eol);
-
-		if (cache_a.size() != 0) sb.append(eol);
-		java.util.Iterator<com.grey.base.utils.ByteChars> itbc = cache_a.keysIterator();
-		while (itbc.hasNext()) {
-			com.grey.base.utils.ByteChars bc = itbc.next();
-			sb.append("A: ").append(bc).append(" => ");
-			cache_a.get(bc).toString(sb).append(eol);
-		}
-
-		if (cache_mx.size() != 0) sb.append(eol);
-		itbc = cache_mx.keysIterator();
-		while (itbc.hasNext()) {
-			com.grey.base.utils.ByteChars bc = itbc.next();
-			java.util.ArrayList<ResourceData> mxips = cache_mx.get(bc);
-			sb.append("MX: ").append(bc).append(" => ").append(mxips.size());
-			String dlm = ": ";
-			for (int idx = 0; idx != mxips.size(); idx++) {
-				sb.append(dlm);
-				mxips.get(idx).toString(sb);
-				dlm = "; ";
-			}
-			sb.append(eol);
-		}
-
-		if (cache_ptr.size() != 0) sb.append(eol);
-		com.grey.base.utils.IteratorInt it_ptr = cache_ptr.keysIterator();
-		while (it_ptr.hasNext()) {
-			int ip = it_ptr.next();
-			sb.append("PTR: ");
-			IP.displayDottedIP(ip, sb);
-			sb.append(" => ");
-			cache_ptr.get(ip).toString(sb).append(eol);
-		}
-
+		sb.append("DNS-Resolver status as of ").append(new java.util.Date(dsptch.getSystemTime()));
+		sb.append(eol).append("Requests=").append(reqcnt).append(" (user=").append(stats_ureqs).append("):");
+		sb.append(" A=").append(stats_reqcnt[Resolver.QTYPE_A]);
+		sb.append(", AAAA=").append(stats_reqcnt[Resolver.QTYPE_AAAA]);
+		sb.append(", PTR=").append(stats_reqcnt[Resolver.QTYPE_PTR]);
+		sb.append(", SOA=").append(stats_reqcnt[Resolver.QTYPE_SOA]);
+		sb.append(", NS=").append(stats_reqcnt[Resolver.QTYPE_NS]);
+		sb.append(", MX=").append(stats_reqcnt[Resolver.QTYPE_MX]);
+		sb.append(", SRV=").append(stats_reqcnt[Resolver.QTYPE_SRV]);
+		sb.append(", TXT=").append(stats_reqcnt[Resolver.QTYPE_TXT]);
+		sb.append(eol).append("Cache misses=").append(cachemiss).append(" (user=").append(stats_umiss).append("):");
+		sb.append(" A=").append(stats_cachemiss[Resolver.QTYPE_A]);
+		sb.append(", AAAA=").append(stats_cachemiss[Resolver.QTYPE_AAAA]);
+		sb.append(", PTR=").append(stats_cachemiss[Resolver.QTYPE_PTR]);
+		sb.append(", SOA=").append(stats_cachemiss[Resolver.QTYPE_SOA]);
+		sb.append(", NS=").append(stats_cachemiss[Resolver.QTYPE_NS]);
+		sb.append(", MX=").append(stats_cachemiss[Resolver.QTYPE_MX]);
+		sb.append(", SRV=").append(stats_cachemiss[Resolver.QTYPE_SRV]);
+		sb.append(", TXT=").append(stats_cachemiss[Resolver.QTYPE_TXT]);
+		sb.append(eol).append("UDP send/receive=").append(stats_udpxmt).append('/').append(stats_udprcv);
+		sb.append(" - truncated=").append(stats_trunc).append(", timeouts=").append(stats_tmt);
+		sb.append(eol).append("TCP connections=").append(stats_tcpconns-stats_tcpfail).append('/').append(stats_tcpconns);
+		if (wrapblocked.size() != 0) sb.append(eol).append(wrapblocked.size()).append(" queries blocked by QID wraparound");
+		sb.append(eol);
+		cachemgr.dump(eol, sb);
 		String dlm1 = " - ";
 		String dlm2 = ", ";
 		sb.append(eol).append("Pending Requests:");
-		sb.append(eol).append("A=").append(pendingdoms_a.size());
-		itbc = pendingdoms_a.keysIterator();
-		String dlm = dlm1;
-		while (itbc.hasNext()) {
-			com.grey.base.utils.ByteChars bc = itbc.next();
-			sb.append(dlm).append(bc);
-			dlm = dlm2;
-		}
-		sb.append(eol).append("MX=").append(pendingdoms_mx.size());
-		itbc = pendingdoms_mx.keysIterator();
-		dlm = dlm1;
-		while (itbc.hasNext()) {
-			com.grey.base.utils.ByteChars bc = itbc.next();
-			sb.append(dlm).append(bc);
-			dlm = dlm2;
-		}
+		dumpPending(pendingdoms_a, "A", dlm1, dlm2, eol, sb);
+		dumpPending(pendingdoms_aaaa, "AAAA", dlm1, dlm2, eol, sb);
+
 		sb.append(eol).append("PTR=").append(pendingdoms_ptr.size());
-		it_ptr = pendingdoms_ptr.keysIterator();
-		dlm = dlm1;
-		while (it_ptr.hasNext()) {
-			int ip = it_ptr.next();
+		com.grey.base.collections.IteratorInt it = pendingdoms_ptr.keysIterator();
+		String dlm = dlm1;
+		while (it.hasNext()) {
+			int ip = it.next();
 			sb.append(dlm);
 			IP.displayDottedIP(ip, sb);
 			dlm = dlm2;
 		}
-		sb.append(eol);
+		dumpPending(pendingdoms_soa, "SOA", dlm1, dlm2, eol, sb);
+		dumpPending(pendingdoms_ns, "NS", dlm1, dlm2, eol, sb);
+		dumpPending(pendingdoms_mx, "MX", dlm1, dlm2, eol, sb);
+		dumpPending(pendingdoms_srv, "SRV", dlm1, dlm2, eol, sb);
+		dumpPending(pendingdoms_txt, "TXT", dlm1, dlm2, eol, sb);
 		return sb;
 	}
 
-	// remove expired entries from our DNS cache
-	private void pruneCache()
+	private static void dumpPending(com.grey.base.collections.HashedMap<com.grey.base.utils.ByteChars, QueryHandle> pending,
+			String qtype, String dlm1, String dlm2, String eol, StringBuilder sb)
 	{
-		long time1 = System.currentTimeMillis();
-		int rrcnt = cache_a.size() + cache_ptr.size();
-		int rrdelcnt = 0;
-		LEVEL lvl = LEVEL.TRC;
-
-		// delete all expired cache_a entries
-		int oldsize = cache_a.size();
-		java.util.Iterator<com.grey.base.utils.ByteChars> itip = cache_a.keySet().iterator();
-		while (itip.hasNext()) {
-			com.grey.base.utils.ByteChars k = itip.next();
-			if (cache_a.get(k).ttl < dsptch.systime()) itip.remove();
+		sb.append(eol).append(qtype).append('=').append(pending.size());
+		java.util.Iterator<com.grey.base.utils.ByteChars> it = pending.keysIterator();
+		String dlm = dlm1;
+		while (it.hasNext()) {
+			com.grey.base.utils.ByteChars bc = it.next();
+			sb.append(dlm).append(bc);
+			dlm = dlm2;
 		}
-		int dels = oldsize - cache_a.size();
-		rrdelcnt += dels;
-		if (dels != 0) dsptch.logger.log(lvl, "DNS Resolver: Pruned stale IP cache entries: " + dels + "/" + oldsize);
-
-		int excess = cache_a.size() - cache_hiwater;
-		if (excess > 0) {
-			// delete random entries to bring us down to the stable high-water ceiling
-			itip = cache_a.keySet().iterator();
-			for (int loop = 0; loop != excess; loop++) {
-				itip.next();
-				itip.remove();
-			}
-			rrdelcnt += excess;
-			dsptch.logger.log(lvl, "DNS Resolver: Pruned IP cache back to hiwater="+cache_a.size()+" - excess="+excess);
-		}
-
-		// prune MX cache in same way
-		oldsize = cache_mx.size();
-		java.util.Iterator<com.grey.base.utils.ByteChars> itmx = cache_mx.keySet().iterator();
-		while (itmx.hasNext()) {
-			com.grey.base.utils.ByteChars k = itmx.next();
-			java.util.ArrayList<ResourceData> mxips = cache_mx.get(k);
-			rrcnt += mxips.size();
-			for (int idx = mxips.size() - 1; idx >= 0; idx--) {
-				if (mxips.get(idx).ttl < dsptch.systime()) {
-					mxips.remove(idx);
-					rrdelcnt++;
-				}
-			}
-			if (mxips.size() == 0) itmx.remove(); //all expired
-		}
-		dels = oldsize - cache_mx.size();
-		if (dels != 0) dsptch.logger.log(lvl, "DNS Resolver: Pruned stale MX cache entries: " + dels + "/" + oldsize);
-
-		if ((excess = cache_mx.size() - cache_hiwater_mx) > 0) {
-			itmx = cache_mx.keySet().iterator();
-			for (int loop = 0; loop != excess; loop++) {
-				com.grey.base.utils.ByteChars k = itmx.next();
-				rrdelcnt += cache_mx.get(k).size();
-				itmx.remove();
-			}
-			dsptch.logger.log(lvl, "DNS Resolver: Pruned MX cache back to hiwater="+cache_mx.size()+" - excess="+excess);
-		}
-
-		// prune PTR cache in same way
-		oldsize = cache_ptr.size();
-		java.util.Iterator<ResourceData> iter = cache_ptr.valuesIterator();
-		while (iter.hasNext()) {
-			ResourceData rr = iter.next();
-			if (rr.ttl < dsptch.systime()) iter.remove();
-		}
-		dels = oldsize - cache_ptr.size();
-		rrdelcnt += dels;
-		if (dels != 0) dsptch.logger.log(lvl, "DNS Resolver: Pruned stale PTR cache entries: " + dels + "/" + oldsize);
-
-		if ((excess = cache_ptr.size() - cache_hiwater) > 0) {
-			com.grey.base.utils.IteratorInt iter2 = cache_ptr.keysIterator();
-			for (int loop = 0; loop != excess; loop++) {
-				iter2.next();
-				iter2.remove();
-			}
-			rrdelcnt += excess;
-			dsptch.logger.log(lvl, "DNS Resolver: Pruned PTR cache back to hiwater="+cache_ptr.size()+" - excess="+excess);
-		}
-		long time2 = System.currentTimeMillis();
-		dsptch.logger.log(lvl, "DNS Resolver: Swept cache in time="+(time2-time1)+", removed RRs="+rrdelcnt+"/"+rrcnt
-				+" - A="+cache_a.size()+", MX="+cache_mx.size()+", PTR="+cache_ptr.size());
-	}
-
-	private ServerHandle nextServer()
-	{
-		ServerHandle next = dnsservers[next_dnssrv++];
-		if (next_dnssrv == dnsservers.length) next_dnssrv = 0;
-		return next;
-	}
-
-	// NB: This method could also use sun.net.dns.ResolverConfiguration.open().nameservers(), but that's even less portable
-	private String getSystemDnsServers() throws javax.naming.NamingException
-	{
-		java.util.Hashtable<String, String> envinput = new java.util.Hashtable<String, String>();
-		envinput.put(javax.naming.Context.INITIAL_CONTEXT_FACTORY, "com.sun.jndi.dns.DnsContextFactory");
-		javax.naming.directory.DirContext cntxt =  new javax.naming.directory.InitialDirContext(envinput);
-		java.util.Hashtable<?, ?> envfinal = cntxt.getEnvironment(); //NB: Does not return same object we passed into InitialDirContext()
-		Object providers = envfinal.get("java.naming.provider.url");
-		dsptch.logger.info("DNS-Resolver: Default DNS servers ["+providers+"]");
-		if (providers == null) return null;
-		String[] serverspecs = String.class.cast(providers).split(" ");
-		String pfx = "dns://";
-		
-		for (int idx = 0; idx != serverspecs.length; idx++) {
-			int pos = serverspecs[idx].indexOf(pfx);
-			if (pos != -1) serverspecs[idx] = serverspecs[idx].substring(pos + pfx.length());
-		}
-		String servers = null;
-
-		for (int idx = 0; idx != serverspecs.length; idx++) {
-			if (serverspecs[idx] == null || serverspecs[idx].trim().length() == 0) continue;
-			if (servers == null) {
-				servers = serverspecs[idx];
-			} else {
-				servers = servers + " | " + serverspecs[idx];
-			}
-		}
-		return servers;
 	}
 }

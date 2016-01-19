@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Yusef Badri - All rights reserved.
+ * Copyright 2013-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.nafman;
@@ -71,11 +71,12 @@ public class RegistryTest
 		org.junit.Assert.assertNull(Primary.get());
 		org.junit.Assert.assertEquals(cnt1+1, Registry.get().getCommands().size());
 
+		// make sure duplicate command defs are discarded
 		Registry.DefCommand stop2 = new Registry.DefCommand(stopcmd.code, "utest", "dup stop", null, false);
-		try {
-			Registry.get().loadCommands(new Registry.DefCommand[]{stop2});
-			org.junit.Assert.fail("Failed to trap command redefinition");
-		} catch (com.grey.base.ConfigException ex) {}
+		Registry.get().loadCommands(new Registry.DefCommand[]{stop2});
+		Registry.DefCommand stop2b = Registry.get().getCommand(stopcmd.code);
+		org.junit.Assert.assertNotEquals("dup stop", stop2b.descr);
+		org.junit.Assert.assertEquals(stop2b.descr, stopcmd.descr);
 		org.junit.Assert.assertEquals(cnt1+1, Registry.get().getCommands().size());
 	}
 
@@ -87,10 +88,10 @@ public class RegistryTest
 		@SuppressWarnings("unchecked")
 		java.util.HashMap<String, java.util.List<Object>> reg_handlers
 			= (java.util.HashMap<String, java.util.List<Object>>)DynLoader.getField(Registry.get(), "cmd_handlers");
-		com.grey.base.utils.HashedMap<String, java.util.ArrayList<Command.Handler>> dsptch_handlers
-			= new com.grey.base.utils.HashedMap<String, java.util.ArrayList<Command.Handler>>();
-		Dispatcher dsptch1 = Dispatcher.create(new DispatcherDef(), 0, logger);
-		Dispatcher dsptch2 = Dispatcher.create(new DispatcherDef(), 0, logger);
+		com.grey.base.collections.HashedMap<String, java.util.ArrayList<Command.Handler>> dsptch_handlers
+			= new com.grey.base.collections.HashedMap<String, java.util.ArrayList<Command.Handler>>();
+		Dispatcher dsptch1 = Dispatcher.create(new DispatcherDef(), -1, logger);
+		Dispatcher dsptch2 = Dispatcher.create(new DispatcherDef(), -1, logger);
 		Registry.get().loadCommands(new Registry.DefCommand[]{fakecmd1});
 		Registry.get().loadCommands(new Registry.DefCommand[]{fakecmd2});
 		reg_handlers.clear();
@@ -103,7 +104,7 @@ public class RegistryTest
 
 		reg_inviolate.clear();
 		org.junit.Assert.assertEquals(0, reg_handlers.size());
-		Boolean mod = Registry.get().registerHandler(fakecmd1.code, 12, new DummyHandler(), dsptch1);
+		boolean mod = Registry.get().registerHandler(fakecmd1.code, 12, new DummyHandler(), dsptch1);
 		org.junit.Assert.assertTrue(mod);
 		org.junit.Assert.assertEquals(1, reg_handlers.size());
 		org.junit.Assert.assertEquals(1, reg_handlers.get(fakecmd1.code).size());
@@ -208,7 +209,10 @@ public class RegistryTest
 
 	private static class DummyHandler implements Command.Handler
 	{
+		DummyHandler() {} //make explicit with non-private access, to eliminate synthetic accessor
 		@Override
 		public CharSequence handleNAFManCommand(Command cmd) {return null;}
+		@Override
+		public CharSequence nafmanHandlerID() {return "Dummy";}
 	}
 }

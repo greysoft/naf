@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2013 Yusef Badri - All rights reserved.
+ * Copyright 2010-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -14,15 +14,20 @@ public final class TSAP
 	public java.net.InetSocketAddress sockaddr;
 	public StringBuilder dotted_ip;
 
-	private String host;  //records the host as originally supplied, if any
+	private String host; //records the host as originally supplied, if any
 	private final byte[] ipbytes = new byte[IP.IPADDR_OCTETS];
 
-	public static TSAP build(String hostport, int port) throws java.net.UnknownHostException {return build(hostport, port, true);}
+	public static TSAP build(String hostport, int port) throws java.net.UnknownHostException {return build(hostport, port, false);}
+	public static TSAP get(java.net.InetAddress jdkip, int port, TSAP tsap) {return get(jdkip, port, tsap, false);}
+	public static TSAP get(java.net.InetAddress jdkip, int port, TSAP tsap, boolean with_dotted) {return get(jdkip, port, tsap, with_dotted, false);}
+	public static java.net.InetSocketAddress createSocketAddress(int ip, int port) {return createSocketAddress(ip, port, null);}
 
 	// hostport is of the form "hostname:portnumber", where one (but not both) of those components is optional (unless hostport null).
 	// The port paramter is a default, which is overridden by any port component embedded in hostport.
 	// port==0 means the hostname part is optional and defaults to localhost. Else the portnumber part of hostpart is the optional bit.
-	// Null hostport is interpreted as "localhost" regardless of port parameter.
+	// Null hostport is interpreted as localhost regardless of port parameter.
+	// This is a client-oriented method, as it constructs an InetSocketAddress object which might not be needed for a
+	// server or session socket.
 	public static TSAP build(String hostport, int port, boolean with_dotted) throws java.net.UnknownHostException
 	{
 		String host = null;
@@ -37,12 +42,12 @@ public final class TSAP
 			if (pos != 0) host = hostport.substring(0, pos);
 			if (pos != hostport.length() - 1) port = (int)IntValue.parseDecimal(hostport, pos+1, hostport.length()-pos-1);
 		}
-		if (host == null) host = "localhost";
+		if (host == null) host = "127.0.0.1";
 		TSAP tsap = new TSAP();
 		tsap.host = host;
 		tsap.port = port;
 		java.net.InetAddress jdkip = IP.getHostByName(host);
-		tsap.sockaddr =  new java.net.InetSocketAddress(jdkip, port);
+		tsap.sockaddr = new java.net.InetSocketAddress(jdkip, port);
 		setIP(tsap, jdkip, with_dotted);
 		return tsap;
 	}
@@ -54,9 +59,9 @@ public final class TSAP
 		} else {
 			tsap.clear();
 		}
-		tsap.sockaddr = (with_sockaddr ? new java.net.InetSocketAddress(jdkip, port) : null);
 		tsap.port = port;
 		setIP(tsap, jdkip, with_dotted);
+		if (with_sockaddr) tsap.sockaddr = new java.net.InetSocketAddress(jdkip, port);
 		return tsap;
 	}
 
@@ -78,15 +83,16 @@ public final class TSAP
 
 	private static void setIP(TSAP tsap, java.net.InetAddress jdkip, boolean with_dotted)
 	{
-		byte[] ipbytes = jdkip.getAddress();
-		tsap.ip = IP.net2ip(ipbytes, 0);
+		tsap.ip = IP.convertIP(jdkip);
 		if (with_dotted) tsap.setDotted();
 	}
 
 	// Unlike build(), this method is expected to do everything in-situ, with no new memory being allocated - apart from the sockaddr object,
 	// which the JDK forces us to create anew.
+	// Like the static build() above, this is a client-oriented method, as it constructs an InetSocketAddress object which might not be needed
+	// when creating a server socket.
 	// I have confirmed that these JDK calls don't trigger any DNS lookups.
-	public void set(int ipnum, int portnum, boolean with_dotted) throws java.net.UnknownHostException 
+	public void set(int ipnum, int portnum, boolean with_dotted) throws java.net.UnknownHostException
 	{
 		clear();
 		ip = ipnum;
@@ -110,16 +116,24 @@ public final class TSAP
 
 	public void clear()
 	{
+		ip = 0;
+		port = 0;
 		sockaddr = null;
 		host = null;
 		if (dotted_ip != null) dotted_ip.setLength(0);
+	}
+
+	public static java.net.InetSocketAddress createSocketAddress(int ip, int port, byte[] workbuf)
+	{
+		java.net.InetAddress jdkip = IP.convertIP(ip, workbuf);
+		return new java.net.InetSocketAddress(jdkip, port);
 	}
 
 	@Override
 	public String toString()
 	{
 		CharSequence hostpart = (host == null ? (dotted_ip==null?"":dotted_ip) : host);
-		if (hostpart == null || hostpart.length() == 0) hostpart = sockaddr.getAddress().toString();
+		if (hostpart == null || hostpart.length() == 0) hostpart = (sockaddr==null? "UNKNOWN_HOST":""+sockaddr.getAddress());
 		return hostpart + ":" + port;
 	}
 }

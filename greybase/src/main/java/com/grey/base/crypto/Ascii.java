@@ -1,24 +1,21 @@
 /*
- * Copyright 2010-2013 Yusef Badri - All rights reserved.
+ * Copyright 2010-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.crypto;
+
+import com.grey.base.config.SysProps;
 
 public class Ascii
 {
 	public enum ARMOURTYPE {HEX, BASE64}
 
-	private static final String EOL = "\r\n";  // Generate Windows/Internet linebreak, as Notepad will not properly copy/paste LineFeed breaks
-	private static final String EOL_ALT = "\n";
-	private static final String BEGINTEXT = "====== *****"+" Begin Grey Text "+"***** =======";
-	private static final String ENDTEXT = BEGINTEXT.replace("Begin", "End");
-	private static final String ARMOUR_BEGIN = BEGINTEXT+EOL;
-	private static final String ARMOUR_END =   EOL+ENDTEXT;
-	private static final String ARMOUR_BEGIN_LF = ARMOUR_BEGIN.replace(EOL, EOL_ALT);  // Tolerate Unix-style LineFeed breaks on incoming data
-	private static final String ARMOUR_END_LF =   ARMOUR_END.replace(EOL, EOL_ALT);
-	private static final char[] ARMOURSPC_BEGIN = (EOL+EOL+ARMOUR_BEGIN).toCharArray();  //add blank lines for easy visibility
-	private static final char[] ARMOURSPC_END = (ARMOUR_END+EOL+EOL+EOL).toCharArray();
-	private static final int ARMOUR_LINESIZE = 40;
+	private static final String EOL = "\r\n";  //generate Windows/Internet linebreak, as Notepad will not properly copy/paste LineFeed breaks
+	private static final String ARMOUR_BEGIN = SysProps.get("grey.crypto.armour.begin", "====== ***** Begin Grey Text ***** =======");
+	private static final String ARMOUR_END = SysProps.get("grey.crypto.armour.end", ARMOUR_BEGIN.replace("Begin", "End"));
+	private static final char[] ARMOURSPC_BEGIN = (EOL+EOL+ARMOUR_BEGIN+EOL).toCharArray();  //add blank lines for easy visibility
+	private static final char[] ARMOURSPC_END = (EOL+ARMOUR_END+EOL+EOL+EOL).toCharArray();
+	private static final int ARMOUR_LINESIZE = SysProps.get("grey.crypto.armour.maxline", 40);
 
 	/* There is no universal standard on what case the 6 hexadecimal letters should be, but lower-case makes
 	 * for compatibility with SASL-CRAM-MD5, among others.
@@ -31,17 +28,23 @@ public class Ascii
 	{
 		java.security.Key pubkey = com.grey.base.crypto.AsyKey.buildPublicKey(kmod, kpub);
 		byte[] encdata = com.grey.base.crypto.Ascii.armourUnwrap(wrapdata, atype);
+		if (encdata == null) return null;
 		byte[] plaindata = com.grey.base.crypto.AsyKey.decryptData(pubkey, encdata, 0, encdata.length);
 		return plaindata;
 	}
 
 	public static char[] armourWrap(byte[] rawdata, int off, int len, ARMOURTYPE atype)
 	{
+		return armourWrap(rawdata, off, len, atype, ARMOUR_LINESIZE);
+	}
+
+	public static char[] armourWrap(byte[] rawdata, int off, int len, ARMOURTYPE atype, int maxline)
+	{
 		char[] cdata;
 		switch (atype)
 		{
 		case BASE64:
-			cdata = Base64.encode(rawdata, off, len, ARMOUR_LINESIZE, null);
+			cdata = Base64.encode(rawdata, off, len, maxline, null);
 			break;
 		case HEX:
 			cdata = hexEncode(rawdata, off, len, null);
@@ -93,23 +96,37 @@ public class Ascii
 	private static String removeArmour(String wrapdata)
 	{
 		if (wrapdata == null) return null;
-		String begintxt = ARMOUR_BEGIN;
-		int off1 = wrapdata.indexOf(begintxt);
-		if (off1 == -1) {
-			// try LineFeed linebreaks
-			begintxt = ARMOUR_BEGIN_LF;
-			off1 = wrapdata.indexOf(begintxt);
-			if (off1 == -1) return null;
-		}
-		String endtxt = ARMOUR_END;
-		int off2 = wrapdata.lastIndexOf(endtxt);
-		if (off2 == -1) {
-			endtxt = ARMOUR_END_LF;
-			off2 = wrapdata.lastIndexOf(endtxt);
-			if (off2 == -1) return null;
-		}
-		String rawdata = wrapdata.substring(off1 + begintxt.length(), off2);
+		int off1 = findArmour(wrapdata, ARMOUR_BEGIN, 0);
+		if (off1 != -1) off1 = wrapdata.indexOf('\n', off1);
+		if (off1 == -1) return null;
+		off1++; //points at start of next line after ARMOUR_BEGIN
+		int off2 = findArmour(wrapdata, ARMOUR_END, off1);
+		if (off2 != -1) off2 = wrapdata.lastIndexOf('\n', off2);
+		if (off2 == -1) return null;
+		if (wrapdata.charAt(--off2) == '\r') off2--; //points at end of line preceding ARMOUR_END
+		if (off1 > off2) return ""; //there was nothing between the armour lines
+		String rawdata = wrapdata.substring(off1, off2+1);
 		return rawdata;
+	}
+
+	private static int findArmour(String wrapdata, String armour, int off) {
+		int start = wrapdata.indexOf(armour, off);
+		if (start == -1) return -1;
+		int pos = start - 1;
+		while (pos != -1 && wrapdata.charAt(pos) != '\n') {
+			if (wrapdata.charAt(pos) != ' ' && wrapdata.charAt(pos) != '\t') { //was a false match
+				return findArmour(wrapdata, armour, start + armour.length());
+			}
+			pos--;
+		}
+		pos = start + armour.length();
+		while (pos != wrapdata.length() && wrapdata.charAt(pos) != '\n') {
+			if (wrapdata.charAt(pos) != ' ' && wrapdata.charAt(pos) != '\t' && wrapdata.charAt(pos) != '\r') { //was a false match
+				return findArmour(wrapdata, armour, start + armour.length());
+			}
+			pos++;
+		}
+		return start;
 	}
 
 
@@ -145,10 +162,21 @@ public class Ascii
 
 	public static byte[] hexDecode(char[] carr, int coff, int clen, byte[] barr)
 	{
-		int blen = hexDecodeLength(clen);
+		int whtspc = 0;
+		int clmt = coff + clen;
+		for (int idx = coff; idx != clmt; idx++)
+		{
+			if (carr[idx] == '\n' || carr[idx] == '\r' || carr[idx] == ' ' || carr[idx] == '\t') {
+				//assume any spaces are at start or end of line
+				whtspc++;
+			}
+		}
+		int clen_hex = clen - whtspc;
+		int blen = hexDecodeLength(clen_hex);
 		if (barr == null || barr.length < blen) barr = new byte[blen];
 
 		for (int idx = 0; idx != blen; idx++) {
+			if (carr[coff] == '\n' || carr[coff] == '\r' || carr[coff] == ' ' || carr[coff] == '\t') continue;
 			barr[idx] = (byte)(hexCharValue(carr[coff++]) << 4);
 			barr[idx] += hexCharValue(carr[coff++]);
 		}

@@ -30,7 +30,7 @@ public class Task
 			throws com.grey.base.GreyException, java.io.IOException
 	{
 		super(name, dsptch, cfg);
-		listeners = new com.grey.naf.reactor.ListenerSet("Task="+naflet_name, dsptch, this, this, "listeners/listener", appcfg, null);
+		listeners = new com.grey.naf.reactor.ListenerSet("Task="+naflet_name, dsptch, this, this, "listeners/listener", taskConfig(), null);
 		com.grey.naf.nafman.Registry.get().registerHandler(CMD_SHOWCONNS, 0, this, dsptch);
 	}
 
@@ -76,6 +76,9 @@ public class Task
 		}
 		return sb;
 	}
+	
+	@Override
+	public CharSequence nafmanHandlerID() {return naflet_name;}
 
 	public void connectionStarted(Relay relay)
 	{

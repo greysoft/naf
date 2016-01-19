@@ -20,7 +20,7 @@ public class MemLogger
 	public final int length() {return logbuf.length();}
 	public void reset() {logbuf.setLength(0);}
 
-	protected MemLogger(Parameters params, String logname) throws java.io.IOException
+	protected MemLogger(Parameters params, String logname)
 	{
 		super(adjust(params), logname, false);
 	}
@@ -28,7 +28,7 @@ public class MemLogger
 	// Doesn't actually close, just discards contents and capacity.
 	// Users can continue to call log()
 	@Override
-	protected void closeStream(boolean isOwner)
+	protected void closeStream(boolean is_owner)
 	{
 		reset();
 		logbuf.trimToSize();

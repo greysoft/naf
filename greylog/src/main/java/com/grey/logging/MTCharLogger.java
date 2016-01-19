@@ -9,7 +9,7 @@ package com.grey.logging;
 public class MTCharLogger
 	extends CharLogger
 {
-	protected MTCharLogger(Parameters params, String logname) throws java.io.IOException
+	protected MTCharLogger(Parameters params, String logname)
 	{
 		super(params, logname, true);
 	}

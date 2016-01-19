@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Yusef Badri - All rights reserved.
+ * Copyright 2012-2014 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -45,7 +45,7 @@ public class CommandParserTest
 	{
 		String[] args = new String[]{"-bad", "-option1", "val1", "-g", "param1", "param2"};
 		Handler handler = new Handler(opts, 2, -1);
-		CommandParser parser = new CommandParser(handler);
+		CommandParser parser = new CommandParser(handler, true);
 		int param1 = parser.parse(args, 1);
 		org.junit.Assert.assertEquals(4, param1);
 		org.junit.Assert.assertEquals("param1", args[param1]);
@@ -57,7 +57,7 @@ public class CommandParserTest
 
 		args = new String[]{"-w", "val2", "-f1"};
 		handler = new Handler(opts, 0, 0);
-		parser = new CommandParser(handler);
+		parser = new CommandParser(handler, true);
 		param1 = parser.parse(args);
 		org.junit.Assert.assertEquals(args.length, param1);
 		org.junit.Assert.assertTrue(handler.flag1);
@@ -67,14 +67,14 @@ public class CommandParserTest
 
 		args = new String[]{"param1", "param2"};
 		handler = new Handler(null, 0, 2);
-		parser = new CommandParser(handler);
+		parser = new CommandParser(handler, true);
 		param1 = parser.parse(args, 0);
 		org.junit.Assert.assertEquals(0, param1);
 		org.junit.Assert.assertEquals("param1", args[param1]);
 
 		args = new String[]{"-f1", "-", "-arg1", "arg2"};
 		handler = new Handler(opts, 0, 2);
-		parser = new CommandParser(handler);
+		parser = new CommandParser(handler, true);
 		param1 = parser.parse(args, 0);
 		org.junit.Assert.assertEquals(2, param1);
 		org.junit.Assert.assertEquals("-arg1", args[param1]);
@@ -86,30 +86,30 @@ public class CommandParserTest
 	{
 		String[] args = new String[]{"-bad", "-option1", "val1", "-g", "param1", "param2"};
 		Handler handler = new Handler(opts, 0, -1);
-		CommandParser parser = new CommandParser(handler);
+		CommandParser parser = new CommandParser(handler, true);
 		int param1 = parser.parse(args);
 		org.junit.Assert.assertEquals(-1, param1);
 
 		args = new String[]{"-g", "-option1"};
 		handler = new Handler(opts, 0, -1);
-		parser = new CommandParser(handler);
+		parser = new CommandParser(handler, true);
 		param1 = parser.parse(args);
 		org.junit.Assert.assertEquals(-1, param1);
 
 		handler = new Handler(null, 0, -1);
-		parser = new CommandParser(handler);
+		parser = new CommandParser(handler, true);
 		param1 = parser.parse(args);
 		org.junit.Assert.assertEquals(-1, param1);
 
 		args = new String[0];
 		handler = new Handler(null, 1, -1);
-		parser = new CommandParser(handler);
+		parser = new CommandParser(handler, true);
 		param1 = parser.parse(args);
 		org.junit.Assert.assertEquals(-1, param1);
 
 		args = new String[]{"param1"};
 		handler = new Handler(null, 0, 0);
-		parser = new CommandParser(handler);
+		parser = new CommandParser(handler, true);
 		param1 = parser.parse(args);
 		org.junit.Assert.assertEquals(-1, param1);
 	}
@@ -119,13 +119,13 @@ public class CommandParserTest
 	{
 		String[] args = new String[]{"-option1", "val1", "-g", "-h", "-f1", "param1"};
 		Handler handler = new Handler(opts, 0, -1);
-		CommandParser parser = new CommandParser(handler);
+		CommandParser parser = new CommandParser(handler, true);
 		int param1 = parser.parse(args);
 		org.junit.Assert.assertEquals(-1, param1);
 
 		args = new String[]{"-help"};
 		handler = new Handler(null, 0, -1);
-		parser = new CommandParser(handler);
+		parser = new CommandParser(handler, true);
 		param1 = parser.parse(args);
 		org.junit.Assert.assertEquals(-1, param1);
 	}

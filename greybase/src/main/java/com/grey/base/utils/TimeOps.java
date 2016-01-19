@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2013 Yusef Badri - All rights reserved.
+ * Copyright 2010-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -34,19 +34,34 @@ public final class TimeOps
 
 	public static StringBuilder makeTimeRFC822(long systime, StringBuilder buf)
 	{
-		java.util.Calendar dtcal = getCalendar(systime, null);
+		return makeTimeRFC822(systime, null, buf);
+	}
+
+	public static StringBuilder makeTimeRFC822(long systime, String tz, StringBuilder buf)
+	{
+		java.util.Calendar dtcal = getCalendar(systime, tz);
 		return makeTimeRFC822(dtcal, buf);
 	}
 
 	public static StringBuilder makeTimeISO8601(long systime, StringBuilder buf, boolean withtime, boolean basicformat, boolean withzone)
 	{
-		java.util.Calendar dtcal = getCalendar(systime, null);
+		return makeTimeISO8601(systime, null, buf, withtime, basicformat, withzone);
+	}
+
+	public static StringBuilder makeTimeISO8601(long systime, String tz, StringBuilder buf, boolean withtime, boolean basicformat, boolean withzone)
+	{
+		java.util.Calendar dtcal = getCalendar(systime, tz);
 		return makeTimeISO8601(dtcal, buf, withtime, basicformat, withzone);
 	}
 
 	public static StringBuilder makeTimeLogger(long systime, StringBuilder buf, boolean withdate, boolean withmilli)
 	{
-		java.util.Calendar dtcal = getCalendar(systime, null);
+		return makeTimeLogger(systime, null, buf, withdate, withmilli);
+	}
+
+	public static StringBuilder makeTimeLogger(long systime, String tz, StringBuilder buf, boolean withdate, boolean withmilli)
+	{
+		java.util.Calendar dtcal = getCalendar(systime, tz);
 		return makeTimeLogger(dtcal, buf, withdate, withmilli);
 	}
 
@@ -164,42 +179,48 @@ public final class TimeOps
 	public static long parseMilliTime(CharSequence str, int off, int len)
 	{
 		long msecs= 0;
-		int lmt = off + len + 1;
+		int lmt = off + len;
 		int off_unit = 0; //offset at which current unit begins
-		long prevmult = 0;
+		long prevmult = MSECS_PER_DAY + 1L;
 
 		for (int idx = off; idx != lmt; idx++) {
-			// We loop one extra time and simulate a milliseconds designator on the final dummy loop,
-			// so that we don't have to do an extra test for milliseconds afterwards.
-			char ch = (idx == lmt - 1 ? 0 : str.charAt(idx));
-			long mult = 0;
+			char ch = str.charAt(idx);
+			int len_unit = idx - off_unit;
+			int len_symbol = 1;
+			long mult;
 
-            if (ch == 'd') {
-            	mult = MSECS_PER_DAY;
+			if (ch == 'd') {
+				mult = MSECS_PER_DAY;
 			} else if (ch == 'h') {
 				mult = MSECS_PER_HOUR;
 			} else if (ch == 'm') {
-				mult = MSECS_PER_MINUTE;
+				if (idx != lmt - 1 && str.charAt(idx+1) == 's') {
+					mult = 1;
+					len_symbol = 2;
+				} else {
+					mult = MSECS_PER_MINUTE;
+				}
 			} else if (ch == 's') {
 				mult = MSECS_PER_SECOND;
-			} else if (ch == 0) {
-				// dummy unit - if it occurs mid-sequence, prevmult check will catch it
-				mult = 1;
 			} else {
 				if (!Character.isDigit(ch)) {
-					throw new NumberFormatException("Invalid char="+ch+" at off="+idx+"- "+str.subSequence(off, off+len));
+					throw new NumberFormatException("Invalid char="+ch+" at pos="+(idx-off+1)+"- "+str.subSequence(off, lmt));
 				}
-				continue;
+				if (idx != lmt - 1) continue;
+				//this sequence ends in a digit, so treat as if followed by "ms"
+				mult = 1;
+				len_unit++;
 			}
 
-            // allow sloppy syntax where symbols are adjacent - interpret as if a zero between them
-            if (prevmult != 0 && prevmult <= mult) {
-				throw new NumberFormatException("Time units in wrong sequence - "+str.subSequence(off, off+len));
-            }
-            long unit = IntValue.parseDecimal(str, off_unit, idx - off_unit);
-            msecs += (unit * mult);
-            off_unit = idx + 1;
-            prevmult = mult;
+			if (prevmult <= mult) {
+				throw new NumberFormatException("Time units repeated or in wrong sequence - "+str.subSequence(off, lmt));
+			}
+			// allow sloppy syntax where symbols are adjacent - interpret as if a zero between them
+			long unit = (len_unit == 0 ? 0 : IntValue.parseDecimal(str, off_unit, len_unit));
+			msecs += (unit * mult);
+			off_unit = idx + len_symbol;
+			if (len_symbol != 1) idx += len_symbol - 1;
+			prevmult = mult;
 		}
 		return msecs;
 	}
@@ -257,8 +278,8 @@ public final class TimeOps
 			dlm = dlm_units;
 		}
 
-		if (str.length() == origlen || msecs != 0) {
-			str.append(dlm).append(msecs);
+		if (msecs != 0 || str.length() == origlen) {
+			str.append(dlm).append(msecs).append("ms");
 		}
 		return str;
 	}
@@ -285,14 +306,12 @@ public final class TimeOps
 	public static String displayTimezone(java.util.TimeZone tz, long systime)
 	{
 		StringBuilder sb = new StringBuilder(96);
-		int off = (systime == 0 ? 0 : tz.getOffset(systime));
+		int off = tz.getOffset(systime);
+		java.util.Date dt = new java.util.Date(systime);
 		sb.append("TZ=").append(tz.getID());
 		if (off != 0) sb.append('/').append(off > 0 ? "+" : "").append(expandMilliTime(off));
 		sb.append(" (").append(tz.getDisplayName());
-		if (systime != 0) {
-			java.util.Date dt = new java.util.Date(systime);
-			if (tz.inDaylightTime(dt)) sb.append(" - ").append(tz.getDisplayName(true, java.util.TimeZone.LONG));
-		}
+		if (tz.inDaylightTime(dt)) sb.append(" - ").append(tz.getDisplayName(true, java.util.TimeZone.LONG));
 		sb.append(')');
 		return sb.toString();
 	}

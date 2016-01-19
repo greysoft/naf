@@ -1,5 +1,5 @@
 <!--
-  Copyright 2010-2013 Yusef Badri - All rights reserved.
+  Copyright 2010-2016 Yusef Badri - All rights reserved.
   NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -12,7 +12,8 @@
 	<parent>
 		<groupId>com.grey.naf</groupId>
 		<artifactId>grey-build-common</artifactId>
-		<version>1.0.0</version>
+		<version>1.1.0</version>
+		<relativePath>../build-common/pom.xml</relativePath>
 	</parent>
 	<properties>
 		<grey.manifest.name>com/grey/logging/</grey.manifest.name>
@@ -26,13 +27,13 @@
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
-			<version>1.6.2</version>
+			<version>${grey.version.slf4j}</version>
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
 			<groupId>commons-logging</groupId>
 			<artifactId>commons-logging</artifactId>
-			<version>1.1.1</version>
+			<version>${grey.version.commonslog}</version>
 			<scope>provided</scope>
 		</dependency>
 	</dependencies>

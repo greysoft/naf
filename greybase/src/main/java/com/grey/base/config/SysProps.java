@@ -1,17 +1,15 @@
 /*
- * Copyright 2010-2013 Yusef Badri - All rights reserved.
+ * Copyright 2010-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.config;
 
+import com.grey.base.utils.IntValue;
 import com.grey.base.utils.StringOps;
 import com.grey.base.utils.TimeOps;
 
 public class SysProps
 {
-	static {
-		loadGreyProps();
-	}
 	public static final String EOL = get("line.separator", "\n");
 	public static final String DirSep = get("file.separator", "/");
 	public static final String PathSep = get("path.separator", ":");
@@ -19,6 +17,18 @@ public class SysProps
 	public static final String SYSPROP_DIRPATH_TMP = "grey.paths.tmp";
 	public static final String DIRTOKEN_TMP = "%DIRTMP%";
 	public static final String TMPDIR = getTempDir();
+
+	public static final boolean isWindows = get("os.name").startsWith("Windows");
+
+	public static final int JAVA_VERSION;
+
+	static {
+		String ver = System.getProperty("java.version");
+		int dot1 = ver.indexOf('.');
+		int dot2 = ver.indexOf('.', dot1+1);
+		JAVA_VERSION = (int)IntValue.parseDecimal(ver, dot1+1, dot2-dot1-1);
+		loadGreyProps();
+	}
 
 	public static String get(String name)
 	{
@@ -144,11 +154,17 @@ public class SysProps
 		java.util.Properties props = null;
 		try {
 			props = load(pthnam);
-			com.grey.base.utils.PkgInfo.announceJAR(clss, "greybase", "Set properties="+props.size()+" from "+pthnam);
+			String txt;
+			if (props == null) {
+				txt = "Grey-Properties file="+pthnam+" not found";
+			} else {
+				txt = "Grey-Properties="+props.size()+" loaded from "+pthnam;
+			}
+			com.grey.base.utils.PkgInfo.announceJAR(clss, "greybase", txt+" - Java="+JAVA_VERSION+"/"+System.getProperty("java.version"));
 		} catch (Exception ex) {
-			throw new RuntimeException("Failed to load properties from "+pthnam, ex);
+			throw new RuntimeException("Failed to load Grey-Properties from "+pthnam, ex);
 		}
-		if (props.size() != 0) System.getProperties().putAll(props);
+		if (props != null) System.getProperties().putAll(props);
 	}
 
 	private static String getTempDir()

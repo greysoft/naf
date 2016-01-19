@@ -10,19 +10,28 @@ It supports and provides:
 - Millisecond Timers: You can have any number of timers outstanding, each
   of which will call back the nominated handler on expiry.
 - Non-blocking SSL (as client, as server, with client certs, etc)
-- Non-blocking DNS Requests: Issue A/CNAME, PTR or MX requests, and your
+- Non-blocking DNS Resolver API: Issue A/CNAME, PTR or MX requests, and your
   code will be called back when the answer is available.
+- Blocking DNS Resolver API: Conventional synchronous interface to the above,
+  for applications which have not been coded as NAF callbacks.
+- DNS-Server framework: You provide the backend data-retrieval, but all the DNS
+  protocol and encoding/decoding is done for you. Ideal for embedding in test
+  suites that require deterministic DNS responses.
 - A lock-free single-threaded execution environment based on the Reactor
   pattern. Parallelism can be provided by adding more Dispatcher threads.
 - A built-in management agent, which you can view and control via your web
   browser.
 - Config-driven application setup: The naf.xml config file lets you easily
-  specify which tasks and classes to invoke, without having to rebuild your code.
+  specify which tasks and classes to invoke, without having to rebuild your
+  code.
 
 See the NAF home page at http://www.greyware.co.uk/naf for more info.
 Non-trivial sample applications are also included in the NAF source tree, to illustrate NAF's features.
 
 ==================================
 
-See ./ossnaf for Readme and licencing info.
-Note that ossnaf/README.txt also appears in the binary release of NAF and is worded accordingly, but obviously this is the full source tree, right here on GitHub.
+Clone me as follows:
+	git clone git://github.com/greysoft/greysoft-java.git ossnaf-git
+
+See ./ossnaf for Readme and licencing info - ossnaf/README.txt contains the build instructions.
+Note that ossnaf/README.txt also appears in the binary release of NAF and is worded accordingly, but obviously this is the full source tree, here on GitHub.

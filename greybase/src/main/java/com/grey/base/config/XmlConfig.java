@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2013 Yusef Badri - All rights reserved.
+ * Copyright 2010-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.config;
@@ -7,7 +7,7 @@ package com.grey.base.config;
 import com.grey.base.utils.StringOps;
 
 /**This class treats an XML file as a structured config file.
- * <br/>
+ * <br>
  * Calling applications just see this as a config structure, so to spare them from the underlying XML intricacies, we
  * map all exceptions to ConfigException
  * Note that we can retrieve attributes and values at the top-level node of an XmlConfig element using XPath dot notation
@@ -71,22 +71,11 @@ public class XmlConfig
 	}
 
 
-	public XmlConfig(XmlConfig cfg, String node_xpath) throws com.grey.base.ConfigException
+	private XmlConfig(XmlConfig cfg, String node_xpath) throws com.grey.base.ConfigException
 	{
 		xpathproc = cfg.xpathproc;
 		label = cfg.label;
 		setup(cfg.cfgsect, node_xpath);
-	}
-
-	// Only used for NULLCFG
-	private XmlConfig()
-	{
-		xpathproc = com.grey.base.utils.XML.getXpathProcessor();
-		try {
-			setup(null, "");
-		} catch (Exception ex) {
-			throw new IllegalArgumentException("Mapping exception to unchecked", ex);
-		}
 	}
 
 	// NB: node_xpath is the associated XPath of 'node', but 'node' has already been looked up, so node_xpath is merely used to annotate the
@@ -107,16 +96,21 @@ public class XmlConfig
 		setup(parentNode, node_xpath);
 	}
 
-	public void setDefaults(XmlConfig dflts)
+	// Only used for NULLCFG
+	private XmlConfig()
 	{
-		cfgDefaults = dflts;
+		xpathproc = com.grey.base.utils.XML.getXpathProcessor();
+		try {
+			setup(null, "");
+		} catch (Exception ex) {
+			throw new IllegalArgumentException("Mapping exception to unchecked", ex);
+		}
 	}
 
 	// Null parentNode means cfgsect has already been looked up (or else not required)
 	private void setup(Object parentNode, String node_xpath) throws com.grey.base.ConfigException
 	{
-		if (parentNode != null)
-		{
+		if (parentNode != null) {
 			// The evaluate() method returns null if the node specified by the XPath expression does not exist (which is
 			// exactly what we want) and only throws if the Xpath syntax is valid or some other irrecoverable bug in our code/
 			try {
@@ -126,23 +120,29 @@ public class XmlConfig
 			}
 		}
 
-		if (label == null)
-		{
+		if (label == null) {
 			label = "";
-		}
-		else
-		{
+		} else {
 			label += SECT_SEP;
 		}
 		label += node_xpath;
 		if (trace_stdout) System.out.println("Config section [" + label + "] " + (cfgsect==null?"absent":"present"));
 	}
 
-	public XmlConfig[] subSections(String xpath) throws com.grey.base.ConfigException
+	public void setDefaults(XmlConfig dflts)
+	{
+		cfgDefaults = dflts;
+	}
+
+	public XmlConfig getSection(String node_xpath) throws com.grey.base.ConfigException
+	{
+		return new XmlConfig(this, node_xpath);
+	}
+
+	public XmlConfig[] getSections(String xpath) throws com.grey.base.ConfigException
 	{
 		org.w3c.dom.NodeList nodes = null;
-		if (cfgsect != null)
-		{
+		if (cfgsect != null) {
 			try {
 				nodes = (org.w3c.dom.NodeList)xpathproc.evaluate(xpath, cfgsect, javax.xml.xpath.XPathConstants.NODESET);
 			} catch (Exception ex) {
@@ -150,15 +150,13 @@ public class XmlConfig
 			}
 		}
 
-		if (nodes == null || nodes.getLength() == 0)
-		{
-			if (cfgDefaults != null) return cfgDefaults.subSections(xpath);
+		if (nodes == null || nodes.getLength() == 0) {
+			if (cfgDefaults != null) return cfgDefaults.getSections(xpath);
 			return null;
 		}
 		XmlConfig[] sects = new  XmlConfig[nodes.getLength()];
 		
-		for (int idx = 0; idx != sects.length; idx++)
-		{
+		for (int idx = 0; idx != sects.length; idx++) {
 			sects[idx] = new XmlConfig(this, nodes.item(idx), xpath+"["+idx+"]");
 		}
 		return sects;
@@ -216,17 +214,13 @@ public class XmlConfig
 
 	// Note that the eraseString() call wipes clean the String object within the XmConfig DOM as
 	// well, as getValue() returns its reference
+	// Update 19/Nov/2015: And therefore we have stopped erasing passwords here. It prevents the
+	// config being reread.
 	public char[] getPassword(String xpath, char[] dflt) throws com.grey.base.ConfigException
 	{
 		String s_dflt = (dflt == null ? null : new String(dflt));
-		String s_passwd = null;
-		try {
-			s_passwd = getValue(xpath, false, s_dflt);
-			return (s_passwd == null ? null : s_passwd.toCharArray());
-		} finally {
-			if (s_passwd != null) StringOps.erase(s_passwd);
-			if (s_dflt != null) StringOps.erase(s_dflt);
-		}
+		String s_passwd = getValue(xpath, false, s_dflt);
+		return (s_passwd == null ? null : s_passwd.toCharArray());
 	}
 
 	public String[] getTuple(String xpath, String dlm, boolean mdty, String dflt, int min, int max) throws com.grey.base.ConfigException

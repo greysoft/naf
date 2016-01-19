@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2012 Yusef Badri - All rights reserved.
+ * Copyright 2011-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -54,20 +54,39 @@ public class IPTest
 		verifyDottedIP("255.255.255.255", ~0);
 		verifyDottedIP("127.0.0.1", (127 << 24) + 1);
 		verifyDottedIP("192.168.0.102", (192 << 24) + (168 << 16) + 102);
+		verifyDottedIP("192.168.0.0", (192 << 24) + (168 << 16));
+		verifyDottedIP("192.168", "192.168.0.0", (192 << 24) + (168 << 16));
+		verifyDottedIP("192", "192.0.0.0", 192 << 24);
 
 		verifyBadIP("192.168.2d.102");
-		verifyBadIP("192");
-		verifyBadIP("192.168.0");
 		verifyBadIP("192.168.0.102.0");
 		verifyBadIP("192.168.0.102.A");
 		verifyBadIP("192.168.256.102");
 		verifyBadIP("256.168.0.102");
 		verifyBadIP("192.168.0.260");
-		verifyBadIP("192.168.0");
 		verifyBadIP("192.168.0.");
 		verifyBadIP("192.168.0.102.1");
 		verifyBadIP("192.168.0.102.");
 		verifyBadIP("192.168..0");
+	}
+
+	@org.junit.Test
+	public void testHexIP6()
+	{
+		int off_start = 3;
+		int off = off_start;
+		int grpsiz = 2;
+		byte[] buf = new byte[off + IP.IPV6ADDR_OCTETS];
+		ByteOps.encodeInt(0x2001, buf, off, grpsiz); off += grpsiz;
+		ByteOps.encodeInt(0x6e1, buf, off, grpsiz); off += grpsiz;
+		ByteOps.encodeInt(0, buf, off, grpsiz); off += grpsiz;
+		ByteOps.encodeInt(0x47, buf, off, grpsiz); off += grpsiz;
+		ByteOps.encodeInt(0, buf, off, grpsiz); off += grpsiz;
+		ByteOps.encodeInt(0, buf, off, grpsiz); off += grpsiz;
+		ByteOps.encodeInt(0, buf, off, grpsiz); off += grpsiz;
+		ByteOps.encodeInt(0x42, buf, off, grpsiz); off += grpsiz;
+		StringBuilder sb = IP.displayIP6(buf, off_start);
+		org.junit.Assert.assertEquals("2001:6e1:0:47::42", sb.toString());
 	}
 
 	@org.junit.Test
@@ -78,6 +97,7 @@ public class IPTest
 		org.junit.Assert.assertEquals(32, net.netprefix);
 		org.junit.Assert.assertEquals(0xffffffff, net.netmask);
 		org.junit.Assert.assertEquals(0x01020304, net.ip);
+		org.junit.Assert.assertTrue(net.toString(), net.toString().contains("1.2.3.4/32"));
 		// this should be the same, ie. the default is 32
 		ipstr = "1.2.3.4/32";
 		Subnet net2 = IP.parseSubnet(ipstr);
@@ -127,16 +147,40 @@ public class IPTest
 		}
 	}
 
-	private static void verifyDottedIP(String dotted, int binval_exp)
+	@org.junit.Test
+	public void testAddresses() throws java.net.UnknownHostException
+	{
+		int ip = IP.parseIP("127.0.0.1");
+		org.junit.Assert.assertEquals(IP.IP_LOCALHOST, ip);
+		ip = IP.parseIP("localhost");
+		org.junit.Assert.assertEquals(IP.IP_LOCALHOST, ip);
+		String ipstr = "192.168.1.2";
+		ip = IP.parseIP(ipstr);
+		int ip2 = IP.convertDottedIP(ipstr);
+		org.junit.Assert.assertEquals(ip, ip2);
+		java.net.InetAddress jdkip = IP.convertIP(ip);
+		org.junit.Assert.assertEquals(ip, IP.convertIP(jdkip));
+		String arpa = IP.displayArpaDomain(ip).toString();
+		org.junit.Assert.assertEquals("2.1.168.192.in-addr.arpa", arpa);
+	}
+
+	private static void verifyDottedIP(String dotted, String dotted_ideal, int binval_exp)
 	{
 		int binval = IP.convertDottedIP(dotted);
-		org.junit.Assert.assertTrue(IP.validDottedIP(dotted, binval));
+		org.junit.Assert.assertTrue(IP.displayDottedIP(binval).toString(), IP.validDottedIP(dotted, binval));
 		org.junit.Assert.assertEquals(binval_exp, binval);
-		byte[] ipbytes = IP.ip2net(binval, null, 0);
-		CharSequence dotted2 = IP.displayDottedIP(ipbytes, 0, null);
-		org.junit.Assert.assertTrue(dotted.equals(dotted2.toString()));
+		CharSequence dotted2 = IP.displayDottedIP(binval);
+		org.junit.Assert.assertEquals(dotted_ideal, dotted2.toString());
+		byte[] ipbytes = IP.ip2net(binval);
+		dotted2 = IP.displayDottedIP(ipbytes, 0);
+		org.junit.Assert.assertEquals(dotted_ideal, dotted2.toString());
 		binval = IP.net2ip(ipbytes, 0);
 		org.junit.Assert.assertEquals(binval_exp, binval);
+	}
+
+	private static void verifyDottedIP(String dotted, int binval_exp)
+	{
+		verifyDottedIP(dotted, dotted, binval_exp);
 	}
 
 	private static void verifyBadIP(String dotted)

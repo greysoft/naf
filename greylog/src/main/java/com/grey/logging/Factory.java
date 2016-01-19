@@ -20,7 +20,7 @@ public class Factory
 
 	public static final boolean sinkstdio = SysProps.get(SYSPROP_SINKSTDIO, false);
 	private static final boolean diagtrace = SysProps.get(Logger.SYSPROP_DIAG, false);
-	private static final java.util.Map<String, Logger> loggers = new com.grey.base.utils.HashedMap<String, Logger>();
+	private static final java.util.Map<String, Logger> loggers = new com.grey.base.collections.HashedMap<String, Logger>();
 
 	/*
 	 * These 2 fields support Logger clients who expect the JUL or LOG4J style usage of logger names, where the name effectively merely
@@ -45,7 +45,7 @@ public class Factory
 		String str = SysProps.get(SYSPROP_LEADNAMEPARTS, null);
 		if (str != null) {
 			String[] tuple = str.split(":");
-			leadingNameParts = Integer.valueOf(tuple[0]);
+			leadingNameParts = Integer.parseInt(tuple[0]);
 			if (tuple.length > 1) delimiterNameParts = tuple[1];
 		}
 	}
@@ -127,7 +127,7 @@ public class Factory
 			alias = cfg.getValue("alias", false, null);
 			if (name.equals(alias)) throw new com.grey.base.ConfigException("GreyLogger: Infinite loop between "+name+" and "+alias+" - "+cfgpath);
 			if (alias != null && alias.length() != 0) return getNamedLogger(cfgpath, alias, tag);
-			cfg = new XmlConfig(cfg, "file");
+			cfg = cfg.getSection("file");
 		}
 		if ((cfg == null || !cfg.exists())
 				&& !name.equalsIgnoreCase(DFLT_LOGNAME)) {

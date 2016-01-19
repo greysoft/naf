@@ -1,19 +1,22 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2015 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.crypto;
 
+import com.grey.base.config.SysProps;
+
 public class Base64
 {
-	private static final char PADCHAR = '=';
-	private static final int DFLT_LINESIZE = 76;  // corresponds to the standard MIME limit
+	private static final int DFLT_LINESIZE = SysProps.get("grey.crypto.base64.maxline", 76); //corresponds to the standard MIME limit
 	private static final int UNITBYTES = 3;  // number of bytes per encoding unit
 	private static final int UNITCHARS = 4;  // number of characters per encoding unit
-	private static final int MASK6 = 0x3f;   // mask for lower 6 bits of an int
+	private static final char PADCHAR = '=';
 	private static final char CRLF1 = '\r';  // use the standard Internet line-break
 	private static final char CRLF2 = '\n';
 	private static final int DFLT_LINEUNITS = DFLT_LINESIZE / UNITCHARS;
+	private static final int MASK6 = 0x3f;   // mask for lower 6 bits of an int
+	private static final byte[] EMPTYBYTES = new byte[0];
 
 	private static StringBuilder tmpstrbuf = new StringBuilder(64);
 	static {
@@ -122,27 +125,34 @@ public class Base64
 		while (encoff != enclimit && encdata[encoff] <= 32) encoff++;  //strip leading whitespace
 		while (encoff != enclimit && encdata[enclimit - 1] <= 32) enclimit--;  //strip trailing whitespace
 		enclen = enclimit - encoff;
-		if (enclen == 0) return null;
+		if (enclen == 0) return (encdata == null ? null : EMPTYBYTES);
 		int rawoff = 0;
 		int datalimit = enclimit;
 		int paddinglen = 0;
 		int eolchars = 0;
+		int whtspc = 0;
 
-		// count pad chars - there's no legal encoded sequence that consists entirely of padding, so no need to test for loop termination
+		// count pad chars
 		while (encdata[datalimit - 1] == PADCHAR)
 		{
 			paddinglen++;
 			datalimit--;
+			if (datalimit == encoff) return EMPTYBYTES;
 		}
 
 		// count the number of line breaks
 		for (int idx = encoff; idx != datalimit; idx++)
 		{
-			if (encdata[idx] == CRLF1 || encdata[idx] == CRLF2) eolchars++;
+			if (encdata[idx] == CRLF1 || encdata[idx] == CRLF2) {
+				eolchars++;
+			} else if (encdata[idx] == ' ' || encdata[idx] == '\t') {
+				//assume this is white space at start or end of line - not really allowed but be tolerant
+				whtspc++;
+			}
 		}
 
 		// now we can work out the size of the final decoded byte buffer
-		int rawlen = (((enclen - eolchars) / UNITCHARS) * UNITBYTES) - paddinglen;
+		int rawlen = (((enclen - eolchars - whtspc) / UNITCHARS) * UNITBYTES) - paddinglen;
 		byte[] rawdata;
 
 		if (arrh != null)
@@ -167,9 +177,9 @@ public class Base64
 				eidx += 2;
 				continue;
 			}
-			if (encdata[eidx] == CRLF2)
+			if (encdata[eidx] == CRLF2 || encdata[eidx] == ' ' || encdata[eidx] == '\t')
 			{
-				eidx += 1;
+				eidx++;
 				continue;
 			}
 			// no need to test for PADCHAR as a special case, as it's map64 slot already returns zero
