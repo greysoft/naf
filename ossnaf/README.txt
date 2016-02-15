@@ -11,7 +11,7 @@ If you have downloaded the binary distribution, skip to the next step
 You can build this binary release from the source as follows:
 
 1) Download and extract the source tree somewhere, which we'll call SRCROOT.
-You will need to have the Java JDK (SE 6) and the Maven build tool on your path.
+You will need to have the Java JDK (Java 7 or later) and the Maven build tool on your path.
 
 2) Run these commands from Unix shell. The DOS equivalent should be obvious.
 - cd SRCROOT/build-common

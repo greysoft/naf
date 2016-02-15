@@ -303,35 +303,30 @@ public final class Dispatcher
 		while (!shutdownRequested && (activechannels.size() + activetimers.size() != 0))
 		{
 			if (!zeroNafletsOK && naflets.size() == 0) break;
-			long iotmt = (activetimers.size() == 0 ? 0 : activetimers.get(0).expiry - getSystemTime());
 			if (INTERRUPT_FRIENDLY) Thread.interrupted();//clear any pending interrupt status
 			systime_msecs = 0;
-			int keycnt;
 
-			if (iotmt <= 0) {
-				// Next timer already due.
-				// We still need to check the NIO Selector anyway, else a continuous stream of
-				// zero-second timers could starve the I/O handlers.
-				keycnt = slct.selectNow();
+			if (activetimers.size() == 0) {
+				if (slct.select() != 0) fireIO();
 			} else {
-				keycnt = slct.select(iotmt);
-			}
-
-			if (keycnt == 0) {
-				// must have been a timer
-				fireTimers();
-			} else {
-				// We definitely have I/O and only check for timers if we already knew we had some before calling select().
-				// This guards against timer handlers being starved by continuous I/O.
-				// Also invoke the timers first, to ensure zero-second timers are handled before anything else.
-				if (iotmt <= 0) fireTimers();
-				fireIO();
+				long iotmt = activetimers.get(0).expiry - getSystemTime();
+				if (iotmt <= 0) {
+					//next timer already due, but we still need to check for I/O as well
+					if (slct.selectNow() != 0) fireIO();
+					fireTimers();
+				} else {
+					if (slct.select(iotmt) == 0) {
+						fireTimers();
+					} else {
+						fireIO();
+					}
+				}
 			}
 		}
 
 		int finalkeys = -1;
 		if (!shutdownPerformed) {
-			//do a final Select to flush the SelectionKeys, as they're always 1 interval in arrears
+			//do a final Select to flush the SelectionKeys, as they're always one interval in arrears
 			finalkeys = slct.selectNow();
 		}
 		logger.info("Dispatcher="+name+": Reactor loop terminated - Naflets="+naflets.size()

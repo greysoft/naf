@@ -54,9 +54,9 @@ public abstract class ChannelMonitor
 	public final boolean disconnect() {return disconnect(true);}
 	public final boolean disconnect(boolean linger) {return disconnect(linger, false);}
 
-	final boolean isFlagSet(int f) {return ((cmstate & f) != 0);}
-	final void setFlag(int f) {cmstate |= f;}
-	final void clearFlag(int f) {cmstate &= ~f;}
+	final boolean isFlagSetCM(int f) {return ((cmstate & f) == f);}
+	final void setFlagCM(int f) {cmstate |= f;}
+	final void clearFlagCM(int f) {cmstate &= ~f;}
 
 	ChannelMonitor(Dispatcher d)
 	{
@@ -81,30 +81,31 @@ public abstract class ChannelMonitor
 	final void registerChannel(java.nio.channels.SelectableChannel chan, boolean takeOwnership)
 		throws java.io.IOException
 	{
-		if (!isFlagSet(S_INIT)) initChannelMonitor();
+		if (!isFlagSetCM(S_INIT)) initChannelMonitor();
 		iochan = chan;
-		if (takeOwnership) setFlag(S_WECLOSE);
+		if (takeOwnership) setFlagCM(S_WECLOSE);
 		iochan.configureBlocking(false);
 		dsptch.registerIO(this);
 	}
 
 	final boolean disconnect(boolean linger, boolean no_reap)
 	{
-		clearFlag(S_INIT); //in case we never got as far as calling CM_Client.connect()
+		clearFlagCM(S_INIT); //in case we never got as far as calling CM_Client.connect()
 		//avoid re-entrancy, ie. calling ourself recursively due to a failure in these disconnect ops
-		if (isFlagSet(S_INDISC)) return true; //we have already completed a disconnect
-		setFlag(S_INDISC);
+		if (isFlagSetCM(S_INDISC)) return true; //we have already completed a disconnect
+		setFlagCM(S_INDISC);
 
 		if (iochan != null) {
 			if (!shutdownChannel(linger)) {
-				clearFlag(S_INDISC); //enable future disconnect() call when linger completes
+				clearFlagCM(S_INDISC); //enable future disconnect() call when linger completes
 				return false;
 			}
+			clearFlagCM(S_CLOSELINGER);
 			try {
 				dsptch.deregisterIO(this);
-				if (isFlagSet(S_WECLOSE)) {
+				if (isFlagSetCM(S_WECLOSE)) {
 					iochan.close();
-					clearFlag(S_ISCONN);
+					clearFlagCM(S_ISCONN);
 				}
 			} catch (Exception ex) {
 				dsptch.logger.log(LEVEL.ERR, ex, true, "Dispatcher="+dsptch.name+": Failed to close ChannelMonitor=E"+cm_id+"/"+iochan
@@ -123,7 +124,7 @@ public abstract class ChannelMonitor
 
 	final void failed(boolean disconnect, Throwable ex) throws java.io.IOException
 	{
-		if (isFlagSet(S_CLOSELINGER)) {
+		if (isFlagSetCM(S_CLOSELINGER)) {
 			// This entity is already in shutdown mode waiting to flush its final transmissions.
 			// Time to discard any blocked sends and terminate it immediately.
 			LEVEL lvl = (ex instanceof RuntimeException ? LEVEL.ERR : LEVEL.TRC2);
@@ -154,8 +155,8 @@ public abstract class ChannelMonitor
 
 	final boolean enableRead() throws java.io.IOException
 	{
-		setFlag(S_INREAD);
-		if (halfduplex && isFlagSet(S_INWRITE)) return false;
+		setFlagCM(S_INREAD);
+		if (halfduplex && isFlagSetCM(S_INWRITE)) return false;
 		return monitorIO_HandleError(regOps | java.nio.channels.SelectionKey.OP_READ, false, "register-Read");
 	}
 
@@ -163,7 +164,7 @@ public abstract class ChannelMonitor
 	// They are probably due to a remote disconnect, and we can handle that later if/when we do any more I/O on this channel.
 	final void disableRead()
 	{
-		clearFlag(S_INREAD);
+		clearFlagCM(S_INREAD);
 		try {
 			monitorIO_HandleError(regOps & ~java.nio.channels.SelectionKey.OP_READ, true, "deregister-Read");
 		} catch (Exception ex) {
@@ -175,7 +176,7 @@ public abstract class ChannelMonitor
 	// on private ChannelMonitor members.
 	final void enableWrite() throws java.io.IOException
 	{
-		setFlag(S_INWRITE);
+		setFlagCM(S_INWRITE);
 		int opflags = (regOps | java.nio.channels.SelectionKey.OP_WRITE);
 		if (halfduplex) opflags &= ~java.nio.channels.SelectionKey.OP_READ;
 		monitorIO_HandleError(opflags, false, "register-Write");
@@ -184,9 +185,9 @@ public abstract class ChannelMonitor
 	// if in half-duplex mode, we restore the read that was disabled by the OP_WRITE
 	final void disableWrite()
 	{
-		clearFlag(S_INWRITE);
+		clearFlagCM(S_INWRITE);
 		int opflags = regOps & ~java.nio.channels.SelectionKey.OP_WRITE;
-		if (halfduplex && isFlagSet(S_INREAD)) opflags |= java.nio.channels.SelectionKey.OP_READ;
+		if (halfduplex && isFlagSetCM(S_INREAD)) opflags |= java.nio.channels.SelectionKey.OP_READ;
 		try {
 			monitorIO_HandleError(opflags, true, "deregister-Write");
 		} catch (Exception ex) {
@@ -245,7 +246,7 @@ public abstract class ChannelMonitor
 		return true;
 	}
 
-	final StringBuilder dumpState(StringBuilder sb, boolean verbose)
+	public final StringBuilder dumpState(StringBuilder sb, boolean verbose)
 	{
 		final Class<?> clss = getClass();
 		if (sb == null) sb = new StringBuilder();
@@ -325,14 +326,14 @@ public abstract class ChannelMonitor
 			sb.append(str);
 		} else {
 			if (sb == null) sb = new StringBuilder();
-			if (isFlagSet(S_ISCONN)) sb.append('C');
-			if (isFlagSet(S_INDISC)) sb.append('D');
-			if (isFlagSet(S_BRKPIPE)) sb.append('P');
-			if (isFlagSet(S_APPCONN)) sb.append('A');
-			if (isFlagSet(S_WECLOSE)) sb.append('X');
-			if (isFlagSet(S_CLOSELINGER)) sb.append('L');
-			if (isFlagSet(S_INREAD)) sb.append('R');
-			if (isFlagSet(S_INWRITE)) sb.append('W');
+			if (isFlagSetCM(S_ISCONN)) sb.append('C');
+			if (isFlagSetCM(S_INDISC)) sb.append('D');
+			if (isFlagSetCM(S_BRKPIPE)) sb.append('P');
+			if (isFlagSetCM(S_APPCONN)) sb.append('A');
+			if (isFlagSetCM(S_WECLOSE)) sb.append('X');
+			if (isFlagSetCM(S_CLOSELINGER)) sb.append('L');
+			if (isFlagSetCM(S_INREAD)) sb.append('R');
+			if (isFlagSetCM(S_INWRITE)) sb.append('W');
 		}
 		return sb;
 	}

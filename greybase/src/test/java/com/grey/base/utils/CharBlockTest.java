@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2012 Yusef Badri - All rights reserved.
+ * Copyright 2011-2016 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -24,7 +24,6 @@ public class CharBlockTest
 		org.junit.Assert.assertNotNull(ah.ar_buf);
 		org.junit.Assert.assertEquals(0, ah.ar_off);
 		org.junit.Assert.assertEquals(0, ah.ar_len);
-		org.junit.Assert.assertTrue(ah.capacity() > 0);
 
 		ah = new CharBlock(src_arr, off, len, false);
 		verify(ah, off, len, src_arr.length - off);
@@ -55,7 +54,6 @@ public class CharBlockTest
 
 		CharBlock src_ah = new CharBlock(src_str);
 		ah = new CharBlock(src_ah);
-		verify(ah, src_ah.ar_off, src_ah.size(), src_ah.capacity());
 		org.junit.Assert.assertTrue(src_ah.ar_buf == ah.ar_buf);
 		ah = new CharBlock(src_ah, off, len, true);
 		verify(ah, 0, len, len);
@@ -121,6 +119,18 @@ public class CharBlockTest
 		verify(ah, 0, 0, cap+1);
 		org.junit.Assert.assertTrue(sts);
 		org.junit.Assert.assertFalse(ah.ar_buf == arr);
+	}
+
+	@org.junit.Test
+	public void testEquals()
+	{
+		CharBlock ah = new CharBlock("hello");
+		ArrayRef<char[]> aref = new ArrayRef<char[]>(ah.ar_buf, ah.ar_off, ah.ar_len, false);
+		org.junit.Assert.assertTrue(aref.equals(ah));
+		org.junit.Assert.assertTrue(ah.equals(aref));
+		aref = ah;
+		org.junit.Assert.assertTrue(aref.equals(ah));
+		org.junit.Assert.assertTrue(ah.equals(aref));
 	}
 
 	private static void verify(CharBlock ah, int off, int len, int cap)

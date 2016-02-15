@@ -35,7 +35,7 @@ public abstract class CM_Server extends CM_TCP
 	@Override
 	final void indicateConnection() throws com.grey.base.FaultException, java.io.IOException
 	{
-		setFlag(S_APPCONN);
+		setFlagCM(S_APPCONN);
 		connected();
 	}
 }

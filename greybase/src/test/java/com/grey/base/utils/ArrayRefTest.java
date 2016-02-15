@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2012 Yusef Badri - All rights reserved.
+ * Copyright 2011-2016 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -213,17 +213,13 @@ public class ArrayRefTest
 
 	public static void verify(ArrayRef<?> ah, int off, int len, int cap)
 	{
-		if (ah.ar_buf == null)
-		{
+		if (ah.ar_buf == null) {
 			org.junit.Assert.assertEquals(0, cap);
-		}
-		else
-		{
+		} else {
 			org.junit.Assert.assertEquals(cap, java.lang.reflect.Array.getLength(ah.ar_buf) - ah.ar_off);
 		}
 		org.junit.Assert.assertEquals(off, ah.ar_off);
 		org.junit.Assert.assertEquals(len, ah.ar_len);
-		org.junit.Assert.assertEquals(cap, ah.capacity());
 		org.junit.Assert.assertEquals(ah.ar_len, ah.size());
 	}
 }

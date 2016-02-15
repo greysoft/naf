@@ -251,7 +251,7 @@ final class QueryHandle
 	// follow-on queries are never needed.
 	public void handleResponseTCP(com.grey.base.utils.ArrayRef<byte[]> rcvdata)
 	{
-		java.net.InetSocketAddress srvaddr = tcpconn.getRemoteTSAP();
+		java.net.InetSocketAddress srvaddr = tcpconn.getRemoteAddress();
 		disconnectTCP();
 		rslvr.handleResponse(rcvdata, this, srvaddr);
 	}

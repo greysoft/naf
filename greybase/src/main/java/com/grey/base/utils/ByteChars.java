@@ -364,6 +364,13 @@ public final class ByteChars
 		return true;
 	}
 
+	// our equals() only permits other ByteChars objects, so signal that to the base classes here
+	@Override
+	public boolean canEqual(Object obj)
+	{
+        return (obj != null && obj.getClass() == ByteChars.class);
+    }
+
 	public boolean equalsBytes(byte[] barr, int boff, int blen)
 	{
 		if (blen != ar_len) return false;

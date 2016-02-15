@@ -53,7 +53,7 @@ class TransportTCP
 			return;
 		}
 		Server qryh = (Server)lstnr.controller;
-		qryh.queryReceived(rcvdata, getRemoteTSAP(), this);
+		qryh.queryReceived(rcvdata, getRemoteAddress(), this);
 	}
 
 	public void sendResponse(java.nio.ByteBuffer buf) throws java.io.IOException

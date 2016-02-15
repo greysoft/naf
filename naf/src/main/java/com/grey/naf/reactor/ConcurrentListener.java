@@ -135,7 +135,7 @@ public final class ConcurrentListener
 		CM_Server srvr = spareservers.extract();
 		if (srvr == null) {
 			// we're at max capacity - can't allocate any more server objects
-			log.info("Listener=" + name + " dropping connection - no spare servers");
+			log.info("Listener="+name+" dropping connection because no spare servers - "+connsock);
 			connsock.close();
 			return;
 		}

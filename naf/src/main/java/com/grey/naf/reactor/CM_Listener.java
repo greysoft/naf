@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015 Yusef Badri - All rights reserved.
+ * Copyright 2010-2016 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -63,7 +63,7 @@ public abstract class CM_Listener
 		}
 		String iface = (cfgdflts==null ? null : String.class.cast(cfgdflts.get(CFGMAP_IFACE)));
 		int port = getInt(cfgdflts, sslconfig == null || sslconfig.latent ? CFGMAP_PORT : CFGMAP_SSLPORT, 0);
-		int srvbacklog = getInt(cfgdflts, CFGMAP_BACKLOG, 1000);
+		int srvbacklog = getInt(cfgdflts, CFGMAP_BACKLOG, 5000);
 
 		if (cfg != null) {
 			iface = cfg.getValue("@interface", false, iface);

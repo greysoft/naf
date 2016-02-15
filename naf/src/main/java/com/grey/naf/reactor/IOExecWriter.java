@@ -193,6 +193,9 @@ public final class IOExecWriter
 		}
 	}
 
+	// Beware: A broken pipe in sendFile() or sendBuffer() could mean that the whole channel has been diposed of and our
+	// clearChannel() method called before they return, meaning that xmtq would be empty by the time we call dequeue() so
+	// it has to handle that despite being apparently called from within a loop on non-zero xmtq.size()
 	private boolean drainQueue() throws CM_Stream.BrokenPipeException
 	{
 		while (xmtq.size() != 0) {
@@ -253,6 +256,7 @@ public final class IOExecWriter
 	private void dequeue(Boolean is_filewrite)
 	{
 		Object obj = xmtq.remove();
+		if (obj == null) return;
 		boolean is_fw = (is_filewrite == null ? obj.getClass() == FileWrite.class : is_filewrite.booleanValue());
 		if (is_fw) {
 			releaseFileWrite((FileWrite)obj);

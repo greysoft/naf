@@ -17,7 +17,7 @@ public abstract class CM_Client extends CM_TCP
 	@Override
 	final void indicateConnection() throws com.grey.base.FaultException, java.io.IOException
 	{
-		setFlag(S_APPCONN);
+		setFlagCM(S_APPCONN);
 		connected(true, null, null);
 	}
 	
@@ -44,11 +44,10 @@ public abstract class CM_Client extends CM_TCP
 
 	public final void connect(java.net.InetSocketAddress remaddr) throws com.grey.base.FaultException, java.io.IOException
 	{
-		if (!isFlagSet(S_INIT)) {
+		if (!isFlagSetCM(S_INIT)) {
 			//subclasses must call initChannelMonitor() before each call to connect()
 			throw new IllegalStateException("CM_Client instances must init before connect() - state="+dumpMonitorState(false, null)+" - "+this);
 		}
-		clearFlag(S_INIT);
 
 		if (iochan != null) {
 			// We're being reused to make a new connection - probably means initial connection attempt failed
@@ -73,7 +72,7 @@ public abstract class CM_Client extends CM_TCP
 	private final void clientConnected(boolean success, Throwable ex) throws com.grey.base.FaultException, java.io.IOException
 	{
 		if (success) {
-			setFlag(S_ISCONN);
+			setFlagCM(S_ISCONN);
 			if (isPureSSL()) {
 				startSSL();
 			} else {
@@ -87,7 +86,7 @@ public abstract class CM_Client extends CM_TCP
 	@Override
 	final void sslDisconnected(CharSequence diag) throws com.grey.base.FaultException, java.io.IOException
 	{
-		if (isFlagSet(S_APPCONN)) {
+		if (isFlagSetCM(S_APPCONN)) {
 			super.sslDisconnected(diag);
 		} else {
 			connected(false, diag, null);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015 Yusef Badri - All rights reserved.
+ * Copyright 2010-2016 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -21,6 +21,10 @@ public final class TSAP
 	public static TSAP get(java.net.InetAddress jdkip, int port, TSAP tsap) {return get(jdkip, port, tsap, false);}
 	public static TSAP get(java.net.InetAddress jdkip, int port, TSAP tsap, boolean with_dotted) {return get(jdkip, port, tsap, with_dotted, false);}
 	public static java.net.InetSocketAddress createSocketAddress(int ip, int port) {return createSocketAddress(ip, port, null);}
+	
+	public TSAP() {}
+	public TSAP(int ip, int port) {this.ip = ip;this.port = port;}
+	@Override public int hashCode() {return ip + port;}
 
 	// hostport is of the form "hostname:portnumber", where one (but not both) of those components is optional (unless hostport null).
 	// The port paramter is a default, which is overridden by any port component embedded in hostport.
@@ -69,15 +73,8 @@ public final class TSAP
 	{
 		java.net.InetSocketAddress sockaddr = (java.net.InetSocketAddress)(local ? sock.getLocalSocketAddress() : sock.getRemoteSocketAddress());
 		if (sockaddr == null) return null;
-
-		if (tsap == null) {
-			tsap = new TSAP();
-		} else {
-			tsap.clear();
-		}
+		tsap = get(sockaddr.getAddress(), sockaddr.getPort(), tsap, with_dotted, false);
 		tsap.sockaddr = sockaddr;
-		tsap.port = sockaddr.getPort();
-		setIP(tsap, sockaddr.getAddress(), with_dotted);
 		return tsap;
 	}
 
@@ -123,17 +120,26 @@ public final class TSAP
 		if (dotted_ip != null) dotted_ip.setLength(0);
 	}
 
-	public static java.net.InetSocketAddress createSocketAddress(int ip, int port, byte[] workbuf)
+	@Override
+	public boolean equals(Object obj)
 	{
-		java.net.InetAddress jdkip = IP.convertIP(ip, workbuf);
-		return new java.net.InetSocketAddress(jdkip, port);
+		if (obj == this) return true;
+		if (obj == null || obj.getClass() != TSAP.class) return false;
+		TSAP tsap2 = (TSAP)obj;
+		return (tsap2.ip == ip && tsap2.port == port);
 	}
 
 	@Override
 	public String toString()
 	{
 		CharSequence hostpart = (host == null ? (dotted_ip==null?"":dotted_ip) : host);
-		if (hostpart == null || hostpart.length() == 0) hostpart = (sockaddr==null? "UNKNOWN_HOST":""+sockaddr.getAddress());
+		if (hostpart == null || hostpart.length() == 0) hostpart = IP.displayDottedIP(ip);
 		return hostpart + ":" + port;
+	}
+
+	public static java.net.InetSocketAddress createSocketAddress(int ip, int port, byte[] workbuf)
+	{
+		java.net.InetAddress jdkip = IP.convertIP(ip, workbuf);
+		return new java.net.InetSocketAddress(jdkip, port);
 	}
 }

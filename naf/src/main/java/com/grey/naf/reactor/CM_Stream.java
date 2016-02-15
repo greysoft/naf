@@ -21,8 +21,8 @@ public abstract class CM_Stream extends ChannelMonitor
 	protected final java.security.cert.Certificate[] getPeerChain() {return sslconn == null ? null : sslconn.getPeerChain();}
 	protected final java.security.cert.X509Certificate getPeerCertificate() {return sslconn == null ? null : sslconn.getPeerCertificate();}
 
-	public final boolean isConnected() {return isFlagSet(S_ISCONN);}
-	public final boolean isBrokenPipe() {return isFlagSet(S_BRKPIPE);}
+	public final boolean isConnected() {return isFlagSetCM(S_ISCONN);}
+	public final boolean isBrokenPipe() {return isFlagSetCM(S_BRKPIPE);}
 
 	void indicateConnection() throws com.grey.base.FaultException, java.io.IOException {}
 	protected void disconnectLingerDone(boolean ok, CharSequence info, Throwable ex) {} //called later, if disconnect() returns False
@@ -45,8 +45,8 @@ public abstract class CM_Stream extends ChannelMonitor
 		throws java.io.IOException
 	{
 		registerChannel(chan, takeOwnership);
-		if (isconn) setFlag(S_ISCONN);
-		if (app_knows) setFlag(S_APPCONN);
+		if (isconn) setFlagCM(S_ISCONN);
+		if (app_knows) setFlagCM(S_APPCONN);
 		if (chanreader != null) chanreader.initChannel(this);
 		if (chanwriter != null) chanwriter.initChannel(this);
 	}
@@ -59,10 +59,10 @@ public abstract class CM_Stream extends ChannelMonitor
 			sslconn = null;
 		}
 		if (chanwriter != null) {
-			if (linger && chanwriter.isBlocked() && !isFlagSet(S_BRKPIPE)) {
+			if (linger && chanwriter.isBlocked() && !isFlagSetCM(S_BRKPIPE)) {
 				// Still waiting for a blocked write to complete, so linger-on-close till it does.
 				// This is irrespective of the S_WECLOSE setting.
-				setFlag(S_CLOSELINGER);
+				setFlagCM(S_CLOSELINGER);
 				return false;
 			}
 			chanwriter.clearChannel();
@@ -97,7 +97,7 @@ public abstract class CM_Stream extends ChannelMonitor
 	{
 		disableWrite();
 
-		if (isFlagSet(S_CLOSELINGER)) {
+		if (isFlagSetCM(S_CLOSELINGER)) {
 			disconnectLingerDone(true, null, null); //notify app first
 			disconnect(false); //now disconnect
 			return;
@@ -106,7 +106,7 @@ public abstract class CM_Stream extends ChannelMonitor
 
 	public final void startSSL() throws com.grey.base.FaultException, java.io.IOException
 	{
-		if (!isFlagSet(S_APPCONN)) {
+		if (!isFlagSetCM(S_APPCONN)) {
 			// This is just to register as a reader with the Dispatcher.
 			// If the application is already connected, we don't want to interfere with its chanreader settings.
 			chanreader.receive(0);
@@ -117,7 +117,7 @@ public abstract class CM_Stream extends ChannelMonitor
 
 	final void sslStarted() throws com.grey.base.FaultException, java.io.IOException
 	{
-		if (isFlagSet(S_APPCONN)) {
+		if (isFlagSetCM(S_APPCONN)) {
 			//the application must have switched into SSL mode after it established the connection
 			startedSSL();
 		} else {
@@ -128,7 +128,7 @@ public abstract class CM_Stream extends ChannelMonitor
 
 	void sslDisconnected(CharSequence diag) throws com.grey.base.FaultException, java.io.IOException
 	{
-		if (isFlagSet(S_APPCONN)) {
+		if (isFlagSetCM(S_APPCONN)) {
 			ioDisconnected(diag);
 		} else {
 			disconnect();
@@ -165,9 +165,9 @@ public abstract class CM_Stream extends ChannelMonitor
 					+"; blocked="+(chanwriter != null && chanwriter.isBlocked()));
 		}
 		if (discmsg == null) discmsg = errmsg;
-		setFlag(S_BRKPIPE);
+		setFlagCM(S_BRKPIPE);
 
-		if (isFlagSet(S_CLOSELINGER)) {
+		if (isFlagSetCM(S_CLOSELINGER)) {
 			//Connection has been lost while we're lingering on close to flush a blocked IOExcWriter.
 			//Clearly no point lingering now that connnection is lost (or we'd get stuck in infinite loop).
 			//First, notify app that the connection it thought was closed has in fact failed.
@@ -175,7 +175,7 @@ public abstract class CM_Stream extends ChannelMonitor
 			disconnect(false);
 			return;
 		}
-		if (!isFlagSet(S_INDISC)) throw new BrokenPipeException(this, discmsg);
+		if (!isFlagSetCM(S_INDISC)) throw new BrokenPipeException(this, discmsg);
 	}
 
 

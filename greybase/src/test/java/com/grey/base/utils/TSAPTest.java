@@ -46,7 +46,7 @@ public class TSAPTest
 		tsap.ensureDotted();
 		verify(tsap, ipdotted, ipdotted, port, true);
 		tsap.clear();
-		org.junit.Assert.assertEquals("UNKNOWN_HOST:0", tsap.toString());
+		org.junit.Assert.assertEquals("0.0.0.0:0", tsap.toString());
 		org.junit.Assert.assertNotNull(tsap.dotted_ip);
 		tsap.ensureDotted();
 		org.junit.Assert.assertEquals("0.0.0.0", tsap.dotted_ip.toString());

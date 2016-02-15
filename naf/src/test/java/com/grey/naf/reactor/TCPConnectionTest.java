@@ -158,10 +158,10 @@ public class TCPConnectionTest
 			org.junit.Assert.assertFalse(srvaddr.getPort()==getLocalPort());
 			org.junit.Assert.assertEquals(getRemoteIP().toString(), IP.IP_LOCALHOST, IP.convertIP(getRemoteIP()));
 			org.junit.Assert.assertEquals(getLocalIP().toString(), IP.IP_LOCALHOST, IP.convertIP(getLocalIP()));
-			org.junit.Assert.assertEquals(getLocalIP(), getLocalTSAP().getAddress());
-			org.junit.Assert.assertEquals(getLocalPort(), getLocalTSAP().getPort());
-			org.junit.Assert.assertEquals(getRemoteIP(), getRemoteTSAP().getAddress());
-			org.junit.Assert.assertEquals(getRemotePort(), getRemoteTSAP().getPort());
+			org.junit.Assert.assertEquals(getLocalIP(), getLocalAddress().getAddress());
+			org.junit.Assert.assertEquals(getLocalPort(), getLocalAddress().getPort());
+			org.junit.Assert.assertEquals(getRemoteIP(), getRemoteAddress().getAddress());
+			org.junit.Assert.assertEquals(getRemotePort(), getRemoteAddress().getPort());
 
 			byte[] buf = new byte[INTSIZE * 2];
 			ByteOps.encodeInt(req, buf, 0, INTSIZE);

@@ -920,7 +920,7 @@ The Listener config block can be specified in arbitrary locations within the NAF
 <tr><td>
 <pre>
 &lt;listener name="webserver" port="80" interface="127.0.0.1"
-          maxservers="1000" backlog="100"&gt;
+          maxservers="1000" backlog="5000"&gt;
     &lt;ssl ... /&gt;
     &lt;server factory="com.grey.http.Server$Factory"&gt;
         ...
@@ -960,19 +960,38 @@ Defaults to all IP interfaces.
 This sets an upper limit on the number of concurrent server connections.
 If this is reached, subsequent connections will be refused.
 <br/>
-The default is no limit.
+The default is zero, meaning no limit.
 </li>
 
 <li><span class="cfgtitle">backlog</span>:
 This is a socket-level OS parameter, which controls how many pending connections the underlying OS will accept and hold in a pending queue, if they arrive faster than they can be passed up to the NAF application.
 <br/>
-The default is 1000.
+The default is 5,000.
 </li>
 
 <li><span class="cfgtitle">ssl</span>:
 This is an optional config block which adds SSL functionality. See &sect;8 below.
 </li>
 </ul>
+
+<p>
+Note that setting a high Listener backlog (or at least expecting it to be honoured!) and supporting high TCP/IP concurrency levels in general will probably require tuning of the underlying OS as well.
+<br/>
+It is beyond the scope of this guide to make such sysadmin recommendations, but on Linux, the key settings include
+<span class="cfgname">net.core.somaxconn</span>,
+<span class="cfgname">net.core.netdev_max_backlog</span>,
+<span class="cfgname">net.ipv4.tcp_max_syn_backlog</span> and
+<span class="cfgname">fs.file-max</span>.
+<br/>
+You can display the current settings with
+<span class="compcode">sysctl -A</span>,
+add them to
+<span class="pathname">/etc/sysctl.conf</span>
+for permanent effect and reload with
+<span class="compcode">sysctl -p</span>
+or set them temporarily (till next reboot) with commands like.
+<span class="compcode">sysctl -w net.core.somaxconn=8192</span>
+</p>
 
 <p>
 The contents of the

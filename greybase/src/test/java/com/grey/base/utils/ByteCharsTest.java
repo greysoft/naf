@@ -24,7 +24,6 @@ public class ByteCharsTest
 		org.junit.Assert.assertNotNull(ah.ar_buf);
 		org.junit.Assert.assertEquals(0, ah.ar_off);
 		org.junit.Assert.assertEquals(0, ah.ar_len);
-		org.junit.Assert.assertTrue(ah.capacity() > 0);
 
 		ah = new ByteChars(src_arr, off, len, false);
 		verify(ah, off, len, src_arr.length - off);
@@ -55,7 +54,6 @@ public class ByteCharsTest
 
 		ByteChars src_ah = new ByteChars(src_str);
 		ah = new ByteChars(src_ah, false);
-		verify(ah, src_ah.ar_off, src_ah.size(), src_ah.capacity());
 		org.junit.Assert.assertTrue(src_ah.ar_buf == ah.ar_buf);
 		ah = new ByteChars(src_ah, off, len, true);
 		verify(ah, 0, len, len);
@@ -102,7 +100,6 @@ public class ByteCharsTest
 		org.junit.Assert.assertNotSame(src.ar_buf, dst.ar_buf);
 		org.junit.Assert.assertEquals(0, dst.ar_off);
 		org.junit.Assert.assertEquals(src.length(), dst.length());
-		org.junit.Assert.assertEquals(dst.length(), dst.capacity());
 		org.junit.Assert.assertEquals(src.hashCode(), dst.hashCode());
 		org.junit.Assert.assertTrue(src.equals(dst));
 
@@ -112,7 +109,6 @@ public class ByteCharsTest
 		org.junit.Assert.assertNotSame(src.ar_buf, dst.ar_buf);
 		org.junit.Assert.assertEquals(0, dst.ar_off);
 		org.junit.Assert.assertEquals(len, dst.length());
-		org.junit.Assert.assertEquals(dst.length(), dst.capacity());
 
 		off = 2;
 		src = new ByteChars(barr);
@@ -165,11 +161,9 @@ public class ByteCharsTest
 		ah1.append(ah2);
 		verify(ah1, 0, ah2.size(), cap);
 		org.junit.Assert.assertTrue(barr == ah1.ar_buf);
-		org.junit.Assert.assertTrue(ah1.capacity() == cap);
 		ah1.append(ah2);
 		org.junit.Assert.assertEquals(ah1.size(), 2*ah2.size());
 		org.junit.Assert.assertFalse(barr == ah1.ar_buf);
-		org.junit.Assert.assertTrue(ah1.capacity() > cap);
 
 		// loop up to the point at which we would trigger a grow() and then do the decisive append after the loop
 		cap = 4;
@@ -180,12 +174,10 @@ public class ByteCharsTest
 			ah1.append((byte)255);
 			org.junit.Assert.assertEquals(ah1.size(), idx+1);
 			org.junit.Assert.assertTrue(barr == ah1.ar_buf);
-			org.junit.Assert.assertTrue(ah1.capacity() == cap);
 		}
 		ah1.append((byte)255);
 		org.junit.Assert.assertEquals(ah1.size(), cap+1);
 		org.junit.Assert.assertFalse(barr == ah1.ar_buf);
-		org.junit.Assert.assertTrue(ah1.capacity() > cap);
 
 		// append a CharSequence other than String, StringBuilder or ourselves
 		String str = "abc";
@@ -321,6 +313,13 @@ public class ByteCharsTest
 		org.junit.Assert.assertTrue(bc == bc2);
 		org.junit.Assert.assertEquals("HELLO", bc2.toString());
 		org.junit.Assert.assertFalse(bc1.equals(bc2));
+
+		ArrayRef<byte[]> aref = new ArrayRef<byte[]>(bc1.ar_buf, bc1.ar_off, bc1.ar_len, false);
+		org.junit.Assert.assertFalse(aref.equals(bc1));
+		org.junit.Assert.assertFalse(bc1.equals(aref));
+		aref = bc1;
+		org.junit.Assert.assertTrue(aref.equals(bc1));
+		org.junit.Assert.assertTrue(bc1.equals(aref));
 	}
 
 	@org.junit.Test
