@@ -16,7 +16,7 @@ public final class ExternalClient
 	{
 		if (outbuf == null) outbuf = new com.grey.base.utils.ByteChars();
 		if (username != null && username.length() != 0) {
-			int len = outbuf.ar_len;
+			int len = outbuf.size();
 			outbuf.append(username);
 			outbuf = encode(outbuf, len);
 		}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.logging;
@@ -49,7 +49,7 @@ public class CharLogger
 		{
 			java.io.BufferedWriter strm = logstrm;
 			logstrm = null;
-			if (isOwner) strm.close();
+			if (isOwner()) strm.close();
 		}
 	}
 
@@ -75,7 +75,7 @@ public class CharLogger
 			logstrm.write(logmsg_chars, 0, logmsg_buf.length());
 		} catch (Throwable ex) {
 	        System.out.println(new java.util.Date(System.currentTimeMillis())+" FATAL ERROR: Failed to write CharLogger - "
-	        		+com.grey.base.GreyException.summary(ex, true));
+	        		+com.grey.base.ExceptionUtils.summary(ex, true));
 			System.exit(1);
 		}
 	}

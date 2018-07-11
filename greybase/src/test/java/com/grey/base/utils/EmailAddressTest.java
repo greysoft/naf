@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015 Yusef Badri - All rights reserved.
+ * Copyright 2010-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -88,7 +88,7 @@ public class EmailAddressTest
 	public void testParse()
 	{
 		EmailAddress emaddr = new EmailAddress();
-		ArrayRef<byte[]> data = setBytes(FULLADDR, 0);
+		ByteArrayRef data = setBytes(FULLADDR, 0);
 		emaddr.parse(data);
 		verifyAddress(emaddr, false);
 
@@ -140,12 +140,12 @@ public class EmailAddressTest
 		emaddr.parse(data);
 		verifyEmpty(emaddr);
 
-		int addrlen = emaddr.full.ar_buf.length + 5;
+		int addrlen = emaddr.full.offset() + emaddr.full.size() + 50;
 		StringBuilder strbuf = new StringBuilder(addrlen + 10);
 		strbuf.append(FULLADDR).append('.');
 		while (strbuf.length() < addrlen) strbuf.append('a');
 		String addrstr = strbuf.toString();
-		data = setBytes(addrstr, 5);
+		data = setBytes(addrstr, 50);
 		emaddr.parse(data);
 		org.junit.Assert.assertEquals(addrstr, emaddr.full.toString());
 
@@ -237,11 +237,11 @@ public class EmailAddressTest
 		org.junit.Assert.assertEquals(emaddr.domain, new ByteChars(DOMPART));
 	}
 	
-	private ArrayRef<byte[]> setBytes(String txt, int off)
+	private ByteArrayRef setBytes(String txt, int off)
 	{
 		int txtlen = txt.length();
 		byte[] arr = new byte[txtlen + off];
 		for (int idx = 0; idx != txtlen; idx++) arr[off + idx] = (byte)txt.charAt(idx);
-		return new ArrayRef<byte[]>(arr, off, txtlen, false);
+		return new ByteArrayRef(arr, off, txtlen);
 	}
 }

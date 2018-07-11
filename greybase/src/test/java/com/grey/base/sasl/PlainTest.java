@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2015 Yusef Badri - All rights reserved.
+ * Copyright 2012-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.sasl;
@@ -91,7 +91,7 @@ public class PlainTest
 	private boolean verify(PlainClient client, SaslServer server, ByteChars rspbuf)
 	{
 		client.init();
-		int pfxlen = (rspbuf == null ? 0 : rspbuf.ar_len);
+		int pfxlen = (rspbuf == null ? 0 : rspbuf.size());
 		ByteChars rsp = client.setResponse(req_role, req_user, req_passwd, rspbuf);
 		if (rspbuf != null) org.junit.Assert.assertTrue(rsp == rspbuf);
 		rsp.advance(pfxlen);

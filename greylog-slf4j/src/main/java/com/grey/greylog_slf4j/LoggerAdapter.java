@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2012 Yusef Badri - All rights reserved.
+ * Copyright 2011-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.greylog_slf4j;
@@ -14,11 +14,14 @@ public class LoggerAdapter
 	private static final long serialVersionUID = 1L;
 	private static final boolean dumpStack = com.grey.base.config.SysProps.get("grey.logger.slf4j.dumpstack", true);
 
-	private com.grey.logging.Logger logger;
-	private String lname;
+	private final com.grey.logging.Logger logger;
+	private final String lname;
+
+	public com.grey.logging.Logger getDelegate() {return logger;}
 
 	protected LoggerAdapter(String lname, com.grey.logging.Logger logger)
 	{
+		if (logger == null) throw new IllegalArgumentException(getClass().getName()+" has null delegate");
 		this.lname = lname;
 		this.logger = logger;
 	}
@@ -238,6 +241,6 @@ public class LoggerAdapter
 	@Override
 	public String toString()
 	{
-		return getClass().getSimpleName()+":"+logger;
+		return getClass().getSimpleName()+" with delegate="+logger.getClass().getName()+"/"+logger;
 	}
 }

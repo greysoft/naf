@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015 Yusef Badri - All rights reserved.
+ * Copyright 2010-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -28,54 +28,54 @@ public final class EmailAddress
 
 	public EmailAddress reset()
 	{
-		full.ar_len = 0;
-		domain.ar_len = 0;
-		mailbox.ar_len = 0;
+		full.clear();
+		domain.clear();
+		mailbox.clear();
 		return this;
 	}
 
 	public EmailAddress set(CharSequence addr)
 	{
 		reset();
-		full.set(addr);
+		full.populate(addr);
 		return this;
 	}
 
 	public EmailAddress decompose(boolean bare_is_domain)
 	{
-		if (mailbox.ar_len != 0 || domain.ar_len != 0) return this; //already broken down
+		if (mailbox.size() != 0 || domain.size() != 0) return this; //already broken down
 		int off = full.lastIndexOf((byte)DLM_DOM);
 
 		if (off == -1) {
 			if (bare_is_domain) {
-				domain.pointAt(full);
-				mailbox.ar_len = 0;
+				domain.set(full);
+				mailbox.clear();
 			} else {
-				mailbox.pointAt(full);
-				domain.ar_len = 0;
+				mailbox.set(full);
+				domain.clear();
 			}
 		} else {
-			mailbox.pointAt(full, 0, off);
-			domain.pointAt(full, off + 1);
+			mailbox.set(full, 0, off);
+			domain.set(full, off + 1);
 		}
 		return this;
 	}
 
 	public EmailAddress stripDomain()
 	{
-		full.ar_len = mailbox.ar_len;
-		domain.ar_len = 0;
+		full.setSize(mailbox.size());
+		domain.clear();
 		return this;
 	}
 
 	// This is a bit too oriented towards Mailismus and SMTP
 	// We also convert to lower-case, for the sake of the Mailismus' DNS-Resolver.
-	public void parse(ArrayRef<byte[]> data)
+	public void parse(ByteArrayRef data)
 	{
 		reset();
-		final byte[] dbuf = data.ar_buf;
-		int doff = data.ar_off;
-		int len = data.ar_len;
+		final byte[] dbuf = data.buffer();
+		int doff = data.offset();
+		int len = data.size();
 		final int lmt = doff + len;
 
 		int pos = ByteOps.indexOf(dbuf, doff, len, (byte)'<');
@@ -115,12 +115,12 @@ public final class EmailAddress
 
 		// copy data to address buffer
 		if (len == 0) {
-			full.ar_len = 0;
+			full.clear();
 			return;
 		}
 		full.ensureCapacity(len);
-		full.ar_len = len;
-		System.arraycopy(dbuf, doff, full.ar_buf, full.ar_off, len);
+		full.setSize(len);
+		full.copyIn(dbuf, doff, len);
 	}
 
 	@Override
@@ -137,7 +137,7 @@ public final class EmailAddress
 		if (obj == this) return true;
 		if (obj == null || obj.getClass() != EmailAddress.class) return false;
 		EmailAddress addr2 = (EmailAddress)obj;
-		if (addr2.mailbox.ar_len != mailbox.ar_len) return false;
+		if (addr2.mailbox.size() != mailbox.size()) return false;
 		return full.equals(addr2.full);
 	}
 

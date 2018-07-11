@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2015 Yusef Badri - All rights reserved.
+ * Copyright 2012-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.sasl;
@@ -136,7 +136,7 @@ public class CramMD5Test
 		server.init();
 		if (nonce != null) {
 			ByteChars srvnonce = (ByteChars)DynLoader.getField(server, "srvnonce");
-			srvnonce.set(nonce);
+			srvnonce.populate(nonce);
 		}
 		saslauth.username_good = new ByteChars(usrnam);
 		if (usrnam.toString().equals("baduser")) {
@@ -153,11 +153,11 @@ public class CramMD5Test
 		ByteChars cbuf = (usrnam.equals("tim") ? new ByteChars() : null);
 		msg = client.setResponse(usrnam, secret, msg, cbuf);
 		if (cbuf != null) org.junit.Assert.assertTrue(msg == cbuf);
-		if (msg.ar_off == 0) {
+		if (msg.offset() == 0) {
 			// shuffle buffer up to test offset handling
-			byte[] buf = new byte[msg.ar_len + 15];
-			System.arraycopy(msg.ar_buf, msg.ar_off, buf, 10, msg.ar_len);
-			msg.pointAt(buf, 10, msg.ar_len);
+			byte[] buf = new byte[msg.size() + 15];
+			System.arraycopy(msg.buffer(), msg.offset(), buf, 10, msg.size());
+			msg.set(buf, 10, msg.size());
 		}
 		if (expected_response != null) org.junit.Assert.assertEquals(expected_response, msg.toString());
 		return server.verifyResponse(msg);

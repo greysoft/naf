@@ -1,0 +1,1510 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<!--
+Copyright 2010-2018 Yusef Badri - All rights reserved.
+NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
+-->
+<HTML>
+<HEAD>
+<TITLE>NAF - Programmer's Guide</TITLE>
+<meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/>
+<link rel="stylesheet" type="text/css" href="naf.css"/>
+</HEAD>
+<BODY>
+
+<div class="menu">
+<p>
+Programmer's Guide<br/>
+NAF v2.5.0
+</p>
+<hr class="mline"/>
+<p>
+<a href="#overview">1&nbsp;-&nbsp;Overview</a>
+</p>
+<p>
+<a href="#nafcfg">2&nbsp;-&nbsp;naf.xml</a>
+</p>
+<p>
+<a href="#dispatcher">3&nbsp;-&nbsp;Dispatchers</a>
+</p>
+<p>
+<a href="#naflet">4&nbsp;-&nbsp;NAFlets</a>
+</p>
+<p>
+<a href="#nafman">5&nbsp;-&nbsp;NAFMAN</a>
+</p>
+<p>
+<a href="#dnsresolv">6&nbsp;-&nbsp;DNS&nbsp;Resolver</a>
+</p>
+<p>
+<a href="#listener">7&nbsp;-&nbsp;Listeners</a>
+</p>
+<p>
+<a href="#ssl">8&nbsp;-&nbsp;SSL</a>
+</p>
+<p>
+<a href="#logging">9&nbsp;-&nbsp;Logging</a>
+</p>
+<p>
+<a href="#greybase">10&nbsp;-&nbsp;GreyBase</a>
+</p>
+<p>
+<a href="#batchresolver">11&nbsp;-&nbsp;DNS&nbsp;Batch-Resolver</a>
+</p>
+<p>
+<a href="#demo">12&nbsp;-&nbsp;Demo&nbsp;Apps</a>
+</p>
+<p>
+<a href="#launch">13&nbsp;-&nbsp;Running&nbsp;NAF</a>
+</p>
+<p>
+<a href="../../NOTICE.txt">COPYRIGHT</a>
+</p>
+<p>
+<a href="../../LICENCE.txt">LICENCE</a>
+</p>
+</div>
+
+<div class="page">
+<table class="chtitle" width="100%">
+<tr><td>
+<center>
+Network Application Framework
+</center>
+</td></tr>
+</table>
+
+<h2>
+<a name="overview">
+1 - Overview
+</a>
+</h2>
+
+<p>
+NAF (Network Application Framework) is a Java API that implements a reactive event-driven framework based on the Java JDK's NIO interface.
+<br/>
+It is free and open-source, distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
+</p>
+
+<b>Why NAF?</b>
+<ul><li>
+NAF supports non-blocking I/O operations (sockets and pipes) and timers, enabling extremely large numbers of concurrent connections and high data throughput levels.
+</li><li>
+NAF provides a lock-free single-threaded execution environment based on the Reactor pattern - parallelism can be provided by adding more Dispatcher threads.
+</li><li>
+NAF provides seamless support for non-blocking I/O on SSL connections as well.
+You can easily create client or server SSL connections, with or without client certificates, and you can start the connection in SSL mode, or negotiate the transition to SSL later.
+</li><li>
+You can set up your application in an entirely programmatic manner if you wish, but it can also be automatically constructed and launched via the
+<span class="pathname">naf.xml</span>
+config file, in which you specify the application classes to be instantiated.
+</li><li>
+NAF provides an extensible web-based GUI, which lets you see snapshots of the registered I/O endpoints and timers in real time.
+You can even kill individual connections.
+</li><li>
+NAF provides object reuse and minimises memory churn (ie. garbage generation), thus minimising the need for expensive GC (Garbage Collector) runs.
+</li></ul>
+<p>
+NAF is intended to be easy to use and does not provide gratuitous layers of abstraction (which force you to learn excessively large custom APIs) over the familiar JDK interfaces that already do what most people need.
+<br/>
+What it does, is turn the raw NIO Selector and Channel interfaces into a functioning multiplexor based on the Reactor comms pattern, that performs the I/O ops for you, calls your code with the received data, and then gets out of the way to let your application handle the event.
+<br/>
+There are no data transformation pipelines, NAF presents received data as raw bytes and you can transmit as either byte[] buffers or NIO ByteByffer objects. The intention is to provide a frictionless low-level interface, that simplifies your code without imposing any extra processing overhead.
+<br/> <br/>
+NAF transparently handles non-blocking writes as you would expect, lets you schedule an unlimited number of arbitrary timed ops (and cancel or reschedule them before they trigger) as you would hope and also lets you specify whether reads should return after a fixed number of bytes, on receipt of a marker char (eg. a LineFeed) or just as soon as any data is available.
+<br/> <br/>
+NAF also provides the possibly unique feature of a non-blocking DNS-resolver API, which lets you perform hostname (A and AAAA), reverse-IP (PTR), MX (mailserver), NS (nameserver), SOA, SRV and TXT lookups.
+<br/>
+A more conventional blocking DNS-resolver API with all the same functionality is also provided as a convenience for non-NAF applications, ie. applications which have not been written for the NAF framework, but would appreciate having a utility API to perform low-level DNS queries.
+<br/> <br/>
+In more detail, a NAF application (more precisely termed a "NAFlet", or sometimes a "NAF task") executes under the control of a single-threaded object called a <dfn>Dispatcher</dfn>, which acts as an NIO controller and invokes registered callbacks in your application, as triggered by I/O, Timer and DNS events.
+<br/>
+As well as simplifying the code, the single-threaded reactor mode of operation permits many optimisations, not least of which is pre-allocating many of the temporary objects that your code might require, so as to reduce memory churn for the GC.
+</p>
+
+<hr width="40%"/>
+<p>
+An overview of the main NAF components follows.
+<br/>
+To find code-level documentation, you are urged to go to the example applications provided (see section &sect;12 below), along with the API Reference (which is included in the NAF download), and of course the NAF source code itself, which is freely available.
+</p>
+
+To dive straight and pull the NAF libraries into your application and start coding, here is the Maven dependency.
+<br/> <br/>
+<table class="cfgbox">
+<tr><td>
+<pre>
+    &lt;dependency&gt;
+            &lt;groupId&gt;com.github.greysoft.naf&lt;/groupId&gt;
+            &lt;artifactId&gt;greynaf&lt;/artifactId&gt;
+            &lt;version&gt;2.5.0&lt;/version&gt;
+    &lt;/dependency&gt;
+</pre>
+</td></tr>
+</table>
+<br/>
+
+<hr class="pline"/>
+<h2>
+<a name="nafcfg">
+2 - NAF Config (naf.xml)
+</a>
+</h2>
+
+<p>
+NAF applications are config-driven, and are specified in an XML-based configuration file which is generically referred to as the
+<span class="pathname">naf.xml</span>
+file (though it is not necessarily named that).
+<br/>
+This config file defines the application's Dispatchers and provides a mechanism for automatically wiring in and launching all your application code without you having to provide the <span class="compcode">main()</span> method (<em>and</em> without the use of custom annotations).
+<br/>
+The top-level structure of a naf.xml file is outlined below.
+</p>
+
+<table class="cfgbox">
+<tr><td>
+<pre>
+&lt;naf&gt;
+    &lt;dirpaths&gt;
+        &lt;root&gt;.&lt;/root&gt;
+        &lt;config&gt;%DIRTOP%/conf&lt;/config&gt;
+        &lt;var&gt;%DIRTOP%/var&lt;/var&gt;
+        &lt;logs&gt;%DIRVAR%/logs&lt;/logs&gt;
+        &lt;tmp&gt;%DIRVAR%/tmp&lt;/tmp&gt;
+    &lt;/dirpaths&gt;
+    &lt;baseport&gt;13000&lt;/baseport&gt;
+    &lt;dependjars&gt;app1.jar : app2.jar&lt;/dependjars&gt;
+    &lt;nafman&gt; ... &lt;/nafman&gt;
+    &lt;dnsresolver&gt; ... &lt;/dnsresolver&gt;
+    &lt;dispatchers&gt; ... &lt;/dispatchers&gt;
+&lt;/naf&gt;
+</pre>
+</td></tr>
+</table>
+
+<p>
+The naf.xml header config elements are as follows:
+</p>
+
+<p><span class="cfgtitle">dirpaths</span><br/>
+This section defines directory paths that a typical NAF application might use. The entire section is optional, since all the paths have default values that are as explicitly defined above.
+<br/>
+For each path, there is an associated system-property that is looked up if the naf.xml config element is absent, and the default value kicks in if the system property isn't defined either.
+<br/>
+Thereafter, the value of the path is used to substitute token strings to generate a concrete path.
+<br/> <br/>
+The use of some replacement tokens is illustrated above.
+These substitutions are automatically performed on all
+<span class="pathname">naf.xml</span>
+paths, and applications can also dynamically perform them on arbitrary strings by calling
+<span class="compcode">com.grey.naf.Config.getPath(String path, Class<?> clss)</span>
+(the <span class="compcode">clss</span> param is typically null).
+<br/> <br/>
+The matrix of configuration settings for these paths is specified in the table below:
+
+<table border="1" width="80%">
+<tr><th>
+	Config Element
+	</th><th>
+	System Property
+	</th><th>
+	Default Value
+	</th><th>
+	Replacement Token
+</th></tr>
+<tr align="center"><td>
+	root
+	</td><td>
+	greynaf.paths.root
+	</td><td>
+	<b>.</b><br/>(current directory)
+	</td><td>
+	%DIRTOP%
+</td></tr>
+<tr align="center"><td>
+	config
+	</td><td>
+	greynaf.paths.conf
+	</td><td>
+	./conf
+	</td><td>
+	%DIRCONF%
+</td></tr>
+<tr align="center"><td>
+	var
+	</td><td>
+	greynaf.paths.var
+	</td><td>
+	./var
+	</td><td>
+	%DIRVAR%
+</td></tr>
+<tr align="center"><td>
+	logs
+	</td><td>
+	grey.logger.dir
+	</td><td>
+	./var/logs
+	</td><td>
+	%DIRLOG%
+</td></tr>
+<tr align="center"><td>
+	tmp
+	</td><td>
+	grey.paths.tmp
+	</td><td>
+	./var/tmp
+	</td><td>
+	%DIRTMP%
+</td></tr>
+</table>
+
+<p>
+The paths are actually defined in terms of each other, so the full derivation is as shown in the naf.xml listing above, and the defaults in the above table are what would result if no config items or system properties are defined.
+<br/> <br/>
+If the <span class="cfgname">grey.paths.tmp</span> system property is set, then NAF's temp path will default to the global value specified by
+<span class="compcode">com.grey.base.config.SysProps.TMPDIR</span>, else it will diverge.
+It's up to the application which setting it wishes to abide by.
+<br/>
+If the 
+<span class="cfgname">grey.logger.dir</span> system property is not set, then NAF will set it to the resolved value of its
+<span class="cfgname">dirpaths/logs</span> config item, and this ought to propagate to the underlying
+<span class="softname">GreyLog</span> logger, so long as you loaded naf.xml before creating any loggers.
+</p>
+
+<p>
+<span class="cfgtitle">baseport</span><br/>
+This optional setting specifies the base port number above which NAF applications allocate the range of TCP ports they may use - whether purely internally or advertised externally.
+The actual number of reserved TCP ports depends on the NAF application, but it will be a contiguous block starting this base port.
+<br/>
+If this config item is absent, the setting is obtained from the
+<span class="cfgname">greynaf.baseport</span>
+system property, and if that is also absent, the ultimate default is 13000.
+</p>
+
+<p> <span class="cfgtitle">dependjars</span><br/>
+A colon-separated list of dependent JAR files to dynamically load.
+<br/>
+Some of the list items may be directory paths rather than a JAR pathname, and if so, then:<br/>
+- If directory spec ends in / (forward slash): NAF loads any .jar files found in that directory.<br/>
+- Else, the directory itself is placed on the live classpath.
+<br/> <br/>
+Note that the
+<span class="cfgname">greynaf.cp</span>
+system property can be used as an alternative to the
+<span class="cfgname">dependjars</span>
+config element.
+<br/>
+Their syntax and treatment is identical, but the system property is evaluated a fraction earlier during application startup.
+<br/>
+It is a matter of personal preference as to whether you would prefer to specify extra JARs in the naf.xml file or via system properties.
+</p>
+
+<hr class="pline"/>
+<h2>
+<a name="dispatcher">
+3 - Dispatchers
+</a>
+</h2>
+
+<p>
+Dispatchers are the event multiplexers at the heart of the NAF framework, and each dispatcher resides in its own thread.
+Multiple Dispatchers can exist within one JVM process, and they are completely independent of each other.
+In a widely used terminology, each Dispatcher represents an event loop.
+<br/>
+Users can simply regard a Dispatchers as a single-threaded execution context within which their applications reside.
+Dispatchers monitor all events (eg. I/O) in which their applications have registered an interest, and they also provide built-in services such as DNS resolution, NAFMAN and logging.
+<br/> <br/>
+An illustrative
+<span class="cfgname">dispatchers</span>
+config block is shown below, and as can be seen, each individual
+<span class="cfgname">dispatcher</span>
+section consists of nothing more than one or more NAFlets, and a set of attributes controlling the dispatcher's own behaviour.
+<br/>
+The top-level config outlined in section &sect;2 above shows where this block fits into the overall naf.xml config file.
+</p>
+
+<table class="cfgbox">
+<tr><td>
+<pre>
+&lt;dispatchers&gt;
+    &lt;dispatcher name="dispatcher1"&gt;
+        &lt;naflets&gt;
+            &lt;naflet name="naflet1a" class="com.my.package.Task1a"&gt;
+                ...
+            &lt;/naflet&gt;
+            &lt;naflet name="naflet1b" class="com.my.package2.Task1b"&gt;
+                ...
+            &lt;/naflet&gt;
+        &lt;/naflets&gt;
+    &lt;/dispatcher&gt;
+
+    &lt;dispatcher name="dispatcher2"&gt;
+        &lt;naflets&gt;
+            &lt;naflet name="naflet2" class="com.my.package2.Task2"&gt;
+                &lt;configfile root="xpath"&gt;%DIRCONF%naflet2.xml&lt;/configfile&gt;
+            &lt;/naflet&gt;
+        &lt;/naflets&gt;
+    &lt;/dispatcher&gt;
+&lt;/dispatchers&gt;
+</pre>
+</td></tr>
+</table>
+
+<p>
+The config block above illustrates the Dispatcher
+<span class="cfgtitle">name</span>
+attribute, and a description of all the other Dispatcher attributes (specified in same manner) follows.
+<br/>
+The <span class="compcode">com.grey.naf.DispatcherDef</span> class is where these attributes are parsed, so refer to the source for the full details.
+</p>
+
+<ul>
+<li><span class="cfgtitle">dns</span>:
+Boolean attribute which specifies whether a DNS Resolver will be enabled in this Dispatcher.
+Default is No.
+<br/>
+If any of the Dispatcher's installed NAFlets does use the DNS Resolver and this is set to No, then the application will simply crash, so this attribute can be seen as a way of declaring whether this Dispatcher contains any DNS users.
+</li>
+
+<li><span class="cfgtitle">enabled</span>:
+A boolean attribute which defaults to Yes, but can be set to No to disable a dispatcher (may sometimes be preferable to removing it from the naf.xml file for good).
+</li>
+
+<li><span class="cfgtitle">flush</span>:
+enabled is a time span, and indicates how often registered flushable objects should be flushed.<br/>
+The default is 0, meaning never.
+<br/>
+A "flushable" object is any object which implements the
+<span class="compcode">java.io.Flushable</span>
+interface and has been passed to the
+<span class="compcode">Dispatcher.flusher.register()</span>
+method in order to be periodically flushed, and it is typically a logger or similiar.
+<br/>
+The rationale behind this facility is that a buffered log file might not get flushed for an indefinite period if no further log messages were written to it, so this attribute guarantees a maximum interval before the last log message is visible in the log file.
+</li>
+
+<li><span class="cfgtitle">nafman</span>:
+Boolean attribute which specifies whether a NAFMAN agent will be activated in this Dispatcher.
+Default is No.
+<br/>
+Beware that turning NAFMAN off will (at the very least) often leave you with no graceful way of shutting down a NAF application.
+</li>
+
+<li><span class="cfgtitle">name</span>:
+A unique per-Dispatcher tag, which used to specify the name of the GreyLog logger this Dispatcher should create.
+<br/>
+The <span class="cfgname">greynaf.dispatchers.logname</span> system property overrides that latter function, and specifies a universal logger name for all Dispatchers.
+This may be more convenient when the number of Dispatchers is very large (eg. an <span class="softname">EchoBot</span> bulk test).
+</li>
+
+<li><span class="cfgtitle">survive_downstream</span>:
+Boolean attribute which specifies whether the primary Dispatcher (as the Dispatcher which hosts the primary NAFMAN agent is termed) should survive the death or termination of any secondary Dispatchers.
+<br/>
+Default is Yes.
+</li>
+
+<li><span class="cfgtitle">survive_handlers</span>:
+Boolean attribute which specifies whether the Dispatcher should survive errors in any of its registered I/O or Timer handlers.
+Default is Yes.
+<br/>
+Such an "error" is said to have occurred if any callback code throws an Exception back to the Dispatcher.
+</li>
+
+<li><span class="cfgtitle">zero_naflets</span>:
+Boolean attribute which specifies whether the Dispatcher should terminate when the count of active NAFlets drops to zero.
+Default is Yes.
+</li>
+</ul>
+
+<p>
+As explained in the Overview section (see EchoBot), Dispatchers can be either be specified in a naf.xml file, in which case the NAF launcher automatically creates and runs them, or they can be programmatically created and started.
+<br/>
+The latter are termed dynamic (or programmatically created) Dispatchers, as opposed to the configured ones created via naf.xml.
+The distinction is in their startup mode, and once launched, there is no difference in the resulting Dispatchers.
+<br/>
+Dispatchers are dynamically created by either of these static methods:<br/>
+&bull; <span class="compcode">com.grey.naf.Dispatcher.create(com.grey.naf.DispatcherDef, com.grey.naf.Config, com.grey.logging.Logger)</span>
+<br/>
+&bull; <span class="compcode">com.grey.naf.Dispatcher.create(com.grey.naf.DispatcherDef, int baseport, com.grey.logging.Logger)</span>
+<br/>
+Once they have been created and set up, you simply call their
+<span class="compcode">start()</span>
+method.
+</p>
+
+<hr class="pline"/>
+<h2>
+<a name="naflet">
+4 - NAFlets
+</a>
+</h2>
+
+<p>
+Each NAF dispatcher executes one or more application entities, known as
+<dfn>NAFlets</dfn>.
+Whereas Dispatchers are event managers which NAF provides for you, NAFlets embody application-specific functionality which you have to code.
+<br/>
+Naflets are independent processing tasks which are unaware of other Naflets executing within the same dispatcher, and can be freely moved between dispatchers, according to performance-tuning considerations.
+<br/> <br/>
+When we say that NAF is a single-threaded framework, what we really mean is that individual NAFlets execute in a single-threaded context (ie. the Dispatcher).
+However, real-world applications may comprise multiple NAFlets, which in turn may or may not be distributed over multiple Dispatchers (ie. multiple threads).
+The important point is that the Dispatchers are independent of one another and co-exist without incurring any synchronisation overhead, it's ultimately up to the developer how closely coupled their own bespoke NAFlets are, and whether they require synchronisation across multiple threads.
+</p>
+
+<p>
+The NAFlet config block is illustrated in the Dispatchers section above, and there are 3 top-level attributes.
+</p>
+
+<ul>
+<li><span class="cfgtitle">class</span>:
+This defines the NAFlet's type, and is used by the Dispatcher to instantiate it.
+<br/>
+All NAFlets are required to be a subclass of <span class="compcode">com.grey.naf.Naflet</span>, so see its source code for further requirements in terms of constructor signature and abstract/override methods.
+</li>
+
+<li><span class="cfgtitle">enabled</span>:
+A boolean attribute which defaults to Yes, but can be set to No to disable a Naflet (may sometimes be preferable to removing it from the naf.xml file for good).
+</li>
+
+<li><span class="cfgtitle">name</span>:
+An arbitrary tag, which merely serves to label log messages.
+</li>
+</ul>
+
+<p>
+The inner elements of a
+<span class="cfgname">naflet</span>
+block are application-specific and are parsed by the bespoke NAFlet code, but there is one generic setting which is understood and actioned by the NAF core:
+</p>
+<ul>
+<li><span class="cfgtitle">configfile</span>:
+This specifies an external config file from which this Naflet will read its settings, and the optional
+<span class="cfgtitle">root</span>
+attribute specifies the relevant section within that config file, in XPath notation.
+<br/>
+If the
+<span class="cfgname">configfile</span>
+element is present, then any other elements are ignored, as the configuration is redirected to the indicated external location.
+</li>
+</ul>
+
+There are two ways a NAFlet can be loaded into a NAF process:
+<ul><li>
+One way is to define it in a naf.xml config file as described above, and that will take care of automatically instantiating and run them when NAF starts up.
+</li><li>
+The other way, is to programmatically create the NAFlet object, and then pass it to a running Dispatcher by calling its
+<span class="compcode">loadNaflet(com.grey.naf.Naflet, com.grey.naf.Dispatcher)</span>
+method.
+</li></ul>
+<p>
+The Dispatcher will call the NAFlet's
+<span class="compcode">start()</span>
+method from within its own thread (so it must not have been called already) and the NAFlet would then be live.
+This method can be used to load new NAFlets whether the Dispatcher was originally launched from a naf.xml file or programmatically.
+<br/>
+The Dispatcher argument indicates which Dispatcher the calling code is associated with, and would be set to Null if it's not running within a Dispatcher.
+If you are calling loadNaflet() on a Dispatcher which you have just created programmatically but not yet started, then you should pass in <span class="compcode">null</span> as the Dispatcher reference, and it will load the NAFlet once it starts up.
+<br/> <br/>
+There is also an
+<span class="compcode">unloadNaflet(String naflet_name, com.grey.naf.Dispatcher)</span>
+method, which tells the Dispatcher to stop the NAFlet of that name, if it's running.
+</p>
+
+<hr class="pline"/>
+<h2>
+<a name="nafman">
+5 - NAFMAN
+</a>
+</h2>
+
+<p>
+NAFMAN is the NAF management agent. It is web-enabled, and enables you to issue commands to a running NAF application from your browser or the command line.
+<br/>
+A NAFMAN agent is embedded in every dispatcher by default, and the first NAFMAN-enabled Dispatcher becomes the Primary NAFMAN agent, all the others (if any) becoming its Secondaries.
+<br/> <br/>
+The
+<span class="cfgname">nafman</span>
+config block is typically absent from the
+<span class="pathname">naf.xml</span>
+config file,
+but that does not mean NAFMAN is disabled, merely that it's operating with its default settings.
+NAFMAN can only be disabled on a per-Dispatcher basis, via the Dispatcher's
+<span class="cfgname">nafman</span>
+attribute.
+<br/>
+The structure of the config block is illustrated below, but you should rarely need to modify it as they are more a case of low-level tuning than anything else.
+<br/>
+See the
+<span class="compcode">com.grey.naf.nafman.Server</span>
+source code for all the options - plus the usual Listener attributes.
+</p>
+<table class="cfgbox">
+<tr><td>
+<pre>
+&lt;nafman&gt;
+    &lt;listener&gt;
+        &lt;server&gt;
+            ... see NAFMAN source ...
+        &lt;/server&gt;
+    &lt;/listener&gt;
+&lt;/nafman&gt;
+</pre>
+</td></tr>
+</table>
+<p>
+The most likely option you would want to change is the TCP port on which the NAFMAN server listens, which by default is the same as the
+<span class="cfgname">baseport</span> (see &sect;2 above), ie. 13000.
+<br/>
+However, if you do want to change this port, it should be done via the
+<span class="cfgname">baseport</span>
+config setting, NOT the Listener's
+<span class="cfgname">port</span>
+attribute.
+That way, NAF continues to reserve a contiguous block of ports that is specified in one place.
+<br/> <br/>
+The upshot of the above is that (notwithstanding any changes to the
+<span class="cfgname">baseport</span>)
+if you point your browser at port 13000, you will see the NAFMAN home page, where you can issue various NAFMAN commands and navigate to other screens.
+<br/>
+NAF contains a built-in NAFMAN home page called the
+<span class="softname">NAF Dashboard</span>,
+but this can be overridden by NAF-based applications (eg.
+<span class="softname">Mailismus</span>
+installs its own bespoke home page).
+<br/> <br/>
+NAFMAN's capabilities are best understood by viewing it on your browser, but the available control points include stopping NAF as a whole, or stopping individual Dispatchers or NAFlets, as well as monitoring the state of all the Dispatchers (you can view all current I/O channels/connections and timers - and even kill TCP connections).
+<br/>
+Assorted other NAF and application commands are also available, as well as the ability to inspect NAFMAN's own internal state, eg. which components have registered to handle which commands.
+<br/>
+Since NAFMAN command handlers are dynamically registered, the exact set of commands available will depend on your Dispatcher config and active NAFlets.
+
+<br/> <br/>
+NAFMAN commands can also issued from the command line, by entering the Path and Query-String part of the URL (ie. the URL mimnus the host-port part) as the argument to the NAF Launcher's
+<span class="cfgvalue">-cmd</span>
+option
+<br/>
+For example, the following command-line invocations list all the available NAFMAN commands.
+The second form illustrates how to connect to an arbitrary instance of NAFMAN, rather than the one associated with a particular naf.xml file.
+</p>
+<div>
+<span class="vt220">
+java -jar lib/greynaf-2.5.0.jar -c conf/naf.xml -cmd showconns?nohttp=y&nbsp;
+<br/><br/><br/>
+&nbsp;java -jar lib/greynaf-2.5.0.jar -remote hostname:13000 -cmd showconns?nohttp=y
+</span>
+</div>
+<p>
+As a web-based agent, NAFMAN returns a standard HTTP response even when invoked from the command line (in fact internally, this issues a HTTP request and forwards the response) and the body of the response is in general an XML document (although even that depends on the particular handler for that command).
+<br/>
+Some of the more common NAFMAN options are:
+</p>
+<ul>
+<li><span class="cfgname">d</span>: Dispatcher name - 
+This targets the command at a particular Dispatcher.
+Some commands are applicable to all Dispatchers, unless thus filtered.
+</li><li><span class="cfgname">n</span>: NAFlet name - 
+This targets the command at a particular NAFlet.
+</li><li><span class="cfgname">st</span>: Stylesheet name (this is a hard-coded auto-registered name)
+</li><li><span class="cfgname">nohttp</span>: Omit header from HTTP response<br/>
+This might be useful in command-line mode, if you want to pipe the XML response into your own XSL stylesheet.
+</li>
+</ul>
+<p>
+Putting it all together, the following command-line invocation can be used to terminate a named NAFlet within a named Dispatcher.
+<br/>
+(NB: On a Unix platform, you will need to escape the ampersand using the usual Shell syntax)
+</p>
+<div>
+<span class="vt220">
+java -jar lib/greynaf-2.5.0.jar -remote hostname:13000 -cmd appstop?d=dispname&amp;n=appname
+</span>
+</div>
+<p>
+See section &sect;13 below for more general info on command-line usage.
+</p>
+
+<hr class="pline"/>
+<h2>
+<a name="dnsresolv">
+6 - DNS Resolver
+</a>
+</h2>
+
+<p>
+The DNS Resolver is a NAF library component that offers a non-blocking (aka asychronous) API to NAF applications and other NAF components.
+It supports A, AAAA, PTR, NS, SOA, MX, TXT and SRV lookups, and can work in recursive or non-recursive mode.
+<br/>
+The Resolver caches the results so that future lookups on the same domain can be satisfied internally within NAF, without recourse to any more external queries.
+It also caches negative answers (ie. domain name not found).
+<br/> <br/>
+The API is provided by the
+<span class="compcode">com.grey.naf.dns.Resolver</span>
+class.
+Any application wishing to use the DNS resolver must implement the
+<span class="compcode">com.grey.naf.dns.Resolver.Client</span>
+interface, and the DNS resolver calls back to its
+<span class="compcode">dnsResolved()</span>
+method with the final result.
+<br/>
+The final result is represented by an instance of the
+<span class="compcode">com.grey.naf.dns.Answer</span>
+class, within which individual Resource Records are represented by the
+<span class="compcode">com.grey.naf.dns.ResourceData</span>
+class.
+<br/>
+If the answer was already cached, then it is returned by the Resolver API call, and there is no subsequent callback.
+
+<br/> <br/>
+NAF offers two alternative implementations of the DNS Resolver, namely the Embedded Resolver and the Distributed Resolver.
+</p>
+<ul>
+<li>
+The Embedded resolver effectively represents an independent resolver within each DNS-enabled Dispatcher thread, each with its own results cache.
+<br/>
+DNS users within a Dispatcher enjoy direct lock-free I/O-free access to its DNS cache.
+</li><li>
+The Distributed resolver is implemented as a master and zero or more secondary parts, where the master component resides in one Dispatcher, and all other DNS-enabled Dispatchers take on the secondary role.
+<br/>
+What this means is that only one DNS cache exists within the JVM process and it is owned by the master resolver (which is essentially identical to the Embedded Resolver). The secondary resolvers incur a slight processing overhead in accessing it.
+<br/>
+For performance reasons therefore, if one of the Dispatchers is expected to be a heavier DNS user than the others, we recommend it takes on the master role, as it will have faster access to the DNS cache.
+<br/>
+The master and secondary roles in the distributed resolver are sometimes referred to as server and client, but they are all "clients" to the core resolver service.
+</li>
+</ul>
+<p>
+So the trade-off between the embedded resolver and the distributed clients is one of nominal speed versus memory consumption.
+However the overhead of the inter-thread communication is expected to have a negligible effect on overall throughput, and would be more than offset by the potential for less cache misses on the larger shared cache, so we recommend the distributed resolver.
+<br/>
+Despite the terminology, both resolvers are obviously embedded in your application, but the so-called "Embedded" one has an independent instance embedded in every Dispatcher thread.
+<br/> <br/>
+Note that the difference between the various embedded and distributed resolvers is internal to the DNS resolver, and the application code within each Dispatcher accesses the resolver via a single API, represented by the
+<span class="compcode">Dispatcher.dnsresolv</span>
+field, which is an instance of the
+<span class="compcode">com.grey.naf.dns.Resolver</span>
+class.
+<br/>
+Application code is unaware what underlying type of DNS resolver it is calling, and it has no effect on the final answer.
+
+<br/> <br/>
+Although each Dispatcher thread contains its own asynchronous (non-blocking) DNS resolver, they're all controlled by one
+<span class="cfgname">dnsresolver</span>
+config block at the top level of the naf.xml file.
+<br/>
+This config block consists entirely of optional parameters, and may be absent from the config file if you don't want to modify its defaults, but its absence simply means that those defaults will be in effect, not that DNS lookup is disabled.
+A resolver will still be created in all dispatchers that have their
+<span class="cfgname">dns</span>
+attribute set to Yes.
+<br/> <br/>
+The DNS config attributes are shown below.<br/>
+</p>
+
+<table class="cfgbox">
+<tr><td>
+<pre>
+&lt;dnsresolver class="com.grey.naf.dns.embedded.EmbeddedResolver" recursive="N"
+             validate_response_ip="N" nonbailiwick_glue="Y" partialprune="N" exitdump="Y"
+             minttl_initial="5m" minttl_lookup="1m" negttl="1h"&gt;
+    &lt;localservers&gt;192.168.1.12 | 192.168.1.13&lt;/localservers&gt;
+    &lt;udpsockets&gt;1&lt;/udpsockets&gt;
+    &lt;rootservers auto="Y"&gt;/path/to/file&lt;/rootservers&gt;
+    &lt;retry timeout="10s" backoff="3s" max="3"/&gt;
+    &lt;cache_a hiwater="2000" lowater="1000"/&gt;
+    &lt;cache_ptr hiwater="1000" lowater="500"/&gt;
+    &lt;cache_soa hiwater="1000" lowater="500"/&gt;
+    &lt;cache_ns hiwater="2000" lowater="1000" maxrr="5"/&gt;
+    &lt;cache_mx hiwater="1000" lowater="500" maxrr="5"/&gt;
+&lt;/dnsresolver&gt;
+</pre>
+</td></tr>
+</table>
+
+<ul>
+<li><span class="cfgtitle">class</span>:
+NAF contains two alternative DNS resolvers.
+<br/>
+The default is
+<span class="compcode">com.grey.naf.dns.distributedresolver.Client.class</span>,
+for the distributed resolver, while the example above shows how to specify the embedded resolver.
+<br/>
+As explained above, these are plug-in alternatives which represent architectural choices, but are transparent to the application code.
+</li>
+
+<li><span class="cfgtitle">master</span>:
+This optional attribute only applies to the distributed resolver, and specifies the name of the Dispatcher which will take on the master role.
+<br/>
+If absent, the first DNS-enabled Dispatcher in the naf.xml config file becomes the master resolver.
+</li>
+
+<li><span class="cfgtitle">recursive</span>:
+If set to Yes/True (which is the default) then the DNS-Resolver issues all its queries to the local DNS server(s) (as specified by the
+<span class="cfgname">localservers</span>
+config setting) in recursive mode, meaning the local DNS server will perform all the follow-on queries required to fulfil the request and respond to us with a single DNS response which concludes the request.
+<br/>
+Non-recursive mode means that the DNS-Resolver does not use any local DNS servers, and instead sends non-recursive queries directly to authoritive DNS domain servers around the world, performing all the required follow-on queries for itself, until the request has been answered in full.
+<br/>
+If the DNS-Resolver is behind a firewall, then it will obviously need outgoing DNS access for non-recursive mode.
+</li>
+
+<li><span class="cfgtitle">validate_response_ip</span>:
+If set to "Y", then we make sure that a response has come from the same IP to which we sent the request. If not, we ignore it.
+<br/>
+The default is "N".
+</li>
+
+<li><span class="cfgtitle">nonbailiwick_glue</span>:
+This controls how many glue records in the Additional-Info section of a DNS response are cached.
+<br/>
+The default of "Y" means all type-A RRs in the Additional-Info section are cached, while "N" means only those that lie within the domain being queried are cached.
+</li>
+
+<li><span class="cfgtitle">partialprune</span>:
+Boolean attribute which controls what happens to the list-based in-memory caches (NS, MX and SRV) when some of the RRs (resource records) have expired but not all.
+<br/>
+If set to "Y", then only the expired RRs are removed, and the reduced cache entry remains in place.
+<br/>
+The default of No means that the entire cache entry is purged, if any RRs have expired.
+<br/>
+RR expiry is based on their TTL field.
+</li>
+
+<li><span class="cfgtitle">minttl_initial</span>:
+This specifies an override TTL which is applied to all RRs (resource records) we cache. If a received RR has a shorter TTL than this value, then its TTL is replaced with this value.
+<br/>
+The default value is 5 minutes.
+</li>
+
+<li><span class="cfgtitle">minttl_lookup</span>:
+This specifies a minimum remaining lifetime that an RR must have, to be returned in a cache lookup.
+If it has less time to live than this threshold, it will be purged from the cache.
+<br/>
+The purpose of effectively timing out an RR before its TTL expires, is to prevent it's expiry time turning negative while the answer is being constructed, in case this should cause any problems.
+<br/>
+The default value is 1 minute, which should be long enough to permit any answer to be fully constructed and returned to the caller.
+</li>
+
+<li><span class="cfgtitle">exitdump</span>:
+Boolean attribute which defaults to No.
+<br/>
+If Yes, then the DNS Resolver will dump its state on exit, to a file under the under the
+<span class="pathname">var</span>
+directory (see
+<span class="cfgname">dirpaths</span>
+settings above).
+</li>
+
+<li><span class="cfgtitle">negttl</span>:
+NAF caches negative (domain doesn't exist) responses as well as positive ones, and this specifies the TTL (Time To Live) to apply to negative cache entries.<br/>
+Default is 1h (1 hour).
+</li>
+
+<li><span class="cfgtitle">localservers</span>:
+This specifies one or more local DNS servers (as hostnames or dotted IPs, separated by vertical bars) which offer full recursive resolution.
+<br/>
+If absent, NAF will automatically obtain the DNS servers configured into the underlying OS (see
+<span class="pathname">/etc/resolv.conf</span>
+on Unix, or TCP Properties on Windows), and in the unlikely event that turns up blank, it will use localhost (127.0.0.1).
+<br/>
+If NAF has multiple DNS servers available to it, it will round-robin DNS requests between them, which is desirable at times of high loading.
+</li>
+
+<li><span class="cfgtitle">udpsockets</span>:
+This determines how many UDP ports will be allocated to send and receive DNS requests and responses on.
+Outgoing requests are spread amongst them on a round-robin basis, so a larger number of ports spreads the load and reduces socket-buffer depletion under heavy traffic conditions.
+<br/>
+The default is 2.
+</li>
+
+<li><span class="cfgtitle">rootservers</span>:
+This only applies in non-recursive mode, and identifies a filename that specifies root nameservers.
+Typically the global root servers of the public DNS, but it can also contain the nameservers for private local domains.
+<br/>
+This file consists of one server per line, in the form:
+<span class="cfgvalue">domain-name COLON hostname-or-IP COLON MANUAL|AUTO</span>
+<br/>
+For example:
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<b>. &nbsp;&nbsp;&nbsp; : &nbsp;&nbsp;&nbsp; A.ROOT-SERVERS.NET.</b>
+<br/>
+The domain name is simply a dot to indicate the global DNS root, as in the example above.
+<br/>
+The AUTO/MANUAL field is optional and defaults to AUTO.
+<br/>
+For AUTO lines, the resolver sends an NS query to the specified nameserver, to retrieve the nameservers for the specified domain.
+<br/>
+For MANUAL lines, the specified host name/IP is simpled added as a nameserver for the specified domain.
+<br/>
+AUTO lines for a domain are ignored if an earlier line (or the
+<span class="cfgname">rootservers/auto</span>
+setting) has already loaded at least one nameserver for that domain, whereas MANUAL lines always take effect and can therefore be used to specify multiple nameservers for the same domain.
+<br/>
+This means that if you have specified rootservers/auto=Y, there is no point having AUTO entries for the global root in the file, as they will be ignored.
+<br/>
+The main function of this file is that it allows you the resolver to load the root servers even if auto=Y is not possible (eg. because no local DNS server is available) and it also allows you to specify nameservers for private local domains that are not known to the public DNS.
+<br/>
+You will rarely need to specify root servers in this file (see the
+<span class="cfgname">rootservers/auto</span>
+attribute) but if you do, the appropriate data can be obtained from the standard InterNIC zone file at this URL (though you will have to edit out the excess fields):
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<a href="ftp://ftp.rs.internic.net/domain/db.cache">ftp://ftp.rs.internic.net/domain/db.cache</a>
+<br/>
+Can auto-download it with:
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<code>wget --user=ftp --password=ftp ftp://ftp.rs.internic.net/domain/db.cache</code>
+<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<code>curl -u ftp:ftp ftp://ftp.rs.internic.net/domain/db.cache</code>
+</li>
+
+<li><span class="cfgtitle">rootservers/auto</span>:
+This setting controls whether a non-recursive instance of the DNS Resolver will bootstrap itself by querying the local DNS servers for the global roots (in recursive mode).
+<br/>
+It defaults to Yes, and if the local DNS servers respond, then any root-server hints in the
+<span class="cfgname">rootservers</span>
+file are ignored. The Resolver will still parse the rootservers file (if any) though, in case it contains any non-root domains.
+</li>
+
+<li><span class="cfgtitle">retry</span>:
+<br/>
+The 
+<span class="cfgtitle">timeout</span>
+parameter specifies how long to wait for a UDP response before we resend the request. Default is 10 seconds.
+<br/>
+The 
+<span class="cfgtitle">backoff</span>
+parameter specifies the randomised interval to add to the timeout period, before each resend.
+The default of 3 seconds means we wait an extra 0-3 seconds after each fixed timeout.
+<br/>
+The 
+<span class="cfgtitle">max</span>
+parameter specifies how many retries are allowed. The default of 3 allows 3 resends after the initial attempt.
+</li>
+
+<li><span class="cfgtitle">hiwater & lowater</span>:
+The hiwater parameters specify how large each in-memory cache is allowed to grow, before it's pruned back to the lowater size.
+<br/>
+Both hi and lo default to zero, which means no upper limit.
+<br/>
+Note that the
+<span class="cfgname">cache_a</span> values also apply to the AAAA cache, and the
+<span class="cfgname">cache_soa</span> values also apply to the SRV and TXT caches.
+</li>
+</ul>
+
+<br/>
+<h4>Synchronous Resolver</h4>
+<p>
+The Resolver-API described above is an asynchronous one based on callbacks, and is intended to support NAF applications, ie. applications that are embedded within the NAF framework. The open-source Batch-Resolver described in section &sect;11 below provides an example.
+<br/>
+However, NAF also offers a synchronous Resolver API as a convenience for non-NAF applications, which consists of blocking calls to retrieve all the same info as returned by the asynchronous API.
+<br/>
+The ability to make simple blocking method calls means the synchronous Resolver API is a toolkit API available to applications of any stripe, rather than a framework API (like the asynchronous one) which requires your application to be structured in a particular manner.
+<br/> <br/>
+This API is provided by the
+<span class="compcode">com.grey.naf.dns.synchronous.SynchronousResolver</span>
+class, and it returns its results in the form of the same
+<span class="compcode">com.grey.naf.dns.Answer</span>
+class as the asynchronous API.
+<br/>
+The <code>SynchronousResolver</code> class launches a Dispatcher thread in the background and uses the asynchronous API behind the scenes.
+It offers constructors which let you either instantiate the asynchronous Resolver with its default settings, or allow you to supply a
+<span class="pathname">naf.xml</span>
+to customise any settings you require.
+<br/>
+The <code>SynchronousResolver</code> class is MT-safe (thread-safe) so the recommended usage is to create a single instance which is shared amongst all the caller threads in your application, to avoid launching excess Dispatcher threads.
+</p>
+
+<hr class="pline"/>
+<h2>
+<a name="listener">
+7 - Listeners
+</a>
+</h2>
+
+<p>
+The Listener is a generic NAF component that crops up in many scenarios.
+It is a functional building block that allows you to listen on a specified TCP port and serve incoming connections with a specified server class.
+<br/>
+It can be created either programmatically or by a naf.xml config file.
+While the programmatic mode allows you to create concurrent or iterative servers, the config mode only supports concurrent.
+<br/> <br/>
+The Listener config block can be specified in arbitrary locations within the NAFlet config, and takes the form shown below:
+</p>
+
+<table class="cfgbox">
+<tr><td>
+<pre>
+&lt;listener name="webserver" port="80" interface="127.0.0.1"
+          maxservers="1000" backlog="5000"&gt;
+    &lt;ssl ... /&gt;
+    &lt;server factory="com.grey.http.Server$Factory"&gt;
+        ...
+    &lt;/server&gt;
+&lt;/listener&gt;
+</pre>
+</td></tr>
+</table>
+
+<p>
+The Listener's attributes are as follows:
+</p>
+
+<ul>
+<li><span class="cfgtitle">name</span>:
+An arbitrary tag, which mainly serves to label log messages, but also supports the
+<span class="compcode">getByName(String name)</span>
+static Listener method.
+<br/>
+This is an optional attribute which must be unique if specified.
+If omitted, a unique tag will be auto-generated.
+</li>
+
+<li><span class="cfgtitle">port</span>:
+The TCP port to listen on.
+<br/>
+The controlling application can programmatically set an appropriate default value, in which case this becomes optional.
+</li>
+
+<li><span class="cfgtitle">interface</span>:
+The interface to listen on, specified as either a hostname or a dotted IP address.
+<br/>
+Defaults to all IP interfaces.
+</li>
+
+<li><span class="cfgtitle">maxservers</span>:
+This sets an upper limit on the number of concurrent server connections.
+If this is reached, subsequent connections will be refused.
+<br/>
+The default is zero, meaning no limit.
+</li>
+
+<li><span class="cfgtitle">backlog</span>:
+This is a socket-level OS parameter, which controls how many pending connections the underlying OS will accept and hold in a pending queue, if they arrive faster than they can be passed up to the NAF application.
+<br/>
+The default is 5,000.
+</li>
+
+<li><span class="cfgtitle">ssl</span>:
+This is an optional config block which adds SSL functionality. See &sect;8 below.
+</li>
+</ul>
+
+<p>
+Note that setting a high Listener backlog (or at least expecting it to be honoured!) and supporting high TCP/IP concurrency levels in general will probably require tuning of the underlying OS as well.
+<br/>
+It is beyond the scope of this guide to make such sysadmin recommendations, but on Linux, the key settings include
+<span class="cfgname">net.core.somaxconn</span>,
+<span class="cfgname">net.core.netdev_max_backlog</span>,
+<span class="cfgname">net.ipv4.tcp_max_syn_backlog</span> and
+<span class="cfgname">fs.file-max</span>.
+<br/>
+You can display the current settings with
+<span class="compcode">sysctl -A</span>,
+add them to
+<span class="pathname">/etc/sysctl.conf</span>
+for permanent effect and reload with
+<span class="compcode">sysctl -p</span>
+or set them temporarily (till next reboot) with commands like.
+<span class="compcode">sysctl -w net.core.somaxconn=8192</span>
+</p>
+
+<p>
+The contents of the
+<span class="cfgname">server</span>
+config block depend on the particular server, but it's top-level attributes are as follows:
+</p>
+
+<ul>
+<li><span class="cfgtitle">factory</span>:
+This specifies the factory class to instantiate to create the server instances.
+<br/>
+It is required to implement the
+<span class="compcode">com.grey.naf.reactor.ConcurrentListener.ServerFactory</span>,
+interface, so see its source code for further requirements in terms of constructor signature and required methods.
+<br/>
+Like the Listener's
+<span class="cfgtitle">port</span>
+this attribute may be omitted if the controlling application programmatically sets a default.
+</ul>
+
+<p>
+Note that the Listener does not instantiate a Server for every incoming connection, as it stores spare server objects on an ObjectWell
+(see <span class="compcode">com.grey.base.utils.ObjectWell</span>) for reuse, and will soon reach a steady state where it always has spare servers in reserve.
+The
+<span class="softname">portfwd</span>
+example app is a good example of how this works, including the use of the prototype factory.
+<br/> <br/>
+There is one further variation to consider:
+<br/>
+Listener config blocks may exist as a sequence, and you may want Listeners on different interfaces or even ports to share the same Server config.
+<br/>
+This can be achieved by the use of an extra Listener attribute called
+<span class="cfgname">configlink</span>, which points at the config block of another named listener, as illustrated below.
+</p>
+
+<table class="cfgbox">
+<tr><td>
+<pre>
+&lt;listeners&gt;
+    &lt;listener name="webserver" port="80" interface="127.0.0.1"
+              iterative="N" backlog="100"&gt;
+        &lt;server factory="com.grey.http.Server$Factory"&gt;
+            ...
+        &lt;/server&gt;
+    &lt;/listener&gt;
+    &lt;listener name="webserver_alt" port="8080" interface="127.0.0.1"
+              configlink="webserver"/&gt;
+&lt;/listeners&gt;
+</pre>
+</td></tr>
+</table>
+
+<p>
+The above XML block configures Listener
+<span class="cfgname">webserver_alt</span>
+on port 8080 to use the same server config as the first Listener on port 80.
+</p>
+
+<hr class="pline"/>
+<h2>
+<a name="ssl">
+8 - SSL
+</a>
+</h2>
+
+<p>
+NAF provides full fledged support for SSL connections in non-blocking mode. This includes client and server mode, client certificates, and the ability to switch to SSL after starting a connection (having exchanged unencrypted data).
+<br/> <br/>
+The
+<span class="compcode">com.grey.naf.reactor.SSLConnection</span>
+and
+<span class="compcode">com.grey.naf.SSLConfig</span>
+classes provide the core of the SSL functionality with the latter providing the means to configure the SSL settings. This can be done programatically via the <span class="compcode">SSLConfig.Def</span> class, or via an XML config block which gets parsed into an SSLConfig.def instance - see <span class="compcode">SSLConfig.create()</span>.
+<br/> <br/>
+A NAF class which engages in a connection is always a subclass of
+<span class="compcode">com.grey.naf.reactor.ChannelMonitor</span>
+and it tells ChannelMomitor whether it requires an SSL connection by means of the abstract
+<span class="compcode">ChannelMonitor.getSSLConfig()</span> method.
+<br/>
+If you override this method to return a non-null value, then ChannelMonitor will act accordingly and make an SSL connection when you call the
+<span class="compcode">ChannelMonitor.connect()</span> method.
+<br/>
+NAF servers inherit their SSL settings from NAF's built-in Listener, and it's SSL capabilities are also controlled by the same <span class="compcode">SSLConfig</span> class.
+<br/> <br/>
+The available settings are probably best described by going through the XML config node. It need not necessarily be called "ssl", as it is the attributes that are read by SSLConfig.
+</p>
+
+<table class="cfgbox">
+<tr><td>
+<pre>
+&lt;ssl cert="my-cert-id" kspath="keystore-path" certpass="mypass"
+    peercert="peer-cert-name" tspath="truststore-path"
+    latent="N" mandatory="N"
+    clientauth="1"/&gt;
+</pre>
+</td></tr>
+</table>
+
+<ul>
+<li><span class="cfgtitle">cert</span><br/>
+This indicates that we're going to supply a certificate. The server end of an SSL connection always has to do so, but a client may optionally do so.
+<br/>
+NAF's certificate handling is based on the
+<span class="softname">keytool</span>
+utility that comes as part of the Java JDK, and the value of the
+<span class="cfgname">cert</span>
+attribute is an alias into what keytool calls a <i>key-store</i>, namely a file containing certificates and private keys which are identified by aliases - such as the one specified by this attribute.
+</li>
+
+<li><span class="cfgtitle">kspath</span><br/>
+If a
+<span class="cfgname">cert</span>
+attribute was specified, then
+<span class="cfgname">kspath</span>
+must be as well, and it is the pathname of the aforementioned keystore file.
+<br/>
+If prefixed with
+<span class="cfgvalue">cp:</span>
+the pathname will be interpreted as a classpath.
+</li>
+
+<li><span class="cfgtitle">certpass</span><br/>
+This attribute also goes with
+<span class="cfgname">cert</span>
+and
+<span class="cfgname">kspath</span>
+and it is the password required to unlock the certificate within the keystore.
+<br/>
+NB: Depending how the keystore was constructed, you might need an additional password to unlock it, and that is specified by the
+<span class="cfgname">kspass</span>
+attribute (not shown).
+</li>
+
+<li><span class="cfgtitle">peercert</span><br/>
+Whereas the
+<span class="cfgname">cert</span>
+attribute is used to identify the certificate supplied by this end of the connection, the
+<span class="cfgname">peercert</span>
+attribute is used to authenticate the other end, and specifies a certificate name to expect.
+<br/>
+The specified name is matched against the peer certificate's
+<span class="softname">subjectAlternativeName</span>
+DNS-name attribute if present, else against its
+<span class="softname">Common-Name</span>
+attribute.
+<br/>
+Note that the
+<span class="cfgname">peercert</span>
+attribute tells the <span class="compcode">SSLConnection</span> class to automatically authenticate the peer certificate, and the SSL connection will never get returned to your application if it fails.
+If you wish to do alternative forms of authentication, you can always omit the
+<span class="cfgname">peercert</span>
+setting from your
+<span class="compcode">SSLConfig</span> class, and then do the authentication within your own code after the SSL connection has been established, by requesting the peer certificate using the
+<span class="compcode">ChannelMonitor.getPeerCertificate()</span> method.
+</li>
+
+<li><span class="cfgtitle">tspath</span><br/>
+This specifies the pathname of a <i>trust-store</i> file, which controls the authentication of peer certificates.
+<br/>
+If all the peer certificates (ie. certificates supplied by the other end of the TCP/IP connection, be it a server or a client) you will encounter are signed by a recognised CA (certificate authority), then you have no need of a trust-store, but ad-hoc certificates (ie. self-signed, or signed by an unknown private CA) need to be added to the trust store before they can be accepted.
+<br/>
+Ad-hoc certificates which are not present in the trust-store will be automatically rejected by Java's internal SSL libraries.
+<br/>
+Like the above-mentioned key-store, the trust-store is also maintained using Java's
+<span class="softname">keytool</span>
+utility.
+<br/>
+If prefixed with
+<span class="cfgvalue">cp:</span>
+the trust-store pathname will be interpreted as a classpath.
+</li>
+
+<li><span class="cfgtitle">clientauth</span><br/>
+This is only applicable in server mode, and can be set to 0, 1 or 2, meaning respectively that client certificates will be discarded, accepted or are compulsorily required.
+<br/>
+If set to 2 and the client does not supply a certificate, then the SSL handshake will be failed by Java's internal SSL libraries, before it even hits NAF or your application code.
+<br/>
+Setting it to 1 merely tells Java to pass the client certificate up to NAF, and does not prejudge whether or not it subsequently gets authenticated by NAF (based on the
+<span class="cfgname">peercert</span>
+setting) or your application.
+<br/>
+This setting defaults to 1.
+</li>
+
+<li><span class="cfgtitle">latent</span><br/>
+This setting is what enables NAF to establish a non-SSL connection, and then switch to SSL mode afterwards on demand - by calling the
+<span class="compcode">ChannelMonitor.startSSL()</span>
+method from your application.
+<br/>
+It is false by default, but if set to true, then a NAF listener will spawn non-SSL servers, and
+<span class="compcode">ChannelMonitor.connect()</span>
+will create a non-SSL connection.
+Of course, the difference between this and a connection which doesn't even have an
+<span class="compcode">SSLConfig</span>
+instance attached to it, is that we can call <span class="compcode">ChannelMonitor.startSSL()</span> to switch to SSL mode, while the latter cannot.
+</li>
+
+<li><span class="cfgtitle">mandatory</span><br/>
+This attribute is only relevant if
+<span class="cfgname">latent</span>
+is false, but NAF does not act on it, and it's interpretation is left up to the application.
+<br/>
+It typically controls whether the application requires the connection to switch to SSL mode at some stage, or if it's content for it to remain unencrypted over its entire lifetime.
+<br/>
+It is False by default.
+</li>
+</ul>
+
+<p>
+See the source code for more details, and the
+<span class="compcode">SSLConnectionTest</span>
+unit test provides an example of how to create SSL clients and servers based on the above settings.
+</p>
+
+<hr class="pline"/>
+<h2>
+<a name="logging">
+9 - Logging
+</a>
+</h2>
+
+<p>
+NAF logging is based on the
+<span class="softname">GreyLog</span>
+logging framework, which is included in the NAF downloads (both source and binary).
+<br/>
+See the GreyLog
+<a href="greylog.htm">Guide</a>
+for how to use it.
+<br/> <br/>
+Each Dispatcher has its own logger, which is made available to its call-out code via the public
+<span class="compcode">Dispatcher.logger</span> field.
+<br/>
+As a developer of NAF applications, your main concern is to provide GreyLog's
+<span class="pathname">logging.xml</span>
+runtime config file, and NAF will do the rest.
+
+<hr class="pline"/>
+<h2>
+<a name="greybase">
+10 - GreyBase
+</a>
+</h2>
+
+<p>
+<span class="softname">GreyBase</span>
+is a term that crops up frequently in the
+<span class="softname">NAF</span>
+code and comments.
+It is a sub-project within NAF and constitutes one of the JAR files in the NAF distribution.
+<br/>
+Broadly speaking however, NAF is considered to consist of all these JARs (including the logging ones - see &sect;9), not just the one that happens to be called greynaf.jar, so GreyBase is simply a physical subdivision within NAF.
+<br/> <br/>
+The dividing line between the GreyBase and NAF sub-projects is that NAF is the framework library and can only be used by NAF applications (indeed, using it is what defines a NAF application). GreyBase on the other hand is a utility API, which contains classes that are not intrinsically tied to NAF and can be used by any application in any context.
+<br/> <br/>
+Notwithstanding that, GreyBase has evolved to serve the needs of NAF applications and will remain focussed on NAF's particular concerns and optimisations,
+such as object reuse (see <span class="compcode">ObjectWell</span>),
+interpreting byte streams as 8-bit text (a valid assumption for most Internet protocols, including HTTP, FTP &amp; SMTP headers - see <span class="compcode">ByteChars</span>)
+and avoiding incidental garbage generation (see <span class="compcode">HashedList</span> and friends).
+<br/> <br/>
+GreyBase includes the following:<br/>
+&bull; SASL: Server and client mode support for Plain, CRAM-MD5 and External<br/>
+&bull; Base64 and Hex encoding and decoding<br/>
+&bull; Some basic utilities for symmetric and assymetric encryption<br/>
+&bull; Hashed maps that support primitives Ints as key or data, without autoboxing to the Integer class<br/>
+&bull; Utilities for parsing XML config files
+</p>
+
+<hr class="pline"/>
+<h2>
+<a name="batchresolver">
+11 - DNS Batch Resolver
+</a>
+</h2>
+
+<p>
+The
+<span class="softname">DNS Batch Resolver</span>
+is a built-in NAF application (technically a standalone <i>NAFlet</i>) that takes an input file containing a list of domain names and issues DNS queries to resolve them, writing out the answers. It is capable of rapidly resolving very large datasets.
+<br/>
+Although it also serves as an illustration of NAF's DNS API (see the
+<span class="compcode">com.grey.naf.dns.batchresolver</span>
+package) it is not intended as merely a sample app like the ones in section &sect;12, but is a fully functional application and is contained within the NAF JAR itself.
+<br/> <br/>
+Assuming you have downloaded and extracted the binary NAF distribution (or built your own and extracted the resulting ZIP/Tar file), you would run it as follows:
+</p>
+<div>
+<span class="vt220">
+java -jar lib/greynaf-2.5.0.jar -c conf/batchresolver.xml
+</span>
+</div>
+<p>
+The
+<span class="pathname">batchresolver.xml</span>
+config file as shipped specifies an input file called
+<span class="cfgvalue">infile.txt</span>
+and an output file called
+<span class="cfgvalue">outfile.txt</span>.
+<br/>
+The above command will also pick up the logger definition labelled
+<span class="cfgname">dnsbatch</span>
+in the provided
+<span class="pathname">conf/logging.xml</span>
+logging config file (the
+<span class="pathname">logging.xml</span>
+file might be under the
+<span class="pathname">samples</span>
+sub-directory initially, in which case just copy it to
+<span class="pathname">conf</span>).
+
+<br/> <br/>
+The input file should contain one record per line, but the type of the records depends on the
+<span class="cfgtitle">dnstype</span>
+setting in the batchresolver.xml config file.
+<br/>
+&bull; <span class="cfgvalue">A</span>:
+Hostname in FQDN (Fully Qualified Domain Name) form - gets resolved to IPv4 address
+<br/>
+&bull; <span class="cfgvalue">AAAA</span>:
+Hostname in FQDN (Fully Qualified Domain Name) form - gets resolved to IPv6 address
+<br/>
+&bull; <span class="cfgvalue">PTR</span>:
+Dotted IPv4 address - resolved to hostname
+<br/>
+&bull; <span class="cfgvalue">NS</span>:
+DNS domain name in FQDN form - resolved to the hostnames and addresses of the domain's name servers
+<br/>
+&bull; <span class="cfgvalue">SOA</span>:
+DNS domain name in FQDN form - resolved to the domain's SOA data
+<br/>
+&bull; <span class="cfgvalue">MX</span>:
+Email domain (mailbox part will be stripped if present) in FQDN form - resolved to hostnames and addresses of the domain's mail relays
+<br/>
+&bull; <span class="cfgvalue">SRV</span>:
+A service specification in the standard SRV <code>_service._proto.name.</code> notation - resolved to hostnames and addresses of its servers.
+<br/>
+&bull; <span class="cfgvalue">TXT</span>:
+DNS domain name in FQDN form - resolved to the domain's SRV data string
+<br/> <br/>
+The remaining config items are all set to appropriate defaults, and the source code can be viewed in the constructor of the
+<span class="softname">BatchResolver</span>
+class, but the most interesting ones are:
+<br/> <br/>
+&bull; <span class="cfgtitle">fullanswer</span>:<br/>
+A Y/N field determining whether we merely report the status (OK, NODOMAIN, etc) of each query in the output file, or the full set of Answer RRs (DNS Resource Records)
+<br/> <br/>
+&bull; <span class="cfgtitle">maxpending</span>:<br/>
+The max number of simultaneous DNS requests that can be outstanding, before the batch resolver pauses.
+<br/>
+It defaults to zero meaning no limit, but if a limit is specified, the batch resolver pauses until the pending requests fall to
+<span class="cfgname">maxpending_lowater</span>.
+<br/> <br/>
+&bull; <span class="cfgtitle">maxpending_lowater</span>:<br/>
+If
+<span class="cfgname">maxpending</span>
+is specified, this defaults to the greater of half its value, or maxpending minus 20.
+<br/> <br/>
+In terms of the standard
+<span class="cfgname">dnsresolver</span>
+attributes (see section &sect;6), you will note that the
+<span class="pathname">batchresolver.xml</span>
+comes with
+<span class="cfgname">recursive</span>
+set to No, which is recommended for large batches as it could well swamp a slow local DNS server.
+<br/>
+The
+<span class="cfgname">exitdump</span>
+attribute is also set, meaning that at the end, the batch resolver will dump the final state of its cache to
+<span class="pathname">var/DNSdump-dnsbatch.txt</span>.
+</p>
+
+<hr class="pline"/>
+<h2>
+<a name="demo">
+12 - Demo Apps
+</a>
+</h2>
+
+<p>
+In addition to the source code and Javadoc-generated
+<a href="../apidocs/index.html">API Reference</a>,
+NAF also provides 3 sample apps (both in pre-built form in the binary download and in source form in the published NAF source tree) that demonstrate its main modes of operation.
+<br/>
+They also demonstrate how little Java code you need to write, to build relatively complex NAF apps.
+</p>
+
+<ul>
+<li><span class="softname">Port Forwarder (portfwd)</span>:
+This is based on the naf.xml config file (see below).
+<br/>
+This app also demonstrates the use of NAF timers, configured Listeners and how to implement a NAFlet and create custom NAFMAN commands, but in addition to its primary pedagogic purpose, it is a fully functioning port forwarder, which accepts TCP connections on behalf of backend services and then distributes them to one or more waiting servers.
+<br/> <br/>
+</li>
+
+<li><span class="softname">Echo Bot</span>:
+This demonstrates the alternative means of launching Dispatchers, as it programmatically creates and starts multiple Dispatchers.
+<br/>
+The EchoBot contains full working examples of how to listen for or initiate TCP connections (with a programmatically created Listener), how to send and receive TCP data once connected, and how to send and receive UDP packets.
+<br/> <br/>
+</li>
+</ul>
+
+<hr class="pline"/>
+<h2>
+<a name="launch">
+13 - Running NAF
+</a>
+</h2>
+
+<p>
+When NAF starts up, it loads system properties from a
+<dfn>grey.properties</dfn>
+file which it looks for it on the following search path:
+<br/>
+&bull; If the
+<span class="cfgname">grey.properties</span> system property
+is set, then it specifies the pathname.
+<br/>
+&bull; <span class="pathname">./grey.properties</span> (ie. look in current directory)
+<br/>
+&bull; <span class="pathname">$HOME/grey.properties</span>
+<br/>
+If no <dfn>grey.properties</dfn> file is found or the
+<span class="cfgname">grey.properties</span> system property
+is set to
+<span class="cfgvalue">"-"</span>, then it is simply not loaded. 
+<br/>
+The file itself is a standard Java properties file, consisting of
+<span class="compcode">name=value</span>
+lines.
+
+<br/> <br/>
+See the source code of the
+<span class="compcode">com.grey.naf.Launcher</span>
+class, for more detail on the startup processing and options.
+
+<br/> <br/>
+The
+<span class="softname">portfwd</span>
+demo app provides an example of how an application that is based on a <dfn>naf.xml</dfn> config file might pass its
+<span class="compcode">main()</span> method directly onto NAF.
+<br/>
+It's
+<span class="compcode">com.grey.portfwd.Task.main()</span>
+method does no more than load its own bespoke NAFMAN command, and while this demo app is running, its NAFMAN commands can be accessed either by pointing your browser at the NAFMAN home page (see section &sect;5 above), where the commands are auto-published, or via the command-line as follows:
+</p>
+<div>
+<span class="vt220">
+java -jar portfwd-1.0.0.jar -cmd showconns
+</span>
+</div>
+
+<p>
+The
+<span class="softname">EchoBot</span>
+demo app illustrates the behaviour of an application that doesn't use a naf.xml file, but it still leverages NAF's command-line parsing facilities.
+<br/>
+As you can see,
+<span class="compcode">com.grey.echobot.App</span>
+subclasses NAF's
+<span class="compcode">com.grey.naf.Launcher</span>
+class, and contains the EchoBot's
+<span class="compcode">main()</span>
+which instantiates the Launcher subclass and then passes control to it.
+<br/>
+The EchoBot's App class defines a subclass of
+<span class="compcode">com.grey.base.utils.CommandParser.OptionsHandler</span>
+to define its own command-line options (on top of those understood by NAF), which it loads in its constructor.
+<br/>
+Because the App class overrides the Launcher's
+<span class="compcode">appExec()</span>
+method, NAF passes control back to it after parsing the command-line, and the EchoBot takes over from there.
+
+<br/> <br/>
+Run NAF directly with the -h option to see its built-in options.
+</p>
+<div>
+<span class="vt220">
+java -jar greynaf-2.5.0.jar -h
+</span>
+</div>
+
+<p>
+<br/>
+NAF would normally be loaded by your own application rather than executed directly, not least of the reasons being that the application-specific classpath you require will be set in your application's JAR (or enclosing framework), rather than NAF.
+<br/>
+As noted in section &sect;2 above though, you could specify all the JARs your application requires in the
+<span class="cfgname">dependjars</span>
+config item or the
+<span class="cfgname">greynaf.cp</span>
+system property, and if so, you could launch your application by directly executing
+<span class="pathname">greynaf.jar</span>
+</p>
+
+<br/>&nbsp;<br/>&nbsp;<br/>
+</div>
+</BODY>
+</HTML>

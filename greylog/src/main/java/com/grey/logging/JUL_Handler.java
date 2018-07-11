@@ -73,7 +73,7 @@ public class JUL_Handler
 					buf.append(com.grey.base.config.SysProps.EOL).append("- ").append(params[idx]);
 				}
 			}
-			if (ex != null) buf.append(com.grey.base.GreyException.summary(ex, true));
+			if (ex != null) buf.append(com.grey.base.ExceptionUtils.summary(ex, true));
 			msg = buf;
 		}
 		Logger.LEVEL lvl = Interop.mapLevel(rec.getLevel());

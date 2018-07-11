@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2013 Yusef Badri - All rights reserved.
+ * Copyright 2011-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.logging;
@@ -22,7 +22,7 @@ public class LoggerTest
 	}
 
 	@org.junit.Test
-	public void testGeneral() throws com.grey.base.ConfigException, java.io.IOException
+	public void testGeneral() throws java.io.IOException
 	{
 		String logfile = rootpath+"gen_utest.log";
 		Class<?> clss = MTCharLogger.class;
@@ -65,7 +65,7 @@ public class LoggerTest
 	}
 
 	@org.junit.Test
-	public void testFilenames() throws com.grey.base.ConfigException, java.io.IOException
+	public void testFilenames() throws java.io.IOException
 	{
 		String mainpart = "AAA"+ScheduledTime.TOKEN_YEAR+"BBB"+ScheduledTime.TOKEN_MONTH+"CCC";
 		String template = rootpath+"/"+mainpart+".log";
@@ -123,7 +123,7 @@ public class LoggerTest
 	}
 
 	@org.junit.Test
-	public void testMemLogger() throws com.grey.base.ConfigException, java.io.IOException
+	public void testMemLogger() throws java.io.IOException
 	{
 		Class<?> clss = MemLogger.class;
 		Parameters params = new Parameters(LEVEL.WARN, "any-old-name-as-will-discard-it");
@@ -153,7 +153,7 @@ public class LoggerTest
 
 	// All we're looking for here is proof it doesn't crash!
 	@org.junit.Test
-	public void testSinkLogger() throws com.grey.base.ConfigException, java.io.IOException
+	public void testSinkLogger() throws java.io.IOException
 	{
 		Class<?> clss = SinkLogger.class;
 		Parameters params = new Parameters(LEVEL.INFO, (java.io.OutputStream)null);
@@ -166,7 +166,7 @@ public class LoggerTest
 
 	// All we're looking for here is proof it doesn't crash!
 	@org.junit.Test
-	public void testAdapters() throws com.grey.base.ConfigException, java.io.IOException
+	public void testAdapters() throws java.io.IOException
 	{
 		Class<?> clss = com.grey.logging.adapters.AdapterSLF4J.class;
 		Parameters params = new Parameters(LEVEL.INFO, (java.io.OutputStream)null);

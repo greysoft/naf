@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015 Yusef Badri - All rights reserved.
+ * Copyright 2010-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.logging;
@@ -37,8 +37,9 @@ abstract public class Logger
 	private final java.io.OutputStream strm_base;
 	private final ScheduledTime rotsched;
 	private final int maxsize;
+	private final boolean withPID;
 	private final boolean withTID;
-	private final boolean tidPlusName;
+	private final boolean withThreadName;
 	private final boolean withDelta;
 	private final boolean withMillisecs;
 	private final boolean withLevel;
@@ -54,7 +55,7 @@ abstract public class Logger
 	// All access to these fields is MT-safe.
 	// They are rarely accessed, so synchronisation cost is not an issue.
 	private java.io.File fh_active;
-	boolean isOwner;
+	private boolean isOwner;
 
 	// This replaces maxLevel for MT loggers - all accesses to maxLevel are intercepted and redirected to here.
 	// Saves MT loggers having to provide boiler-plate code to override getLevel() and setLevel()
@@ -69,10 +70,11 @@ abstract public class Logger
 	@Override
 	public void flush() throws java.io.IOException {}
 
-	public final boolean isActive(LEVEL lvl) {return  Interop.isActive(getLevel(), lvl);}
-	public final String getName() {return name;}
-	public final String getPathTemplate() {return pthnam_tmpl;}
-	public final synchronized String getActivePath() {return fh_active == null ? null : fh_active.getAbsolutePath();}
+	boolean isOwner() {return isOwner;}
+	public boolean isActive(LEVEL lvl) {return  Interop.isActive(getLevel(), lvl);}
+	public String getName() {return name;}
+	public String getPathTemplate() {return pthnam_tmpl;}
+	public synchronized String getActivePath() {return fh_active == null ? null : fh_active.getAbsolutePath();}
 	@Override
 	public String toString() {return this_string;}
 
@@ -86,6 +88,7 @@ abstract public class Logger
 		rotsched = (params.rotfreq == ScheduledTime.FREQ.NEVER ? null : new ScheduledTime(params.rotfreq, dtcal, null));
 
 		boolean with_tid = (isMT ? true : params.withTID);
+		boolean with_pid = params.withPID;
 		boolean with_milli = true;
 		boolean with_level = true;
 		boolean with_initmark = true;
@@ -93,6 +96,7 @@ abstract public class Logger
 		if (params.mode != null) {
 			if (params.mode.equals(Parameters.MODE_AUDIT)) {
 				with_tid = false;
+				with_pid = false;
 				with_milli = false;
 				with_level = false;
 				with_initmark = false;
@@ -100,8 +104,9 @@ abstract public class Logger
 				System.out.println("GreyLogger: Logger="+name+" ignoring unrecognised Mode="+params.mode);
 			}
 		}
+		withPID = with_pid;
 		withTID = with_tid;
-		tidPlusName = params.tidPlusName;
+		withThreadName = params.withThreadName;
 		withMillisecs = with_milli;
 		withLevel = with_level;
 		withInitMark = with_initmark;
@@ -126,13 +131,13 @@ abstract public class Logger
 		open(System.currentTimeMillis(), null);
 	}
 
-	public final LEVEL getLevel()
+	public LEVEL getLevel()
 	{
 		if (isMT) return maxLevel_MT;
 		return maxLevel;
 	}
 
-	public final LEVEL setLevel(LEVEL newlvl)
+	public LEVEL setLevel(LEVEL newlvl)
 	{
 		LEVEL oldlvl = getLevel();
 		if (newlvl == oldlvl) return oldlvl;
@@ -190,7 +195,7 @@ abstract public class Logger
 						System.out.println("\nGreyLogger: Shutdown Thread=T"+Thread.currentThread().getId()+" - Open loggers="+openlogs.length);
 						for (int idx = 0; idx != openlogs.length; idx++) {
 							Logger logger = openlogs[idx];
-							System.out.println("- GreyLogger: Logger #"+(idx+1)+"/"+openlogs.length+": IsOwner="+logger.isOwner+" - "+logger);
+							System.out.println("- GreyLogger: Logger #"+(idx+1)+"/"+openlogs.length+": IsOwner="+logger.isOwner()+" - "+logger);
 							logger.close();
 						}
 					}
@@ -228,7 +233,7 @@ abstract public class Logger
 			closeStream(isOwner);
 		} catch (Exception ex) {
 	        System.out.println(new java.util.Date(System.currentTimeMillis())+" Logger failed to close logfile - "+this_string+" - "
-	        		+com.grey.base.GreyException.summary(ex, false));
+	        		+com.grey.base.ExceptionUtils.summary(ex, false));
 		}
 		isOwner = false;
 
@@ -238,13 +243,13 @@ abstract public class Logger
 		}
 	}
 
-	public final void log(LEVEL lvl, Throwable ex, boolean dumpStack, CharSequence msg)
+	public void log(LEVEL lvl, Throwable ex, boolean dumpStack, CharSequence msg)
 	{
 		if (!isActive(lvl)) return;
 		if (ex == null) {log(lvl, msg); return;}
 		if (ex instanceof java.lang.NullPointerException || ex instanceof java.lang.ArrayIndexOutOfBoundsException) dumpStack = true;
 		String conj = (dumpStack ? "\n\t" : " - ");
-		String exmsg = "EXCEPTION: "+msg+conj+com.grey.base.GreyException.summary(ex, dumpStack);
+		String exmsg = "EXCEPTION: "+msg+conj+com.grey.base.ExceptionUtils.summary(ex, dumpStack);
 		log(lvl, exmsg);
 	}
 
@@ -259,7 +264,7 @@ abstract public class Logger
 	// NB: There is no synchronisation performed in here, and multi-threaded loggers need to ensure that all necessary synchronisation
 	// happens at a higher level.
 	// This is a very low-level routine where synchronisation would be a significant and unnecessary burden on non-MT loggers.
-	protected final StringBuilder setLogEntry(LEVEL lvl, StringBuilder pfxbuf) throws java.io.IOException
+	protected StringBuilder setLogEntry(LEVEL lvl, StringBuilder pfxbuf) throws java.io.IOException
 	{
 		long systime = System.currentTimeMillis();
 		if (withMillisecs || systime - dtcal.getTimeInMillis() > 500) dtcal.setTimeInMillis(systime);
@@ -280,14 +285,17 @@ abstract public class Logger
 			intro = '-';
 		}
 
+		if (withPID) {
+			pfxbuf.append(intro).append('P').append(Parameters.CURRENT_PID);
+			intro = '-';
+		}
 		if (withTID) {
-			Thread thrd = Thread.currentThread();
-			pfxbuf.append(intro).append('T').append(thrd.getId());
-			intro = 0;
-			if (tidPlusName) {
-				String tnam = thrd.getName();
-				if (tnam != null && tnam.length() != 0) pfxbuf.append('-').append(tnam);
-			}
+			pfxbuf.append(intro).append('T').append(Thread.currentThread().getId());
+			intro = '-';
+		}
+		if (withThreadName) {
+			String tnam = Thread.currentThread().getName();
+			if (tnam != null && tnam.length() != 0) pfxbuf.append(intro).append(tnam);
 		}
 		if (intro != '[') pfxbuf.append("] ");
 
@@ -308,8 +316,8 @@ abstract public class Logger
 	}
 
 	// Convenenience methods to ease the transition from SLF4J to this logger
-	public final void error(CharSequence msg) {log(LEVEL.ERR, msg);}
-	public final void warn(CharSequence msg) {log(LEVEL.WARN, msg);}
-	public final void info(CharSequence msg) {log(LEVEL.INFO, msg);}
-	public final void trace(CharSequence msg) {log(LEVEL.TRC, msg);}
+	public void error(CharSequence msg) {log(LEVEL.ERR, msg);}
+	public void warn(CharSequence msg) {log(LEVEL.WARN, msg);}
+	public void info(CharSequence msg) {log(LEVEL.INFO, msg);}
+	public void trace(CharSequence msg) {log(LEVEL.TRC, msg);}
 }

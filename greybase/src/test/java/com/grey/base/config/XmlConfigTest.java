@@ -1,10 +1,10 @@
 /*
- * Copyright 2011-2013 Yusef Badri - All rights reserved.
+ * Copyright 2011-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.config;
 
-import com.grey.base.ConfigException;
+import com.grey.base.config.XmlConfig.XmlConfigException;
 
 public class XmlConfigTest
 {
@@ -67,7 +67,7 @@ public class XmlConfigTest
 	// Just do one simple test to establish that we've been able to parse a valid config block from a file.
 	// Once read in, it's the same as one created from the literal string above, and we do all the other tests on that.
 	@org.junit.Test
-	public void testFile() throws java.io.IOException, ConfigException
+	public void testFile() throws java.io.IOException
 	{
 		java.io.File fh = new java.io.File("temptest_xmlconfig.xml");
 		String pthnam = fh.getAbsolutePath();
@@ -84,7 +84,7 @@ public class XmlConfigTest
 	}
 
 	@org.junit.Test
-	public void testPrimitives() throws ConfigException
+	public void testPrimitives()
 	{
 		com.grey.base.config.XmlConfig cfg = com.grey.base.config.XmlConfig.makeSection(cfgxml, "/root");
 		org.junit.Assert.assertTrue(cfg.exists());
@@ -142,25 +142,25 @@ public class XmlConfigTest
 		try {
 			cfg.getValue("tag11", true, null);
 			org.junit.Assert.fail("Absent mandatory string not detected");
-		} catch (ConfigException ex) {}
+		} catch (XmlConfigException ex) {}
 
 		try {
 			cfg.getInt("tag12", true, 0);
 			org.junit.Assert.fail("Absent mandatory int not detected");
-		} catch (ConfigException ex) {}
+		} catch (XmlConfigException ex) {}
 
 		try {
 			cfg.getChar("tag16b", true, (char)0);
 			org.junit.Assert.fail("Absent mandatory char not detected");
-		} catch (ConfigException ex) {}
+		} catch (XmlConfigException ex) {}
 		try {
 			cfg.getChar("tag2", true, 'c');
 			org.junit.Assert.fail("Invalid char item not detected");
-		} catch (ConfigException ex) {}
+		} catch (XmlConfigException ex) {}
 	}
 
 	@org.junit.Test
-	public void testAbsentConfig()throws ConfigException
+	public void testAbsentConfig()
 	{
 		com.grey.base.config.XmlConfig cfg = com.grey.base.config.XmlConfig.makeSection(cfgxml, "/badroot");
 		org.junit.Assert.assertFalse(cfg.exists());
@@ -187,21 +187,21 @@ public class XmlConfigTest
 		try {
 			cfg.getValue("tag11", true, null);
 			org.junit.Assert.fail("Absent mandatory string not detected");
-		} catch (com.grey.base.ConfigException ex) {}
+		} catch (XmlConfigException ex) {}
 
 		try {
 			cfg.getValue("tag11", true, "");
 			org.junit.Assert.fail("Blank mandatory string not detected");
-		} catch (com.grey.base.ConfigException ex) {}
+		} catch (XmlConfigException ex) {}
 
 		try {
 			cfg.getInt("tag12", true, 0);
 			org.junit.Assert.fail("Absent mandatory int not detected");
-		} catch (com.grey.base.ConfigException ex) {}
+		} catch (XmlConfigException ex) {}
 	}
 
 	@org.junit.Test
-	public void testDefaultBlocks() throws ConfigException
+	public void testDefaultBlocks()
 	{
 		com.grey.base.config.XmlConfig cfg = com.grey.base.config.XmlConfig.makeSection(cfgxml, "/root");
 		String strval = cfg.getValue("tag11", false, null);
@@ -231,7 +231,7 @@ public class XmlConfigTest
 	}
 
 	@org.junit.Test
-	public void testNested() throws ConfigException
+	public void testNested()
 	{
 		com.grey.base.config.XmlConfig maincfg = com.grey.base.config.XmlConfig.makeSection(cfgxml, "/root");
 
@@ -267,7 +267,7 @@ public class XmlConfigTest
 	}
 
 	@org.junit.Test
-	public void testTuples() throws ConfigException
+	public void testTuples()
 	{
 		com.grey.base.config.XmlConfig cfg = com.grey.base.config.XmlConfig.makeSection(cfgxml, "/root");
 
@@ -296,22 +296,22 @@ public class XmlConfigTest
 		try {
 			cfg.getTuple("tuple1", "|", true, null, 4, 3);
 			org.junit.Assert.fail("Failed to detect min-tuple violations");
-		} catch (com.grey.base.ConfigException ex) {}
+		} catch (XmlConfigException ex) {}
 
 		try {
 			cfg.getTuple("tuple1", "|", true, null, 3, 2);
 			org.junit.Assert.fail("Failed to detect max-tuple violations");
-		} catch (com.grey.base.ConfigException ex) {}
+		} catch (XmlConfigException ex) {}
 
 		try {
 			cfg.getTuple("tuple3", "|", true, null);
 			org.junit.Assert.fail("Absent mandatory tuple not detected");
-		} catch (com.grey.base.ConfigException ex) {}
+		} catch (XmlConfigException ex) {}
 
 		try {
 			cfg.getTuple("tuple4", "|", true, null);
 			org.junit.Assert.fail("Blank mandatory tuple not detected");
-		} catch (com.grey.base.ConfigException ex) {}
+		} catch (XmlConfigException ex) {}
 
 		str = cfg.getTuple("tuple1", ";", true, null);
 		org.junit.Assert.assertEquals(1, str.length);  // would have gotten back entire element content as one string
@@ -324,7 +324,7 @@ public class XmlConfigTest
 
 	// NB: We're not testing the Time and Size parsers here, we're merely verifying that XmlConfig does call them correctly
 	@org.junit.Test
-	public void testTypedData() throws ConfigException
+	public void testTypedData()
 	{
 		com.grey.base.config.XmlConfig cfg = com.grey.base.config.XmlConfig.makeSection(cfgxml, "/root");
 
@@ -340,7 +340,7 @@ public class XmlConfigTest
 	}
 
 	@org.junit.Test
-	public void testSpecialCases() throws ConfigException
+	public void testSpecialCases()
 	{
 		com.grey.base.config.XmlConfig maincfg = com.grey.base.config.XmlConfig.makeSection(cfgxml, "/root");
 
@@ -358,7 +358,7 @@ public class XmlConfigTest
 		try {
 			com.grey.base.config.XmlConfig.makeSection(cfgxml, "");
 			org.junit.Assert.fail("Illegal blank XPath not detected");
-		} catch (com.grey.base.ConfigException ex) {}
+		} catch (XmlConfigException ex) {}
 
 		try {
 			com.grey.base.config.XmlConfig.makeSection(cfgxml, null);
@@ -379,13 +379,13 @@ public class XmlConfigTest
 			// beware the the XML parser writes an error messages to stdout when this fails
 			com.grey.base.config.XmlConfig.makeSection("<root><tag1>x</tag2></root>", "");
 			org.junit.Assert.fail("Illegal XML not detected");
-		} catch (com.grey.base.ConfigException ex)  {}
+		} catch (XmlConfigException ex)  {}
 	}
 
 	// Assuming our defaults-handling works as expected (that is verified by testPrimitives), this verifies our understanding of
 	// how XPath expressions will be interpreted.
 	@org.junit.Test
-	public void testXPath() throws ConfigException
+	public void testXPath()
 	{
 		com.grey.base.config.XmlConfig cfg = com.grey.base.config.XmlConfig.makeSection(cfgxml, "/");
 		String strval = cfg.getValue("/root/tag1", true, "dflt1");

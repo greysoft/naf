@@ -157,7 +157,7 @@ public final class Circulist<T>
 		return true;
 	}
 
-	/**
+	/*
 	 * Unlike many of the methods in this class, we allow this to be called on an empty list, so that callers can consume a
 	 * list by looping on this call till it returns null.
 	 * There is nothing in this class which prohibits null members, but it's up to the caller to beware whether their list may

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base;
@@ -16,9 +16,7 @@ public class Exec
 	private static final boolean listprops = SysProps.get("grey.listprops", false);
 	private static final String extracp = SysProps.get("grey.cp");
 
-	public static void main(String[] argv)
-			throws java.io.IOException, java.net.MalformedURLException, NoSuchMethodException, ClassNotFoundException,
-				IllegalAccessException, java.lang.reflect.InvocationTargetException, InstantiationException
+	public static void main(String[] argv) throws Exception
 	{
 		if (listprops) {
 			SysProps.dump(System.getProperties(), System.out);

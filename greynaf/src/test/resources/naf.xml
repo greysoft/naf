@@ -1,0 +1,7 @@
+<naf>
+	<baseport>-1</baseport>
+	<dispatchers>
+		<dispatcher name="testdispatcher1" nafman="Y" survive_handlers="N">
+		</dispatcher>
+	</dispatchers>
+</naf>

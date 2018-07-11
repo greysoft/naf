@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -117,7 +117,7 @@ public class PkgInfo
 			String path = new java.io.File(".").getCanonicalPath();
 			strm.println("CanonPath: "+path);
 		} catch (Exception ex) {
-			strm.println("Failed to obtain CanonicalPath of current dir - "+com.grey.base.GreyException.summary(ex));
+			strm.println("Failed to obtain CanonicalPath of current dir - "+com.grey.base.ExceptionUtils.summary(ex));
 		}
 		strm.println("java.class.path: "+System.getProperty("java.class.path"));
 		strm.println("user.home: "+System.getProperty("user.home"));

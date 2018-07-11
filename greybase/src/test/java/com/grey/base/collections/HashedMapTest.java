@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015 Yusef Badri - All rights reserved.
+ * Copyright 2010-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.collections;
@@ -48,11 +48,6 @@ public class HashedMapTest
 		org.junit.Assert.assertTrue(oldval == val);
 		verifySize(hmap, 0);
 		hmap.toString(); //for sake of code coverage
-
-		//test bad types
-		org.junit.Assert.assertNull(hmap.remove(new Exception()));
-		org.junit.Assert.assertFalse(hmap.containsKey(new Exception()));
-		org.junit.Assert.assertFalse(hmap.containsValue(new Exception()));
 
 		//for sake of code coverage
 		hmap = allocMap(-1, 0);
@@ -541,7 +536,6 @@ public class HashedMapTest
 		org.junit.Assert.assertTrue(collview.contains(entr9));
 		org.junit.Assert.assertTrue(collview.contains(entrnull));
 		org.junit.Assert.assertFalse(collview.contains(null));
-		org.junit.Assert.assertFalse(collview.contains("bad type"));
 		org.junit.Assert.assertEquals(hmap.size(), collview.size());
 		try {
 			collview.add(entr1);
@@ -579,7 +573,6 @@ public class HashedMapTest
 		org.junit.Assert.assertFalse(collview.remove(ent_alt));
 
 		org.junit.Assert.assertFalse(collview.remove(null));
-		org.junit.Assert.assertFalse(collview.remove("bad type"));
 		verifySize(hmap, 6);
 		org.junit.Assert.assertEquals(hmap.size(), collview.size());
 

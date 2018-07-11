@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015 Yusef Badri - All rights reserved.
+ * Copyright 2010-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.config;
@@ -10,6 +10,8 @@ import com.grey.base.utils.TimeOps;
 
 public class SysProps
 {
+	private static final boolean ENABLE_ENV = StringOps.stringAsBool(System.getProperty("grey.properties.env", StringOps.boolAsString(false)));
+
 	public static final String EOL = get("line.separator", "\n");
 	public static final String DirSep = get("file.separator", "/");
 	public static final String PathSep = get("path.separator", ":");
@@ -38,7 +40,9 @@ public class SysProps
 	// As long as people access the system props via this method, they're guaranteed to see the LoadGreyProps() overrides
 	public static String get(String name, String dflt)
 	{
-		return System.getProperty(name, dflt);
+		String val = (ENABLE_ENV ? System.getenv(name.replace('.', '_')) : null);
+		if (val == null) val = System.getProperty(name, dflt);
+		return val;
 	}
 
 	public static boolean get(String name, boolean dflt)
@@ -126,12 +130,10 @@ public class SysProps
 		return parr;
 	}
 
-	// NB: Can't call this class's get() methods here, as they refer to the override properties which
-	// this method exists to load.
 	private static void loadGreyProps()
 	{
 		String sysprop_override = "grey.properties";
-		String pthnam = System.getProperty(sysprop_override);
+		String pthnam = get(sysprop_override);
 		if (pthnam == null) {
 			String[] huntpath = new String[]{"./grey.properties", "./conf/grey.properties",
 					System.getProperty("user.home", ".")+"/grey.properties"};
@@ -146,7 +148,7 @@ public class SysProps
 		}
 		//PkgInfo will fail to get a handle on the root GreyBase package if none of its immediate member
 		//classes have been loaded yet, so reference one of them to make sure announceJAR() succeeds.
-		Class<?> clss = com.grey.base.GreyException.class;
+		Class<?> clss = com.grey.base.ExceptionUtils.class;
 		if (pthnam == null || pthnam.equals("-")) {
 			com.grey.base.utils.PkgInfo.announceJAR(clss, "greybase", "No extra properties loaded - "+sysprop_override+"="+pthnam);
 			return;

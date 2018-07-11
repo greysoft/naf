@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2012 Yusef Badri - All rights reserved.
+ * Copyright 2011-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.logging;
@@ -11,7 +11,7 @@ public class SinkLogger
 {
 	public SinkLogger(String logname)
 	{
-		this(new Parameters(), logname);
+		this(new Parameters(SinkLogger.class), logname);
 	}
 
 	public SinkLogger(Parameters params, String logname)

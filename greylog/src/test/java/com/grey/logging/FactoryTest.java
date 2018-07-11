@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2013 Yusef Badri - All rights reserved.
+ * Copyright 2011-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.logging;
@@ -21,7 +21,7 @@ public class FactoryTest
 	private static final String NO_SUCH_LOG = "log99";  //must not match any entries in RSRCFILE
 
 	@org.junit.Test
-	public void testMappings() throws com.grey.base.ConfigException, java.io.IOException, java.net.URISyntaxException
+	public void testMappings() throws java.io.IOException, java.net.URISyntaxException
 	{
 		java.net.URL url = DynLoader.getResource(RSRCFILE, getClass());
 		String cfgpath = new java.io.File(url.toURI()).getCanonicalPath();

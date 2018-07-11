@@ -1,13 +1,17 @@
 /*
- * Copyright 2010-2016 Yusef Badri - All rights reserved.
+ * Copyright 2010-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
 
-import java.nio.file.StandardOpenOption;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.Files;
+import java.nio.file.DirectoryStream;
 import java.nio.file.LinkOption;
 import java.nio.file.attribute.FileAttribute;
+import java.nio.file.StandardOpenOption;
+import java.nio.file.StandardCopyOption;
 
 import com.grey.base.config.SysProps;
 
@@ -34,7 +38,7 @@ public class FileOps
 	public static final StandardCopyOption[] COPYOPTS_REPLACE = new StandardCopyOption[]{StandardCopyOption.REPLACE_EXISTING};
 	public static final StandardCopyOption[] COPYOPTS_ATOMIC = new StandardCopyOption[]{StandardCopyOption.ATOMIC_MOVE};
 
-	protected static final int RDBUFSIZ = SysProps.get("grey.fileio.rdbufsiz", 1024); //min buffer for unknown stream size
+	private static final int RDBUFSIZ = SysProps.get("grey.fileio.rdbufsiz", 1024); //min buffer for unknown stream size
 
 	public interface LineReader
 	{
@@ -42,16 +46,16 @@ public class FileOps
 	}
 
 	private static class PathComparator_ByFilename
-		implements java.util.Comparator<java.nio.file.Path>, java.io.Serializable
+		implements java.util.Comparator<Path>, java.io.Serializable
 	{
 		private static final long serialVersionUID = 1L;
 		public PathComparator_ByFilename() {} //eliminate warning about synthetic accessor
 		@Override
-		public int compare(java.nio.file.Path p1, java.nio.file.Path p2) {
+		public int compare(Path p1, Path p2) {
 			if (p1 == null) return (p2 == null ? 0 : -1);
 			if (p2 == null) return 1;
-			java.nio.file.Path f1 = p1.getFileName();
-			java.nio.file.Path f2 = p2.getFileName();
+			Path f1 = p1.getFileName();
+			Path f2 = p2.getFileName();
 			if (f1 == null) {
 				if (f2 != null) return -1;
 				return p1.compareTo(p2);
@@ -103,124 +107,75 @@ public class FileOps
 	}
 
 
-	public static byte[] read(java.io.File fh) throws java.io.IOException {return read(fh, -1, null);}
+	public static ByteArrayRef read(Path fh) throws java.io.IOException {return read(fh, -1, null);}
+	public static void ensureDirExists(String pthnam) throws java.io.IOException {ensureDirExists(Paths.get(pthnam));}
+	public static java.util.ArrayList<String> directoryListSimple(Path dirh) throws java.io.IOException {return directoryListSimple(dirh, 0, null);}
+	public static void sortByFilename(Path[] paths) {sortByFilename(paths, 0, paths.length);}
+
 	public static void writeTextFile(String pthnam, String txt) throws java.io.IOException {writeTextFile(new java.io.File(pthnam), txt, false);}
 	public static int deleteDirectory(String pthnam) throws java.io.IOException {return deleteDirectory(new java.io.File(pthnam));}
-	public static void ensureDirExists(String pthnam) throws java.io.IOException {ensureDirExists(java.nio.file.Paths.get(pthnam));}
+
+	public static ByteArrayRef read(java.io.File fh) throws java.io.IOException {return read(fh.toPath());}
+	public static ByteArrayRef read(java.io.File fh, int reqlen, ByteArrayRef bufh) throws java.io.IOException {return read(fh.toPath(), reqlen, bufh);}
+	public static String readAsText(java.io.File fh, String charset) throws java.io.IOException {return readAsText(fh.toPath(), charset);}
 	public static void ensureDirExists(java.io.File dirh) throws java.io.IOException {ensureDirExists(dirh.toPath());}
-	public static java.util.ArrayList<String> directoryListSimple(java.nio.file.Path dirh) throws java.io.IOException {return directoryListSimple(dirh, 0, null);}
-	public static void sortByFilename(java.nio.file.Path[] paths) {sortByFilename(paths, 0, paths.length);}
 
 
-	// Read requested number of bytes from stream, and return as byte array.
-	// If bufh is non-null, then it will be used (and grown if necessary) to hold the data and its backing array is returned.
+	// Read requested number of bytes from stream.
 	// If reqlen is -1, that means read to end of stream, which we refer to as an unbounded read.
-	// Note that this method does not append to bufh, it will replaces whatever is already there.
-	//
-	// The bounded case is pretty straightforward, but unbounded reads are complicated by the fact that in the general case, we can't tell how
-	// many bytes are in the URL's content stream in advance. We therefore use a ByteArrayOutputStream to accumulate its data.
-	// However, the caller may know via other means how large the content is or may be, and therefore allocate 'bufh' storage which is large
-	// enough to hold it all. Or, the intermediate read buffer we allocate might be enough to hold the entire content.
-	// In these cases, it seems a shame to go to the wasted expense of allocating a ByteArrayOutputStream, copying the read buffer into it,
-	// and then allocating another byte array at the end to return its contents. We therefore go to a moderate amount of trouble to defer
-	// the introduction of the ByteArrayOutputStream until the intermediate read buffer (which might or might not be based on caller-provider
-	// storage) fills up.
-	public static byte[] read(java.io.InputStream istrm, int reqlen, ArrayRef<byte[]> bufh) throws java.io.IOException
+	// The read bytes will be appended to bufh if it is supplied, else a ByteArrayRef will be allocated, and either way
+	// it will be grown as required to hold all the read bytes.
+    public static ByteArrayRef read(java.io.InputStream istrm, int reqlen, ByteArrayRef bufh) throws java.io.IOException
+    {
+        if (reqlen == 0) return (bufh == null ? new ByteArrayRef(0) : bufh);
+        final int initsize = RDBUFSIZ;
+        final int incr = 64;
+        int totaldata = 0;
+
+        while (totaldata != reqlen) {
+            int readSize = reqlen;
+            if (reqlen == -1) {
+                int sparecap = (bufh == null ? initsize : bufh.spareCapacity());
+                readSize = Math.max(istrm.available(), sparecap);
+                if (readSize == 0) readSize = incr;
+            }
+            bufh = (bufh == null ? new ByteArrayRef(readSize) : (ByteArrayRef)bufh.ensureSpareCapacity(readSize));
+            int nbytes = istrm.read(bufh.buffer(), bufh.limit(), readSize);
+            if (nbytes == -1) break; //end of input stream
+            bufh.incrementSize(nbytes);
+            totaldata += nbytes;
+        }
+        return bufh;
+    }
+    
+	public static ByteArrayRef read(Path fh, int reqlen, ByteArrayRef bufh) throws java.io.IOException
 	{
-		int bufcap = reqlen;
-		if (bufcap == -1)
-		{
-			bufcap = istrm.available();
-			if (bufcap < RDBUFSIZ) bufcap = RDBUFSIZ;
+		if (reqlen == -1) reqlen = (int)Files.size(fh);
+		try (java.io.InputStream strm = Files.newInputStream(fh, FileOps.OPENOPTS_NONE);) {
+			return read(strm, reqlen, bufh);
 		}
-		byte[] rdbuf = alloc(bufh, bufcap); //this is the intermediate read buffer, a staging area between istrm and ostrm
-		int off = (bufh == null ? 0 : bufh.ar_off);
-		java.io.ByteArrayOutputStream ostrm = null;
-		int totaldata = 0;
-		int buflen = 0;
-
-		while (totaldata != reqlen)
-		{
-			if (buflen == bufcap)
-			{
-				// The intermediate read buffer is full, so flush it to the byte-array-stream.
-				// If reqlen was -1 and InputStream.available() gave us an accurate total, then the creation of the ByteArrayOutputStream
-				// is a waste as we've already got the whole stream stored in 'rdbuf'. But, there's no way of knowing for sure as we can't
-				// depend on available()==0 really meaning we're at EOF.
-				if (ostrm == null) ostrm = new java.io.ByteArrayOutputStream(bufcap);
-				ostrm.write(rdbuf, off, buflen);
-				buflen = 0;
-			}
-			int nbytes = istrm.read(rdbuf, off + buflen, bufcap - buflen);
-			if (nbytes == -1) break; //end of input stream
-
-			// accumulate data in 'buf' if there's space, to avoid copying into the byte-stream on every single read
-			buflen += nbytes;
-			totaldata += nbytes;
-		}
-
-		if (ostrm == null)
-		{
-			// NB: This means totaldata == buflen
-			// Either the caller provided enough storage, or we allocated an intermediate read buffer that was sufficient
-			if (totaldata == 0) return null; //there was no data
-
-			if (bufh == null && totaldata != bufcap)
-			{
-				// The buffer we initially allocated was too large, and it's length attribute is the only indication the caller will have
-				// of how much data we did read, so we have to return a smaller buffer that's exactly sized - allocate it and copy into it.
-				byte[] buf2 = new byte[totaldata];
-				System.arraycopy(rdbuf, off, buf2, 0, totaldata);
-				rdbuf = buf2;
-			}
-		}
-		else
-		{
-			// the caller didn't provide enough storage (or maybe any storage), so return a copy of the ByteArrayOutputStream's buffer
-			if (buflen != 0) ostrm.write(rdbuf, off, buflen); //append the final batch of data to the byte stream first
-			rdbuf = ostrm.toByteArray();
-		}
-
-		if (bufh != null)
-		{
-			if (bufh.ar_buf != rdbuf) bufh.ar_off = 0; //we allocated a new backing array, and it has no offset
-			bufh.ar_buf = rdbuf;
-			bufh.ar_len = totaldata;
-		}
-		return rdbuf;
 	}
 
-	public static byte[] read(java.io.File fh, int reqlen, ArrayRef<byte[]> bufh) throws java.io.IOException
+	public static ByteArrayRef read(java.net.URL url, int reqlen, ByteArrayRef bufh) throws java.io.IOException
 	{
-		if (reqlen == -1) reqlen = (int)fh.length();
-		return read(new java.io.FileInputStream(fh), reqlen, bufh);
+		try (java.io.InputStream strm = url.openStream()) {
+			return read(strm, reqlen, bufh);
+		}
 	}
 
-	public static byte[] read(java.io.FileInputStream strm, int reqlen, ArrayRef<byte[]> bufh) throws java.io.IOException
-	{
-		if (reqlen == -1) reqlen = strm.available();
-		return readAndClose(strm, reqlen, bufh);
-	}
-
-	public static byte[] read(java.net.URL url, int reqlen, ArrayRef<byte[]> bufh) throws java.io.IOException
-	{
-		return readAndClose(url.openStream(), reqlen, bufh);
-	}
-
-	public static byte[] read(CharSequence pthnam_cs, int reqlen, ArrayRef<byte[]> bufh) throws java.io.IOException
+	public static ByteArrayRef read(CharSequence pthnam_cs, int reqlen, ByteArrayRef bufh) throws java.io.IOException
 	{
 		String pthnam = pthnam_cs.toString();
 		java.net.URL url = makeURL(pthnam);
 		if (url != null) return read(url, reqlen, bufh);
-		return read(new java.io.File(pthnam), reqlen, bufh);
+		return read(Paths.get(pthnam), reqlen, bufh);
 	}
 
 	public static byte[] readResource(String path, Class<?> clss) throws java.io.IOException
 	{
 		java.net.URL url = DynLoader.getResource(path, clss);
 		if (url == null) return null;
-		java.io.InputStream strm = url.openStream();
-		return readAndClose(strm, -1, null);
+		return read(url, -1, null).toArray();
 	}
 
 	public static String readResourceAsText(String path, Class<?> clss, String charset) throws java.io.IOException
@@ -232,35 +187,34 @@ public class FileOps
 
 	public static String readAsText(java.io.InputStream strm, String charset) throws java.io.IOException
 	{
-		byte[] buf = read(strm, -1, null);
-		return StringOps.convert(buf, charset);
+		ByteArrayRef bufh = read(strm, -1, null);
+		return StringOps.convert(bufh.toArray(), charset);
 	}
 
-	public static String readAsText(java.io.File fh, String charset) throws java.io.IOException
+	public static String readAsText(Path fh, String charset) throws java.io.IOException
 	{
-		byte[] buf = read(fh, -1, null);
-		return StringOps.convert(buf, charset);
+		try (java.io.InputStream strm = Files.newInputStream(fh, FileOps.OPENOPTS_NONE);) {
+			return readAsText(strm, charset);
+		}
 	}
 
 	public static String readAsText(java.net.URL url, String charset) throws java.io.IOException
 	{
-		byte[] buf = read(url, -1, null);
-		return StringOps.convert(buf, charset);
+		try (java.io.InputStream strm = url.openStream()) {
+			return readAsText(strm, charset);
+		}
 	}
 
 	public static String readAsText(CharSequence pthnam_cs, String charset) throws java.io.IOException
 	{
-		byte[] buf = read(pthnam_cs, -1, null);
-		return StringOps.convert(buf, charset);
+		ByteArrayRef bufh = read(pthnam_cs, -1, null);
+		return StringOps.convert(bufh.toArray(), charset);
 	}
 
 	public static void writeTextFile(java.io.File fh, String txt, boolean append) throws java.io.IOException
 	{
-		java.io.FileWriter cstrm = new java.io.FileWriter(fh, append);
-		try {
+		try (java.io.FileWriter cstrm = new java.io.FileWriter(fh, append)) {
 			cstrm.append(txt);
-		} finally {
-			cstrm.close(); //this flushes its own buffer and closes the underlying stream
 		}
 	}
 
@@ -291,11 +245,17 @@ public class FileOps
 		return lno;
 	}
 
+	public static int readTextLines(Path fh, LineReader consumer, int bufsiz, String cmnt,
+			int mode, Object cbdata) throws java.io.IOException
+	{
+		java.io.InputStream strm = Files.newInputStream(fh, FileOps.OPENOPTS_NONE);
+		return readTextLines(strm, consumer, bufsiz, cmnt, mode, cbdata);
+	}
+
 	public static int readTextLines(java.io.File fh, LineReader consumer, int bufsiz, String cmnt,
 			int mode, Object cbdata) throws java.io.IOException
 	{
-		java.io.InputStream strm = new java.io.FileInputStream(fh);
-		return readTextLines(strm, consumer, bufsiz, cmnt, mode, cbdata);
+		return readTextLines(fh.toPath(), consumer, bufsiz, cmnt, mode, cbdata);
 	}
 
 	public static int readTextLines(java.net.URL path, LineReader consumer, int bufsiz, String cmnt,
@@ -305,7 +265,7 @@ public class FileOps
 		return readTextLines(strm, consumer, bufsiz, cmnt, mode, cbdata);
 	}
 
-	public static long copyFile(java.nio.file.Path srcfile, java.nio.file.Path dstfile) throws java.io.IOException
+	public static long copyFile(Path srcfile, Path dstfile) throws java.io.IOException
 	{
 		java.nio.channels.FileChannel inchan = java.nio.channels.FileChannel.open(srcfile, OPENOPTS_READ);
 		java.nio.channels.FileChannel outchan = null;
@@ -326,8 +286,8 @@ public class FileOps
 
 	public static long copyFile(CharSequence srcpath, CharSequence dstpath) throws java.io.IOException
 	{
-		java.nio.file.Path srcfile = java.nio.file.Paths.get(srcpath.toString());
-		java.nio.file.Path dstfile = java.nio.file.Paths.get(dstpath.toString());
+		Path srcfile = Paths.get(srcpath.toString());
+		Path dstfile = Paths.get(dstpath.toString());
 		return copyFile(srcfile, dstfile);
 	}
 
@@ -340,7 +300,7 @@ public class FileOps
 		if (srcfile.renameTo(dstfile)) {
 			return;
 		}
-		java.nio.file.Path srcpath = srcfile.toPath();
+		Path srcpath = srcfile.toPath();
 		copyFile(srcpath, dstfile.toPath());
 		deleteFile(srcpath);
 	}
@@ -352,18 +312,18 @@ public class FileOps
 		moveFile(srcfile, dstfile);
 	}
 
-	public static void deleteFile(java.io.File fh) throws java.io.IOException
-	{
-		java.io.IOException ex = deleteFile(fh.toPath());
-		if (ex != null) throw new java.io.IOException("Failed to delete "+(fh.isDirectory()?"directory":"file")+"="+fh.getAbsolutePath());
-	}
+    public static void deleteFile(java.io.File fh) throws java.io.IOException
+    {
+        java.io.IOException ex = deleteFile(fh.toPath());
+        if (ex != null) throw new java.io.IOException("Failed to delete "+(fh.isDirectory()?"directory":"file")+"="+fh.getAbsolutePath());
+    }
 
-	public static java.io.IOException deleteFile(java.nio.file.Path fh)
+	public static java.io.IOException deleteFile(Path fh)
 	{
 		try {
-			java.nio.file.Files.delete(fh);
+			Files.delete(fh);
 		} catch (java.io.IOException ex) {
-			if (java.nio.file.Files.exists(fh, LINKOPTS_NONE)) return ex; //genuine error
+			if (Files.exists(fh, LINKOPTS_NONE)) return ex; //genuine error
 		}
 		return null;
 	}
@@ -384,12 +344,18 @@ public class FileOps
 
 	public static boolean close(Object obj) throws java.io.IOException
 	{
-		if (!(obj instanceof java.io.Closeable)) {
+		if (!(obj instanceof AutoCloseable)) {
 			//at least try and flush it if possible, since a close() would have achieved that much
 			flush(obj);
 			return false;
 		}
-		((java.io.Closeable)obj).close();
+		try {
+			((AutoCloseable)obj).close();
+		} catch (java.io.IOException ex) {
+			throw ex;
+		} catch (Exception ex) {
+			throw new java.io.IOException(ex);
+		}
 		return true;
 	}
 
@@ -433,57 +399,57 @@ public class FileOps
 		return new java.net.URL(pthnam);
 	}
 
-	public static java.util.ArrayList<java.nio.file.Path> directoryList(java.nio.file.Path dirh, boolean recursive) throws java.io.IOException
+	public static java.util.ArrayList<Path> directoryList(Path dirh, boolean recursive) throws java.io.IOException
 	{
-		java.util.ArrayList<java.nio.file.Path> lst = new java.util.ArrayList<java.nio.file.Path>();
-		try (java.nio.file.DirectoryStream<java.nio.file.Path> ds = java.nio.file.Files.newDirectoryStream(dirh)) {
-			for (java.nio.file.Path fpath : ds) {
-				if (!recursive || !java.nio.file.Files.isDirectory(fpath, LINKOPTS_NONE)) {
+		java.util.ArrayList<Path> lst = new java.util.ArrayList<Path>();
+		try (DirectoryStream<Path> ds = Files.newDirectoryStream(dirh)) {
+			for (Path fpath : ds) {
+				if (!recursive || !Files.isDirectory(fpath, LINKOPTS_NONE)) {
 					lst.add(fpath);
 				} else {
-					java.util.ArrayList<java.nio.file.Path> lst2 = directoryList(fpath, true);
+					java.util.ArrayList<Path> lst2 = directoryList(fpath, true);
 					lst.addAll(lst2);
 				}
 			}
 		} catch (java.nio.file.NoSuchFileException ex) {
 			return null; //exists() test below could return true by now, due to race conditions
 		} catch (java.io.IOException ex) {
-			if (!java.nio.file.Files.exists(dirh, LINKOPTS_NONE)) return null;
+			if (!Files.exists(dirh, LINKOPTS_NONE)) return null;
 			throw ex;
 		}
 		return lst;
 	}
 
-	public static java.util.ArrayList<String> directoryListSimple(java.nio.file.Path dirh, int max, java.util.ArrayList<String> lst)
+	public static java.util.ArrayList<String> directoryListSimple(Path dirh, int max, java.util.ArrayList<String> lst)
 		throws java.io.IOException
 	{
 		if (lst == null) lst = new java.util.ArrayList<String>();
-		try (java.nio.file.DirectoryStream<java.nio.file.Path> ds = java.nio.file.Files.newDirectoryStream(dirh)) {
-			for (java.nio.file.Path fpath : ds) {
+		try (DirectoryStream<Path> ds = Files.newDirectoryStream(dirh)) {
+			for (Path fpath : ds) {
 				if (max != 0 && lst.size() == max) break;
 				lst.add(getFilename(fpath));
 			}
 		} catch (java.nio.file.NoSuchFileException ex) {
 			return null; //exists() test below could return true by now, due to race conditions
 		} catch (java.io.IOException ex) {
-			if (!java.nio.file.Files.exists(dirh, LINKOPTS_NONE)) return null;
+			if (!Files.exists(dirh, LINKOPTS_NONE)) return null;
 			throw ex;
 		}
 		return lst;
 	}
 
 	// This avoids FindBugs warnings for cases where we know Path.getParent() can't return null
-	public static java.nio.file.Path parentDirectory(java.nio.file.Path fh)
+	public static Path parentDirectory(Path fh)
 	{
-		java.nio.file.Path dh = fh.getParent();
+		Path dh = fh.getParent();
 		if (dh == null) throw new IllegalStateException("Non-null parent dir was expected for "+fh);
 		return dh;
 	}
 
 	// This avoids FindBugs warnings for cases where we know Path.getFilename() can't return null
-	public static String getFilename(java.nio.file.Path fh)
+	public static String getFilename(Path fh)
 	{
-		java.nio.file.Path name = fh.getFileName();
+		Path name = fh.getFileName();
 		if (name == null) throw new IllegalStateException("Non-null filename was expected for "+fh);
 		return name.toString();
 	}
@@ -563,17 +529,17 @@ public class FileOps
 		return deleteOlderThan(dirh, -1, null, true);
 	}
 
-	public static void ensureDirExists(java.nio.file.Path dirh) throws java.io.IOException
+	public static void ensureDirExists(Path dirh) throws java.io.IOException
 	{
-		java.nio.file.Files.createDirectories(dirh, FATTR_NONE);
+		Files.createDirectories(dirh, FATTR_NONE);
 	}
 
-	public static void sortByFilename(java.util.ArrayList<java.nio.file.Path> paths)
+	public static void sortByFilename(java.util.ArrayList<Path> paths)
 	{
 		java.util.Collections.sort(paths, cmp_filename);
 	}
 
-	public static void sortByFilename(java.nio.file.Path[] paths, int off, int len)
+	public static void sortByFilename(Path[] paths, int off, int len)
 	{
 		java.util.Arrays.sort(paths, off, off+len, cmp_filename);
 	}
@@ -586,32 +552,5 @@ public class FileOps
 		int pos = filename.lastIndexOf('.');
 		if (pos <= pos_slash) return null;
 		return filename.substring(pos+1);
-	}
-
-	private static byte[] readAndClose(java.io.InputStream strm, int reqlen, ArrayRef<byte[]> bufh) throws java.io.IOException
-	{
-		try {
-			return read(strm, reqlen, bufh);
-		} finally {
-			if (strm != null) strm.close();
-		}
-	}
-
-	// NB: This doesn't just alloc capacity, it also sets bufh.len to the allocated size in advance, expecting caller to read in that much
-	private static byte[] alloc(ArrayRef<byte[]> bufh, int size)
-	{
-		byte[] buf = null;
-
-		if (bufh == null) {
-			if (size != 0) buf = new byte[size];
-		} else {
-			if (bufh.ar_buf.length - bufh.ar_off < size) {
-				bufh.ar_buf = new byte[size];
-				bufh.ar_off = 0;
-			}
-			bufh.ar_len = size;
-			buf = bufh.ar_buf;
-		}
-		return buf;
 	}
 }

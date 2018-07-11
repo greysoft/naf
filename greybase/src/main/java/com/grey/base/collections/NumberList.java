@@ -1,5 +1,6 @@
 /*
- * Copyright 2013 Grey Software (Yusef Badri) - All rights reserved
+ * Copyright 2013-2018 Yusef Badri - All rights reserved.
+ * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.collections;
 
@@ -8,32 +9,34 @@ package com.grey.base.collections;
 public final class NumberList
 	extends com.grey.base.utils.ArrayRef<int[]>
 {
+	private static final Allocator<int[]> ALLOCATOR = (n) -> new int[n];
+
 	private final int increment;
 
-	public void clear() {ar_len = 0;}
-	public int get(int idx) {return ar_buf[idx];}
-
 	public NumberList() {this(16);}
-	public NumberList(int incr) {super(int.class, incr); increment=incr;}
+	public NumberList(int incr) {super(incr, ALLOCATOR); increment=incr;}
+
+	public int get(int idx) {return buffer()[idx];}
+
+	@Override
+	protected int totalBufferSize(int[] buf) {return (buf == null ? 0 : buf.length);}
+	@Override
+	protected int[] allocBuffer(int cap) {return ALLOCATOR.allocate(cap);}
 
 	public void append(int v) {
-		if (ar_len == ar_buf.length) {
-			int[] newbuf = new int[ar_buf.length+increment];
-			System.arraycopy(ar_buf, ar_off, newbuf, 0, ar_len);
-			ar_buf = newbuf;
-			ar_off = 0;
-		}
-		ar_buf[ar_len++] = v;
+		if (spareCapacity() == 0) ensureSpareCapacity(increment);
+		buffer()[size()] = v;
+		incrementSize(1);
 	}
 
 	public void append(com.grey.base.utils.ArrayRef<int[]> lst) {
-		int lmt = lst.ar_off + lst.ar_len;
-		for (int idx = lst.ar_off; idx != lmt; idx++) {
-			append(lst.ar_buf[idx]);
+		int lmt = lst.limit();
+		for (int idx = lst.offset(); idx != lmt; idx++) {
+			append(lst.buffer()[idx]);
 		}
 	}
 
 	public void sort() {
-		java.util.Arrays.sort(ar_buf, 0, ar_len);
+		java.util.Arrays.sort(buffer(), 0, size());
 	}
 }

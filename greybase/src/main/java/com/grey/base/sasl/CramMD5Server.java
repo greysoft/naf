@@ -1,10 +1,12 @@
 /*
- * Copyright 2012-2015 Yusef Badri - All rights reserved.
+ * Copyright 2012-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.sasl;
 
 import com.grey.base.crypto.Ascii;
+import com.grey.base.utils.ByteArrayRef;
+import com.grey.base.utils.ByteChars;
 import com.grey.base.utils.ByteOps;
 
 // The SASL CRAM-MD5 mechanism is defined in RFC-2195 (Sep 1997)
@@ -12,7 +14,7 @@ public final class CramMD5Server
 	extends SaslServer
 {
 	private final SecureHash hashfunc = new SecureHash();
-	private final com.grey.base.utils.ByteChars srvnonce = new com.grey.base.utils.ByteChars();
+	private final ByteChars srvnonce = new ByteChars();
 
 	@Override
 	public boolean requiresInitialResponse() {return false;}
@@ -39,23 +41,23 @@ public final class CramMD5Server
 	}
 
 	@Override
-	public com.grey.base.utils.ByteChars setChallenge(com.grey.base.utils.ByteChars outbuf)
+	public com.grey.base.utils.ByteChars setChallenge(ByteChars outbuf)
 	{
-		if (outbuf == null) outbuf = new com.grey.base.utils.ByteChars();
+		if (outbuf == null) outbuf = new ByteChars();
 		encode(srvnonce, outbuf);
 		return outbuf;
 	}
 
 	@Override
-	protected boolean verifyDecodedResponse(com.grey.base.utils.ArrayRef<byte[]> msg)
+	protected boolean verifyDecodedResponse(ByteArrayRef msg)
 	{
-		int dlm = ByteOps.indexOf(msg.ar_buf, msg.ar_off, msg.ar_len, (byte)' ');
+		int dlm = ByteOps.indexOf(msg.buffer(), msg.offset(), msg.size(), (byte)' ');
 		if (dlm == -1) return false;
-		auth_username.set(msg.ar_buf, msg.ar_off, dlm - msg.ar_off);
-		int digest_len = msg.ar_len - auth_username.ar_len - 1;
-		com.grey.base.utils.ByteChars passwd = (digest_len == 0 ? null : authenticator.saslPasswordLookup(auth_username));
+		auth_username.populate(msg.buffer(), msg.offset(), dlm - msg.offset());
+		int digest_len = msg.size() - auth_username.size() - 1;
+		ByteChars passwd = (digest_len == 0 ? null : authenticator.saslPasswordLookup(auth_username));
 		if (passwd == null) return false;
-		return hashfunc.matches(passwd, srvnonce, msg.ar_buf, dlm + 1, digest_len);
+		return hashfunc.matches(passwd, srvnonce, msg.buffer(), dlm + 1, digest_len);
 	}
 
 
@@ -69,22 +71,21 @@ public final class CramMD5Server
 			km = new com.grey.base.crypto.HMAC.KeyMaterial("MD5", null);
 		}
 
-		private void calculate(com.grey.base.utils.ByteChars secret, com.grey.base.utils.ArrayRef<byte[]> data)
+		private void calculate(ByteChars secret, ByteArrayRef data)
 		{
-			km.reset(secret.ar_buf, secret.ar_off, secret.ar_len);
-			byte[] hash = km.encode(data.ar_buf, data.ar_off, data.ar_len);
+			km.reset(secret.buffer(), secret.offset(), secret.size());
+			byte[] hash = km.encode(data.buffer(), data.offset(), data.size());
 			hexbuf = Ascii.hexEncode(hash, 0, hash.length, hexbuf);
 			hexlen = Ascii.hexEncodeLength(hash.length);
 		}
 
-		public void append(com.grey.base.utils.ByteChars secret, com.grey.base.utils.ArrayRef<byte[]> data, com.grey.base.utils.ByteChars outbuf)
+		public void append(ByteChars secret, ByteArrayRef data, ByteChars outbuf)
 		{
 			calculate(secret, data);
 			outbuf.append(hexbuf, 0, hexlen);
 		}
 
-		public boolean matches(com.grey.base.utils.ByteChars secret, com.grey.base.utils.ArrayRef<byte[]> data,
-				byte[] buf, int off, int len)
+		public boolean matches(ByteChars secret, ByteArrayRef data, byte[] buf, int off, int len)
 		{
 			calculate(secret, data);
 			if (hexlen != len) return false;

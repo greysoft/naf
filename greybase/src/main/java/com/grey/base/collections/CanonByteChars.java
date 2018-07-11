@@ -30,7 +30,7 @@ public final class CanonByteChars
 		if (inpval == null) return null;
 		ByteChars canonval = canonset.get(inpval);
 		if (canonval == null) {
-			canonval = bufpool.extract().set(inpval);
+			canonval = bufpool.extract().populate(inpval);
 			canonset.add(canonval);
 		}
 		return canonval;
@@ -39,7 +39,7 @@ public final class CanonByteChars
 	public ByteChars intern(CharSequence inpval)
 	{
 		if (inpval == null) return null;
-		ByteChars inpval_bc = bufpool.extract().set(inpval);
+		ByteChars inpval_bc = bufpool.extract().populate(inpval);
 		ByteChars canonval = canonset.get(inpval_bc);
 		if (canonval == null) {
 			canonval = inpval_bc;

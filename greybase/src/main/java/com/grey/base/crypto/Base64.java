@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015 Yusef Badri - All rights reserved.
+ * Copyright 2010-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.crypto;
@@ -69,10 +69,10 @@ public class Base64
 
 		if (arrh != null)
 		{
-			arrh.ensureCapacity(arrh.ar_len + enclen);
-			encdata = arrh.ar_buf;
-			encoff = arrh.ar_off + arrh.ar_len;
-			arrh.ar_len += enclen;
+			arrh.ensureCapacity(arrh.size() + enclen);
+			encdata = arrh.buffer();
+			encoff = arrh.limit();
+			arrh.incrementSize(enclen);
 		}
 		else
 		{
@@ -157,10 +157,10 @@ public class Base64
 
 		if (arrh != null)
 		{
-			arrh.ensureCapacity(arrh.ar_len + rawlen);
-			rawdata = arrh.ar_buf;
-			rawoff = arrh.ar_off + arrh.ar_len;
-			arrh.ar_len += rawlen;
+			arrh.ensureCapacity(arrh.size() + rawlen);
+			rawdata = arrh.buffer();
+			rawoff = arrh.limit();
+			arrh.incrementSize(rawlen);
 		}
 		else
 		{
@@ -238,10 +238,10 @@ public class Base64
 
 		if (arrh != null)
 		{
-			arrh.ensureCapacity(arrh.ar_len + enclen);
-			encdata = arrh.ar_buf;
-			encoff = arrh.ar_off + arrh.ar_len;
-			arrh.ar_len += enclen;
+			arrh.ensureCapacity(arrh.size() + enclen);
+			encdata = arrh.buffer();
+			encoff = arrh.limit();
+			arrh.incrementSize(enclen);
 		}
 		else
 		{
@@ -313,10 +313,10 @@ public class Base64
 
 		if (arrh != null)
 		{
-			arrh.ensureCapacity(arrh.ar_len + rawlen);
-			rawdata = arrh.ar_buf;
-			rawoff = arrh.ar_off + arrh.ar_len;
-			arrh.ar_len += rawlen;
+			arrh.ensureCapacity(arrh.size() + rawlen);
+			rawdata = arrh.buffer();
+			rawoff = arrh.limit();
+			arrh.incrementSize(rawlen);
 		}
 		else
 		{

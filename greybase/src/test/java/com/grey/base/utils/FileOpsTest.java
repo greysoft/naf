@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2016 Yusef Badri - All rights reserved.
+ * Copyright 2011-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -9,22 +9,12 @@ import com.grey.base.config.SysProps;
 public final class FileOpsTest
 	implements FileOps.LineReader
 {
-	private static class IndeterminateStream extends java.io.FileInputStream
-	{
-		private final int availbytes;
-		public IndeterminateStream(java.io.File fh, int avail) throws java.io.FileNotFoundException {
-			super(fh);
-			availbytes = avail;
-		}
-		@Override
-		public int available() {return availbytes;}
-	}
 	private static final String RSRC_NAME = "file1.txt";
 	private static final String RSRC_TEXT = "Hello there!";
 	private final String workdir = SysProps.TMPDIR+"/utest/greybase/"+getClass().getSimpleName();
 
 	@org.junit.Test
-	public void basicIO() throws java.io.IOException
+	public void testDirectoryOps() throws java.io.IOException
 	{
 		String origtxt = "This is a test";
 		String dirpath2 = workdir+"/dir2";
@@ -277,7 +267,7 @@ public final class FileOpsTest
 	}
 
 	@org.junit.Test
-	public void filenameSort()
+	public void testFilenameSort()
 	{
 		java.util.ArrayList<java.nio.file.Path> lst = new java.util.ArrayList<java.nio.file.Path>();
 		lst.add(java.nio.file.Paths.get("/dir1/file2"));
@@ -306,7 +296,7 @@ public final class FileOpsTest
 	}
 
 	@org.junit.Test
-	public void readResource() throws java.io.IOException, java.net.URISyntaxException
+	public void testReadResource() throws java.io.IOException, java.net.URISyntaxException
 	{
 		java.io.File fh = getResource(RSRC_NAME, getClass());
 
@@ -319,8 +309,9 @@ public final class FileOpsTest
 		org.junit.Assert.assertEquals(fh.length(), rtxt.length());
 		org.junit.Assert.assertEquals(RSRC_TEXT, rtxt.trim());
 
-		byte[] buf = FileOps.read(url.toString(), -1, null);
-		rtxt = new String(buf, StringOps.DFLT_CHARSET);
+		ByteArrayRef bufh = FileOps.read(url.toString(), -1, null);
+		byte[] arr = bufh.toArray();
+		rtxt = new String(arr, StringOps.DFLT_CHARSET);
 		org.junit.Assert.assertEquals(fh.length(), rtxt.length());
 		org.junit.Assert.assertEquals(RSRC_TEXT, rtxt.trim());
 
@@ -333,111 +324,7 @@ public final class FileOpsTest
 	}
 
 	@org.junit.Test
-	public void readBuffer() throws java.io.IOException, java.net.URISyntaxException
-	{
-		java.io.File fh = getResource(RSRC_NAME, getClass());
-
-		// test with a null ArrayRef param first
-		byte[] buf = FileOps.read(fh, -1, null);
-		String rtxt = new String(buf, StringOps.DFLT_CHARSET);
-		org.junit.Assert.assertEquals(fh.length(), buf.length);
-		org.junit.Assert.assertTrue(RSRC_TEXT.equals(rtxt.trim()));
-
-		buf = FileOps.read(fh, (int)fh.length(), null);
-		rtxt = new String(buf, StringOps.DFLT_CHARSET);
-		org.junit.Assert.assertEquals(fh.length(), buf.length);
-		org.junit.Assert.assertTrue(RSRC_TEXT.equals(rtxt.trim()));
-
-		buf = FileOps.read(fh, (int)fh.length() + 1, null);
-		rtxt = new String(buf, StringOps.DFLT_CHARSET);
-		org.junit.Assert.assertEquals(fh.length(), buf.length);
-		org.junit.Assert.assertTrue(RSRC_TEXT.equals(rtxt.trim()));
-
-		int seglen = 5; //must be shorter than resource-file contents, AFTER stripping newline
-		buf = FileOps.read(fh, seglen, null);
-		rtxt = new String(buf, StringOps.DFLT_CHARSET);
-		org.junit.Assert.assertEquals(seglen, buf.length);
-		org.junit.Assert.assertTrue(RSRC_TEXT.substring(0, seglen).equals(rtxt.trim()));
-
-		seglen = 1; //similiar to above test, but more of a boundary condition
-		buf = FileOps.read(fh, seglen, null);
-		rtxt = new String(buf, StringOps.DFLT_CHARSET);
-		org.junit.Assert.assertEquals(seglen, buf.length);
-		org.junit.Assert.assertTrue(RSRC_TEXT.substring(0, seglen).equals(rtxt.trim()));
-
-		buf = FileOps.read(fh, 0, null); //a special boundary condition
-		org.junit.Assert.assertNull(buf);
-
-		// now test with an ArrayRef param: equal-to, greater-than and less-than file size
-		int initcap = (int)fh.length();
-		ArrayRef<byte[]> ah = new ArrayRef<byte[]>(byte.class, initcap);
-		buf = FileOps.read(fh, -1, ah);
-		rtxt = new String(buf, StringOps.DFLT_CHARSET);
-		org.junit.Assert.assertEquals(fh.length(), ah.size());
-		org.junit.Assert.assertEquals(fh.length(), buf.length);
-		org.junit.Assert.assertTrue(RSRC_TEXT.equals(rtxt.trim()));
-
-		initcap = (int)fh.length() + 1;
-		ah = new ArrayRef<byte[]>(byte.class, initcap);
-		buf = FileOps.read(fh, -1, ah);
-		rtxt = new String(buf, StringOps.DFLT_CHARSET);
-		org.junit.Assert.assertEquals(fh.length(), ah.size());
-		org.junit.Assert.assertEquals(initcap, buf.length);
-		org.junit.Assert.assertTrue(RSRC_TEXT.equals(rtxt.trim()));
-
-		initcap = 5;
-		ah = new ArrayRef<byte[]>(byte.class, initcap);
-		buf = FileOps.read(fh, -1, ah);
-		rtxt = new String(buf, StringOps.DFLT_CHARSET);
-		org.junit.Assert.assertEquals(fh.length(), ah.size());
-		org.junit.Assert.assertEquals(fh.length(), buf.length);
-		org.junit.Assert.assertTrue(RSRC_TEXT.equals(rtxt.trim()));
-
-		// now read from a file which exceeds RDBUFSIZ: 1st test requires more than one read, 2nd is exactly 1 read
-		String filepath = workdir+"/binfile1";
-		fh = new java.io.File(filepath);
-		FileOps.ensureDirExists(workdir);
-		buf = new byte[256];
-		for (int bval = 0; bval != 256; bval++) buf[bval] = (byte)bval;
-		java.io.FileOutputStream ostrm = new java.io.FileOutputStream(filepath, false);
-		try {
-			while (fh.length() < (FileOps.RDBUFSIZ * 2) + 1) ostrm.write(buf);
-		} finally {
-			ostrm.close();
-		}
-		initcap = (int)fh.length();
-		ah = new ArrayRef<byte[]>(byte.class, initcap);
-		java.io.InputStream strm = new IndeterminateStream(fh, 0);
-		try {
-			buf = FileOps.read(strm, -1, ah);
-		} finally {
-			strm.close();
-		}
-		org.junit.Assert.assertEquals(fh.length(), ah.size());
-		org.junit.Assert.assertEquals(fh.length(), buf.length);
-		org.junit.Assert.assertEquals(1, buf[1]);
-		org.junit.Assert.assertEquals(1, buf[257]);
-		org.junit.Assert.assertEquals(2, buf[258]);
-
-		initcap = (int)fh.length();
-		ah = new ArrayRef<byte[]>(byte.class, initcap);
-		strm = new IndeterminateStream(fh, initcap);
-		try {
-			buf = FileOps.read(strm, -1, ah);
-		} finally {
-			strm.close();
-		}
-		org.junit.Assert.assertEquals(fh.length(), ah.size());
-		org.junit.Assert.assertEquals(fh.length(), buf.length);
-		org.junit.Assert.assertEquals(1, buf[1]);
-		org.junit.Assert.assertEquals(1, buf[257]);
-		org.junit.Assert.assertEquals(2, buf[258]);
-
-		FileOps.deleteDirectory(workdir);
-	}
-
-	@org.junit.Test
-	public void writeFail() throws java.io.IOException
+	public void testWriteFail() throws java.io.IOException
 	{
 		String txt = "This is a test";
 		String pthnam = workdir+"/writeFail/wfail.txt";
@@ -450,7 +337,7 @@ public final class FileOpsTest
 	}
 
 	@org.junit.Test
-	public void filetype() throws java.io.IOException
+	public void testFileType() throws java.io.IOException
 	{
 		String dirslash = SysProps.get("file.separator");
 		final String filesfx = "txt";
@@ -476,7 +363,7 @@ public final class FileOpsTest
 	}
 
 	@org.junit.Test
-	public void lineReader() throws java.io.IOException, java.net.URISyntaxException
+	public void testLineReader() throws java.io.IOException, java.net.URISyntaxException
 	{
 		int cnt = FileOps.readTextLines(getClass().getResource(RSRC_NAME), this, 8192, null, 0, null);
 		org.junit.Assert.assertEquals(2, cnt);

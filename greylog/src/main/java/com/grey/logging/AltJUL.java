@@ -118,7 +118,7 @@ public class AltJUL
 	private void log(CharSequence msg, Throwable ex, boolean withstack, Level lvl)
 	{
 		msgbuf.setLength(0);
-		msgbuf.append(msg).append(com.grey.base.GreyException.summary(ex, withstack));
+		msgbuf.append(msg).append(com.grey.base.ExceptionUtils.summary(ex, withstack));
 		log(msgbuf, lvl);
 	}
 

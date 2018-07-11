@@ -1,8 +1,10 @@
 /*
- * Copyright 2011-2015 Yusef Badri - All rights reserved.
+ * Copyright 2011-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.logging;
+
+import java.lang.management.ManagementFactory;
 
 import com.grey.base.config.SysProps;
 import com.grey.base.config.XmlConfig;
@@ -19,6 +21,7 @@ public class Parameters
 	public static final String SYSPROP_FLUSHINTERVAL = "grey.logger.flushinterval";
 	public static final String SYSPROP_BUFSIZ = "grey.logger.bufsiz";
 	public static final String SYSPROP_ROTFREQ = "grey.logger.rotfreq";
+	public static final String SYSPROP_SHOWPID = "grey.logger.pid";
 	public static final String SYSPROP_SHOWTID = "grey.logger.tid";
 	public static final String SYSPROP_SHOWTHRDNAME = "grey.logger.threadname";
 	public static final String SYSPROP_SHOWDELTA = "grey.logger.delta";
@@ -26,6 +29,7 @@ public class Parameters
 
 	public static final String TOKEN_LOGSDIR = "%DIRLOG%";
 	public static final String TOKEN_TID = "%TID%";
+	public static final String TOKEN_PID = "%PID%";
 
 	public static final String MODE_AUDIT = "AUDIT";
 
@@ -33,6 +37,8 @@ public class Parameters
 	public static final java.io.OutputStream DFLT_STRM = System.out;
 	public static final String PTHNAM_STDOUT = "%stdout%";
 	public static final String PTHNAM_STDERR = "%stderr%";
+
+	public static final int CURRENT_PID = Integer.parseInt(ManagementFactory.getRuntimeMXBean().getName().split("@")[0]);
 
 	public String logclass = DFLTCLASS.getName();
 	public java.io.OutputStream strm = DFLT_STRM;
@@ -43,7 +49,8 @@ public class Parameters
 	public String pthnam = null;	// pathname template for logfile
 	public int maxsize;
 	public boolean withTID = true;
-	public boolean tidPlusName = false;
+	public boolean withThreadName = false;
+	public boolean withPID = false;
 	public boolean withDelta = false;
 	public String mode;
 
@@ -52,8 +59,9 @@ public class Parameters
 		pthnam = SysProps.get(SYSPROP_LOGFILE, pthnam);
 		logclass = SysProps.get(SYSPROP_LOGCLASS, logclass);
 		loglevel = Logger.LEVEL.valueOf(SysProps.get(SYSPROP_LOGLEVEL, loglevel.name()).toUpperCase());
+		withPID = SysProps.get(SYSPROP_SHOWPID, withPID);
 		withTID = SysProps.get(SYSPROP_SHOWTID, withTID);
-		tidPlusName = SysProps.get(SYSPROP_SHOWTHRDNAME, tidPlusName);
+		withThreadName = SysProps.get(SYSPROP_SHOWTHRDNAME, withThreadName);
 		withDelta = SysProps.get(SYSPROP_SHOWDELTA, withDelta);
 		flush_interval = SysProps.getTime(SYSPROP_FLUSHINTERVAL, flush_interval);
 		bufsiz = SysProps.get(SYSPROP_BUFSIZ, bufsiz);
@@ -62,15 +70,16 @@ public class Parameters
 		rotfreq = ScheduledTime.FREQ.valueOf(str.toUpperCase());
 	}
 
-	public Parameters(XmlConfig cfg) throws com.grey.base.ConfigException
+	public Parameters(XmlConfig cfg)
 	{
 		this();
 		if (cfg == null) return;
 		pthnam = cfg.getValue(".", false, null);
 		logclass = cfg.getValue("@class", false, logclass);
 		loglevel = Logger.LEVEL.valueOf(cfg.getValue("@level", false, loglevel.name()).toUpperCase());
+		withPID = cfg.getBool("@pid", withPID);
 		withTID = cfg.getBool("@tid", withTID);
-		tidPlusName = cfg.getBool("@tname", tidPlusName);
+		withThreadName = cfg.getBool("@tname", withThreadName);
 		withDelta = cfg.getBool("@delta", withDelta);
 		flush_interval = cfg.getTime("@flush", flush_interval);
 		bufsiz = (int)cfg.getSize("@buffer", bufsiz);
@@ -93,6 +102,12 @@ public class Parameters
 		this();
 		if (max != null) loglevel = max;
 		if (s != null) strm = s;
+	}
+
+	public Parameters(Class<?> clss)
+	{
+		this();
+		logclass = clss.getName();
 	}
 
 	// NB: We deliberately don't take a static final reading of SYSPROP_LOGSDIR, in order to allow callers
@@ -131,10 +146,11 @@ public class Parameters
 			if (tokenval != null) pthnam = pthnam.replace(TOKEN_LOGSDIR, tokenval);
 			pthnam = pthnam.replace(SysProps.DIRTOKEN_TMP, SysProps.TMPDIR);
 			pthnam = pthnam.replaceAll(TOKEN_TID, String.valueOf(Thread.currentThread().getId()));
+			pthnam = pthnam.replaceAll(TOKEN_PID, String.valueOf(CURRENT_PID));
 			try {
 				pthnam = new java.io.File(pthnam).getCanonicalPath();
 			} catch (Exception ex) {
-				throw new RuntimeException("Failed to determine logger path - "+com.grey.base.GreyException.summary(ex), ex);
+				throw new IllegalArgumentException("Failed to canonise config="+pthnam, ex);
 			}
 		}
 		if (bufsiz == 0) flush_interval = 0;

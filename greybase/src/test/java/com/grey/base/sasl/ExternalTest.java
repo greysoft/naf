@@ -55,7 +55,7 @@ public class ExternalTest
 	private boolean verify(ExternalClient client, ExternalServer server, java.security.cert.X509Certificate cert, CharSequence rolename, ByteChars rspbuf)
 	{
 		server.init(cert);
-		int pfxlen = (rspbuf == null ? 0 : rspbuf.ar_len);
+		int pfxlen = (rspbuf == null ? 0 : rspbuf.size());
 		ByteChars rsp = client.setResponse(rolename, rspbuf);
 		if (rspbuf != null) org.junit.Assert.assertTrue(rsp == rspbuf);
 		rsp.advance(pfxlen);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2015 Yusef Badri - All rights reserved.
+ * Copyright 2012-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.collections;
@@ -31,8 +31,6 @@ public class HashedSetTest
 		org.junit.Assert.assertFalse(hset.contains("nonsuch"));
 		org.junit.Assert.assertFalse(hset.remove(null));
 		org.junit.Assert.assertFalse(hset.contains(null));
-		org.junit.Assert.assertFalse(hset.remove(new Exception())); //test bad type
-		org.junit.Assert.assertFalse(hset.contains(new Exception()));
 		hset.clear();
 		org.junit.Assert.assertEquals(0, hset.size());
 		org.junit.Assert.assertTrue(hset.isEmpty());
@@ -360,7 +358,6 @@ public class HashedSetTest
 		org.junit.Assert.assertEquals(cap, set.size());
 		org.junit.Assert.assertFalse(set.remove(null));
 		org.junit.Assert.assertEquals(cap, set.size());
-		org.junit.Assert.assertFalse(set.remove(cap+1));
 		org.junit.Assert.assertEquals(cap, set.size());
 		org.junit.Assert.assertTrue(set.add(null));
 		org.junit.Assert.assertEquals(cap+1, set.size());

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015 Yusef Badri - All rights reserved.
+ * Copyright 2010-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.crypto;
@@ -50,7 +50,7 @@ public class Ascii
 			cdata = hexEncode(rawdata, off, len, null);
 			break;
 		default:
-			throw new RuntimeException("Missing case for armourtype="+atype);
+			throw new Error("Missing case for armourtype="+atype);
 		}
 		return armourWrap(cdata, 0, cdata.length);
 	}
@@ -88,7 +88,7 @@ public class Ascii
 			rawdata = hexDecode(cdata, 0, cdata.length, null);
 			break;
 		default:
-			throw new RuntimeException("Missing case for armourtype="+atype);
+			throw new Error("Missing case for armourtype="+atype);
 		}
 		return rawdata;
 	}
@@ -133,7 +133,7 @@ public class Ascii
 	public static char[] digest(com.grey.base.utils.ByteChars plain, java.security.MessageDigest proc)
 	{
 		com.grey.base.utils.ByteChars digest = plain.digest(proc);
-		return com.grey.base.crypto.Ascii.hexEncode(digest.ar_buf, digest.ar_off, digest.ar_len, null);
+		return com.grey.base.crypto.Ascii.hexEncode(digest.buffer(), digest.offset(), digest.size(), null);
 	}
 
 	public static char[] hexEncode(byte[] barr)

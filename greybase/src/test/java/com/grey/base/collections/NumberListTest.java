@@ -1,7 +1,10 @@
 /*
- * Copyright 2015 Grey Software (Yusef Badri) - All rights reserved
+ * Copyright 2015-2018 Yusef Badri - All rights reserved.
+ * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.collections;
+
+import java.lang.reflect.Array;
 
 public class NumberListTest
 {
@@ -49,16 +52,16 @@ public class NumberListTest
 	@org.junit.Test
 	public void testGrow() {
 		NumberList lst = new NumberList();
-		int cap = lst.ar_buf.length;
+		int cap = Array.getLength(lst.buffer());
 		for (int idx = 0; idx != cap; idx++) {
 			lst.append(idx+100);
 		}
 		org.junit.Assert.assertEquals(cap, lst.size());
-		org.junit.Assert.assertEquals(cap, lst.ar_buf.length);
+		org.junit.Assert.assertEquals(cap, Array.getLength(lst.buffer()));
 		org.junit.Assert.assertEquals(100, lst.get(0));
 		org.junit.Assert.assertEquals(cap + 99, lst.get(cap - 1));
 		lst.append(cap + 101);
-		int cap2 = lst.ar_buf.length;
+		int cap2 = Array.getLength(lst.buffer());
 		org.junit.Assert.assertTrue(cap2 > cap);
 		org.junit.Assert.assertEquals(cap+1, lst.size());
 		org.junit.Assert.assertEquals(100, lst.get(0));
@@ -66,6 +69,6 @@ public class NumberListTest
 		org.junit.Assert.assertEquals(cap + 101, lst.get(cap));
 		lst.clear();
 		org.junit.Assert.assertEquals(0, lst.size());
-		org.junit.Assert.assertEquals(cap2, lst.ar_buf.length);
+		org.junit.Assert.assertEquals(cap2, Array.getLength(lst.buffer()));
 	}
 }

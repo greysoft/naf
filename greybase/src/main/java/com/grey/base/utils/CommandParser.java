@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2015 Yusef Badri - All rights reserved.
+ * Copyright 2012-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -60,6 +60,7 @@ public final class CommandParser
 		return parse(args, 0);
 	}
 
+	// returns index of first param (ie. first non-options arg)
 	public int parse(String[] args, int arg)
 	{
 		int arg0 = arg;
@@ -74,7 +75,7 @@ public final class CommandParser
 						if (!silent) System.out.print(usage());
 						return -1;
 					}
-					return fail(args, arg0, "Unrecognised option="+opt+" at pos="+arg);
+					return fail(args, arg0, "Unrecognised option="+opt+" at arg="+arg);
 				}
 				OptionsHandler handler = handlers.get(idx++);
 				if (handler.containsSoloOption(opt)) {

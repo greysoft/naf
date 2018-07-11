@@ -1,0 +1,40 @@
+<!--
+  Copyright 2018 Yusef Badri - All rights reserved.
+  NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>com.github.greysoft.naf</groupId>
+		<artifactId>ossnaf</artifactId>
+		<version>${revision}</version>
+	</parent>
+	<artifactId>greynaf-bom</artifactId>
+	<packaging>pom</packaging>
+	<name>NAF BOM</name>
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>${project.groupId}</groupId>
+				<artifactId>greybase</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>${project.groupId}</groupId>
+				<artifactId>greynaf</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>${project.groupId}</groupId>
+				<artifactId>greylog</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>${project.groupId}</groupId>
+				<artifactId>greylog-slf4j</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+</project>

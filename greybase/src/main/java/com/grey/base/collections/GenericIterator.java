@@ -92,7 +92,7 @@ public final class GenericIterator<T>
 			data = arr[curslot];
 			break;
 		default:
-			throw new RuntimeException("Missing case for dtype="+dtype);
+			throw new Error("Missing case for dtype="+dtype);
 
 		}
 		curslot++;

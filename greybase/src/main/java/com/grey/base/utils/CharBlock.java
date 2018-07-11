@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -8,32 +8,45 @@ public final class CharBlock
 	extends ArrayRef<char[]>
 	implements CharSequence
 {
-	@Override
-	public int length() {return ar_len;}
-	@Override
-	public char charAt(int idx) {return ar_buf[ar_off + idx];}
-	public char[] toCharArray() {return toCharArray(0, ar_len);}
+	private static final char[] EMPTYBUF = new char[0];
+	private static final Allocator<char[]> ALLOCATOR = (n) -> (n == 0 ? EMPTYBUF : new char[n]);
 
 	public CharBlock() {this(16);}
-	public CharBlock(int cap) {super(char.class, cap);}
-	public CharBlock(char[] src) {this(src, false);}
-	public CharBlock(char[] src, boolean copy) {this(src, 0, src.length, copy);}
-	public CharBlock(char[] src, int off, int len, boolean copy) {super(src, off, len, copy);}
+	public CharBlock(int cap) {super(cap, ALLOCATOR);}
+	public CharBlock(char[] src)  {this(src, false);}
+	public CharBlock(char[] src, boolean copy) {this(src, 0, src == null ? 0 : src.length, copy);}
+	public CharBlock(char[] src, int off, int len) {this(src, off, len, false);}
 	public CharBlock(CharBlock src) {this(src, false);}
-	public CharBlock(CharBlock src, boolean copy) {this(src, 0, src.ar_len, copy);}
-	public CharBlock(CharBlock src, int off, int len, boolean copy) {super(src, off, len, copy);}
-	public CharBlock(CharSequence src) {this(src, 0, src.length());}
-	public CharBlock clear() {ar_len = 0; return this;}
+	public CharBlock(CharBlock src, boolean copy) {this(src, 0, getSize(src), copy);}
+	public CharBlock(CharSequence src) {this(src, 0, src == null ? 0 : src.length());}
+
+	@Override
+	public int length() {return size();}
+	@Override
+	public char charAt(int idx) {return buffer()[offset(idx)];}
+	@Override
+	public CharBlock clear() {return (CharBlock)super.clear();}
+
+	@Override
+	protected int totalBufferSize(char[] buf) {return (buf == null ? 0 : buf.length);}
+	@Override
+	protected char[] allocBuffer(int cap) {return ALLOCATOR.allocate(cap);}
 
 	public CharBlock(CharSequence src, int off, int len)
 	{
 		this(len);
-		ar_len = len;
-		
-		for (int idx = 0; idx != len; idx++)
-		{
-			ar_buf[idx] = src.charAt(off + idx);
+		for (int idx = 0; idx != len; idx++) {
+			buffer()[offset(idx)] = src.charAt(off + idx);
 		}
+		setSize(len);
+	}
+
+	public CharBlock(CharBlock src, int off, int len, boolean copy) {
+		this(getBuffer(src), getOffset(src, off), len, copy);
+	}
+
+	public CharBlock(char[] src, int off, int len, boolean copy) {
+		super(src, off, len, copy ? ALLOCATOR : null);
 	}
 
 	@Override
@@ -47,24 +60,9 @@ public final class CharBlock
 		return new CharBlock(this, start, end - start, copy);
 	}
 
-	public char[] toCharArray(int off, int len)
-	{
-		char[] newbuf = new char[len];
-		System.arraycopy(ar_buf, ar_off + off, newbuf, 0, len);
-		return newbuf;
-	}
-
-	public boolean ensureCapacity(int cap)
-	{
-		if (ar_buf.length - ar_off >= cap) return false;
-		ar_buf = new char[cap];
-		ar_off = 0;
-		return true;
-	}
-
 	@Override	
 	public String toString()
 	{
-		return new String(ar_buf, ar_off, ar_len);
+		return new String(buffer(), offset(), size());
 	}
 }

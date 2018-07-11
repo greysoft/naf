@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.logging;
@@ -56,7 +56,7 @@ public class LatinLogger
 		{
 			java.io.OutputStream strm = logstrm;
 			logstrm = null;
-			if (isOwner) strm.close();
+			if (isOwner()) strm.close();
 		}
 	}
 
@@ -73,11 +73,11 @@ public class LatinLogger
 
 		try {
 			setLogEntry(lvl, tmpstrbuf);
-			logmsg_buf.set(tmpstrbuf).append(msg).append(eolbytes, 0, eolbytes.length);
-			logstrm.write(logmsg_buf.ar_buf, logmsg_buf.ar_off, logmsg_buf.ar_len);
+			logmsg_buf.populate(tmpstrbuf).append(msg).append(eolbytes, 0, eolbytes.length);
+			logstrm.write(logmsg_buf.buffer(), logmsg_buf.offset(), logmsg_buf.size());
 		} catch (Throwable ex) {
 	        System.out.println(new java.util.Date(System.currentTimeMillis())+" FATAL ERROR: Failed to write LatinLogger - "
-	        		+com.grey.base.GreyException.summary(ex, true));
+	        		+com.grey.base.ExceptionUtils.summary(ex, true));
 			System.exit(1);
 		}
 	}

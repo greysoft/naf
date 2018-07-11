@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2015 Yusef Badri - All rights reserved.
+ * Copyright 2012-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -137,8 +137,10 @@ public class ScheduledTimeTest
 		long basetime = ScheduledTime.getBaseTime(sched.frequency(), dtcal_base);
 		long next1 = sched.set(systime);
 		long next2 = sched.set(basetime);
+		Calendar dtcal_next = TimeOps.getCalendar(next1, TZID);
 		org.junit.Assert.assertTrue(systime - basetime >= 0);
 		org.junit.Assert.assertEquals(next1, next2);
+		org.junit.Assert.assertEquals(next1, sched.get());
 
 		org.junit.Assert.assertEquals(0, dtcal_base.get(Calendar.MILLISECOND));
 		org.junit.Assert.assertEquals(0, dtcal_base.get(Calendar.SECOND));
@@ -169,8 +171,10 @@ public class ScheduledTimeTest
 
 		if (interval != 0) {
 			org.junit.Assert.assertTrue(systime - basetime < interval);
-			org.junit.Assert.assertEquals(basetime + interval, next1);
-			org.junit.Assert.assertEquals(interval, sched.get() - basetime);
+			if (dtcal_next.get(Calendar.DST_OFFSET) == dtcal_base.get(Calendar.DST_OFFSET)) {
+				//this won't be true if the clocks have changed during this interval
+				org.junit.Assert.assertEquals(basetime + interval, next1);
+			}
 		} else {
 			if (sched.frequency() == FREQ.MONTHLY) {
 				org.junit.Assert.assertTrue(TimeOps.expandMilliTime(systime - basetime)+"/day="+dtcal_now.get(Calendar.DAY_OF_MONTH),

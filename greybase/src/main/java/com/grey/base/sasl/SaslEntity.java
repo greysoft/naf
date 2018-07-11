@@ -1,8 +1,11 @@
 /*
- * Copyright 2012-2013 Yusef Badri - All rights reserved.
+ * Copyright 2012-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.sasl;
+
+import com.grey.base.utils.ByteArrayRef;
+import com.grey.base.utils.ByteChars;
 
 // Base SASL standard is RFC-2222 (Oct 1997), latest is RFC-4422 (Jun 2006)
 // Official list of SASL mechanisms: www.iana.org/assignments/sasl-mechanisms/sasl-mechanisms.xml
@@ -17,45 +20,45 @@ public abstract class SaslEntity
 	public static final String MECHNAME_EXTERNAL = MECH.EXTERNAL.toString();
 
 	public final MECH mechanism;
-	private final com.grey.base.utils.ByteChars base64buf; //temp working buffer preallocated for efficiency
+	private final ByteChars base64buf; //temp working buffer preallocated for efficiency
 
 	public SaslEntity init() {return this;}
 
 	public SaslEntity(MECH id, boolean base64)
 	{
 		mechanism = id;
-		base64buf = (base64 ? new com.grey.base.utils.ByteChars() : null);
+		base64buf = (base64 ? new ByteChars() : null);
 	}
 
 	// encodes an existing portion of 'buf', starting at base_len
-	protected com.grey.base.utils.ByteChars encode(com.grey.base.utils.ByteChars buf, int base_len)
+	protected ByteChars encode(ByteChars buf, int base_len)
 	{
 		if (base64buf == null) return buf;
-		com.grey.base.crypto.Base64.encodeBytes(buf.ar_buf, buf.ar_off + base_len, buf.ar_len - base_len, 0, base64buf.clear());
-		buf.ar_len = base_len;
+		com.grey.base.crypto.Base64.encodeBytes(buf.buffer(), buf.offset(base_len), buf.size() - base_len, 0, base64buf.clear());
+		buf.setSize(base_len);
 		buf.append(base64buf);
 		return buf;
 	}
 
-	protected void encode(com.grey.base.utils.ArrayRef<byte[]> inbuf, com.grey.base.utils.ByteChars outbuf)
+	protected void encode(ByteArrayRef inbuf, ByteChars outbuf)
 	{
 		if (base64buf != null) {
-			com.grey.base.crypto.Base64.encodeBytes(inbuf.ar_buf, inbuf.ar_off, inbuf.ar_len, 0, outbuf);
+			com.grey.base.crypto.Base64.encodeBytes(inbuf.buffer(), inbuf.offset(), inbuf.size(), 0, outbuf);
 		} else {
-			outbuf.append(inbuf.ar_buf, inbuf.ar_off, inbuf.ar_len);
+			outbuf.append(inbuf.buffer(), inbuf.offset(), inbuf.size());
 		}
 	}
 
-	protected com.grey.base.utils.ArrayRef<byte[]> decode(com.grey.base.utils.ArrayRef<byte[]> buf)
+	protected ByteArrayRef decode(ByteArrayRef buf)
 	{
-		if (base64buf != null && buf.ar_len != 0) {
-			com.grey.base.crypto.Base64.decodeBytes(buf.ar_buf, buf.ar_off, buf.ar_len, base64buf.clear());
+		if (base64buf != null && buf.size() != 0) {
+			com.grey.base.crypto.Base64.decodeBytes(buf.buffer(), buf.offset(), buf.size(), base64buf.clear());
 			buf = base64buf;
 		}
 		return buf;
 	}
 
-	public static void setNonce(com.grey.base.utils.ByteChars buf, CharSequence tagstr, int tagnum, StringBuilder sb)
+	public static void setNonce(ByteChars buf, CharSequence tagstr, int tagnum, StringBuilder sb)
 	{
 		if (sb == null) sb = new StringBuilder();
 		java.lang.management.RuntimeMXBean rt = java.lang.management.ManagementFactory.getRuntimeMXBean();

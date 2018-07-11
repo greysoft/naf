@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2016 Yusef Badri - All rights reserved.
+ * Copyright 2010-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -13,50 +13,130 @@ package com.grey.base.utils;
  */
 public class ArrayRef<T>
 {
-	public T ar_buf;
-	public int ar_off;
-	public int ar_len;
+	public interface Allocator<T> {
+		T allocate(int capacity);
+	}
+
+	private T ar_buf;
+	private int ar_off;
+	private int ar_len;
+
+	public ArrayRef() {this(0, null);}
+	public ArrayRef(T src, int off, int len) {this(src, off, len, null);}
+	public ArrayRef(ArrayRef<T> src) {this(src, null);}
+	public ArrayRef(ArrayRef<T> src, Allocator<T> allocator) {this(src, 0, getSize(src), allocator);}
+	public ArrayRef(ArrayRef<T> src, int off, int len) {this(src, off, len, null);}
+	public ArrayRef(ArrayRef<T> src, int off, int len, Allocator<T> allocator) {this(getBuffer(src), getOffset(src, off), len, allocator);}
+
+	public ArrayRef<T> set(T src) {return set(src, 0, totalBufferSize(src));}
+	public ArrayRef<T> set(ArrayRef<T> src) {return set(src, 0, getSize(src));}
+	public ArrayRef<T> set(ArrayRef<T> src, int off) {return set(src, off, src.size() - off);}
+	public ArrayRef<T> set(ArrayRef<T> src, int off, int len) {return set(getBuffer(src), getOffset(src, off), len);}
 
 	public final int size() {return ar_len;}
+	public final int offset() {return ar_off;}
+	public final T buffer() {return ar_buf;}
+	public final void setSize(int len) {ar_len = len;}
+	private final void setOffset(int off) {ar_off = off;}
+	private final void setBuffer(T buf) {ar_buf = buf;}
 
-	public ArrayRef(T src) {this(src, false);}
-	public ArrayRef(T src, boolean copy) {this(src, 0, java.lang.reflect.Array.getLength(src), copy);}
-	public ArrayRef(ArrayRef<T> src) {this(src, false);}
-	public ArrayRef(ArrayRef<T> src, boolean copy) {this(src, 0, src.ar_len, copy);}
-	public ArrayRef(ArrayRef<T> src, int src0, int len, boolean copy) {this(src.ar_buf, src.ar_off + src0, len, copy);}
+	public final int offset(int off) {return offset() + off;}
+	public final int limit() {return offset() + size();}
+	protected final int capacity() {return totalBufferSize() - offset();}
+	protected final int spareCapacity() {return capacity() - size();}
 
-	public ArrayRef(T src, int off, int len, boolean copy)
+	public final void incrementSize(int len) {setSize(size() + len);}
+	private final void incrementOffset(int off) {setOffset(offset() + off);}
+	public ArrayRef<T> clear() {setSize(0); return this;}
+
+	public T toArray() {return toArray(false);}
+	public T toArray(boolean nocopy) {return toArray(0, size(), nocopy);}
+	public T toArray(int off, int len) {return toArray(off, len, false);}
+
+	// subclasses should override the reflective one, for efficiency
+	protected int totalBufferSize() {return totalBufferSize(buffer());}
+	protected int totalBufferSize(T buf) {return (buf == null ? 0 : java.lang.reflect.Array.getLength(buf));}
+
+	public ArrayRef(T src, int off, int len, Allocator<T> allocator)
 	{
-		if (copy) {
-			ar_off = 0;
-			ar_len = len;
-			if (ar_len == 0) {
-				ar_buf = null;
-				return;
-			}
-			@SuppressWarnings("unchecked")
-			T uncheckedbuf = (T)java.lang.reflect.Array.newInstance(src.getClass().getComponentType(), ar_len);
-			ar_buf = uncheckedbuf;  //minimised scope of Suppress annotation
-			System.arraycopy(src, off, ar_buf, ar_off, ar_len);
-		} else {
+		if (allocator == null) {
 			ar_buf = src;
 			ar_off = off;
-			ar_len = len;
+		} else {
+			if (len != 0) {
+				ar_buf = allocator.allocate(len);
+				System.arraycopy(src, off, ar_buf, 0, len);
+			}
+		}
+		ar_len = len;
+	}
+
+	public ArrayRef(int capacity, Allocator<T> allocator)
+	{
+		if (capacity > 0) {
+			//beware that many older callers use capacity == -1 rather than zero to indicate no-alloc
+			if (allocator == null) throw new UnsupportedOperationException("No Allocator for "+this+" - cap="+capacity);
+			ar_buf = allocator.allocate(capacity);
 		}
 	}
 
-	/**
-	 * Allocate the buffer, but leave it marked as empty (len=0).
-	 * <br>
-	 * If size is -1 we don't even allocate the buffer, and this is equivalent to the basic ArrayRef() constructor
-	 */
-	public ArrayRef(Class<?> clss, int cap)
+	// subclasses should override this for efficiency, to avoid doing reflection
+	protected T allocBuffer(int capacity) {
+		if (buffer() == null)
+			throw new UnsupportedOperationException("No prototype buffer - cannot alloc cap="+capacity+" on "+this);
+		return allocBuffer(buffer().getClass(), capacity);
+	};
+
+	public ArrayRef<T> set(T buf, int off, int len)
 	{
-		if (cap != -1) {
-			@SuppressWarnings("unchecked")
-			T uncheckedbuf = (T)java.lang.reflect.Array.newInstance(clss, cap);
-			ar_buf = uncheckedbuf;  //minimised scope of Suppress annotation
+		setBuffer(buf);
+		setOffset(off);
+		setSize(len);
+		return this;
+	}
+
+	public void copyIn(T src_buf, int src_off, int off, int len) {
+		if (len != 0) System.arraycopy(src_buf, src_off, buffer(), offset(off), len);
+	}
+
+	public void copyIn(T src_buf, int src_off, int len) {
+		copyIn(src_buf, src_off, 0, len);
+	}
+
+	public void copyOut(int off, T dst_buf, int dst_off, int len) {
+		if (len != 0) System.arraycopy(buffer(), offset(off), dst_buf, dst_off, len);
+	}
+
+	public void copyOut(T dst_buf, int dst_off) {
+		copyOut(0, dst_buf, dst_off, size());
+	}
+
+	public static <T> void copy(ArrayRef<T> src, int src_off, ArrayRef<T> dst, int dst_off, int len) {
+		dst.copyIn(getBuffer(src), getOffset(src, src_off), dst_off, len);
+	}
+
+	public ArrayRef<T> ensureCapacity(int capacity) {
+		if (capacity() >= capacity) return this;
+		T newbuf = allocBuffer(capacity);
+		copyOut(newbuf, 0);
+		set(newbuf, 0, size());
+		return this;
+	}
+
+	public ArrayRef<T> ensureSpareCapacity(int spareCapacity) {
+		ensureCapacity(size() + spareCapacity);
+		return this;
+	}
+
+	// The nocopy arg avoids a copy if possible, by returning the underlying buffer.
+	// This will never return null.
+	public T toArray(int off, int len, boolean nocopy) {
+		if (nocopy && off == 0 && offset() == 0 && len == totalBufferSize()) {
+			return (buffer() == null ? allocBuffer(0) : buffer()); //len must be zero if buffer is null
 		}
+		T buf = allocBuffer(len);
+		copyOut(off, buf, 0, len);
+		return buf;
 	}
 
 	/**
@@ -74,51 +154,62 @@ public class ArrayRef<T>
 	public boolean equals(Object obj)
 	{
 		if (obj == this) return true;
-		if (!(obj instanceof ArrayRef<?>)) return false;
-		ArrayRef<?> ah2 = (ArrayRef<?>)obj;
-		return (ah2.ar_buf == ar_buf && ah2.ar_off == ar_off && ah2.ar_len == ar_len && ah2.canEqual(this));
+		if (!canEqual(obj)) return false;
+		ArrayRef<?> ref2 = (ArrayRef<?>)obj;
+		return (ref2.buffer() == buffer() && ref2.offset() == offset() && ref2.size() == size() && ref2.canEqual(this));
 	}
 
 	// This hashcode is not unique (nor do hashcodes have to be), but it is distinct enough to be a viable hash key.
 	@Override
 	public int hashCode()
 	{
-		if (ar_buf == null) return 0;
-		return ar_buf.hashCode() + ar_off + ar_len;
+		if (buffer() == null) return 0;
+		return buffer().hashCode() + offset() + size();
 	}
 
-	/**
+	/*
 	 * Must be overridden by any subclass which is not willing to consider instances of this base class as equal
 	 */
 	public boolean canEqual(Object obj)
 	{
 		return (obj instanceof ArrayRef<?>);
-    }
+	}
 
 	@Override
 	public String toString()
 	{
-		return getClass().getName()+"-"+System.identityHashCode(this)+" buf="+ar_buf
-				+" off="+ar_off+"/len="+ar_len+"/cap="+(java.lang.reflect.Array.getLength(ar_buf) - ar_off);
+		return getClass().getName()+"/"+System.identityHashCode(this)+" buf="+buffer()
+				+" off="+offset()+"/len="+size()+"/cap="+capacity();
 	}
 
 	// NB: These methods don't null the vacated array elements.
 	// First, we don't even know if the element type is Object or primitive, and secondly this ArrayRef may simply be a pointer into a
 	// buffer owned by something else.
-	// It is therefore always the responsibility of the caller to nullify any elements that are no longer needed.	
-	public final void advance(int incr)
+	// It is therefore always the responsibility of the caller to nullify any elements that are no longer needed.   
+	public void advance(int incr)
 	{
-		ar_off += incr;
-		ar_len -= incr;
+		incrementOffset(incr);
+		incrementSize(-incr);
 	}
 
-	public final void truncateBy(int incr)
-	{
-		ar_len -= incr;
+	@SuppressWarnings("unchecked")
+	private static <T> T allocBuffer(Class<?> bufferClass, int capacity) {
+		return (T)java.lang.reflect.Array.newInstance(bufferClass.getComponentType(), capacity);
 	}
 
-	public final void truncateTo(int len)
-	{
-		ar_len = len;
+	protected static <T> T getBuffer(ArrayRef<T> ref) {
+		return (ref == null ? null : ref.buffer());
+	}
+
+	protected static <T> int getSize(ArrayRef<T> ref) {
+		return (ref == null ? 0 : ref.size());
+	}
+
+	protected static <T> int getOffset(ArrayRef<T> ref) {
+		return (ref == null ? 0 : ref.offset());
+	}
+
+	protected static <T> int getOffset(ArrayRef<T> ref, int off) {
+		return (ref == null ? 0 : ref.offset(off));
 	}
 }

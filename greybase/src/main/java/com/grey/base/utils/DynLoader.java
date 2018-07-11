@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2016 Yusef Badri - All rights reserved.
+ * Copyright 2010-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -58,7 +58,7 @@ public class DynLoader
 	}
 
 	public static java.util.ArrayList<java.net.URL> loadFromDir(String dirpath)
-			throws java.io.IOException, NoSuchMethodException,
+			throws java.io.IOException, java.net.URISyntaxException, NoSuchMethodException,
 				IllegalAccessException, java.lang.reflect.InvocationTargetException
 	{
 		java.io.File dh = new java.io.File(dirpath);
@@ -68,17 +68,17 @@ public class DynLoader
 	}
 
 	public static java.util.ArrayList<java.net.URL> load(String cp)
-			throws java.io.IOException, NoSuchMethodException,
+			throws java.io.IOException, java.net.URISyntaxException, NoSuchMethodException,
 				IllegalAccessException, java.lang.reflect.InvocationTargetException
 	{
 		return load(cp.split(CPDLM));
 	}
 
 	public static java.util.ArrayList<java.net.URL> load(String[] cp)
-			throws java.io.IOException, NoSuchMethodException,
+			throws java.io.IOException, java.net.URISyntaxException, NoSuchMethodException,
 				IllegalAccessException, java.lang.reflect.InvocationTargetException
 	{
-		java.util.ArrayList<java.io.File> expandedcp = new java.util.ArrayList<java.io.File>();
+		java.util.ArrayList<java.io.File> expandedcp = new java.util.ArrayList<>();
 
 		for (int idx = 0; idx != cp.length; idx++) {
 			String path = cp[idx].trim();
@@ -108,20 +108,22 @@ public class DynLoader
 	// are to be individually added to our classpath without further expansion (but
 	// with possible contraction, ie. some can be filtered out).
 	private static java.util.ArrayList<java.net.URL> load(java.util.List<java.io.File> cp)
-			throws java.io.IOException, NoSuchMethodException,
+			throws java.io.IOException, java.net.URISyntaxException, NoSuchMethodException,
 				IllegalAccessException, java.lang.reflect.InvocationTargetException
 	{
 		ClassLoader cld = getClassLoader();
-		java.util.HashSet<java.net.URL> cp_existing = getClassPath(cld);
-		java.util.ArrayList<java.net.URL> cp_extra = new java.util.ArrayList<java.net.URL>();
+		java.util.HashSet<java.net.URI> cp_existing = getClassPath(cld);
+		java.util.ArrayList<java.net.URI> cp_extra1 = new java.util.ArrayList<>();
 
 		// Weed out duplicates
 		for (int idx = 0; idx != cp.size(); idx++) {
-			java.net.URL url = cp.get(idx).toURI().toURL();
-			if (cp_existing.contains(url) || cp_extra.contains(url)) continue;
-			cp_extra.add(url);
+			java.net.URI uri = cp.get(idx).toURI();
+			if (cp_existing.contains(uri) || cp_extra1.contains(uri)) continue;
+			cp_extra1.add(uri);
 		}
-		if (cp_extra.size() == 0) return null;
+		if (cp_extra1.size() == 0) return null;
+		java.util.ArrayList<java.net.URL> cp_extra = new java.util.ArrayList<>(cp_extra1.size());
+		for (java.net.URI uri : cp_extra1) cp_extra.add(uri.toURL());
 
 		// Dynamically add the URLs to our existing classpath
 		if (CLDHACK) {
@@ -221,15 +223,15 @@ public class DynLoader
 		return cld;
 	}
 
-	private static java.util.HashSet<java.net.URL> getClassPath(ClassLoader cld)
+	private static java.util.HashSet<java.net.URI> getClassPath(ClassLoader cld) throws java.net.URISyntaxException
 	{
-		java.util.HashSet<java.net.URL> cp = new java.util.HashSet<java.net.URL>();
+		java.util.HashSet<java.net.URI> cp = new java.util.HashSet<>();
 		do {
 			if (!(cld instanceof java.net.URLClassLoader)) break;
 			java.net.URL[] urls = ((java.net.URLClassLoader)cld).getURLs();
 			if (urls != null) {
 				for (int idx = 0; idx != urls.length; idx++) {
-					cp.add(urls[idx]); 
+					cp.add(urls[idx].toURI()); 
 				}
 			}
 			cld = cld.getParent();
@@ -303,7 +305,7 @@ public class DynLoader
 
 	public static com.grey.base.collections.HashedMapIntKey<String> generateSymbolNamess(Class<?> clss, String pfx)
 	{
-		com.grey.base.collections.HashedMapIntKey<String> symbols = new com.grey.base.collections.HashedMapIntKey<String>();
+		com.grey.base.collections.HashedMapIntKey<String> symbols = new com.grey.base.collections.HashedMapIntKey<>();
 		java.lang.reflect.Field[] flds = clss.getDeclaredFields();
 		int cnt = (flds == null ? 0 : flds.length);
 		for (int idx = 0; idx != cnt; idx++) {

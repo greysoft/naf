@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015 Yusef Badri - All rights reserved.
+ * Copyright 2010-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -14,6 +14,8 @@ public final class ByteOps
 	public static final int INTBYTES = Integer.SIZE/8; //32-bit int
 	public static final int SHORTMASK = (-1 & 0xffff); //can be used to prevent sign-extension when casting short to larger
 	public static final long INTMASK = (1L << 32) - 1L; //can be used to prevent sign-extension when casting int to larger
+
+	public static final byte[] EMPTYBUF = new byte[0];
 
 	public static byte[] getBytesUTF16(CharSequence str) {return getBytesUTF16(str, 0, str.length());}
 	public static byte[] getBytesUTF16(CharSequence str, int off, int len) {return getBytesUTF16(str, off, len, null, 0);}
@@ -167,7 +169,7 @@ public final class ByteOps
 		return -1;
 	}
 
-	/**
+	/*
 	 * Finds an occurence of the specified sequence in the specified data buffer, including cases
 	 * where the beginning of the sequence was found in a previous data buffer and allowing us to
 	 * keep track of our position in 'seq' for scanning a subsequent data buffer.
