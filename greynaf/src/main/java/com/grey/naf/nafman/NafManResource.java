@@ -106,7 +106,7 @@ class NafManResource
 		java.util.Collection<NafManRegistry.DefCommand> cmds = reg.getCommands();
 		CharSequence xml_dispatchers = d.getAgent().listDispatchers();
 		com.grey.base.utils.ByteChars bc = new com.grey.base.utils.ByteChars();
-		long timeboot = d.timeboot;
+		long timeboot = d.getTimeBoot();
 		long uptime = d.getSystemTime() - timeboot;
 		dt.setTime(timeboot);
 		StringBuilder sb = TimeOps.expandMilliTime(uptime, null, true, " ");

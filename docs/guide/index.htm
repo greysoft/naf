@@ -14,7 +14,7 @@ NAF is distributed under the terms of the GNU Affero General Public License, Ver
 <div class="menu">
 <p>
 Programmer's Guide<br/>
-NAF v2.5.0
+NAF v${project.version}
 </p>
 <hr class="mline"/>
 <p>
@@ -128,7 +128,7 @@ An overview of the main NAF components follows.
 To find code-level documentation, you are urged to go to the example applications provided (see section &sect;12 below), along with the API Reference (which is included in the NAF download), and of course the NAF source code itself, which is freely available.
 </p>
 
-To dive straight and pull the NAF libraries into your application and start coding, here is the Maven dependency.
+To dive straight in and pull the NAF libraries into your application so you can start coding, here is the Maven dependency.
 <br/> <br/>
 <table class="cfgbox">
 <tr><td>
@@ -136,7 +136,7 @@ To dive straight and pull the NAF libraries into your application and start codi
     &lt;dependency&gt;
             &lt;groupId&gt;com.github.greysoft.naf&lt;/groupId&gt;
             &lt;artifactId&gt;greynaf&lt;/artifactId&gt;
-            &lt;version&gt;2.5.0&lt;/version&gt;
+            &lt;version&gt;${project.version}&lt;/version&gt;
     &lt;/dependency&gt;
 </pre>
 </td></tr>
@@ -588,9 +588,9 @@ The second form illustrates how to connect to an arbitrary instance of NAFMAN, r
 </p>
 <div>
 <span class="vt220">
-java -jar lib/greynaf-2.5.0.jar -c conf/naf.xml -cmd showconns?nohttp=y&nbsp;
+java -jar lib/greynaf-${project.version}.jar -c conf/naf.xml -cmd showconns?nohttp=y&nbsp;
 <br/><br/><br/>
-&nbsp;java -jar lib/greynaf-2.5.0.jar -remote hostname:13000 -cmd showconns?nohttp=y
+&nbsp;java -jar lib/greynaf-${project.version}.jar -remote hostname:13000 -cmd showconns?nohttp=y
 </span>
 </div>
 <p>
@@ -616,7 +616,7 @@ Putting it all together, the following command-line invocation can be used to te
 </p>
 <div>
 <span class="vt220">
-java -jar lib/greynaf-2.5.0.jar -remote hostname:13000 -cmd appstop?d=dispname&amp;n=appname
+java -jar lib/greynaf-${project.version}.jar -remote hostname:13000 -cmd appstop?d=dispname&amp;n=appname
 </span>
 </div>
 <p>
@@ -638,16 +638,16 @@ The Resolver caches the results so that future lookups on the same domain can be
 It also caches negative answers (ie. domain name not found).
 <br/> <br/>
 The API is provided by the
-<span class="compcode">com.grey.naf.dns.Resolver</span>
+<span class="compcode">com.grey.naf.dns.ResolverDNS</span>
 class.
 Any application wishing to use the DNS resolver must implement the
-<span class="compcode">com.grey.naf.dns.Resolver.Client</span>
+<span class="compcode">com.grey.naf.dns.ResolverDNS.Client</span>
 interface, and the DNS resolver calls back to its
 <span class="compcode">dnsResolved()</span>
 method with the final result.
 <br/>
 The final result is represented by an instance of the
-<span class="compcode">com.grey.naf.dns.Answer</span>
+<span class="compcode">com.grey.naf.dns.ResolverAnswer</span>
 class, within which individual Resource Records are represented by the
 <span class="compcode">com.grey.naf.dns.ResourceData</span>
 class.
@@ -894,27 +894,31 @@ Note that the
 </li>
 </ul>
 
-<br/>
-<h4>Synchronous Resolver</h4>
+<h4>DNSClient API</h4>
 <p>
-The Resolver-API described above is an asynchronous one based on callbacks, and is intended to support NAF applications, ie. applications that are embedded within the NAF framework. The open-source Batch-Resolver described in section &sect;11 below provides an example.
+The Resolver-API described above is an internal asynchronous one based on callbacks, and is intended to support NAF applications, ie. applications that are embedded within the NAF framework. The open-source Batch-Resolver described in section &sect;11 below provides an example.
 <br/>
-However, NAF also offers a synchronous Resolver API as a convenience for non-NAF applications, which consists of blocking calls to retrieve all the same info as returned by the asynchronous API.
+However, NAF also offers the
+<span class="compcode">com.grey.naf.dns.client.DNSClient</span>
+class as a DNS API for non-NAF applications, which allows 2 modes of access:
 <br/>
-The ability to make simple blocking method calls means the synchronous Resolver API is a toolkit API available to applications of any stripe, rather than a framework API (like the asynchronous one) which requires your application to be structured in a particular manner.
+- Synchronous: As the name suggests, the calls block and return the result
+<br/>
+- Asynchronous: The call is non-blocking and the result is returned later via a callback
 <br/> <br/>
-This API is provided by the
-<span class="compcode">com.grey.naf.dns.synchronous.SynchronousResolver</span>
-class, and it returns its results in the form of the same
-<span class="compcode">com.grey.naf.dns.Answer</span>
-class as the asynchronous API.
-<br/>
-The <code>SynchronousResolver</code> class launches a Dispatcher thread in the background and uses the asynchronous API behind the scenes.
-It offers constructors which let you either instantiate the asynchronous Resolver with its default settings, or allow you to supply a
-<span class="pathname">naf.xml</span>
-to customise any settings you require.
-<br/>
-The <code>SynchronousResolver</code> class is MT-safe (thread-safe) so the recommended usage is to create a single instance which is shared amongst all the caller threads in your application, to avoid launching excess Dispatcher threads.
+While the asynchronous mode may at first glance sound similar to the <code>ResolverDNS</code> API described above, the crucial difference betwen the DNSClient API (in any mode) and the ResolverDNS API, is that it is aimed at non-NAF applications, whereas the Resolver API is only intended to be called within the Dispatcher thread.
+<br>
+That is to say, the DNSClient class is called from outside the Dispatcher thread and it takes responsibility for injecting the request into the Dispatcher thread.
+<br>
+The DNSClient callback in asynchronous mode is performed within the Dispatcher thread, so the callback should not spent too long handling the result, and should hand off to another thread if it would do so, to avoid blocking the Dispatcher.
+<br> <br>
+The <code>DNSClient</code> class returns the same
+<span class="compcode">com.grey.naf.dns.ResolverAnswer</span>
+result type as the NAF ResolverDNS API.
+<br> <br>
+The DNSClient class always has an associated Dispatcher object, and it offers constructors that can either accept an existing Dispatcher or create a new one.
+<br>
+The DNSClient class is MT-safe (thread-safe).
 </p>
 
 <hr class="pline"/>
@@ -1298,7 +1302,7 @@ Assuming you have downloaded and extracted the binary NAF distribution (or built
 </p>
 <div>
 <span class="vt220">
-java -jar lib/greynaf-2.5.0.jar -c conf/batchresolver.xml
+java -jar lib/greynaf-${project.version}.jar -c conf/batchresolver.xml
 </span>
 </div>
 <p>
@@ -1458,7 +1462,7 @@ method does no more than load its own bespoke NAFMAN command, and while this dem
 </p>
 <div>
 <span class="vt220">
-java -jar portfwd-1.0.0.jar -cmd showconns
+java -jar portfwd-${project.version}.jar -cmd showconns
 </span>
 </div>
 
@@ -1488,7 +1492,7 @@ Run NAF directly with the -h option to see its built-in options.
 </p>
 <div>
 <span class="vt220">
-java -jar greynaf-2.5.0.jar -h
+java -jar greynaf-${project.version}.jar -h
 </span>
 </div>
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2018 Yusef Badri - All rights reserved.
+ * Copyright 2010-2019 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -10,6 +10,7 @@ import java.util.Collection;
 import java.util.Set;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.time.Clock;
 
 import com.grey.base.config.SysProps;
 import com.grey.base.config.XmlConfig;
@@ -47,28 +48,28 @@ public class Dispatcher
 
 	private static final AtomicInteger anonDispatcherCount = new AtomicInteger();
 
-	public final long timeboot = System.currentTimeMillis();
 	public final String name;
-
 	private final ApplicationContextNAF appctx;
 	private final NafManAgent nafman;
 	private final ResolverDNS dnsresolv;
 	private final Flusher flusher;
 	private final Logger logger;
+	private final Clock clock;
 	private final HashedMapIntKey<ChannelMonitor> activechannels = new HashedMapIntKey<>(); //keyed on cm_id
 	private final Circulist<TimerNAF> activetimers = new Circulist<>(TimerNAF.class);
 	private final ObjectQueue<TimerNAF> pendingtimers = new ObjectQueue<>(TimerNAF.class);  //timers which have expired and are ready to fire
-	private final ArrayList<Naflet> naflets = new ArrayList<>();
+	private final ArrayList<Naflet> dynamicNaflets = new ArrayList<>();
+	private final ArrayList<Producer<?>> dynamicProducers = new ArrayList<>();
 	private final ArrayList<EntityReaper> reapers = new ArrayList<>();
 	private final Thread thrd_main;
 	private final Thread thrd_init;
 	private final java.nio.channels.Selector slct;
 	private final ObjectWell<TimerNAF> sparetimers;
-	private final Producer<Object> apploader;
+	private final Producer<Object> dynamicLoader;
 	private final ObjectWell<IOExecWriter.FileWrite> filewritepool;
-
 	private final boolean surviveHandlers; //survive error in event handlers
 	private final boolean zeroNafletsOK;  //true means ok if no Naflets running, else exit when count falls to zero
+	private final long timeboot;
 
 	private int uniqid_timer;
 	private int uniqid_chan;
@@ -90,6 +91,8 @@ public class Dispatcher
 	public boolean isActive() {return isRunning() && !shutdownRequested;}
 	public void waitStopped() {waitStopped(0, false);}
 
+	public String getName() {return name;}
+	public long getTimeBoot() {return timeboot;}
 	public ApplicationContextNAF getApplicationContext() {return appctx;}
 	public NafManAgent getAgent() {return nafman;}
 	public ResolverDNS getResolverDNS() {return dnsresolv;}
@@ -109,12 +112,14 @@ public class Dispatcher
 	private Dispatcher(ApplicationContextNAF appctx, DispatcherDef def, Logger initlog) throws java.io.IOException
 	{
 		this.appctx = appctx;
+		clock = def.clock;
+		timeboot = clock.millis();
 		name = def.name;
 		zeroNafletsOK = def.zeroNafletsOK;
 		surviveHandlers = def.surviveHandlers;
 		NAFConfig nafcfg = appctx.getConfig();
 
-		systime_msecs = System.currentTimeMillis();
+		systime_msecs = timeboot;
 		thrd_main = new Thread(this, "Dispatcher-"+name);
 		thrd_init = Thread.currentThread();
 		FileOps.ensureDirExists(nafcfg.path_var);
@@ -139,7 +144,8 @@ public class Dispatcher
 				+", wbufs="+IOExecWriter.MAXBUFSIZ+"/"+IOExecWriter.FILEBUFSIZ);
 
 		//this has to be done after creating slct, and might as well wait till logger exists as well
-		apploader = new Producer<>(Object.class, this, this);
+		dynamicLoader = new Producer<>(Object.class, this, this);
+		dynamicLoader.start();
 
 		if (def.hasNafman) {
 			NafManRegistry reg = NafManRegistry.get(appctx);
@@ -168,8 +174,8 @@ public class Dispatcher
 						new Class<?>[]{String.class, getClass(), appcfg.getClass()},
 						new Object[]{null, this, appcfg});
 				Naflet app = Naflet.class.cast(obj);
-				if (app.naflet_name.charAt(0) == '_') {
-					throw new NAFConfigException("Invalid Naflet name (starts with underscore) - "+app.naflet_name);
+				if (app.getName().charAt(0) == '_') {
+					throw new NAFConfigException("Invalid Naflet name (starts with underscore) - "+app.getName());
 				}
 				addNaflet(app);
 			}
@@ -189,7 +195,7 @@ public class Dispatcher
 	public void run()
 	{
 		getLogger().info("Dispatcher="+name+": Started thread="+Thread.currentThread().getName()+":T"+Thread.currentThread().getId());
-		systime_msecs = System.currentTimeMillis();
+		systime_msecs = getRealTime();
 		boolean ok = true;
 
 		try {
@@ -224,7 +230,7 @@ public class Dispatcher
 	{
 		if (inThread()) return stopSynchronously();
 		try {
-			apploader.produce(STOPCMD);
+			dynamicLoader.produce(STOPCMD);
 		} catch (java.io.IOException ex) {
 			//probably a harmless error caused by Dispatcher already being shut down
 			getLogger().trace("Failed to send cmd="+STOPCMD+" to Dispatcher="+name+", Thread="+threadInfo()+" - "+ex);
@@ -245,7 +251,10 @@ public class Dispatcher
 			for (int idx = 0; idx != arr.length; idx++) {
 				stopNaflet(arr[idx]);
 			}
-			getLogger().trace("Dispatcher="+name+": Issued Stop commands - naflets="+getNafletCount());
+			for (Producer<?> p : dynamicProducers) {
+				p.shutdown();
+			}
+			getLogger().trace("Dispatcher="+name+": Issued Stop commands - naflets="+getNafletCount()+", producers="+dynamicProducers.size());
 		}
 
 		if (launched) {
@@ -267,7 +276,7 @@ public class Dispatcher
 		}
 		if (dnsresolv != null)  dnsresolv.stop();
 		if (nafman != null) nafman.stop();
-		apploader.shutdown();
+		dynamicLoader.shutdown();
 
 		int reaper_cnt = 0;
 		synchronized (reapers) {
@@ -282,7 +291,7 @@ public class Dispatcher
 				+", Timers="+activetimers.size()+":"+pendingtimers.size()
 				+", reapers="+reaper_cnt
 				+" (well="+sparetimers.size()+"/"+sparetimers.population()+")");
-		if (naflets.size() != 0) getLogger().trace("Naflets: "+naflets);
+		if (dynamicNaflets.size() != 0) getLogger().trace("Naflets: "+dynamicNaflets);
 		if (activetimers.size()+pendingtimers.size() != 0) getLogger().trace("Timers: Active="+activetimers+" - Pending="+pendingtimers);
 		if (activechannels.size() != 0) {
 			getLogger().trace("Channels: "+activechannels);
@@ -314,11 +323,20 @@ public class Dispatcher
 		return STOPSTATUS.ALIVE; //failed to stop it - could only happen if blocked in an application callback
 	}
 
+	/**
+	 * This should only be called within the Dispatcher thread.
+	 */
 	@Override
-	public long getSystemTime()
-	{
-		if (systime_msecs == 0) systime_msecs = System.currentTimeMillis();
+	public long getSystemTime() {
+		if (systime_msecs == 0) systime_msecs = getRealTime();
 		return systime_msecs;
+	}
+	
+	/**
+	 * This returns the instantaneous system time, and is thread-safe.
+	 */
+	public long getRealTime() {
+		return clock.millis();
 	}
 
 	// This is the Dispatcher's main loop.
@@ -601,7 +619,8 @@ public class Dispatcher
 	public void producerIndication(Producer<Object> p) throws java.io.IOException
 	{
 		Object event;
-		while ((event = apploader.consume()) != null) {
+		while ((event = dynamicLoader.consume()) != null) {
+			getLogger().info("Loading dynamic handler - "+event);
 			if (event.getClass() == String.class) {
 				String evtname = (String)event;
 				if (evtname.equals(STOPCMD)) {
@@ -611,21 +630,40 @@ public class Dispatcher
 					// the received item is a Naflet name, to be stopped
 					Naflet app = getNaflet(evtname);
 					if (app == null) {
-						getLogger().info("Discarding stop request for Naflet="+evtname+" - unknown Naflet");
+						getLogger().info("Discarding stop request for unknown Naflet="+evtname);
 						continue;
 					}
-					getLogger().info("Unloading Naflet="+app.naflet_name+" via Producer");
+					getLogger().info("Unloading Naflet="+app.getName()+" via Producer");
 					stopNaflet(app);
 				}
 			} else {
-				Naflet app = (Naflet)event;
 				if (shutdownRequested) {
-					getLogger().info("Discarding dynamic NAFlet="+app.naflet_name+" as we're in shutdown mode");
+					getLogger().info("Discarding dynamic handler as we're in shutdown mode - "+event);
 					continue;
 				}
-				getLogger().info("Loading Naflet="+app.naflet_name+" via Producer");
-				addNaflet(app);
-				app.start(this);
+				if (event instanceof Naflet) {
+					Naflet app = (Naflet)event;
+					if (app.getDispatcher() != this) {
+						getLogger().warn("Dispatcher="+getName()+" rejecting dynamic Naflet from wrong dispatcher="+app.getDispatcher().getName());
+						return;
+					}
+					addNaflet(app);
+					app.start(this);
+				} else if (event instanceof Producer) {
+					Producer<?> prod = (Producer<?>)event;
+					if (prod.getDispatcher() != this) {
+						getLogger().warn("Dispatcher="+getName()+" rejecting dynamic Producer from wrong dispatcher="+prod.getDispatcher().getName());
+						return;
+					}
+					if (dynamicProducers.remove(prod)) {
+						prod.shutdown();
+					} else {
+						dynamicProducers.add(prod);
+						prod.start();
+					}
+				} else {
+					getLogger().warn("Dispatcher="+getName()+" rejecting unknown dynamic handler - "+event);
+				}
 			}
 		}
 	}
@@ -635,15 +673,25 @@ public class Dispatcher
 	// within the Dispatcher thread once it's been loaded.
 	public void loadNaflet(Naflet app) throws java.io.IOException
 	{
-		if (app.naflet_name.charAt(0) == '_') {
-			throw new IllegalArgumentException("Invalid Naflet name (starts with underscore) - "+app.naflet_name);
+		if (app.getName().charAt(0) == '_') {
+			throw new IllegalArgumentException("Invalid Naflet name (starts with underscore) - "+app.getName());
 		}
-		apploader.produce(app);
+		dynamicLoader.produce(app);
 	}
 
 	public void unloadNaflet(String naflet_name) throws java.io.IOException
 	{
-		apploader.produce(naflet_name);
+		dynamicLoader.produce(naflet_name);
+	}
+
+	public void loadProducer(Producer<?> prod) throws java.io.IOException
+	{
+		dynamicLoader.produce(prod);
+	}
+
+	public void unloadProducer(Producer<?> prod) throws java.io.IOException
+	{
+		dynamicLoader.produce(prod);
 	}
 
 	@Override
@@ -652,7 +700,7 @@ public class Dispatcher
 		Naflet app = Naflet.class.cast(entity);
 		boolean exists = removeNaflet(app);
 		if (!exists) return;  // duplicate notification - ignore
-		getLogger().info("Dispatcher="+name+": Naflet="+app.naflet_name+" has terminated - remaining="+getNafletCount());
+		getLogger().info("Dispatcher="+name+": Naflet="+app.getName()+" has terminated - remaining="+getNafletCount());
 	}
 
 	private void stopNaflet(Naflet app)
@@ -695,11 +743,11 @@ public class Dispatcher
 		if (shutdownRequested) sb.append("<br/>In Shutdown");
 		sb.append("</infonode>");
 
-		synchronized (naflets) {
-			sb.append("<infonode name=\"NAFlets\" total=\"").append(naflets.size()).append("\">");
-			for (int idx = 0; idx != naflets.size(); idx++) {
-				sb.append("<item id=\"").append(naflets.get(idx).naflet_name).append("\">");
-				sb.append(naflets.get(idx).getClass().getName()).append("</item>");
+		synchronized (dynamicNaflets) {
+			sb.append("<infonode name=\"NAFlets\" total=\"").append(dynamicNaflets.size()).append("\">");
+			for (int idx = 0; idx != dynamicNaflets.size(); idx++) {
+				sb.append("<item id=\"").append(dynamicNaflets.get(idx).getName()).append("\">");
+				sb.append(dynamicNaflets.get(idx).getClass().getName()).append("</item>");
 			}
 		}
 		sb.append("</infonode>");
@@ -770,16 +818,16 @@ public class Dispatcher
 	// the Naflets list.
 	public Naflet[] listNaflets()
 	{
-		synchronized (naflets) {
-			return naflets.toArray(new Naflet[getNafletCount()]);
+		synchronized (dynamicNaflets) {
+			return dynamicNaflets.toArray(new Naflet[getNafletCount()]);
 		}
 	}
 
 	private Naflet getNaflet(String naflet_name)
 	{
-		synchronized (naflets) {
+		synchronized (dynamicNaflets) {
 			for (int idx = 0; idx != getNafletCount(); idx++) {
-				if (naflets.get(idx).naflet_name.equals(naflet_name)) return naflets.get(idx);
+				if (dynamicNaflets.get(idx).getName().equals(naflet_name)) return dynamicNaflets.get(idx);
 			}
 		}
 		return null;
@@ -787,22 +835,22 @@ public class Dispatcher
 
 	private void addNaflet(Naflet app)
 	{
-		synchronized (naflets) {
-			naflets.add(app);
+		synchronized (dynamicNaflets) {
+			dynamicNaflets.add(app);
 		}
 	}
 
 	private boolean removeNaflet(Naflet app)
 	{
-		synchronized (naflets) {
-			return naflets.remove(app);
+		synchronized (dynamicNaflets) {
+			return dynamicNaflets.remove(app);
 		}
 	}
 	
 	private int getNafletCount()
 	{
-		synchronized (naflets) {
-			return naflets.size();
+		synchronized (dynamicNaflets) {
+			return dynamicNaflets.size();
 		}
 	}
 
@@ -908,11 +956,11 @@ public class Dispatcher
 		Collection<Dispatcher> dispatchers = appctx.getDispatchers();
 		txt += "Dispatchers="+dispatchers.size()+":";
 		for (Dispatcher d : dispatchers) {
-			synchronized (d.naflets) {
-				txt += "\n- "+d.name+": NAFlets="+d.naflets.size();
+			synchronized (d.dynamicNaflets) {
+				txt += "\n- "+d.name+": NAFlets="+d.dynamicNaflets.size();
 				String dlm = " - ";
-				for (int idx2 = 0; idx2 != d.naflets.size(); idx2++) {
-					txt += dlm + d.naflets.get(idx2).naflet_name;
+				for (int idx2 = 0; idx2 != d.dynamicNaflets.size(); idx2++) {
+					txt += dlm + d.dynamicNaflets.get(idx2).getName();
 					dlm = ", ";
 				}
 			}

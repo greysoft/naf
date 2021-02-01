@@ -31,6 +31,7 @@ public class SecondaryAgent
 			throw new IllegalStateException("Dispatcher="+dsptch.name+": Cannot create Secondary NAFMAN before Primary");
 		}
 		requests = new Producer<NafManCommand>(NafManCommand.class, dsptch, this);
+		requests.start();
 		primary.secondarySubscribed(this);
 	}
 

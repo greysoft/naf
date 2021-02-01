@@ -4,6 +4,8 @@
  */
 package com.grey.naf;
 
+import java.time.Clock;
+
 import com.grey.base.config.SysProps;
 
 public class DispatcherDef
@@ -13,6 +15,7 @@ public class DispatcherDef
 	public boolean zeroNafletsOK = true;
 	public boolean surviveDownstream = true;
 	public boolean surviveHandlers = true;
+	public Clock clock = Clock.systemUTC();
 
 	public String name;
 	public String logname;

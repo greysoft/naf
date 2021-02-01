@@ -1,5 +1,5 @@
 <!--
-  Copyright 2010-2018 Yusef Badri - All rights reserved.
+  Copyright 2010-2019 Yusef Badri - All rights reserved.
   NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -25,7 +25,6 @@
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
 			<version>${grey.version.slf4j}</version>
-			<scope>provided</scope>
 		</dependency>
 		<dependency>
 			<groupId>commons-logging</groupId>

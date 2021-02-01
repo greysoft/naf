@@ -45,6 +45,7 @@ public class PrimaryAgent
 		super(dsptch, reg, cfg);
 		surviveDownstream = def.surviveDownstream;
 		events = new Producer<Object>(Object.class, dsptch, this);
+		events.start();
 		dsptch.getLogger().info("NAFMAN="+dsptch.name+": survive_downstream="+surviveDownstream);
 
 		int lstnport = dsptch.getApplicationContext().getConfig().assignPort(NAFConfig.RSVPORT_NAFMAN);

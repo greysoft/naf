@@ -44,6 +44,7 @@ public class Client
 		cancelled_callers = new HashedSet<>();
 		proxy = Proxy.get(dsptch, cfg);
 		prod = new Producer<>(Request.class, dsptch, this);
+		prod.start();
 
 		RequestFactory factory = new RequestFactory(prod);
 		reqpool = new ObjectWell<>(Request.class, factory, "DNS_Client_"+dsptch.name, 0, 0, 1);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Yusef Badri - All rights reserved.
+ * Copyright 2014-2019 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.integration;
@@ -14,7 +14,7 @@ import com.grey.naf.ApplicationContextNAF;
 import com.grey.naf.NAFConfig;
 import com.grey.naf.dns.ResolverAnswer;
 import com.grey.naf.dns.ResolverDNS;
-import com.grey.naf.dns.synchronous.SynchronousResolver;
+import com.grey.naf.dns.client.DNSClient;
 
 public class SynchronousTest
 	extends ResolverTester
@@ -22,7 +22,7 @@ public class SynchronousTest
 	private static final String rootdir = DispatcherTest.initPaths(SynchronousTest.class);
 	private static final String DNAME = "TEST-SyncDNS";
 
-	private SynchronousResolver resolver;
+	private DNSClient resolver;
 
 	@org.junit.Before
 	public void beforeTest() throws java.io.IOException
@@ -32,7 +32,7 @@ public class SynchronousTest
 	}
 
 	@org.junit.After
-	public void afterTest()
+	public void afterTest() throws java.io.IOException
 	{
 		if (resolver != null) shutdown();
 	}
@@ -157,11 +157,11 @@ public class SynchronousTest
 		String nafcfg_path = createConfig(tag, recursive, use_mockserver);
 		NAFConfig nafcfg = NAFConfig.load(nafcfg_path);
 		ApplicationContextNAF appctx = ApplicationContextNAF.create(null, nafcfg);
-		resolver = new SynchronousResolver(appctx, DNAME+"-"+tag, false, logger);
+		resolver = new DNSClient(null, appctx, DNAME+"-"+tag, false, logger);
 		resolver.init();
 	}
 
-	private void shutdown()
+	private void shutdown() throws java.io.IOException
 	{
 		Dispatcher d = (Dispatcher)DynLoader.getField(resolver, "dsptch");
 		Dispatcher.STOPSTATUS stopsts = resolver.shutdown();

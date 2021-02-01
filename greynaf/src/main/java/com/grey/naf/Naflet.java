@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2018 Yusef Badri - All rights reserved.
+ * Copyright 2010-2019 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf;
@@ -19,7 +19,7 @@ import com.grey.naf.reactor.Dispatcher;
  */
 abstract public class Naflet
 {
-	public final String naflet_name;
+	private final String naflet_name;
 	private final Dispatcher dsptch;
 	private final String cfgfile;
 
@@ -29,6 +29,7 @@ abstract public class Naflet
 
 	abstract protected void startNaflet() throws java.io.IOException;
 
+	public String getName() {return naflet_name;}
 	public Dispatcher getDispatcher() {return dsptch;}
 	protected String taskConfigFile() {return cfgfile;}
 	public Logger getLogger() {return getDispatcher().getLogger();} //for convenience
@@ -78,5 +79,10 @@ abstract public class Naflet
 	{
 		getLogger().info("Naflet="+naflet_name+" has terminated - reaper="+reaper);
 		if (reaper != null) reaper.entityStopped(this);
+	}
+	
+	@Override
+	public String toString() {
+		return super.toString()+"/Naflet="+getName()+" in Dispatcher="+getDispatcher().getName();
 	}
 }

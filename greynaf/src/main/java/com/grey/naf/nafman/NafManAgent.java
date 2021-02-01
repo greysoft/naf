@@ -165,7 +165,7 @@ public abstract class NafManAgent
 			sb.append("<naflets>");
 			for (int idx2 = 0; idx2 != apps.length; idx2++) {
 				Naflet app = apps[idx2];
-				sb.append("<naflet name=\"").append(app.naflet_name).append("\"/>");
+				sb.append("<naflet name=\"").append(app.getName()).append("\"/>");
 			}
 			sb.append("</naflets>");
 			sb.append("</dispatcher>");

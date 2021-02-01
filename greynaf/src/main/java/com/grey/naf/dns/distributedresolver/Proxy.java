@@ -55,6 +55,7 @@ class Proxy
 	{
 		rslvr = new ResolverService(d, cfg);
 		prod = new Producer<>(Request.class, d, this);
+		prod.start();
 		cfg = null;
 	}
 

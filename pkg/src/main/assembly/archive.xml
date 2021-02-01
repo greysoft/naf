@@ -20,19 +20,11 @@
 		 	</includes>
 		</fileSet>
 		<fileSet>
-		 	<directory>${basedir}/src/main/config</directory>
-		 	<outputDirectory>conf</outputDirectory>
-		 	<includes>
-		 		<include>batchresolver.xml</include>
-		 	</includes>
-		</fileSet>
-		<fileSet>
 		 	<directory>${project.parent.basedir}</directory>
 		 	<outputDirectory>.</outputDirectory>
 		 	<includes>
 		 		<include>LICENCE.txt</include>
 		 		<include>NOTICE.txt</include>
-		 		<include>README.txt</include>
 		 	</includes>
 		</fileSet>
 		<fileSet>
@@ -42,6 +34,7 @@
 		<fileSet>
 		 	<directory>${project.parent.basedir}/docs/guide</directory>
 		 	<outputDirectory>docs/guide</outputDirectory>
+		 	<filtered>true</filtered>
 		</fileSet>
 		<fileSet>
 		 	<directory>${project.parent.basedir}/samples/echobot/target</directory>
@@ -59,6 +52,13 @@
 		</fileSet>
 		<fileSet>
 		 	<directory>${basedir}/src/main/config</directory>
+		 	<outputDirectory>conf</outputDirectory>
+		 	<includes>
+		 		<include>batchresolver.xml</include>
+		 	</includes>
+		</fileSet>
+		<fileSet>
+		 	<directory>${basedir}/src/main/config</directory>
 		 	<outputDirectory>samples</outputDirectory>
 		 	<includes>
 		 		<include>portfwd.xml</include>
@@ -66,4 +66,11 @@
 		 	</includes>
 		</fileSet>
 	</fileSets>
+	<files>
+		<file>
+		 	<source>${project.parent.basedir}/README.txt</source>
+	 		<outputDirectory>.</outputDirectory>
+	 		<filtered>true</filtered>
+		</file>
+	</files>
 </assembly>

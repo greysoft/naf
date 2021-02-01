@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 Yusef Badri - All rights reserved.
+ * Copyright 2011-2019 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -32,6 +32,7 @@ public class ProducerTest
 		def.surviveHandlers = false;
 		dsptch = Dispatcher.create(appctx, def, logger);
 		Producer<String> prod = new Producer<String>(String.class, dsptch, this);
+		prod.start();
 
 		// Launch threaded Producer in this thread
 		setProducedItems("A");
@@ -54,13 +55,6 @@ public class ProducerTest
 		prod.shutdown(true);
 		org.junit.Assert.assertEquals(prevcnt, consumed_cnt);
 		prod.shutdown();  //make sure duplicate close is ok
-
-		// Repeat test with non-MT Producer
-		prod = new Producer<String>(String.class, this, null);
-		setProducedItems("C");
-		produce(prod);
-		prod.shutdown();
-		org.junit.Assert.assertEquals(produced_items.size(), consumed_cnt);
 	}
 
 	// This runs in a very reasonable time, but larger values can be attempted for interactive testing
@@ -77,6 +71,7 @@ public class ProducerTest
 		def.surviveHandlers = false;
 		Dispatcher d = Dispatcher.create(appctx, def, logger);
 		Producer<String> p = new Producer<String>(String.class, d, this);
+		p.start();
 		d.start();
 		long systime1 = System.currentTimeMillis();
 		for (int idx = 0; idx != benchsize; idx++) {

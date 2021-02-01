@@ -283,7 +283,7 @@ public abstract class ChannelMonitor
 			}
 			sb.append(clss.getName());
 		}
-		if (start_time - getDispatcher().timeboot > minbootdiff) {
+		if (start_time - getDispatcher().getTimeBoot() > minbootdiff) {
 			//we don't show start-time if this CM apparently dates back to the birth of this Dispatcher
 			getDispatcher().getCalendar().setTimeInMillis(start_time);
 			sb.append(" - ");

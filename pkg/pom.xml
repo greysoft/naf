@@ -59,7 +59,7 @@
 				<configuration>
 					<bottom>Copyright 2010-2018 Grey Software (Yusef Badri). All Rights Reserved.</bottom>
 					<includeDependencySources>true</includeDependencySources>
-					<excludePackageNames>com.grey.naf.dns.batchresolver,com.grey.greylog_slf4j,com.grey.echobot,com.grey.portfwd,org.apache</excludePackageNames>
+					<excludePackageNames>com.grey.naf.dns.batchresolver,com.grey.greylog_slf4j,com.grey.echobot,com.grey.portfwd,org.slf4j,org.apache</excludePackageNames>
 				</configuration>
 				<executions>
 					<execution>

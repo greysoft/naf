@@ -4,7 +4,7 @@ If you simply want to link NAF into your application, the Maven dependency block
 	<dependency>
 		<groupId>com.github.greysoft.naf</groupId>
 		<artifactId>greynaf</artifactId>
-		<version>2.5.0</version>
+		<version>${project.version}</version>
 	</dependency>
 
 Section A - Building From Source
@@ -56,17 +56,17 @@ Note that if there is already a NAF application running on the standard NAFMAN p
 	-Dgreynaf.baseport=13100
 
 The DNS Batch Resolver (which is technically a built-in NAFlet rather than a sample app) could be run by entering the following:
-    java -jar lib/greynaf-2.5.0.jar -c conf/batchresolver.xml -logger dnsbatch < infile
+    java -jar lib/greynaf-${project.version}.jar -c conf/batchresolver.xml -logger dnsbatch < infile
 This would write the results to stdout and log messages to ./dnsbatchresolver.log
 See the NAF Programmer's Guide for more info about how to run the Batch Resolver.
 Note that the actual JAR filenames will obviously depend on the current version.
 
 The Port Forwarder sample app could be run as:
-    java -jar lib/samples-portfwd-2.5.0.jar -c conf/portfwd.xml -logger portfwd &
+    java -jar lib/samples-portfwd-${project.version}.jar -c conf/portfwd.xml -logger portfwd &
 The logfile will be under ./var/logs
 
 The Echo Bot could run a simple TCP test like this:
-    java -Dgreynaf.dispatchers.logname=echobot -jar lib/samples-echobot-2.5.0.jar -logger echobot -server-solo -clients 10:2 18001
+    java -Dgreynaf.dispatchers.logname=echobot -jar lib/samples-echobot-${project.version}.jar -logger echobot -server-solo -clients 10:2 18001
 Since this command creates multiple Dispatchers, which would normally use distinct loggers that are named after them, the above command sets a system property that directs them all to use the same GreyLog logger.
 
 All the above apps use GreyLog for their logging, and if you experience any issues with it, you can set the system property grey.logger.diagnostics=Y to get more information about what's going on.

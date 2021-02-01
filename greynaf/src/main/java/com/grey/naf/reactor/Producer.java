@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 Yusef Badri - All rights reserved.
+ * Copyright 2011-2019 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -18,8 +18,7 @@ import com.grey.logging.Logger.LEVEL;
  */
 public class Producer<T>
 {
-	public interface Consumer<T>
-	{
+	public interface Consumer<T> {
 		void producerIndication(Producer<T> p) throws java.io.IOException;
 	}
 
@@ -27,72 +26,55 @@ public class Producer<T>
 	private final Consumer<T> consumer;
 	private final com.grey.base.collections.Circulist<T> exchgq;  //MT queue, on which Dispatcher receives items from producer
 	private final com.grey.base.collections.Circulist<T> availq;  //non-MT staging queue, only accessed by the Dispatcher
-	private final AlertsPipe<T> alertspipe; //null means this Producer can only be used synchronously (not MT-safe)
+	private final AlertsPipe<T> alertspipe;
 	private final com.grey.logging.Logger logger;
 	private boolean in_shutdown;
 
-	public Dispatcher getDispatcher() {return alertspipe == null ? null : alertspipe.getDispatcher();}
+	public Dispatcher getDispatcher() {return alertspipe.getDispatcher();}
 	public void shutdown(){shutdown(false);}
 
-	public Producer(Class<T> clss, Dispatcher dsptch, Consumer<T> cons)
-			throws java.io.IOException
-	{
-		this(clss, dsptch, cons, null);
-	}
-
-	public Producer(Class<T> clss, Consumer<T> cons, com.grey.logging.Logger log)
-			throws java.io.IOException
-	{
-		this(clss, null, cons, log);
-	}
-
-	private Producer(Class<T> clss_item, Dispatcher dsptch, Consumer<T> cons, com.grey.logging.Logger log)
-			throws java.io.IOException
-	{
+	public Producer(Class<T> clss, Dispatcher dsptch, Consumer<T> cons) throws java.io.IOException {
 		consumer = cons;
-		consumerType = consumer.getClass().getName()+"/"+clss_item.getName();
-		exchgq = new com.grey.base.collections.Circulist<T>(clss_item);
-		availq = new com.grey.base.collections.Circulist<T>(clss_item);
-		logger = (log == null && dsptch != null ? dsptch.getLogger() : log);
-		alertspipe = (dsptch == null ? null : new AlertsPipe<T>(dsptch, this));
-		if (logger != null) {
-			logger.trace("Dispatcher="+(dsptch==null?"n/a":dsptch.name)+" created Producer="
-					+this+"/"+alertspipe+" for Consumer="+consumerType);
-		}
+		consumerType = consumer.getClass().getName()+"/"+clss.getName();
+		exchgq = new com.grey.base.collections.Circulist<T>(clss);
+		availq = new com.grey.base.collections.Circulist<T>(clss);
+		alertspipe = new AlertsPipe<T>(dsptch, this);
+		logger = dsptch.getLogger();
+	}
+	
+	public void start() throws java.io.IOException {
+		logger.info("Dispatcher="+getDispatcher().name+" starting Producer="+this);
+		alertspipe.start();
 	}
 
 	// If some items are already on the available queue, then we don't attempt to consume them even if
 	// the 'consume' arg is true, as this shutdown could be occurring during a notifyConsumer() callout,
 	// in which case the caller has already decided to abort.
-	public void shutdown(boolean consume_pending)
-	{
+	public void shutdown(boolean consume_pending) {
 		if (in_shutdown) return;
 		try {
-			if (alertspipe != null) alertspipe.shutdown();
-		} catch (Exception ex) {
-			if (logger != null) logger.log(LEVEL.INFO, ex, true, "Error on Producer shutdown - "+consumerType);
+			alertspipe.shutdown();
+		} catch (Throwable ex) {
+			logger.log(LEVEL.INFO, ex, true, "Error on Producer shutdown - "+this);
 		}
 		int ready = availq.size();
 		takePendingItems();
 		int pending = availq.size() - ready;
 
-		if (logger != null) logger.info("Shutdown Producer="+this+" with pending="+ready+"+"+pending+"/drain="+consume_pending
-				+" - Consumer="+consumerType);
+		logger.info("Shutdown Producer with pending="+ready+"+"+pending+"/drain="+consume_pending+" - "+this);
 		if (consume_pending && ready == 0 && pending != 0) {
 			notifyConsumer();
-			if (logger != null) logger.info("Shutdown Producer="+this+": Drainage completed - pending="+availq.size());
+			logger.info("Shutdown Producer="+this+": Drainage completed - pending="+availq.size());
 		}
 		in_shutdown = true; // don't set this till after we've drained any pending events
 	}
 
-	public T consume()
-	{
+	public T consume() {
 		if (availq.size() == 0) return null;
 		return availq.remove();
 	}
 
-	public void produce(T item) throws java.io.IOException
-	{
+	public void produce(T item) throws java.io.IOException {
 		int cnt;
 		synchronized (exchgq) {
 			cnt = exchgq.size();
@@ -101,8 +83,7 @@ public class Producer<T>
 		produce(cnt);
 	}
 
-	public void produce(java.util.ArrayList<T> items) throws java.io.IOException
-	{
+	public void produce(java.util.ArrayList<T> items) throws java.io.IOException {
 		int cnt;
 		synchronized (exchgq) {
 			cnt = exchgq.size();
@@ -113,8 +94,7 @@ public class Producer<T>
 		produce(cnt);
 	}
 
-	public void produce(T[] items, int off, int len) throws java.io.IOException
-	{
+	public void produce(T[] items, int off, int len) throws java.io.IOException {
 		int lmt = off + len;
 		int cnt;
 		synchronized (exchgq) {
@@ -126,8 +106,7 @@ public class Producer<T>
 		produce(cnt);
 	}
 
-	public void produce(T[] items) throws java.io.IOException
-	{
+	public void produce(T[] items) throws java.io.IOException {
 		produce(items, 0, items.length);
 	}
 
@@ -140,29 +119,25 @@ public class Producer<T>
 	// the AlertsPipe to signal the owner Dispatcher.
 	// If exchgq already had unconsumed items on it, then we assume the owner Dispatcher has already been signalled,
 	// so we can skip the I/O cost of sending it a redundant signal.
-	private void produce(int exchq_prevsize) throws java.io.IOException
-	{
-		if (alertspipe == null || getDispatcher().inThread()) {
+	private void produce(int exchq_prevsize) throws java.io.IOException {
+		if (getDispatcher().inThread()) {
 			producerEvent(); //we can synchronously call the Consumer
 		} else {
 			if (exchq_prevsize == 0) alertspipe.signalConsumer();  //one signal is enough
 		}
 	}
 
-	private void notifyConsumer()
-	{
+	private void notifyConsumer() {
 		int ready = availq.size();
 		if (in_shutdown || ready == 0) return;
 		try {
 			consumer.producerIndication(this);
-		} catch (Exception ex) {
-			if (logger != null) logger.log(LEVEL.INFO, ex, true,
-					"Consumer failed to handle Producer-indication - left="+availq.size()+"/"+ready+" - "+consumerType);
+		} catch (Throwable ex) {
+			logger.log(LEVEL.INFO, ex, true, "Consumer failed to handle Producer-indication - left="+availq.size()+"/"+ready+" - "+this);
 		}
 	}
 
-	private void takePendingItems()
-	{
+	private void takePendingItems() {
 		synchronized (exchgq) {
 			while (exchgq.size() != 0) {
 				availq.append(exchgq.remove());
@@ -170,10 +145,14 @@ public class Producer<T>
 		}
 	}
 
-	void producerEvent()
-	{
+	private void producerEvent() {
 		takePendingItems();
 		notifyConsumer();
+	}
+	
+	@Override
+	public String toString() {
+		return super.toString()+" Consumer="+consumerType+"/"+consumer;
 	}
 
 
@@ -189,13 +168,12 @@ public class Producer<T>
 		private final Producer<T> producer;
 		private final java.nio.channels.Pipe.SinkChannel wep;   //Write end-point of pipe
 		private final java.nio.channels.Pipe.SourceChannel rep; //Read end-point of pipe
-		private final java.nio.ByteBuffer xmtbuf;
 		private final java.nio.ByteBuffer rcvbuf;
 
 		public Producer<T> getProducer() {return producer;}
 
-		AlertsPipe(Dispatcher d, Producer<T> p) throws java.io.IOException
-		{
+		// Note that 'rep' and 'CM_Stream.iochan' are one and the same, but recording it as rep allows us to avoid casting iochan.
+		private AlertsPipe(Dispatcher d, Producer<T> p) throws java.io.IOException {
 			super(d, new com.grey.naf.BufferSpec(0, 0), null); //we will do our own reads
 			producer = p;
 
@@ -203,19 +181,16 @@ public class Producer<T>
 			rep = pipe.source(); //Read end-point
 			wep = pipe.sink();
 			wep.configureBlocking(false); //guaranteed not to block in practice
+			rcvbuf = com.grey.base.utils.NIOBuffers.create(16, true);
+		}
 
-			java.nio.ByteBuffer niobuf = com.grey.base.utils.NIOBuffers.create(1, true);
-			niobuf.put((byte)1); //value doesn't matter
-			xmtbuf = niobuf.asReadOnlyBuffer();
-			rcvbuf = com.grey.base.utils.NIOBuffers.create(64, true);
-
-			// enable event notifications on the read (consumer) endpoint of our pipe
+		// enable event notifications on the read (consumer) endpoint of our pipe		
+		private void start() throws java.io.IOException {
 			registerConnectedChannel(rep, true);
 			getReader().receive(0);
 		}
 
-		void shutdown() throws java.io.IOException
-		{
+		private void shutdown() throws java.io.IOException {
 			wep.close();
 			disconnect();
 		}
@@ -224,18 +199,16 @@ public class Producer<T>
 		// We don't care if the write() returns zero because it's blocked. We are not sending data which the
 		// consumer has to read, but merely kicking it into action, and if the pipe is full, then the
 		// consumer will surely be signalled that I/O is pending.
-		synchronized void signalConsumer() throws java.io.IOException
-		{
-			xmtbuf.flip();
-			wep.write(xmtbuf);
+		private synchronized void signalConsumer() throws java.io.IOException {
+			java.nio.ByteBuffer buf = com.grey.base.utils.NIOBuffers.create(1, false);
+			wep.write(buf);
 		}
 
 		// This happens within the Dispatcher (consumer) thread.
 		// We don't care what's in rcvbuf, we just read it off to clear the I/O notification.
-		// Note that 'rep' and 'CM_Stream.iochan' are one and the same, but recording using rep allows us to avoid casting iochan.
 		@Override
-		public void ioReceived(ByteArrayRef data) throws java.io.IOException
-		{
+		public void ioReceived(ByteArrayRef data) throws java.io.IOException {
+			rcvbuf.clear();
 			rep.read(rcvbuf);
 			producer.producerEvent();
 		}

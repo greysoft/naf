@@ -24,7 +24,7 @@ public class Task
 	public Task(String name, Dispatcher dsptch, XmlConfig cfg) throws java.io.IOException
 	{
 		super(name, dsptch, cfg);
-		listeners = new ListenerSet("Task="+naflet_name, dsptch, this, this, "listeners/listener", taskConfig(), null);
+		listeners = new ListenerSet("Task="+getName(), dsptch, this, this, "listeners/listener", taskConfig(), null);
 		if (dsptch.getAgent() != null) {
 			NafManRegistry reg = dsptch.getAgent().getRegistry();
 			reg.registerHandler(CMD_SHOWCONNS, 0, this, dsptch);
@@ -74,7 +74,7 @@ public class Task
 	}
 	
 	@Override
-	public CharSequence nafmanHandlerID() {return naflet_name;}
+	public CharSequence nafmanHandlerID() {return getName();}
 
 	public void connectionStarted(Relay relay)
 	{
