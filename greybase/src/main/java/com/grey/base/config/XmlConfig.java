@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2018 Yusef Badri - All rights reserved.
+ * Copyright 2010-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.config;
@@ -17,7 +17,6 @@ import com.grey.base.utils.XML;
 public class XmlConfig
 {
 	public static final String XPATH_ENABLED = "[@enabled='Y' or not(@enabled)]";
-	public static final String NULLMARKER = "-";  // gets translated to null, and prevents us traversing the chain of defaults
 
 	private static final boolean trace_stdout = SysProps.get("grey.config.trace", false);
 	private static final String XPATH_SEP = "/";
@@ -229,7 +228,7 @@ public class XmlConfig
 
 			for (int idx = 0; idx != arr.length; idx++) {
 				arr[idx] = arr[idx].trim();
-				if (arr[idx].length() != 0) lst.add(arr[idx]);
+				if (!arr[idx].isEmpty()) lst.add(arr[idx]);
 			}
 
 			// split() always returns at least one element, so make sure there was something
@@ -275,14 +274,15 @@ public class XmlConfig
 		if (elem != null) {
 			cfgval = elem.getTextContent();
 			if (cfgval != null) cfgval = cfgval.trim();
+			cfgval = EnvExpression.eval(cfgval);
 		}
 
-		if (cfgval == null || cfgval.length() == 0) {
+		if (cfgval == null || cfgval.isEmpty()) {
 			cfgval = dflt;
 		} else {
-			if (!disable_nullmarker && cfgval.equals(NULLMARKER)) cfgval = null;
+			if (!disable_nullmarker && cfgval.equals(SysProps.NULLMARKER)) cfgval = null;
 		}
-		if (mdty && (cfgval == null || cfgval.length() == 0)) configError(xpath, "Missing mandatory item");
+		if (mdty && (cfgval == null || cfgval.isEmpty())) configError(xpath, "Missing mandatory item");
 
 		return cfgval;
 	}

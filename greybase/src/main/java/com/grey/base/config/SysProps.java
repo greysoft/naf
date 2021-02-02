@@ -1,8 +1,12 @@
 /*
- * Copyright 2010-2018 Yusef Badri - All rights reserved.
+ * Copyright 2010-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.config;
+
+import java.util.Collections;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.grey.base.utils.IntValue;
 import com.grey.base.utils.StringOps;
@@ -10,8 +14,9 @@ import com.grey.base.utils.TimeOps;
 
 public class SysProps
 {
-	private static final boolean ENABLE_ENV = StringOps.stringAsBool(System.getProperty("grey.properties.env", StringOps.boolAsString(false)));
+	private static final Map<String,String> AppEnv = new ConcurrentHashMap<>(); //primarily intended for the benefit of tests
 
+	public static final String NULLMARKER = "-";  // placeholder value that translates to null - prevents us traversing a chain of defaults
 	public static final String EOL = get("line.separator", "\n");
 	public static final String DirSep = get("file.separator", "/");
 	public static final String PathSep = get("path.separator", ":");
@@ -40,8 +45,11 @@ public class SysProps
 	// As long as people access the system props via this method, they're guaranteed to see the LoadGreyProps() overrides
 	public static String get(String name, String dflt)
 	{
-		String val = (ENABLE_ENV ? System.getenv(name.replace('.', '_')) : null);
-		if (val == null) val = System.getProperty(name, dflt);
+		String val = AppEnv.get(name);
+		if (val == null || val.isEmpty()) val = System.getenv(name.replace('.', '_'));
+		if (val == null || val.isEmpty()) val = System.getProperty(name);
+		if (val == null || val.isEmpty()) val = dflt;
+		if (val == null || val.isEmpty() || NULLMARKER.equals(val)) val = null;
 		return val;
 	}
 
@@ -70,7 +78,9 @@ public class SysProps
 	public static String set(String name, String newval)
 	{
 		java.util.Properties props = System.getProperties();
-		return (newval == null ? (String)props.remove(name) : (String)props.setProperty(name, newval));
+		String oldval = (newval == null || newval.isEmpty() ? (String)props.remove(name) : (String)props.setProperty(name, newval));
+		if (oldval != null && oldval.isEmpty()) oldval = null;
+		return oldval;
 	}
 
 	public static boolean set(String name, boolean val)
@@ -89,6 +99,22 @@ public class SysProps
 	{
 		String oldval = set(name, Long.toString(val));
 		return (oldval == null ? 0L : TimeOps.parseMilliTime(oldval));
+	}
+
+	public static void setAppEnv(String name, String val) {
+		if (val == null || val.isEmpty()) {
+			AppEnv.remove(name);
+		} else {
+			AppEnv.put(name, val);
+		}
+	}
+
+	public static void clearAppEnv() {
+		AppEnv.clear();
+	}
+
+	public static Map<String,String> getAppEnv() {
+		return Collections.unmodifiableMap(AppEnv);
 	}
 
 	public static java.util.Properties load(String pthnam) throws java.io.IOException
@@ -149,7 +175,7 @@ public class SysProps
 		//PkgInfo will fail to get a handle on the root GreyBase package if none of its immediate member
 		//classes have been loaded yet, so reference one of them to make sure announceJAR() succeeds.
 		Class<?> clss = com.grey.base.ExceptionUtils.class;
-		if (pthnam == null || pthnam.equals("-")) {
+		if (pthnam == null || pthnam.isEmpty() || NULLMARKER.equals(pthnam)) {
 			com.grey.base.utils.PkgInfo.announceJAR(clss, "greybase", "No extra properties loaded - "+sysprop_override+"="+pthnam);
 			return;
 		}

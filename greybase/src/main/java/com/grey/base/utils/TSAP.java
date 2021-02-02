@@ -1,8 +1,11 @@
 /*
- * Copyright 2010-2016 Yusef Badri - All rights reserved.
+ * Copyright 2010-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
+
+import java.io.IOException;
+import java.net.ServerSocket;
 
 /**
  * Transport Service Access Point (ie.&nbsp; a TCP or UDP address)
@@ -141,5 +144,12 @@ public final class TSAP
 	{
 		java.net.InetAddress jdkip = IP.convertIP(ip, workbuf);
 		return new java.net.InetSocketAddress(jdkip, port);
+	}
+
+	public static int getVacantPort() throws IOException {
+		ServerSocket sock = new ServerSocket(0);
+		int port = sock.getLocalPort();
+		sock.close();
+		return port;
 	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 Yusef Badri - All rights reserved.
+ * Copyright 2011-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.config;
@@ -18,7 +18,7 @@ public class XmlConfigTest
 			+"<tag1 attr1=\" attrval1 \"> tagval1 </tag1>"
 			+"<tag2>10</tag2>"
 			+"<tag3>N</tag3>"
-			+"<tag14>"+XmlConfig.NULLMARKER+"</tag14>"
+			+"<tag14>"+SysProps.NULLMARKER+"</tag14>"
 			+"<tag16>b</tag16>"
 			+"<blanktag></blanktag>"
 			+"<innernode>"
