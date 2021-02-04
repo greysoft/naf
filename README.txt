@@ -1,14 +1,13 @@
-If you have downloaded the binary distribution, skip straight to Section B.
-
-If you simply want to link NAF into your application, the Maven dependency block is as follows:
+If you simply want to link NAF into your application, then insert this Maven dependency block in your POM:
 	<dependency>
 		<groupId>com.github.greysoft.naf</groupId>
 		<artifactId>greynaf</artifactId>
-		<version>${project.version}</version>
+		<version>current version</version>
 	</dependency>
+You can then ignore sections A and B below.
 
-Section A - Building From Source
-=================================
+Section A - Building NAF From Source
+=====================================
 NAF (Network Application Framework) is an open-source framework for non-blocking sockets I/O and timers.
 The source code is available for download at: http://www.greyware.co.uk/naf
 
@@ -16,24 +15,34 @@ Prerequisites:
 - You will need to have the Java JDK (Java 8 or later) on your Path
 - You will need to have the Maven build tool (3.5+) on your Path
 
-You can build the binary release from the source as follows:
-(we illustrate the procedure here with the Unix shell commands but the equivalent DOS commands should be obvious)
+NAF is now available on GitHub, and can be built locally as follows:
+- Clone https://github.com/greysoft/greybuild (contains required parent POM)
+- Run this in greybuild project root: 
+	mvn -Dgrey.logger.level=WARN clean install
+- Clone https://github.com/greysoft/naf
+- Run this in naf project root: 
+	mvn -Dgrey.logger.level=WARN clean install
+The logger setting shown is recommended to reduce the build noise.
 
-1) Extract the source tarball to a directory which we'll call SRCROOT.
-Documentation is now available by pointing your browser at SRCROOT/docs/guide/index.htm
+The NAF jars and their dependencies will now all be under pkg/target/dependency and each individual Jar will also be under the 'target' directory of its own sub-project, eg. greylog/target, greynaf/target, etc.
 
-2) Run these commands from Unix shell.
-- cd SRCROOT/ossnaf
-- mvn -Dgrey.logger.level=WARN clean install
-The system property setting shown is recommended to reduce the noise from the unit tests.
+The Javadocs will have been generated under pkg/target/site/apidocs
 
-That's it!  The binary distributions will now be under SRCROOT/ossnaf/target, in both the ZIP and tar.gz formats
-This corresponds to the pre-built binary distribution you could have downloaded, so continue to the next step ...
+The two sample apps will also have been built, and their Jars can be found under:
+- samples/echobot/target
+- samples/portfwd/target
+
+Finally the binaries will also have been zipped up along with the Javadocs, and are available in both Zip and compressed tar form:
+- pkg/target/naf-VERSION.zip
+- pkg/target/naf-VERSION.tar.gz
 
      -------------------------------------------------------------
 
 Section B - Contents of Binary Distribution
 ============================================
+NB: This section predates the publishing of NAF artifacts on the Maven Central repository, and used to provide a means of obtaining binary JARs to link against.
+This is no longer the recommended way of linking the NAF library into your code. Use the Maven dependency block instead as shown above, to pull the libs from the Maven Central repository.
+
 A binary release of NAF is available in both the ZIP format or as a compressed tar file.
 You "install" it simply by unpacking, and the extracted contents are:
 - ./lib: The NAF library JARs

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.logging.adapters;
@@ -11,10 +11,11 @@ public class AdapterSLF4J
 {
 	private final org.slf4j.Logger extlog;  //the external logger we're bridging to
 
-	protected AdapterSLF4J(com.grey.logging.Parameters params, String logname)
+	public AdapterSLF4J(com.grey.logging.Parameters params, String logname)
 	{
 		super(adjust(params), logname, false);
-		extlog = org.slf4j.LoggerFactory.getLogger(logname);
+		extlog = org.slf4j.LoggerFactory.getLogger("NAF-log="+logname);
+		System.out.println("NAF-log="+logname+" created SLF4J="+extlog.getClass().getName()+"/"+extlog+" in "+new java.io.File(".").getAbsolutePath());
 	}
 
 	@Override

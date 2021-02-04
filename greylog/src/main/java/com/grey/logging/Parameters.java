@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 Yusef Badri - All rights reserved.
+ * Copyright 2011-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.logging;
@@ -45,7 +45,7 @@ public class Parameters
 	public Logger.LEVEL loglevel = Logger.LEVEL.INFO;
 	public ScheduledTime.FREQ rotfreq = ScheduledTime.FREQ.NEVER;
 	public int bufsiz = 8 * 1024;  // 8K
-	public long flush_interval = 0;
+	public long flush_interval = 1_000;
 	public String pthnam = null;	// pathname template for logfile
 	public int maxsize;
 	public boolean withTID = true;
@@ -56,38 +56,28 @@ public class Parameters
 
 	public Parameters()
 	{
-		pthnam = SysProps.get(SYSPROP_LOGFILE, pthnam);
-		logclass = SysProps.get(SYSPROP_LOGCLASS, logclass);
-		loglevel = Logger.LEVEL.valueOf(SysProps.get(SYSPROP_LOGLEVEL, loglevel.name()).toUpperCase());
-		withPID = SysProps.get(SYSPROP_SHOWPID, withPID);
-		withTID = SysProps.get(SYSPROP_SHOWTID, withTID);
-		withThreadName = SysProps.get(SYSPROP_SHOWTHRDNAME, withThreadName);
-		withDelta = SysProps.get(SYSPROP_SHOWDELTA, withDelta);
-		flush_interval = SysProps.getTime(SYSPROP_FLUSHINTERVAL, flush_interval);
-		bufsiz = SysProps.get(SYSPROP_BUFSIZ, bufsiz);
-
-		String str = SysProps.get(SYSPROP_ROTFREQ, rotfreq.name());
-		rotfreq = ScheduledTime.FREQ.valueOf(str.toUpperCase());
+		envOverride();
 	}
 
 	public Parameters(XmlConfig cfg)
 	{
-		this();
-		if (cfg == null) return;
-		pthnam = cfg.getValue(".", false, null);
-		logclass = cfg.getValue("@class", false, logclass);
-		loglevel = Logger.LEVEL.valueOf(cfg.getValue("@level", false, loglevel.name()).toUpperCase());
-		withPID = cfg.getBool("@pid", withPID);
-		withTID = cfg.getBool("@tid", withTID);
-		withThreadName = cfg.getBool("@tname", withThreadName);
-		withDelta = cfg.getBool("@delta", withDelta);
-		flush_interval = cfg.getTime("@flush", flush_interval);
-		bufsiz = (int)cfg.getSize("@buffer", bufsiz);
-		maxsize = (int)cfg.getSize("@maxfile", maxsize);
-		mode = cfg.getValue("@mode", false, mode);
+		if (cfg != null) {
+			pthnam = cfg.getValue(".", false, null);
+			logclass = cfg.getValue("@class", false, logclass);
+			loglevel = Logger.LEVEL.valueOf(cfg.getValue("@level", false, loglevel.name()).toUpperCase());
+			withPID = cfg.getBool("@pid", withPID);
+			withTID = cfg.getBool("@tid", withTID);
+			withThreadName = cfg.getBool("@tname", withThreadName);
+			withDelta = cfg.getBool("@delta", withDelta);
+			flush_interval = cfg.getTime("@flush", flush_interval);
+			bufsiz = (int)cfg.getSize("@buffer", bufsiz);
+			maxsize = (int)cfg.getSize("@maxfile", maxsize);
+			mode = cfg.getValue("@mode", false, mode);
 
-		String str = cfg.getValue("@rot", false, rotfreq.name());
-		rotfreq = ScheduledTime.FREQ.valueOf(str.toUpperCase());
+			String str = cfg.getValue("@rot", false, rotfreq.name());
+			rotfreq = ScheduledTime.FREQ.valueOf(str.toUpperCase());
+		}
+		envOverride();
 	}
 
 	public Parameters(Logger.LEVEL max, String path)
@@ -156,11 +146,27 @@ public class Parameters
 		if (bufsiz == 0) flush_interval = 0;
 	}
 
+	private void envOverride()
+	{
+		pthnam = SysProps.get(SYSPROP_LOGFILE, pthnam);
+		logclass = SysProps.get(SYSPROP_LOGCLASS, logclass);
+		loglevel = Logger.LEVEL.valueOf(SysProps.get(SYSPROP_LOGLEVEL, loglevel.name()).toUpperCase());
+		withPID = SysProps.get(SYSPROP_SHOWPID, withPID);
+		withTID = SysProps.get(SYSPROP_SHOWTID, withTID);
+		withThreadName = SysProps.get(SYSPROP_SHOWTHRDNAME, withThreadName);
+		withDelta = SysProps.get(SYSPROP_SHOWDELTA, withDelta);
+		flush_interval = SysProps.getTime(SYSPROP_FLUSHINTERVAL, flush_interval);
+		bufsiz = SysProps.get(SYSPROP_BUFSIZ, bufsiz);
+
+		String str = SysProps.get(SYSPROP_ROTFREQ, rotfreq.name());
+		rotfreq = ScheduledTime.FREQ.valueOf(str.toUpperCase());
+	}
+
 	@Override
 	public String toString()
 	{
-		StringBuilder sb = new StringBuilder(80);
-		sb.append("Dest=");
+		StringBuilder sb = new StringBuilder(super.toString());
+		sb.append(": Dest=");
 		if (pthnam != null) {
 			sb.append(pthnam);
 		} else if (strm == System.out) {
@@ -188,6 +194,7 @@ public class Parameters
 			sb.append('/');
 			TimeOps.expandMilliTime(flush_interval, sb, false);
 		}
+		sb.append(" Mode=").append(mode);
 		return sb.toString();
 	}
 }

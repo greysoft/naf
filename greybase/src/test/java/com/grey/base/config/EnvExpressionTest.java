@@ -31,10 +31,6 @@ public class EnvExpressionTest {
 	public void testMissingEnvWithoutDefault() {
 		String s = EnvExpression.eval("${KEY1}");
 		Assert.assertNull(s);
-
-		SysProps.setAppEnv("KEY1", "va1");
-		s = EnvExpression.eval("${key1}");
-		Assert.assertNull(s);
 	}
 
 	@Test

@@ -30,9 +30,9 @@ public class LoggerTest
 		params.logclass = clss.getName();
 		params.withTID = true;
 		params.withDelta = true;
-		Logger log = Factory.getLogger(params, null);
+		Logger log = Factory.getLogger(params, "general1");
 		org.junit.Assert.assertEquals(clss, log.getClass());
-		org.junit.Assert.assertNull(log.getName());
+		org.junit.Assert.assertEquals("general1", log.getName());
 		org.junit.Assert.assertEquals(log.getActivePath(), log.getPathTemplate());
 		java.io.File fh = new java.io.File(log.getActivePath());
 		log.flush();
@@ -129,9 +129,8 @@ public class LoggerTest
 		Parameters params = new Parameters(LEVEL.WARN, "any-old-name-as-will-discard-it");
 		params.logclass = clss.getName();
 		params.flush_interval = TimeOps.MSECS_PER_DAY; //just to prove flushing is meaningless here
-		Logger log = Factory.getLogger(params, null);
+		Logger log = Factory.getLogger(params, "mem1");
 		org.junit.Assert.assertEquals(clss, log.getClass());
-		org.junit.Assert.assertNull(log.getName());
 		org.junit.Assert.assertNull(log.getActivePath());
 		org.junit.Assert.assertNull(log.getPathTemplate());
 		MemLogger mlog = MemLogger.class.cast(log);
@@ -158,7 +157,7 @@ public class LoggerTest
 		Class<?> clss = SinkLogger.class;
 		Parameters params = new Parameters(LEVEL.INFO, (java.io.OutputStream)null);
 		params.logclass = clss.getName();
-		Logger log = Factory.getLogger(params, null);
+		Logger log = Factory.getLogger(params, "sink1");
 		org.junit.Assert.assertEquals(clss, log.getClass());
 		log.log(LEVEL.WARN, null, true, "This message should not come out");
 		log.close();

@@ -113,9 +113,7 @@ logger is used.
 The <span class="cfgvalue">default</span> entry need not exist (though it is recommended that you do define it) and if it doesn't GreyLog will create a logger with default settings, which can be influenced by system properties (see the default constructor in the
 <span class="compcode">com.grey.logging.Parameters</span>
 source code), but is typically the standard-output stream.
-<br/>
-If you specify a named logger other than <span class="cfgvalue">default</span>, and it doesn't exist in the logging.xml file, then a
-<span class="compcode">SinkLogger</span> instance is returned, which silently discards all messages written to it.
+If you specify a named logger other than <span class="cfgvalue">default</span>, and it doesn't exist in the logging.xml file, then a default <span class="compcode">Logger</span> will be returned which logs to stdout.
 
 <br/> <br/>
 The first time the GreyLog framework tries to access the default <dfn>logging.xml</dfn> config file, it looks for it on the following search path, stopping on the first match:<br/>
@@ -129,7 +127,7 @@ The first time the GreyLog framework tries to access the default <dfn>logging.xm
 <br/>
 &bull; Look for it on the classpath as <span class="pathname">./logging.xml</span>.
 <br/>
-If still not found, then <span class="compcode">getLogger()</span> calls will treat all requested loggers as non-existent, so as described above, any logger other than <span class="cfgvalue">default</span> will get mapped to the <span class="compcode">SinkLogger</span>.
+If still not found, then <span class="compcode">getLogger()</span> calls will treat all requested loggers as non-existent, so as described above, they will be directed to stdout.
 
 <br/> <br/>
 The example below illustrates the structure of the logging.xml config file, and the logger name specified in the
@@ -272,13 +270,6 @@ If the system property
 <span class="cfgname">grey.logger.diagnostics</span>
 is set to Yes, then progress messages on the search for the
 <dfn>logging.xml</dfn> file and the process of creating a logger will be printed to the process's standard-output.
-<br/> <br/>
-If the system property
-<span class="cfgname">grey.logger.sinkstdio</span>
-is set to Yes, then instead of missing loggers (ie. specified name not found in logging.xml file) being mapped to the SinkLogger, they will be mapped to a logger with default settings, ie. the same type of logger that would be created for a missing
-<span class="cfgvalue">default</span> logger (which as explained above, is typically on stdout).
-<br/>
-This can be useful if you don't want to lose any logging output regardless of your logging.xml config.
 </p>
 
 <hr class="pline"/>

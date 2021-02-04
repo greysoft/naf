@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2018 Yusef Badri - All rights reserved.
+ * Copyright 2010-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.logging;
@@ -239,7 +239,6 @@ abstract public class Logger
 
 		if (!rollover) {
 			loggers.remove(this);
-			Factory.removeMappedLogger(this);
 		}
 	}
 

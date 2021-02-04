@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2018 Yusef Badri - All rights reserved.
+ * Copyright 2010-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf;
@@ -81,6 +81,11 @@ public class Launcher
 		@Override
 		public String displayUsage() {
 			return Launcher.displayUsage();
+		}
+
+		@Override
+		public String toString() {
+			return super.toString()+" - cfgpath="+cfgpath+", appname="+appname+", cmd="+cmd+", hostport="+hostport+", logname="+logname+", flags=0x"+Integer.toHexString(flags);
 		}
 	}
 

@@ -587,11 +587,11 @@ For example, the following command-line invocations list all the available NAFMA
 The second form illustrates how to connect to an arbitrary instance of NAFMAN, rather than the one associated with a particular naf.xml file.
 </p>
 <div>
-<span class="vt220">
+<p class="vt220">
 java -jar lib/greynaf-${project.version}.jar -c conf/naf.xml -cmd showconns?nohttp=y&nbsp;
-<br/><br/><br/>
-&nbsp;java -jar lib/greynaf-${project.version}.jar -remote hostname:13000 -cmd showconns?nohttp=y
-</span>
+<br/><br/>
+java -jar lib/greynaf-${project.version}.jar -remote hostname:13000 -cmd showconns?nohttp=y
+</p>
 </div>
 <p>
 As a web-based agent, NAFMAN returns a standard HTTP response even when invoked from the command line (in fact internally, this issues a HTTP request and forwards the response) and the body of the response is in general an XML document (although even that depends on the particular handler for that command).
@@ -615,9 +615,9 @@ Putting it all together, the following command-line invocation can be used to te
 (NB: On a Unix platform, you will need to escape the ampersand using the usual Shell syntax)
 </p>
 <div>
-<span class="vt220">
+<p class="vt220">
 java -jar lib/greynaf-${project.version}.jar -remote hostname:13000 -cmd appstop?d=dispname&amp;n=appname
-</span>
+</p>
 </div>
 <p>
 See section &sect;13 below for more general info on command-line usage.
@@ -1301,9 +1301,9 @@ package) it is not intended as merely a sample app like the ones in section &sec
 Assuming you have downloaded and extracted the binary NAF distribution (or built your own and extracted the resulting ZIP/Tar file), you would run it as follows:
 </p>
 <div>
-<span class="vt220">
+<p class="vt220">
 java -jar lib/greynaf-${project.version}.jar -c conf/batchresolver.xml
-</span>
+</p>
 </div>
 <p>
 The
@@ -1404,7 +1404,9 @@ They also demonstrate how little Java code you need to write, to build relativel
 <li><span class="softname">Port Forwarder (portfwd)</span>:
 This is based on the naf.xml config file (see below).
 <br/>
-This app also demonstrates the use of NAF timers, configured Listeners and how to implement a NAFlet and create custom NAFMAN commands, but in addition to its primary pedagogic purpose, it is a fully functioning port forwarder, which accepts TCP connections on behalf of backend services and then distributes them to one or more waiting servers.
+This app also demonstrates the use of NAF timers, configured Listeners and how to implement a NAFlet and create custom NAFMAN commands.
+<br/>
+In addition to its primary pedagogic purpose, it is a fully functioning port forwarder, which accepts TCP connections on behalf of backend services and then distributes them to one or more waiting servers.
 <br/> <br/>
 </li>
 
@@ -1461,9 +1463,9 @@ It's
 method does no more than load its own bespoke NAFMAN command, and while this demo app is running, its NAFMAN commands can be accessed either by pointing your browser at the NAFMAN home page (see section &sect;5 above), where the commands are auto-published, or via the command-line as follows:
 </p>
 <div>
-<span class="vt220">
+<p class="vt220">
 java -jar portfwd-${project.version}.jar -cmd showconns
-</span>
+</p>
 </div>
 
 <p>
@@ -1491,9 +1493,9 @@ method, NAF passes control back to it after parsing the command-line, and the Ec
 Run NAF directly with the -h option to see its built-in options.
 </p>
 <div>
-<span class="vt220">
+<p class="vt220">
 java -jar greynaf-${project.version}.jar -h
-</span>
+</p>
 </div>
 
 <p>

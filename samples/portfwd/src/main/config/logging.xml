@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<loggers>
+	<logger name="portfwd">
+		<file level="trc" rot="daily" class="com.grey.logging.LatinLogger">%DIRLOG%/portfwd.log</file>
+	</logger>
+</loggers>

@@ -17,23 +17,23 @@ public class SysProps
 	private static final Map<String,String> AppEnv = new ConcurrentHashMap<>(); //primarily intended for the benefit of tests
 
 	public static final String NULLMARKER = "-";  // placeholder value that translates to null - prevents us traversing a chain of defaults
-	public static final String EOL = get("line.separator", "\n");
-	public static final String DirSep = get("file.separator", "/");
-	public static final String PathSep = get("path.separator", ":");
+	public static final String EOL = System.getProperty("line.separator", "\n");
+	public static final String DirSep = System.getProperty("file.separator", "/");
+	public static final String PathSep = System.getProperty("path.separator", ":");
 
 	public static final String SYSPROP_DIRPATH_TMP = "grey.paths.tmp";
 	public static final String DIRTOKEN_TMP = "%DIRTMP%";
 	public static final String TMPDIR = getTempDir();
 
-	public static final boolean isWindows = get("os.name").startsWith("Windows");
+	public static final boolean isWindows = System.getProperty("os.name", "").startsWith("Windows");
 
-	public static final int JAVA_VERSION;
+	public static final int JAVA_VERSION_MAJOR;
 
 	static {
 		String ver = System.getProperty("java.version");
 		int dot1 = ver.indexOf('.');
 		int dot2 = ver.indexOf('.', dot1+1);
-		JAVA_VERSION = (int)IntValue.parseDecimal(ver, dot1+1, dot2-dot1-1);
+		JAVA_VERSION_MAJOR = (int)IntValue.parseDecimal(ver, dot1+1, dot2-dot1-1);
 		loadGreyProps();
 	}
 
@@ -45,8 +45,9 @@ public class SysProps
 	// As long as people access the system props via this method, they're guaranteed to see the LoadGreyProps() overrides
 	public static String get(String name, String dflt)
 	{
-		String val = AppEnv.get(name);
-		if (val == null || val.isEmpty()) val = System.getenv(name.replace('.', '_'));
+		String envName = name.replace('.', '_').toUpperCase();
+		String val = AppEnv.get(envName);
+		if (val == null || val.isEmpty()) val = System.getenv(envName);
 		if (val == null || val.isEmpty()) val = System.getProperty(name);
 		if (val == null || val.isEmpty()) val = dflt;
 		if (val == null || val.isEmpty() || NULLMARKER.equals(val)) val = null;
@@ -102,6 +103,7 @@ public class SysProps
 	}
 
 	public static void setAppEnv(String name, String val) {
+		name = name.toUpperCase();
 		if (val == null || val.isEmpty()) {
 			AppEnv.remove(name);
 		} else {
@@ -158,8 +160,7 @@ public class SysProps
 
 	private static void loadGreyProps()
 	{
-		String sysprop_override = "grey.properties";
-		String pthnam = get(sysprop_override);
+		String pthnam = get("grey.properties");
 		if (pthnam == null) {
 			String[] huntpath = new String[]{"./grey.properties", "./conf/grey.properties",
 					System.getProperty("user.home", ".")+"/grey.properties"};
@@ -175,20 +176,20 @@ public class SysProps
 		//PkgInfo will fail to get a handle on the root GreyBase package if none of its immediate member
 		//classes have been loaded yet, so reference one of them to make sure announceJAR() succeeds.
 		Class<?> clss = com.grey.base.ExceptionUtils.class;
-		if (pthnam == null || pthnam.isEmpty() || NULLMARKER.equals(pthnam)) {
-			com.grey.base.utils.PkgInfo.announceJAR(clss, "greybase", "No extra properties loaded - "+sysprop_override+"="+pthnam);
-			return;
-		}
 		java.util.Properties props = null;
 		try {
-			props = load(pthnam);
 			String txt;
-			if (props == null) {
-				txt = "Grey-Properties file="+pthnam+" not found";
+			if (pthnam == null || pthnam.isEmpty() || NULLMARKER.equals(pthnam)) {
+				txt = "No Grey-Properties loaded";
 			} else {
-				txt = "Grey-Properties="+props.size()+" loaded from "+pthnam;
+				props = load(pthnam);
+				if (props == null) {
+					txt = "Grey-Properties file="+pthnam+" not found";
+				} else {
+					txt = "Grey-Properties="+props.size()+" loaded from "+pthnam;
+				}
 			}
-			com.grey.base.utils.PkgInfo.announceJAR(clss, "greybase", txt+" - Java="+JAVA_VERSION+"/"+System.getProperty("java.version"));
+			com.grey.base.utils.PkgInfo.announceJAR(clss, "greybase", txt+" - Java="+JAVA_VERSION_MAJOR+"/"+System.getProperty("java.version"));
 		} catch (Exception ex) {
 			throw new RuntimeException("Failed to load Grey-Properties from "+pthnam, ex);
 		}
@@ -197,8 +198,7 @@ public class SysProps
 
 	private static String getTempDir()
 	{
-		String home = System.getProperty("user.home");
-		String dflt = (home == null ? System.getProperty("java.io.tmpdir") : home+"/tmp");
+		String dflt = System.getProperty("java.io.tmpdir", System.getProperty("user.home", "/")+"/tmp");
 		return System.getProperty(SYSPROP_DIRPATH_TMP, dflt);
 	}
 }

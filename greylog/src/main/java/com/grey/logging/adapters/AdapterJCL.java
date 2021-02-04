@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.logging.adapters;
@@ -11,10 +11,11 @@ public class AdapterJCL
 {
 	private final org.apache.commons.logging.Log extlog;  //the external logger we're bridging to
 
-	protected AdapterJCL(com.grey.logging.Parameters params, String logname)
+	public AdapterJCL(com.grey.logging.Parameters params, String logname)
 	{
 		super(adjust(params), logname, false);
-		extlog = org.apache.commons.logging.LogFactory.getLog(logname);
+		extlog = org.apache.commons.logging.LogFactory.getLog("NAF-log="+logname);
+		System.out.println("NAF-log="+logname+" created JCL="+extlog+" in "+new java.io.File(".").getAbsolutePath());
 	}
 
 	@Override

@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 Yusef Badri - All rights reserved.
+ * Copyright 2011-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.logging;
@@ -13,13 +13,10 @@ import com.grey.base.config.XmlConfig.XmlConfigException;
 public class Factory
 {
 	private static final String SYSPROP_CFGFILE = "grey.logger.configfile";
-	private static final String SYSPROP_SINKSTDIO = "grey.logger.sinkstdio";
 	public static final String DFLT_CFGFILE = getConfigFile();
 	public static final String DFLT_LOGNAME = "default";
 
-	public static final boolean sinkstdio = SysProps.get(SYSPROP_SINKSTDIO, false);
 	private static final boolean diagtrace = SysProps.get(Logger.SYSPROP_DIAG, false);
-	private static final java.util.Map<String, Logger> loggers = new com.grey.base.collections.HashedMap<String, Logger>();
 
 	static {
 		com.grey.base.utils.PkgInfo.announceJAR(Factory.class, "GreyLogger", null);
@@ -36,7 +33,7 @@ public class Factory
 	 */
 	public static Logger getLogger() throws java.io.IOException
 	{
-		return getLogger(null);
+		return getLogger(DFLT_LOGNAME);
 	}
 
 	/*
@@ -52,7 +49,8 @@ public class Factory
 	 */
 	public static Logger getLogger(String cfgpath, String name) throws java.io.IOException
 	{
-		return getNamedLogger(cfgpath, name, null);
+		XmlConfig cfg = parseConfig(cfgpath, name);
+		return getLogger(cfg, name);
 	}
 
 	public static Logger getLogger(XmlConfig cfg, String name) throws java.io.IOException
@@ -63,6 +61,7 @@ public class Factory
 
 	public static Logger getLogger(Parameters params, String name) throws java.io.IOException
 	{
+		if (name == null || name.isEmpty()) name = DFLT_LOGNAME;
 		if (params == null) params = new Parameters();
 		params.reconcile();
 		Logger log = null;
@@ -79,10 +78,8 @@ public class Factory
 		return log;
 	}
 
-	private static Logger getNamedLogger(String cfgpath, String name, String alias) throws java.io.IOException
+	private static XmlConfig parseConfig(String cfgpath, String name) throws java.io.IOException
 	{
-		String tag = (alias == null ? name : (alias+"/"+name));
-		if (name == null || name.isEmpty()) name = DFLT_LOGNAME;
 		String xpath = "/loggers/logger[@name='"+name+"']"+XmlConfig.XPATH_ENABLED;
 		java.io.File fh = new java.io.File(cfgpath);
 		java.net.URL url = null;
@@ -99,55 +96,14 @@ public class Factory
 			}
 		}
 		if (url == null) cfgpath = fh.getCanonicalPath();
-		Parameters params = null;
 
 		if (cfg != null) {
-			alias = cfg.getValue("alias", false, null);
-			if (name.equals(alias)) throw new XmlConfigException("GreyLogger: Infinite loop between "+name+" and "+alias+" - "+cfgpath);
-			if (alias != null && !alias.isEmpty()) return getNamedLogger(cfgpath, alias, tag);
+			String alias = cfg.getValue("alias", false, null);
+			if (name != null && name.equals(alias)) throw new XmlConfigException("GreyLogger: Infinite loop between "+name+" and "+alias+" - "+cfgpath);
+			if (alias != null && !alias.isEmpty()) return parseConfig(cfgpath, alias);
 			cfg = cfg.getSection("file");
 		}
-		if ((cfg == null || !cfg.exists())
-				&& !name.equalsIgnoreCase(DFLT_LOGNAME)) {
-			if (sinkstdio) {
-				if (diagtrace) System.out.println("GreyLogger: Logger="+tag+" has been directed to stdio - "+cfgpath);
-				params = new Parameters();
-			} else {
-				if (diagtrace) System.out.println("GreyLogger: Logger="+tag+" has been directed to Sink - "+cfgpath);
-				return new SinkLogger(name);
-			}
-		}
-		if (params == null) params = new Parameters(cfg);
-		params.reconcile();
-		String key = params.pthnam+":"+params.strm;
-		Logger log = null;
-
-		synchronized (loggers) {
-			log = loggers.get(key);
-			if (log != null) {
-				if (diagtrace) System.out.println("GreyLogger: Logger="+tag+" has been directed to existing Logger "+log+" - "+cfgpath);
-				return log;
-			}
-			log = getLogger(params, name);
-			loggers.put(key, log);
-			if (diagtrace) System.out.println("GreyLogger: Named Logger="+tag+" yielded "+log+" - "+cfgpath);
-		}
-		return log;
-	}
-
-	protected static boolean removeMappedLogger(Logger log)
-	{
-		synchronized (loggers) {
-			java.util.Iterator<String> it = loggers.keySet().iterator();
-			while (it.hasNext()) {
-				String key = it.next();
-				if (loggers.get(key) == log) {
-					loggers.remove(key);
-					return true;
-				}
-			}
-		}
-		return false;
+		return cfg;
 	}
 
 	private static String getConfigFile()
