@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 Yusef Badri - All rights reserved.
+ * Copyright 2011-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.greylog_slf4j;
@@ -14,16 +14,16 @@ public class LoggerAdapter
 	private static final long serialVersionUID = 1L;
 	private static final boolean dumpStack = com.grey.base.config.SysProps.get("grey.logger.slf4j.dumpstack", true);
 
-	private final com.grey.logging.Logger logger;
+	private final com.grey.logging.Logger defaultLogger;
 	private final String lname;
 
-	public com.grey.logging.Logger getDelegate() {return logger;}
+	public com.grey.logging.Logger getDelegate() {return defaultLogger;}
 
 	protected LoggerAdapter(String lname, com.grey.logging.Logger logger)
 	{
 		if (logger == null) throw new IllegalArgumentException(getClass().getName()+" has null delegate");
 		this.lname = lname;
-		this.logger = logger;
+		this.defaultLogger = logger;
 	}
 
 	//override org.slf4j.helpers.MarkerIgnoringBase method
@@ -36,49 +36,49 @@ public class LoggerAdapter
 	@Override
 	public boolean isTraceEnabled()
 	{
-		return logger.isActive(LEVEL.TRC2);
+		return isActive(LEVEL.TRC2);
 	}
 
 	@Override
 	public boolean isDebugEnabled()
 	{
-		return logger.isActive(LEVEL.TRC);
+		return isActive(LEVEL.TRC);
 	}
 
 	@Override
 	public boolean isInfoEnabled()
 	{
-		return logger.isActive(LEVEL.INFO);
+		return isActive(LEVEL.INFO);
 	}
 
 	@Override
 	public boolean isWarnEnabled()
 	{
-		return logger.isActive(LEVEL.WARN);
+		return isActive(LEVEL.WARN);
 	}
 
 	@Override
 	public boolean isErrorEnabled()
 	{
-		return logger.isActive(LEVEL.ERR);
+		return isActive(LEVEL.ERR);
 	}
 
 	@Override
 	public void trace(String msg)
 	{
-		logger.log(LEVEL.TRC2, msg);
+		trace(msg, (Throwable)null);
 	}
 
 	@Override
 	public void trace(String msg, Throwable ex)
 	{
-		logger.log(LEVEL.TRC2, ex, dumpStack, msg);
+		log(LEVEL.TRC2, msg, ex);
 	}
 
 	@Override
 	public void trace(String fmt, Object arg)
 	{
-		formatAndLog(LEVEL.TRC2, fmt, arg, null);
+		trace(fmt, arg, null);
 	}
 
 	@Override
@@ -96,19 +96,19 @@ public class LoggerAdapter
 	@Override
 	public void debug(String msg)
 	{
-		logger.log(LEVEL.TRC, msg);
+		debug(msg, (Throwable)null);
 	}
 
 	@Override
 	public void debug(String msg, Throwable ex)
 	{
-		logger.log(LEVEL.TRC, ex, dumpStack, msg);
+		log(LEVEL.TRC, msg, ex);
 	}
 
 	@Override
 	public void debug(String fmt, Object arg)
 	{
-		formatAndLog(LEVEL.TRC, fmt, arg, null);
+		debug(fmt, arg, null);
 	}
 
 	@Override
@@ -126,19 +126,19 @@ public class LoggerAdapter
 	@Override
 	public void info(String msg)
 	{
-		logger.log(LEVEL.INFO, msg);
+		info(msg, (Throwable)null);
 	}
 
 	@Override
 	public void info(String msg, Throwable ex)
 	{
-		logger.log(LEVEL.INFO, ex, dumpStack, msg);
+		log(LEVEL.INFO, msg, ex);
 	}
 
 	@Override
 	public void info(String fmt, Object arg)
 	{
-		formatAndLog(LEVEL.INFO, fmt, arg, null);
+		info(fmt, arg, null);
 	}
 
 	@Override
@@ -156,19 +156,19 @@ public class LoggerAdapter
 	@Override
 	public void warn(String msg)
 	{
-		logger.log(LEVEL.WARN, msg);
+		warn(msg, (Throwable)null);
 	}
 
 	@Override
 	public void warn(String msg, Throwable ex)
 	{
-		logger.log(LEVEL.WARN, ex, dumpStack, msg);
+		log(LEVEL.WARN, msg, ex);
 	}
 
 	@Override
 	public void warn(String fmt, Object arg)
 	{
-		formatAndLog(LEVEL.WARN, fmt, arg, null);
+		warn(fmt, arg, null);
 	}
 
 	@Override
@@ -186,19 +186,19 @@ public class LoggerAdapter
 	@Override
 	public void error(String msg)
 	{
-		logger.log(LEVEL.ERR, msg);
+		error(msg, (Throwable)null);
 	}
 
 	@Override
 	public void error(String msg, Throwable ex)
 	{
-		logger.log(LEVEL.ERR, ex, dumpStack, msg);
+		log(LEVEL.ERR, msg, ex);
 	}
 
 	@Override
 	public void error(String fmt, Object arg)
 	{
-		formatAndLog(LEVEL.ERR, fmt, arg, null);
+		error(fmt, arg, null);
 	}
 
 	@Override
@@ -215,32 +215,50 @@ public class LoggerAdapter
 
 	private void formatAndLog(LEVEL lvl, String fmt, Object arg1, Object arg2)
 	{
+		if (!isActive(lvl)) return;
 		formatAndLog(lvl, fmt, new Object[] {arg1, arg2});
 	}
 
 	private void formatAndLog(LEVEL lvl, String fmt, Object[] args)
 	{
-		if (!logger.isActive(lvl)) return;
+		if (!isActive(lvl)) return;
 		org.slf4j.helpers.FormattingTuple tp = org.slf4j.helpers.MessageFormatter.arrayFormat(fmt, args);
-		logger.log(lvl, tp.getThrowable(), dumpStack, tp.getMessage());
+		log(lvl, tp.getMessage(), tp.getThrowable());
+	}
+
+	private void log(LEVEL lvl, String msg, Throwable ex)
+	{
+		getLogger().log(lvl, ex, dumpStack, "SLF4J-"+getName()+" "+msg);
 	}
 
 
 	@Override
 	public void flush() throws java.io.IOException
 	{
-		logger.flush();
+		defaultLogger.flush();
 	}
 
 	@Override
 	public void close()
 	{
-		logger.close();
+		defaultLogger.close();
+	}
+
+	// The basis for doing this, is that the current Thread logger probably represents the Dispatcher context we're running in.
+	// And at startup time, it should map to the NAF boot logger.
+	private com.grey.logging.Logger getLogger() {
+		com.grey.logging.Logger logger = com.grey.logging.Logger.getThreadLogger();
+		if (logger == null) logger = defaultLogger;
+		return logger;
+	}
+
+	private boolean isActive(LEVEL lvl) {
+		return  getLogger().isActive(lvl);
 	}
 
 	@Override
 	public String toString()
 	{
-		return getClass().getSimpleName()+" with delegate="+logger.getClass().getName()+"/"+logger;
+		return super.toString()+" with delegate="+defaultLogger.getClass().getName()+"/"+defaultLogger+" - current="+getLogger();
 	}
 }

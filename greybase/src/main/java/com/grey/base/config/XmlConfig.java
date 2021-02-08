@@ -35,6 +35,7 @@ public class XmlConfig
 
 	public static XmlConfig getSection(CharSequence pthnam, String node_xpath)
 	{
+		if (pthnam == null || pthnam.length() == 0) return XmlConfig.NULLCFG;
 		org.w3c.dom.Document xmldoc = null;
 		try {
 			xmldoc = com.grey.base.utils.XML.getDOM(pthnam);

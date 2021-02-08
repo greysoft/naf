@@ -150,6 +150,7 @@ public class Launcher
 		if (appname == null) appname = dflt_appname;
 
 		Logger bootlog = createBootLogger(baseOptions);
+		Logger.setThreadLogger(bootlog);
 		System.out.println("Created NAF Boot Logger="+bootlog.getClass().getName()+" for application="+appname);
 
 		NAFConfig nafcfg = loadConfig(baseOptions.cfgpath, defaults, bootlog);

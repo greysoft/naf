@@ -6,7 +6,4 @@
 	<logger name="dnsbatch">
 		<file level="trc" class="com.grey.logging.LatinLogger">%stdout%</file>
 	</logger>
-	<logger name="echobot">
-		<file level="trc" delta="y">echobot.log</file>
-	</logger>
 </loggers>

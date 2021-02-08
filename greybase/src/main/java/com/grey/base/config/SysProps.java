@@ -180,7 +180,7 @@ public class SysProps
 		try {
 			String txt;
 			if (pthnam == null || pthnam.isEmpty() || NULLMARKER.equals(pthnam)) {
-				txt = "No Grey-Properties loaded";
+				txt = "No Grey-Properties found";
 			} else {
 				props = load(pthnam);
 				if (props == null) {

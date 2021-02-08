@@ -16,15 +16,15 @@ public class Factory
 	public static final String DFLT_CFGFILE = getConfigFile();
 	public static final String DFLT_LOGNAME = "default";
 
-	private static final boolean diagtrace = SysProps.get(Logger.SYSPROP_DIAG, false);
-
 	static {
 		com.grey.base.utils.PkgInfo.announceJAR(Factory.class, "GreyLogger", null);
 		java.io.File fh = new java.io.File(DFLT_CFGFILE);
-		if (!fh.exists()) {
-			System.out.println("* * * GreyLogger: Default config file not found - "+DFLT_CFGFILE);
-		} else {
-			if (diagtrace) System.out.println("* * * GreyLogger: Default config file is "+DFLT_CFGFILE);
+		if (Logger.DIAGNOSTICS) {
+			if (!fh.exists()) {
+				System.out.println(Logger.DIAGMARK+"Default config file not found - "+DFLT_CFGFILE);
+			} else {
+				System.out.println(Logger.DIAGMARK+"Default config file is "+DFLT_CFGFILE);
+			}
 		}
 	}
 
@@ -49,6 +49,7 @@ public class Factory
 	 */
 	public static Logger getLogger(String cfgpath, String name) throws java.io.IOException
 	{
+		if (Logger.DIAGNOSTICS) System.out.println(Logger.DIAGMARK+"Parsing logging config="+cfgpath+" - PWD="+new java.io.File(".").getAbsolutePath());
 		XmlConfig cfg = parseConfig(cfgpath, name);
 		return getLogger(cfg, name);
 	}
@@ -65,6 +66,7 @@ public class Factory
 		if (params == null) params = new Parameters();
 		params.reconcile();
 		Logger log = null;
+		if (Logger.DIAGNOSTICS) System.out.println(Logger.DIAGMARK+"Creating Logger="+params.logclass);
 		try {
 			Class<?> clss = DynLoader.loadClass(params.logclass);
 			java.lang.reflect.Constructor<?> ctor = clss.getDeclaredConstructor(Parameters.class, String.class);
@@ -73,8 +75,9 @@ public class Factory
 		} catch (ReflectiveOperationException ex) {
 			throw new IllegalArgumentException("Failed to create logger="+params.logclass, ex);
 		}
+		if (Logger.DIAGNOSTICS) System.out.println(Logger.DIAGMARK+"Created Logger - "+log);
 		log.init();
-		if (diagtrace) System.out.println("GreyLogger: Created Logger - "+log);
+		if (Logger.DIAGNOSTICS) System.out.println(Logger.DIAGMARK+"Initialised Logger - "+log);
 		return log;
 	}
 
@@ -130,7 +133,7 @@ public class Factory
 		try {
 			return fh.getCanonicalPath();
 		} catch (Exception ex) {
-			String msg = "GreyLogger: Failed to canonise config="+pthnam;
+			String msg = Logger.DIAGMARK+"Failed to get full pathname of config="+pthnam;
 			System.out.println(msg+" - "+com.grey.base.ExceptionUtils.summary(ex));
 			throw new IllegalArgumentException(msg, ex);
 		}

@@ -1,3 +1,11 @@
+NAF (Network Application Framework) is a Java API that implements a reactive event-driven framework based on the NIO interface, that supports non-blocking I/O over TCP, UDP and SSL.
+It is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3). 
+
+Home page: http://www.greyware.co.uk/naf
+Programmer's Guide: docs/guide/index.htm in this repo
+https://github.com/greysoft/naf/docs/guide/index.htm
+API Reference: http://www.greyware.co.uk/naf/install/docs/apidocs
+
 If you simply want to link NAF into your application, then insert this Maven dependency block in your POM:
 	<dependency>
 		<groupId>com.github.greysoft.naf</groupId>

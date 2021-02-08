@@ -74,14 +74,19 @@
 	</fileSets>
 	<files>
 		<file>
+		 	<source>${project.parent.basedir}/samples/portfwd/README.txt</source>
+		 	<outputDirectory>samples</outputDirectory>
+		 	<destName>README-portfwd.txt</destName>
+		</file>
+		<file>
 		 	<source>${project.parent.basedir}/samples/portfwd/src/main/config/logging.xml</source>
 		 	<outputDirectory>samples</outputDirectory>
 		 	<destName>portfwd-logging.xml</destName>
 		</file>
 		<file>
-		 	<source>${project.parent.basedir}/samples/portfwd/README.txt</source>
+		 	<source>${project.parent.basedir}/samples/echobot/README.txt</source>
 		 	<outputDirectory>samples</outputDirectory>
-		 	<destName>README-portfwd.txt</destName>
+		 	<destName>README-echobot.txt</destName>
 		</file>
 	</files>
 </assembly>

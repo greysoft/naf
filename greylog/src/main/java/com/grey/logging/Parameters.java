@@ -61,7 +61,7 @@ public class Parameters
 
 	public Parameters(XmlConfig cfg)
 	{
-		if (cfg != null) {
+		if (cfg != null && cfg != XmlConfig.BLANKCFG && cfg != XmlConfig.NULLCFG) {
 			pthnam = cfg.getValue(".", false, null);
 			logclass = cfg.getValue("@class", false, logclass);
 			loglevel = Logger.LEVEL.valueOf(cfg.getValue("@level", false, loglevel.name()).toUpperCase());

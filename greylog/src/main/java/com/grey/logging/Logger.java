@@ -4,6 +4,9 @@
  */
 package com.grey.logging;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 import com.grey.base.config.SysProps;
 import com.grey.base.utils.FileOps;
 import com.grey.base.utils.TimeOps;
@@ -26,8 +29,11 @@ abstract public class Logger
 	public enum LEVEL {OFF, ERR, WARN, INFO, TRC, TRC2, TRC3, TRC4, TRC5, ALL}
 
 	public static final String SYSPROP_DIAG = "grey.logger.diagnostics";
-	private static final boolean diagtrace = SysProps.get(SYSPROP_DIAG, false);
-	private static final java.util.HashSet<Logger> loggers = new java.util.HashSet<Logger>();
+	static final boolean DIAGNOSTICS = SysProps.get("grey.logger.diagnostics", false);
+	static final String DIAGMARK = "GREYLOG: ";
+
+	private static final java.util.HashSet<Logger> Loggers = new java.util.HashSet<Logger>();
+	private static final Map<Long,Logger> ThreadLoggers = new ConcurrentHashMap<>();
 	private static Thread shutdown_hook;
 
 	private final boolean isMT;
@@ -185,37 +191,38 @@ abstract public class Logger
 		// so we no longer close these loggers here as the other threads might still be logging their shutdown.
 		// This process is exiting anyway when this is run, so closing the loggers was just an empty courtesy.
 		// Instead, we just display then.
-		synchronized (loggers) {
+		synchronized (Loggers) {
 			if (shutdown_hook == null) {
-				final Logger[] openlogs = (diagtrace ? loggers.toArray(new Logger[loggers.size()]) : null);
+				final Logger[] openlogs = (DIAGNOSTICS ? Loggers.toArray(new Logger[Loggers.size()]) : null);
 				shutdown_hook = new Thread() {
 					@Override
 					public void run() {
 						if (openlogs == null || openlogs.length == 0) return;
-						System.out.println("\nGreyLogger: Shutdown Thread=T"+Thread.currentThread().getId()+" - Open loggers="+openlogs.length);
+						System.out.println("\n"+DIAGMARK+"Shutdown Thread=T"+Thread.currentThread().getId()+" - Open loggers="+openlogs.length);
 						for (int idx = 0; idx != openlogs.length; idx++) {
 							Logger logger = openlogs[idx];
-							System.out.println("- GreyLogger: Logger #"+(idx+1)+"/"+openlogs.length+": IsOwner="+logger.isOwner()+" - "+logger);
+							System.out.println("- "+DIAGMARK+"Logger #"+(idx+1)+"/"+openlogs.length+": IsOwner="+logger.isOwner()+" - "+logger);
 							logger.close();
 						}
 					}
 				};
 				Runtime.getRuntime().addShutdownHook(shutdown_hook);
 			}
-			loggers.add(this);
+			Loggers.add(this);
 		}
 		if (!withInitMark) return;
 
 		java.lang.management.RuntimeMXBean rt = java.lang.management.ManagementFactory.getRuntimeMXBean();
-		log(LEVEL.ALL, "INITMARK:"
-				+com.grey.base.config.SysProps.EOL+"\t"
-				+this
-				+com.grey.base.config.SysProps.EOL+"\t"
-				+"Opened "+(fh_active==null ? "stream" : getActivePath())
-				+" with level="+getLevel()+" at "+new java.util.Date(systime)
-				+com.grey.base.config.SysProps.EOL+"\t"
-				+"Thread="+rt.getName()+":"+Thread.currentThread().getName()+":"+Thread.currentThread().getId()
-				+", Running since " + new java.util.Date(rt.getStartTime()));
+		String txt = "Opened Logger: "+this;
+		if (strm_base != System.out && strm_base != System.err) {
+			txt += com.grey.base.config.SysProps.EOL+"\t"
+					+"Opened "+(fh_active==null ? "stream" : getActivePath())
+					+" with level="+getLevel()+" at "+new java.util.Date(systime)
+					+com.grey.base.config.SysProps.EOL+"\t"
+					+"Thread="+rt.getName()+":"+Thread.currentThread().getName()+":"+Thread.currentThread().getId()
+					+", Running since " + new java.util.Date(rt.getStartTime());
+		}
+		log(LEVEL.ALL, txt);
 		flush();
 	}
 
@@ -229,7 +236,7 @@ abstract public class Logger
 	synchronized private void close(boolean rollover)
 	{
 		try {
-			flush();  //bizzarely, close() doesn't flush in all circumstances
+			flush();  //bizarrely, close() doesn't flush in all circumstances
 			closeStream(isOwner);
 		} catch (Exception ex) {
 	        System.out.println(new java.util.Date(System.currentTimeMillis())+" Logger failed to close logfile - "+this_string+" - "
@@ -238,7 +245,14 @@ abstract public class Logger
 		isOwner = false;
 
 		if (!rollover) {
-			loggers.remove(this);
+			synchronized (Loggers) {
+				Loggers.remove(this);
+				for (Map.Entry<Long,Logger> ent : ThreadLoggers.entrySet()) {
+					if (ent.getValue() == this) {
+						ThreadLoggers.remove(ent.getKey());
+					}
+				}
+			}
 		}
 	}
 
@@ -319,4 +333,25 @@ abstract public class Logger
 	public void warn(CharSequence msg) {log(LEVEL.WARN, msg);}
 	public void info(CharSequence msg) {log(LEVEL.INFO, msg);}
 	public void trace(CharSequence msg) {log(LEVEL.TRC, msg);}
+
+	public static Logger setThreadLogger(Logger log, Long tid) {
+		if (log == null) {
+			return ThreadLoggers.remove(tid);
+		}
+		return ThreadLoggers.put(tid, log);
+	}
+
+	public static Logger setThreadLogger(Logger log) {
+		Long tid = Long.valueOf(Thread.currentThread().getId());
+		return setThreadLogger(log, tid);
+	}
+
+	public static Logger getThreadLogger(Long tid) {
+		return ThreadLoggers.get(tid);
+	}
+
+	public static Logger getThreadLogger() {
+		Long tid = Long.valueOf(Thread.currentThread().getId());
+		return getThreadLogger(tid);
+	}
 }

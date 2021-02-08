@@ -51,10 +51,10 @@ NAF v${project.version}
 <a href="#batchresolver">11&nbsp;-&nbsp;DNS&nbsp;Batch-Resolver</a>
 </p>
 <p>
-<a href="#demo">12&nbsp;-&nbsp;Demo&nbsp;Apps</a>
+<a href="#launch">12&nbsp;-&nbsp;Running&nbsp;NAF</a>
 </p>
 <p>
-<a href="#launch">13&nbsp;-&nbsp;Running&nbsp;NAF</a>
+<a href="#demo">13&nbsp;-&nbsp;Demo&nbsp;Apps</a>
 </p>
 <p>
 <a href="../../NOTICE.txt">COPYRIGHT</a>
@@ -125,7 +125,7 @@ As well as simplifying the code, the single-threaded reactor mode of operation p
 <p>
 An overview of the main NAF components follows.
 <br/>
-To find code-level documentation, you are urged to go to the example applications provided (see section &sect;12 below), along with the API Reference (which is included in the NAF download), and of course the NAF source code itself, which is freely available.
+To find code-level documentation, you are urged to go to the example applications provided (see section &sect;13 below), along with the API Reference (which is included in the NAF download), and of course the NAF source code itself, which is freely available.
 </p>
 
 To dive straight in and pull the NAF libraries into your application so you can start coding, here is the Maven dependency.
@@ -579,7 +579,7 @@ Assorted other NAF and application commands are also available, as well as the a
 Since NAFMAN command handlers are dynamically registered, the exact set of commands available will depend on your Dispatcher config and active NAFlets.
 
 <br/> <br/>
-NAFMAN commands can also issued from the command line, by entering the Path and Query-String part of the URL (ie. the URL mimnus the host-port part) as the argument to the NAF Launcher's
+NAFMAN commands can also issued against a running NAF application from the command line, by entering the Path and Query-String part of the URL (ie. the URL mimnus the host-port part) as the argument to the NAF Launcher's
 <span class="cfgvalue">-cmd</span>
 option
 <br/>
@@ -588,7 +588,7 @@ The second form illustrates how to connect to an arbitrary instance of NAFMAN, r
 </p>
 <div>
 <p class="vt220">
-java -jar lib/greynaf-${project.version}.jar -c conf/naf.xml -cmd showconns?nohttp=y&nbsp;
+java -jar lib/greynaf-${project.version}.jar -c conf/naf.xml -cmd showconns?nohttp=y
 <br/><br/>
 java -jar lib/greynaf-${project.version}.jar -remote hostname:13000 -cmd showconns?nohttp=y
 </p>
@@ -620,7 +620,7 @@ java -jar lib/greynaf-${project.version}.jar -remote hostname:13000 -cmd appstop
 </p>
 </div>
 <p>
-See section &sect;13 below for more general info on command-line usage.
+See section &sect;12 below for more general info on command-line usage.
 </p>
 
 <hr class="pline"/>
@@ -1296,13 +1296,15 @@ is a built-in NAF application (technically a standalone <i>NAFlet</i>) that take
 <br/>
 Although it also serves as an illustration of NAF's DNS API (see the
 <span class="compcode">com.grey.naf.dns.batchresolver</span>
-package) it is not intended as merely a sample app like the ones in section &sect;12, but is a fully functional application and is contained within the NAF JAR itself.
+package) it is not intended as merely a sample app like the ones in section &sect;13, but is a fully functional application and is contained within the NAF JAR itself.
 <br/> <br/>
-Assuming you have downloaded and extracted the binary NAF distribution (or built your own and extracted the resulting ZIP/Tar file), you would run it as follows:
+You can run the resolver as follows, the first form being based on unzipping the binary NAF distribution and the second on having run a build at the root of the NAF project.
 </p>
 <div>
 <p class="vt220">
 java -jar lib/greynaf-${project.version}.jar -c conf/batchresolver.xml
+<br/> <br/>
+java -jar pkg/target/dependency/greynaf-${project.version}.jar -c conf/batchresolver.xml
 </p>
 </div>
 <p>
@@ -1387,41 +1389,8 @@ attribute is also set, meaning that at the end, the batch resolver will dump the
 
 <hr class="pline"/>
 <h2>
-<a name="demo">
-12 - Demo Apps
-</a>
-</h2>
-
-<p>
-In addition to the source code and Javadoc-generated
-<a href="../apidocs/index.html">API Reference</a>,
-NAF also provides 3 sample apps (both in pre-built form in the binary download and in source form in the published NAF source tree) that demonstrate its main modes of operation.
-<br/>
-They also demonstrate how little Java code you need to write, to build relatively complex NAF apps.
-</p>
-
-<ul>
-<li><span class="softname">Port Forwarder (portfwd)</span>:
-This is based on the naf.xml config file (see below).
-<br/>
-This app also demonstrates the use of NAF timers, configured Listeners and how to implement a NAFlet and create custom NAFMAN commands.
-<br/>
-In addition to its primary pedagogic purpose, it is a fully functioning port forwarder, which accepts TCP connections on behalf of backend services and then distributes them to one or more waiting servers.
-<br/> <br/>
-</li>
-
-<li><span class="softname">Echo Bot</span>:
-This demonstrates the alternative means of launching Dispatchers, as it programmatically creates and starts multiple Dispatchers.
-<br/>
-The EchoBot contains full working examples of how to listen for or initiate TCP connections (with a programmatically created Listener), how to send and receive TCP data once connected, and how to send and receive UDP packets.
-<br/> <br/>
-</li>
-</ul>
-
-<hr class="pline"/>
-<h2>
 <a name="launch">
-13 - Running NAF
+12 - Running NAF
 </a>
 </h2>
 
@@ -1453,31 +1422,96 @@ See the source code of the
 class, for more detail on the startup processing and options.
 
 <br/> <br/>
-The
-<span class="softname">portfwd</span>
-demo app provides an example of how an application that is based on a <dfn>naf.xml</dfn> config file might pass its
-<span class="compcode">main()</span> method directly onto NAF.
-<br/>
-It's
-<span class="compcode">com.grey.portfwd.Task.main()</span>
-method does no more than load its own bespoke NAFMAN command, and while this demo app is running, its NAFMAN commands can be accessed either by pointing your browser at the NAFMAN home page (see section &sect;5 above), where the commands are auto-published, or via the command-line as follows:
+You can run a NAF application with the -h option to see its command-line options.
 </p>
 <div>
 <p class="vt220">
-java -jar portfwd-${project.version}.jar -cmd showconns
-</p>
+java -jar lib/greynaf-${project.version}.jar -h
+<br/> <br/>
+java -cp lib/greynaf-${project.version}.jar:my-application.jar my.main.class -h
+<br/> <br/>
+java -jar my-application.jar my.main.class -h
 </div>
+<p>
+If you've unzipped a binary NAF distribution (whether one you downloaded or built yourself) invoking the NAF Jar under
+<span class="pathname">lib</span>
+as above will work because all the other Jars it depends on are in the same directory.
+<br/>
+However if you're running from the project root after doing a build, you would invoke the NAF jar as
+<span class="pathname">pkg/target/dependency/greynaf-${project.version}.jar</span>
+
+<br/> <br/>
+However you would normally launch your own application directly as in the 3rd example above, as it would have NAF and all other dependencies already on its classpath.
+<br/>
+As noted in section &sect;2 above though, you could specify all the JARs your application requires in the
+<span class="cfgname">dependjars</span>
+config item or the
+<span class="cfgname">greynaf.cp</span>
+system property, and if so, you could launch your application by directly executing
+<span class="pathname">greynaf.jar</span>
+</p>
+
+<hr class="pline"/>
+<h2>
+<a name="demo">
+13 - Demo Apps
+</a>
+</h2>
+
+<p>
+In addition to the source code and Javadoc-generated
+<a href="../apidocs/index.html">API Reference</a>,
+NAF also provides 3 sample apps (both in pre-built form in the binary download and in source form in the published NAF source tree) that demonstrate its main modes of operation.
+<br/>
+They also demonstrate how little Java code you need to write, to build relatively complex NAF apps.
+</p>
+
+<ul>
+<li><span class="softname">Port Forwarder (portfwd)</span>:
+This is based on the naf.xml config file (see below).
+<br/>
+This app also demonstrates the use of NAF timers, configured Listeners and how to implement a NAFlet and create custom NAFMAN commands.
+<br/>
+In addition to its primary pedagogic purpose, it is a fully functioning port forwarder, which accepts TCP connections on behalf of backend services and then distributes them to one or more waiting servers.
+<br/> <br/>
+</li>
+
+<li><span class="softname">Echo Bot</span>:
+This demonstrates the alternative means of launching Dispatchers, as it programmatically creates and starts multiple Dispatchers.
+<br/>
+The EchoBot contains full working examples of how to listen for or initiate TCP connections (with a programmatically created Listener), how to send and receive TCP data once connected, and how to send and receive UDP packets.
+<br/> <br/>
+</li>
+</ul>
 
 <p>
 The
+<span class="softname">portfwd</span>
+demo app provides an example of how an application that is based on a <dfn>naf.xml</dfn> config file (called portfwd.xml in this case) might pass control to the NAF framework in its
+<span class="compcode">main()</span> method.
+<br/>
+The XML config file specifies a NAFlet
+(see <span class="compcode">com.grey.portfwd.Task()</span>)
+in the PortFwd application code, which simply creates the configured listeners and creates a custom NAFMAN command before returning control to the NAF framework which does everything else.
+<br/>
+While this demo app is running, its NAFMAN commands can be accessed either by pointing your browser at the NAFMAN home page (see section &sect;5 above), where the commands are auto-published, or via the command-line as follows:
+</p>
+<div>
+<p class="vt220">
+java -cp portfwd-${project.version}.jar com.grey.portfwd.App -cmd showconns
+</div>
+
+<p>
+&nbsp;<br/>
+The
 <span class="softname">EchoBot</span>
-demo app illustrates the behaviour of an application that doesn't use a naf.xml file, but it still leverages NAF's command-line parsing facilities.
+demo app illustrates the behaviour of an application that doesn't use a naf.xml config file, but it still leverages NAF's command-line parsing facilities.
 <br/>
 As you can see,
 <span class="compcode">com.grey.echobot.App</span>
 subclasses NAF's
 <span class="compcode">com.grey.naf.Launcher</span>
-class, and contains the EchoBot's
+class (as does PortFwd) and contains the EchoBot's
 <span class="compcode">main()</span>
 which instantiates the Launcher subclass and then passes control to it.
 <br/>
@@ -1490,24 +1524,7 @@ Because the App class overrides the Launcher's
 method, NAF passes control back to it after parsing the command-line, and the EchoBot takes over from there.
 
 <br/> <br/>
-Run NAF directly with the -h option to see its built-in options.
-</p>
-<div>
-<p class="vt220">
-java -jar greynaf-${project.version}.jar -h
-</p>
-</div>
-
-<p>
-<br/>
-NAF would normally be loaded by your own application rather than executed directly, not least of the reasons being that the application-specific classpath you require will be set in your application's JAR (or enclosing framework), rather than NAF.
-<br/>
-As noted in section &sect;2 above though, you could specify all the JARs your application requires in the
-<span class="cfgname">dependjars</span>
-config item or the
-<span class="cfgname">greynaf.cp</span>
-system property, and if so, you could launch your application by directly executing
-<span class="pathname">greynaf.jar</span>
+Both demo apps have a README with some more practical information on how to build and run them.
 </p>
 
 <br/>&nbsp;<br/>&nbsp;<br/>

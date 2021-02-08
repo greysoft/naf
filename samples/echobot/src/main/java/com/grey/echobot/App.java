@@ -1,11 +1,12 @@
 /*
- * Copyright 2012-2018 Yusef Badri - All rights reserved.
+ * Copyright 2012-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.echobot;
 
 import com.grey.base.utils.FileOps;
 import com.grey.base.utils.TSAP;
+import com.grey.base.config.SysProps;
 import com.grey.base.utils.CommandParser;
 import com.grey.logging.Logger;
 import com.grey.naf.ApplicationContextNAF;
@@ -15,25 +16,31 @@ import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.CM_Listener;
 import com.grey.naf.reactor.ConcurrentListener;
 
+import org.slf4j.LoggerFactory;
+
 public class App
 	extends com.grey.naf.Launcher
 {
+	private static final org.slf4j.Logger Logger = LoggerFactory.getLogger(App.class);
+	static final boolean USE_NAFMAN = SysProps.get("grey.echobot.nafman", false);
+
 	static final String[] opts = new String[]{"udp", "server", "server-solo", "clients:", "msg:", "cbuf:", "sbuf:", "sockbuf:", "verify"};
 	static final int HDRSIZ = 0; //no message header is defined
 
 	public static void main(String[] args) throws Exception
 	{
+		Logger.info("Starting EchoBot with NAFMAN="+USE_NAFMAN+", logger="+Logger.getClass().getName()+"/"+Logger);
 		App app = new App(args);
-		app.exec("echobot", false);
+		app.exec("echobot", USE_NAFMAN);
 	}
 
 	private static class OptsHandler extends CommandParser.OptionsHandler
 	{
 		boolean udpmode;
 		boolean server_enabled;
-		boolean server_solo; //true means standalone server, ie. has own exclusive Dispatcher
-		int cgrpcnt = 1;
-		int cgrpsiz = 0;
+		boolean server_solo; //true means standalone server, ie. has own exclusive Dispatcher with no clients
+		int cgrpcnt = 0; //no. of client groups, ie. number of client Dispatchers
+		int cgrpsiz = 1; //no. of clients in each group
 		int msgcnt = 1;
 		int msgsiz = 4 * 1024;
 		int cxmtbuf = msgsiz;
@@ -67,8 +74,8 @@ public class App
 			String[] parts;
 			if (opt.equals("clients")) {
 				parts = val.split(":");
-				cgrpsiz = Integer.parseInt(parts[0]);
-				if (parts.length != 1) cgrpcnt = Integer.parseInt(parts[1]);
+				cgrpcnt = Integer.parseInt(parts[0]);
+				if (parts.length != 1) cgrpsiz = Integer.parseInt(parts[1]);
 			} else if (opt.equals("msg")) {
 				parts = val.split(":");
 				msgcnt = Integer.parseInt(parts[0]);
@@ -95,7 +102,7 @@ public class App
 		@Override
 		public String displayUsage()
 		{
-			String txt = "\t-udp -server[-solo] -clients num[:groups] -msg msgcnt:msgsiz -cbuf rcv:xmt -sbuf rcv:xmt -sockbuf siz -verify address-spec";
+			String txt = "\t-udp -server[-solo] -clients groups[:num] -msg msgcnt:msgsiz -cbuf rcv:xmt -sbuf rcv:xmt -sockbuf siz -verify host:port";
 			txt += "\nAll the params are optional, apart from the address-spec param, but at least one of -server or -clients must be specified";
 			return txt;
 		}
@@ -116,8 +123,12 @@ public class App
 	@Override
 	protected void appExec(ApplicationContextNAF appctx, int param1, Logger bootlog) throws java.io.IOException
 	{
-		if (!options.server_enabled && options.cgrpsiz == 0) {
-			cmdParser.usage(cmdlineArgs, "Must specify whether client and/or server mode");
+		if (!options.server_enabled && options.cgrpcnt == 0) {
+			cmdParser.usage(cmdlineArgs, "Must specify client and/or server mode");
+			return;
+		}
+		if (options.cgrpcnt != 0 && options.cgrpsiz == 0) {
+			cmdParser.usage(cmdlineArgs, "Client-group size cannot be zero");
 			return;
 		}
 		int arg = param1;
@@ -132,21 +143,19 @@ public class App
 			if (options.srcvbuf > maxuserdata) options.srcvbuf = maxuserdata;
 			if (options.sxmtbuf > maxuserdata) options.sxmtbuf = maxuserdata;
 		}
-		if (baseOptions.logname == null) {
-			//override given bootlog with our configured one
-			com.grey.logging.Parameters logparams = new com.grey.logging.Parameters(null, "./echobot.log");
-			bootlog = com.grey.logging.Factory.getLogger(logparams, "echobot");
-		}
-		if (options.server_enabled && options.cgrpsiz == 0) options.server_solo = true;
+		if (options.server_enabled && options.cgrpcnt == 0) options.server_solo = true;
 		int dcnt = (options.server_solo ? options.cgrpcnt + 1 : options.cgrpcnt);
+		if (dcnt == 0) dcnt++; //need at least one Dispatcher for the server
+
 		DispatcherDef def = new DispatcherDef();
+		def.hasNafman = USE_NAFMAN;
 		Dispatcher[] cdispatchers = new Dispatcher[dcnt];
 		ClientGroup[] cgroups = new ClientGroup[options.cgrpcnt];
 		TSAP tsap = TSAP.build(hostport, 0, true);
 		sbufspec = (options.server_enabled ? new BufferSpec(options.srcvbuf, options.sxmtbuf) : null);
 		byte[] msgbuf = null;
 
-		if (options.cgrpsiz != 0) {
+		if (options.cgrpcnt != 0) {
 			if (options.msgpath == null) {
 				msgbuf = new byte[HDRSIZ+options.msgsiz];
 				for (int idx = 0; idx != options.msgsiz; idx++) {
@@ -161,7 +170,7 @@ public class App
 		}
 		System.out.println();
 		if (options.server_enabled) System.out.println("Launching "+(options.server_solo?"stand-alone ":"")+"server");
-		if (options.cgrpsiz != 0) {
+		if (options.cgrpcnt != 0) {
 			System.out.println("Launching clients="+(options.cgrpsiz * options.cgrpcnt)+" within Dispatchers="+options.cgrpcnt);
 			System.out.println("Messages = "+options.msgcnt+"x "+options.msgsiz+" bytes"+(options.msgpath==null ? "" : " - "+options.msgpath));
 		}
@@ -172,8 +181,9 @@ public class App
 
 		// create the Dispatchers and initialise their callback apps
 		for (int idx = 0; idx != dcnt; idx++) {
+			boolean hasClients = (options.cgrpcnt != 0 && (!options.server_solo || idx != 0));
 			def.name = (options.server_enabled && idx == 0 ? "DS" : "");  //server resides in first Dispatcher
-			if (options.cgrpsiz != 0 && (!options.server_solo || idx != 0)) def.name += "DC"+(cgnum+1); //this Dispatcher hosts clients
+			if (hasClients) def.name += "DC"+(cgnum+1); //this Dispatcher hosts clients
 			cdispatchers[idx] = Dispatcher.create(appctx, def, bootlog);
 			Dispatcher dsptch = cdispatchers[idx];
 
@@ -195,12 +205,14 @@ public class App
 					if (options.server_solo) continue;
 				}
 			}
-			BufferSpec bufspec = new BufferSpec(options.crcvbuf, options.cxmtbuf);
-			cgroups[cgnum++] = new ClientGroup(this, dsptch, options.udpmode, tsap, options.cgrpsiz, bufspec, msgbuf, options.msgcnt,
-					options.sockbufsiz, options.verify);
+			if (hasClients) {
+				BufferSpec bufspec = new BufferSpec(options.crcvbuf, options.cxmtbuf);
+				cgroups[cgnum++] = new ClientGroup(this, dsptch, options.udpmode, tsap, options.cgrpsiz, bufspec, msgbuf, options.msgcnt,
+						options.sockbufsiz, options.verify);
+			}
 		}
 		cgrpcnt = options.cgrpcnt;
-		System.out.println("\nEchoBot initialisation complete\n"+Dispatcher.dumpConfig(appctx));
+		Logger.info("EchoBot initialisation complete\n"+Dispatcher.dumpConfig(appctx));
 
 		// start the Dispatchers
 		for (int idx = 0; idx != dcnt; idx++) {

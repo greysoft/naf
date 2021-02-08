@@ -294,12 +294,18 @@ Creates an SLF4J logger with the same name as the GreyLog logger.
 <span class="cfgvalue">class="com.grey.logging.adapters.AdapterJCL"</span>:
 Creates a JCL logger with the same name as the GreyLog logger.
 <br/> <br/>
-The net effect is that the calling code will still have a GreyLog logger instance
+The net effect is that the calling code will still be using a GreyLog logger instance
 (ie. of type <span class="compcode">com.grey.logging.Logger</span>)
-but all log messages will be forwarded to the external logger.
+but all log messages will be forwarded to the external SLF4J or JCL logger.
 <br/>
 If you already manage and configure all your logging via another framework, this allows GreyLog users to tap into that without changing any Java code.
-Simply modify the logging.xml and the GreyLog logger joins the external logging framework.
+Simply modify the
+<span class="pathname">logging.xml</span>
+config file (or specify the logger class via the
+<span class="compcode">-Dgrey.logger.class</span>
+system property, or
+<span class="compcode">GREY_LOGGER_CLASS</span>
+environment variable) and the GreyLog logger becomes part of the external logging framework.
 </p>
 
 <hr class="pline"/>
@@ -321,7 +327,7 @@ it includes an adapter library
 (see the
 <span class="softname">greylog-slf4j</span>
 Maven project)
-which enables it to act as underlying logger for SLF4J.
+which enables it to act as an underlying logger for SLF4J.
 <br/>
 Simply put the greylog-slf4j JAR on your classpath ahead of any other SLF4J bindings, and all instantiations of SLF4J loggers will be redirected to the GreyLog framework.
 <br/>

@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 Yusef Badri - All rights reserved.
+ * Copyright 2011-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.greylog_slf4j;
@@ -8,6 +8,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.grey.base.config.SysProps;
+import com.grey.logging.Parameters;
+import com.grey.logging.adapters.AdapterSLF4J;
 
 public class LoggerFactory
 	implements org.slf4j.ILoggerFactory
@@ -22,12 +24,12 @@ public class LoggerFactory
 	@Override
 	public org.slf4j.Logger getLogger(String name)
 	{
-		LoggerAdapter logger = loggers.get(name);
-		if (logger == null) {
-			logger = createLogger(name);
-			LoggerAdapter logger2 = loggers.putIfAbsent(name, logger);
-			if (logger2 != null) logger = logger2;
+		if (AdapterSLF4J.class.getName().equals(SysProps.get(Parameters.SYSPROP_LOGCLASS))) {
+			String msg = "You cannot set "+Parameters.SYSPROP_LOGCLASS+"="+SysProps.get(Parameters.SYSPROP_LOGCLASS)+" when greylog-slf4j is on your classpath"
+					+"\n\tThat environment setting directs GreyLog loggers to SLF4J, while greylog-slf4j performs the opposite mapping";
+			throw new IllegalStateException(msg);
 		}
+		LoggerAdapter logger = loggers.computeIfAbsent(name, s -> createLogger(s));
 		return logger;
 	}
 

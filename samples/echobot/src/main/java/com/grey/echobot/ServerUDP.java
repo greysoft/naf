@@ -1,8 +1,10 @@
 /*
- * Copyright 2012-2018 Yusef Badri - All rights reserved.
+ * Copyright 2012-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.echobot;
+
+import org.slf4j.LoggerFactory;
 
 import com.grey.base.utils.ByteArrayRef;
 
@@ -14,6 +16,8 @@ import com.grey.base.utils.ByteArrayRef;
 public class ServerUDP
 	extends com.grey.naf.reactor.CM_UDP
 {
+	private static final org.slf4j.Logger Logger = LoggerFactory.getLogger(ServerUDP.class);
+
 	private final App app;
 	private final java.nio.channels.DatagramChannel udpchan;
 	private java.nio.ByteBuffer niobuf;
@@ -31,6 +35,7 @@ public class ServerUDP
 		sock.bind(tsap.sockaddr);
 
 		registerConnectionlessChannel(udpchan, true);
+		Logger.info("Created UDP server="+this);
 	}
 	
 	public void start() throws java.io.IOException {
@@ -40,6 +45,7 @@ public class ServerUDP
 	@Override
 	public void ioReceived(ByteArrayRef data, java.net.InetSocketAddress remaddr) throws java.io.IOException
 	{
+		Logger.info("Received data="+data.size()+" from remote="+remaddr);
 		niobuf = com.grey.base.utils.NIOBuffers.encode(data.buffer(), data.offset(), data.size(), niobuf, app.sbufspec.directbufs);
 		int nbytes = udpchan.send(niobuf, remaddr);
 		if (nbytes != data.size()) {

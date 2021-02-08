@@ -1,12 +1,16 @@
 /*
- * Copyright 2012-2015 Yusef Badri - All rights reserved.
+ * Copyright 2012-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.echobot;
 
+import org.slf4j.LoggerFactory;
+
 // This represents the set of echo-clients running on each Dispatcher, all pointing at the same server.
 public class ClientGroup
 {
+	private static final org.slf4j.Logger Logger = LoggerFactory.getLogger(ClientGroup.class);
+
 	private final App app;
 	public final com.grey.naf.reactor.Dispatcher dsptch;
 	public final com.grey.base.utils.TSAP tsap;
@@ -23,6 +27,7 @@ public class ClientGroup
 			int size, com.grey.naf.BufferSpec bufspec, byte[] msgbuf, int mcnt, int sockbufsiz, boolean verify)
 			throws java.io.IOException
 	{
+		Logger.info("Creating client-group with mode="+(udpmode?"UDP":"TCP")+" and size="+size);
 		this.app = app;
 		dsptch = d;
 		tsap = remote_addr;
@@ -44,6 +49,7 @@ public class ClientGroup
 
 	public void terminated(boolean success, long duration)
 	{
+		Logger.info("Client-group terminated with success="+success+", clients="+clientcnt);
 		if (!success) {
 			failcnt++;
 		} else {

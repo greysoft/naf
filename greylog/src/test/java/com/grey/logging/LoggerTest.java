@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 Yusef Badri - All rights reserved.
+ * Copyright 2011-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.logging;
@@ -161,6 +161,33 @@ public class LoggerTest
 		org.junit.Assert.assertEquals(clss, log.getClass());
 		log.log(LEVEL.WARN, null, true, "This message should not come out");
 		log.close();
+	}
+
+	@org.junit.Test
+	public void testThreadLoggers() throws java.io.IOException {
+		Logger log1 = Factory.getLogger();
+		Logger log2 = Factory.getLogger();
+		org.junit.Assert.assertFalse(log1 == log2);
+
+		Logger.setThreadLogger(log1);
+		Logger.setThreadLogger(log1, 1001L);
+		Logger.setThreadLogger(log2, 1002L);
+		org.junit.Assert.assertTrue(log1 == Logger.getThreadLogger());
+		org.junit.Assert.assertTrue(log1 == Logger.getThreadLogger(Thread.currentThread().getId()));
+		org.junit.Assert.assertTrue(log1 == Logger.getThreadLogger(1001L));
+		org.junit.Assert.assertTrue(log2 == Logger.getThreadLogger(1002L));
+
+		log1.close();
+		org.junit.Assert.assertNull(Logger.getThreadLogger());
+		org.junit.Assert.assertNull(Logger.getThreadLogger(Thread.currentThread().getId()));
+		org.junit.Assert.assertNull(Logger.getThreadLogger(1001L));
+		org.junit.Assert.assertTrue(log2 == Logger.getThreadLogger(1002L));
+
+		log2.close();
+		org.junit.Assert.assertNull(Logger.getThreadLogger());
+		org.junit.Assert.assertNull(Logger.getThreadLogger(Thread.currentThread().getId()));
+		org.junit.Assert.assertNull(Logger.getThreadLogger(1001L));
+		org.junit.Assert.assertNull(Logger.getThreadLogger(1002L));
 	}
 
 	// All we're looking for here is proof it doesn't crash!

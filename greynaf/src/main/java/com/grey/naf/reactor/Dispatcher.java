@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Yusef Badri - All rights reserved.
+ * Copyright 2010-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -131,8 +131,10 @@ public class Dispatcher
 		slct = java.nio.channels.Selector.open();
 
 		Logger dlog = null;
+		Logger prevThreadLogger = null;
 		if (def.logname != null || initlog == null) dlog = com.grey.logging.Factory.getLogger(def.logname);
 		logger = (dlog == null ? initlog : dlog);
+		if (logger != null) prevThreadLogger = Logger.setThreadLogger(logger);
 		if (initlog != null) initlog.info("Initialising Dispatcher="+name+" - Logger="+def.logname+" - "+dlog);
 		if (getLogger() != initlog) flusher.register(getLogger());
 		getLogger().info("Dispatcher="+name+": baseport="+nafcfg.baseport+", NAFMan="+def.hasNafman+", DNS="+def.hasDNS
@@ -181,6 +183,7 @@ public class Dispatcher
 			}
 		}
 		getLogger().info("Dispatcher="+name+": Init complete - Naflets="+getNafletCount());
+		if (logger != null) Logger.setThreadLogger(prevThreadLogger);
 	}
 
 	public Thread start()
@@ -188,6 +191,7 @@ public class Dispatcher
 		getLogger().info("Dispatcher="+name+": Loaded JARs "+com.grey.base.utils.PkgInfo.getLoadedJARs());
 		launched = true;
 		thrd_main.start();
+		Logger.setThreadLogger(getLogger(), thrd_main.getId());
 		return thrd_main;
 	}
 
