@@ -45,10 +45,18 @@ public class SysProps
 	// As long as people access the system props via this method, they're guaranteed to see the LoadGreyProps() overrides
 	public static String get(String name, String dflt)
 	{
-		String envName = name.replace('.', '_').toUpperCase();
-		String val = AppEnv.get(envName);
-		if (val == null || val.isEmpty()) val = System.getenv(envName);
-		if (val == null || val.isEmpty()) val = System.getProperty(name);
+		String val = getEnvironment(name);
+		if (val == null || val.isEmpty()) {
+			String envName = name.replace('.', '_').toUpperCase();
+			val = getEnvironment(envName);
+		}
+		if (val == null || val.isEmpty()) {
+			val = System.getProperty(name);
+		}
+		if (val == null || val.isEmpty()) {
+			String propName = name.replace('_', '.').toLowerCase();
+			val = System.getProperty(propName);
+		}
 		if (val == null || val.isEmpty()) val = dflt;
 		if (val == null || val.isEmpty() || NULLMARKER.equals(val)) val = null;
 		return val;
@@ -117,6 +125,13 @@ public class SysProps
 
 	public static Map<String,String> getAppEnv() {
 		return Collections.unmodifiableMap(AppEnv);
+	}
+
+	private static String getEnvironment(String name)
+	{
+		String val = AppEnv.get(name);
+		if (val == null || val.isEmpty()) val = System.getenv(name);
+		return val;
 	}
 
 	public static java.util.Properties load(String pthnam) throws java.io.IOException

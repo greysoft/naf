@@ -19,7 +19,7 @@
 	<description>Framework for non-blocking socket I/O and timers</description>
 	<properties>
 		<revision>dev-SNAPSHOT</revision>
-		<grey.scm.url>https://github.com/greysoft/naf/tree/master</grey.scm.url>
+		<grey.scm.url>https://github.com/greysoft/naf</grey.scm.url>
 		<grey.assemblyname>naf</grey.assemblyname>
 	</properties>
 	<modules>
