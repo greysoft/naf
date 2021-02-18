@@ -3,7 +3,6 @@ It is distributed under the terms of the GNU Affero General Public License, Vers
 
 Home page: http://www.greyware.co.uk/naf
 Programmer's Guide: docs/guide/index.htm in this repo
-https://github.com/greysoft/naf/docs/guide/index.htm
 API Reference: http://www.greyware.co.uk/naf/install/docs/apidocs
 
 If you simply want to link NAF into your application, then insert this Maven dependency block in your POM:
@@ -40,18 +39,18 @@ The two sample apps will also have been built, and their Jars can be found under
 - samples/echobot/target
 - samples/portfwd/target
 
-Finally the binaries will also have been zipped up along with the Javadocs, and are available in both Zip and compressed tar form:
+This build also creates a distribution package (in two formats):
 - pkg/target/naf-VERSION.zip
 - pkg/target/naf-VERSION.tar.gz
 
      -------------------------------------------------------------
 
-Section B - Contents of Binary Distribution
-============================================
+Section B - Contents of Distribution Package
+==============================================
 NB: This section predates the publishing of NAF artifacts on the Maven Central repository, and used to provide a means of obtaining binary JARs to link against.
 This is no longer the recommended way of linking the NAF library into your code. Use the Maven dependency block instead as shown above, to pull the libs from the Maven Central repository.
 
-A binary release of NAF is available in both the ZIP format or as a compressed tar file.
+The distribution package contains a binary release of NAF and is available in both the ZIP format or as a compressed tar file.
 You "install" it simply by unpacking, and the extracted contents are:
 - ./lib: The NAF library JARs
 - ./samples: Pre-built binaries of the sample applications, along with
