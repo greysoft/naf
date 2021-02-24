@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Yusef Badri - All rights reserved.
+ * Copyright 2012-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.logging;
@@ -52,12 +52,14 @@ public class MemLogger
 	// remove settings that make no sense for this logger
 	private static Parameters adjust(Parameters params)
 	{
-		params.pthnam = null;
-		params.strm = null;
-		params.rotfreq = ScheduledTime.FREQ.NEVER;
-		params.maxsize = 0;
-		params.bufsiz = 0;
-		params.flush_interval = 0;
-		return params;
+		Parameters.Builder bldr = new Parameters.Builder(params);
+		return bldr
+				.withPathname(null)
+				.withStream(null)
+				.withRotFreq(ScheduledTime.FREQ.NEVER)
+				.withMaxSize(0)
+				.withBufferSize(0)
+				.withFlushInterval(0)
+				.build();
 	}
 }

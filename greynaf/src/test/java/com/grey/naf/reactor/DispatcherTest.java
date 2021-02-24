@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 Yusef Badri - All rights reserved.
+ * Copyright 2011-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -47,7 +47,7 @@ public class DispatcherTest
 		org.junit.Assert.assertEquals(appctx.getDispatchers().toString(), 1, appctx.getDispatchers().size());
 		Dispatcher dsptch = appctx.getDispatcher(dname);
 		org.junit.Assert.assertNotNull(dsptch);
-		org.junit.Assert.assertEquals(dname, dsptch.name);
+		org.junit.Assert.assertEquals(dname, dsptch.getName());
 		org.junit.Assert.assertTrue(dsptch.isRunning());
 		dsptch.stop();
 		waitStopped(dsptch);
@@ -64,7 +64,7 @@ public class DispatcherTest
 		NAFConfig nafcfg = NAFConfig.load(cfgpath);
 		ApplicationContextNAF appctx = ApplicationContextNAF.create("DispatcherTest-NamedConfig", nafcfg);
 		Dispatcher dsptch = Dispatcher.createConfigured(appctx, dname, bootlog);
-		org.junit.Assert.assertEquals(dname, dsptch.name);
+		org.junit.Assert.assertEquals(dname, dsptch.getName());
 		org.junit.Assert.assertFalse(dsptch.isRunning());
 		try {
 			Dispatcher.createConfigured(appctx, dname, bootlog);
@@ -85,13 +85,14 @@ public class DispatcherTest
 		FileOps.deleteDirectory(rootdir);
 		ApplicationContextNAF appctx = ApplicationContextNAF.create("DispatcherTest-Dynamic");
 		String dname = "utest_dynamic1";
-		DispatcherDef def = new DispatcherDef();
-		def.name = dname;
-		def.hasNafman = true;
-		def.hasDNS = true;
-		def.surviveHandlers = false;
+		DispatcherDef def = new DispatcherDef.Builder()
+				.withName(dname)
+				.withDNS(true)
+				.withNafman(true)
+				.withSurviveHandlers(false)
+				.build();
 		Dispatcher dsptch = Dispatcher.create(appctx, def, bootlog);
-		org.junit.Assert.assertEquals(dname, dsptch.name);
+		org.junit.Assert.assertEquals(dname, dsptch.getName());
 		org.junit.Assert.assertTrue(dsptch.getApplicationContext().getConfig().isAnonymousBasePort());
 		dsptch.start();
 		org.junit.Assert.assertTrue(dsptch.isRunning());
@@ -100,7 +101,7 @@ public class DispatcherTest
 
 		//make sure it can be run again
 		dsptch = Dispatcher.create(appctx, def, bootlog);
-		org.junit.Assert.assertEquals(dname, dsptch.name);
+		org.junit.Assert.assertEquals(dname, dsptch.getName());
 		org.junit.Assert.assertTrue(dsptch.getApplicationContext().getConfig().isAnonymousBasePort());
 		dsptch.start();
 		org.junit.Assert.assertTrue(dsptch.isRunning());

@@ -28,7 +28,7 @@ public class SecondaryAgent
 		super(dsptch, reg, cfg);
 		primary = dsptch.getApplicationContext().getPrimaryAgent();
 		if (primary == null) {
-			throw new IllegalStateException("Dispatcher="+dsptch.name+": Cannot create Secondary NAFMAN before Primary");
+			throw new IllegalStateException("Dispatcher="+dsptch.getName()+": Cannot create Secondary NAFMAN before Primary");
 		}
 		requests = new Producer<NafManCommand>(NafManCommand.class, dsptch, this);
 		requests.start();
@@ -46,7 +46,7 @@ public class SecondaryAgent
 			primary.secondaryUnsubscribed(this);
 		} catch (Exception ex) {
 			// probably due to Primary shutting down in tandem
-			dsptch.getLogger().trace("NAFMAN="+dsptch.name+" failed to send Unsubscribe to Primary="+primary.getDispatcher().name+" - "+ex);
+			dsptch.getLogger().trace("NAFMAN="+dsptch.getName()+" failed to send Unsubscribe to Primary="+primary.getDispatcher().getName()+" - "+ex);
 		}
 	}
 

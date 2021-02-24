@@ -368,12 +368,14 @@ public class XmlConfigTest
 		org.junit.Assert.assertTrue(XmlConfig.BLANKCFG.exists());
 		String strval = XmlConfig.BLANKCFG.getValue("tag1", false, "dflt1");
 		org.junit.Assert.assertTrue(strval.equals("dflt1"));
-		strval = XmlConfig.BLANKCFG.getValue("x", false, "dflt1");
-		org.junit.Assert.assertTrue(strval.equals("dflt1"));
+		strval = XmlConfig.BLANKCFG.getValue("x", false, null);
+		org.junit.Assert.assertNull(strval);
 
 		org.junit.Assert.assertFalse(XmlConfig.NULLCFG.exists());
 		strval = XmlConfig.NULLCFG.getValue("tag1", false, "dflt1");
 		org.junit.Assert.assertTrue(strval.equals("dflt1"));
+		strval = XmlConfig.NULLCFG.getValue("x", false, null);
+		org.junit.Assert.assertNull(strval);
 
 		try {
 			// beware the the XML parser writes an error messages to stdout when this fails

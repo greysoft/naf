@@ -37,7 +37,7 @@ public class LoggerFactory
 		com.grey.logging.Logger logger;
 		try {
 			if (NOCFG) {
-				logger = com.grey.logging.Factory.getLogger(new com.grey.logging.Parameters(), name);
+				logger = com.grey.logging.Factory.getLogger(new Parameters.Builder().build(), name);
 			} else {
 				logger = com.grey.logging.Factory.getLogger(name);
 			}

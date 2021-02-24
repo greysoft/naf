@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2018 Yusef Badri - All rights reserved.
+ * Copyright 2013-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -146,9 +146,10 @@ public class SSLConnectionTest
 		FileOps.deleteDirectory(rootdir);
 
 		// create the Dispatcher
-		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
-		def.zeroNafletsOK = false;
-		def.surviveHandlers = false;
+		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
+				.withSurviveHandlers(false)
+				.withZeroNafletsOK(false)
+				.build();
 		dsptch = Dispatcher.create(appctx, def, com.grey.logging.Factory.getLogger("no-such-logger"));
 
 		// set up the server component

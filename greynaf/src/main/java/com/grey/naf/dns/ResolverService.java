@@ -115,14 +115,14 @@ public class ResolverService
 		cachemgr = new CacheManager(dsptch, config);
 		xmtmgr = new CommsManager(this);
 
-		bcstore = new ObjectWell<>(ByteChars.class, "DNS_"+dsptch.name);
-		anstore = new ObjectWell<>(ResolverAnswer.class, "DNS_"+dsptch.name);
-		rrwstore = new ObjectWell<>(QueryHandle.WrapperRR.class, "DNS_"+dsptch.name);
+		bcstore = new ObjectWell<>(ByteChars.class, "DNS_"+dsptch.getName());
+		anstore = new ObjectWell<>(ResolverAnswer.class, "DNS_"+dsptch.getName());
+		rrwstore = new ObjectWell<>(QueryHandle.WrapperRR.class, "DNS_"+dsptch.getName());
 		QueryHandle.Factory qryfact = new QueryHandle.Factory(this);
-		qrystore = new ObjectWell<>(qryfact, "DNS_"+dsptch.name);
+		qrystore = new ObjectWell<>(qryfact, "DNS_"+dsptch.getName());
 		pkt_tmp = new PacketDNS(Math.max(ResolverConfig.PKTSIZ_TCP, ResolverConfig.PKTSIZ_UDP), ResolverConfig.DIRECTNIOBUFS, config.minttl_initial);
 
-		fh_dump = new java.io.File(dsptch.getApplicationContext().getConfig().path_var+"/DNSdump-"+dsptch.name+".txt");
+		fh_dump = new java.io.File(dsptch.getApplicationContext().getConfig().path_var+"/DNSdump-"+dsptch.getName()+".txt");
 		FileOps.ensureDirExists(fh_dump.getParentFile()); //flush out any permissions issues right away
 
 		if (dsptch.getAgent() != null) {

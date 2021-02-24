@@ -71,7 +71,7 @@ public class NafManServer
 			long permcache = cfg.getTime("permcache", com.grey.base.utils.TimeOps.parseMilliTime("1d"));
 			long dyncache = cfg.getTime("dyncache", "5s");
 			bufspec = new com.grey.naf.BufferSpec(cfg, "niobuffers", 1024, 4*1024);
-			cmdstore = new com.grey.base.collections.ObjectWell<NafManCommand>(NafManCommand.class, "NAFMAN_"+dsptch.name);
+			cmdstore = new com.grey.base.collections.ObjectWell<NafManCommand>(NafManCommand.class, "NAFMAN_"+dsptch.getName());
 			http = new HTTP(bufspec, permcache);
 			rsrcmgr = new ResourceManager(cfg_rsrc, primary, http, dyncache);
 			httprsp400 = http.buildErrorResponse("400 Bad request");

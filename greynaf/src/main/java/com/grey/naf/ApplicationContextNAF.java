@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Yusef Badri - All rights reserved.
+ * Copyright 2018-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf;
@@ -75,12 +75,12 @@ public class ApplicationContextNAF {
 	}
 
 	public void register(Dispatcher d) {
-		Dispatcher dup = dispatchers.putIfAbsent(d.name, d);
+		Dispatcher dup = dispatchers.putIfAbsent(d.getName(), d);
 		if (dup != null) throw new NAFConfigException("Duplicate Dispatcher="+d+" - prev="+dup);
 	}
 
 	public void deregister(Dispatcher d) {
-		dispatchers.remove(d.name);
+		dispatchers.remove(d.getName());
 	}
 
 	public Dispatcher getDispatcher(String name) {

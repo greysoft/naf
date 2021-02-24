@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2018 Yusef Badri - All rights reserved.
+ * Copyright 2012-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.integration;
@@ -476,10 +476,11 @@ public class ResolverTest
 		clss_resolver = com.grey.naf.dns.embedded.EmbeddedResolver.class;
 		com.grey.naf.NAFConfig nafcfg = setConfig(null, flags);
 		ApplicationContextNAF appctx = ApplicationContextNAF.create(null, nafcfg);
-		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
-		def.name = dispatcher_name;
-		def.hasDNS = true;
-		def.surviveHandlers = false;
+		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
+				.withName(dispatcher_name)
+				.withDNS(true)
+				.withSurviveHandlers(false)
+				.build();
 		Dispatcher dsptch = Dispatcher.create(appctx, def, logger);
 		org.junit.Assert.assertEquals(clss_resolver, dsptch.getResolverDNS().getClass());
 		return dsptch;
@@ -503,14 +504,15 @@ public class ResolverTest
 			nafcfg = setConfig(d2name, flags);
 		}
 		ApplicationContextNAF appctx = ApplicationContextNAF.create(null, nafcfg);
-		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
-		def.name = d1name;
-		def.hasDNS = true;
-		def.hasNafman = true;
-		def.surviveHandlers = false;
-		def.surviveDownstream = false;
+		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
+				.withName(d1name)
+				.withDNS(true)
+				.withNafman(true)
+				.withSurviveHandlers(false)
+				.withSurviveDownstream(false)
+				.build();
 		Dispatcher d1 = Dispatcher.create(appctx, def, logger);
-		def.name = d2name;
+		def = new com.grey.naf.DispatcherDef.Builder(def).withName(d2name).build();
 		Dispatcher d2 = Dispatcher.create(appctx, def, logger);
 		org.junit.Assert.assertEquals(clss_resolver, d1.getResolverDNS().getClass());
 		org.junit.Assert.assertEquals(clss_resolver, d2.getResolverDNS().getClass());

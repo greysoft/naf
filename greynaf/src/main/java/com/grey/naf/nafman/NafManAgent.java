@@ -48,7 +48,7 @@ public abstract class NafManAgent
 	public void start() throws java.io.IOException
 	{
 		getRegistry().getHandlers(dsptch, handlers);
-		dsptch.getLogger().info("NAFMAN Agent="+dsptch.name+" registered handlers="+handlers.size()+": "+handlers.keySet());
+		dsptch.getLogger().info("NAFMAN Agent="+dsptch.getName()+" registered handlers="+handlers.size()+": "+handlers.keySet());
 	}
 
 	protected void commandReceived(NafManCommand cmd) throws java.io.IOException
@@ -71,7 +71,7 @@ public abstract class NafManAgent
 		NafManRegistry.DefCommand def = cmd.getCommandDef();
 		java.util.ArrayList<NafManCommand.Handler> lst = handlers.get(def.code);
 		sbtmp.setLength(0);
-		sbtmp.append("NAFMAN=").append(dsptch.name).append(" received command=").append(def.code);
+		sbtmp.append("NAFMAN=").append(dsptch.getName()).append(" received command=").append(def.code);
 		if (lst == null) {
 			sbtmp.append(" - no Handlers");
 			dsptch.getLogger().log(Logger.LEVEL.INFO, sbtmp);
@@ -138,7 +138,7 @@ public abstract class NafManAgent
 			}
 		} else {
 			//we've obviously registered to handle this command, so missing If clause is a bug
-			dsptch.getLogger().error("NAFMAN="+dsptch.name+": Missing case for cmd="+def.code);
+			dsptch.getLogger().error("NAFMAN="+dsptch.getName()+": Missing case for cmd="+def.code);
 			return null;
 		}
 		return sbtmp;
@@ -158,7 +158,7 @@ public abstract class NafManAgent
 			Naflet[] apps = d.listNaflets();
 			String nafman = "No";
 			if (d.getAgent() != null) nafman = (d.getAgent().isPrimary() ? "Primary" : "Secondary");
-			sb.append("<dispatcher name=\"").append(d.name);
+			sb.append("<dispatcher name=\"").append(d.getName());
 			sb.append("\" log=\"").append(d.getLogger().getLevel());
 			sb.append("\" nafman=\"").append(nafman);
 			sb.append("\" dns=\"").append(d.getResolverDNS() == null ? "No" : d.getResolverDNS()).append("\">");

@@ -216,7 +216,7 @@ public class Launcher
 				Dispatcher.STOPSTATUS stopsts = d.waitStopped(5000, false);
 				if (stopsts != Dispatcher.STOPSTATUS.ALIVE) {
 					dispatchers.remove(d);
-					bootlog.info("Launcher has reaped Dispatcher="+d.name+" - remaining="+dispatchers.size());
+					bootlog.info("Launcher has reaped Dispatcher="+d.getName()+" - remaining="+dispatchers.size());
 					break;
 				}
 			}
@@ -234,7 +234,10 @@ public class Launcher
 	{
 		if (opts.logname != null) return Factory.getLogger(opts.logname);
 		Logger.LEVEL lvl = Logger.LEVEL.valueOf(SysProps.get(SYSPROP_BOOTLVL, Logger.LEVEL.TRC.toString()));
-		Parameters params = new Parameters(lvl, System.out);
+		Parameters params = new Parameters.Builder()
+				.withStream(System.out)
+				.withLogLevel(lvl)
+				.build();
 		return Factory.getLogger(params, "NAF-bootlog");
 	}
 

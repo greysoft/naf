@@ -47,7 +47,7 @@ public class Client
 		prod.start();
 
 		RequestFactory factory = new RequestFactory(prod);
-		reqpool = new ObjectWell<>(Request.class, factory, "DNS_Client_"+dsptch.name, 0, 0, 1);
+		reqpool = new ObjectWell<>(Request.class, factory, "DNS_Client_"+dsptch.getName(), 0, 0, 1);
 	}
 
 	@Override

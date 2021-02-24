@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2019 Yusef Badri - All rights reserved.
+ * Copyright 2014-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.client;
@@ -14,6 +14,7 @@ import com.grey.naf.dns.ResolverDNS;
 import com.grey.naf.dns.ResolverAnswer;
 import com.grey.naf.errors.NAFException;
 import com.grey.logging.Logger;
+import com.grey.logging.Parameters;
 
 public class DNSClient
 {
@@ -54,7 +55,7 @@ public class DNSClient
 	 */
 	public void init() throws java.io.IOException {
 		if (ownDispatcher) {
-			if (dsptch.isRunning()) throw new IllegalStateException("SynchDNS: Dispatcher="+dsptch.name+" already running");
+			if (dsptch.isRunning()) throw new IllegalStateException("SynchDNS: Dispatcher="+dsptch.getName()+" already running");
 			dsptch.start();
 		}
 		dsptch.loadProducer(reqSubmitter);
@@ -132,24 +133,27 @@ public class DNSClient
 	
 	private static Dispatcher createDispatcher(ApplicationContextNAF appctx, String dname, boolean withNafman, com.grey.logging.Logger logger)
 			throws java.io.IOException {
-		DispatcherDef def = null;
+		DispatcherDef.Builder bldr = new DispatcherDef.Builder();
 		if (dname != null) {
 			XmlConfig dcfg = appctx.getConfig().getDispatcher(dname);
 			if (dcfg == null) {
-				def = new DispatcherDef(dname);
+				bldr = bldr.withName(dname);
 			} else {
-				def = new DispatcherDef(dcfg);
+				bldr = new DispatcherDef.Builder(dcfg);
 			}
 		}
-		if (def == null) def = new DispatcherDef();
-		def.hasDNS = true;
-		def.hasNafman = withNafman;
-		if (def.logname == null) def.logname = LOGNAME;
+		bldr = bldr.withDNS(true)
+				.withNafman(withNafman);
+		if (bldr.build().getLogName() == null) bldr = bldr.withLogName(LOGNAME);
+
+		DispatcherDef def = bldr.build();
 
 		if (logger == null) {
-			Logger.LEVEL lvl = Logger.LEVEL.valueOf(LOGLVL);
-			com.grey.logging.Parameters params = new com.grey.logging.Parameters(lvl, System.out);
-			logger = com.grey.logging.Factory.getLogger(params, def.logname);
+			Parameters params = new Parameters.Builder()
+					.withStream(System.out)
+					.withLogLevel(Logger.LEVEL.valueOf(LOGLVL))
+					.build();
+			logger = com.grey.logging.Factory.getLogger(params, def.getLogName());
 		}
 		return Dispatcher.create(appctx, def, logger);
 	}

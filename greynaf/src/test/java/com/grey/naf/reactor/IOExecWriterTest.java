@@ -71,8 +71,9 @@ public class IOExecWriterTest
 		final String initialchar = "z";
 		final java.nio.ByteBuffer rdonlybuf = com.grey.base.utils.NIOBuffers.encode(rdonlydata, null, false).asReadOnlyBuffer();
 
-		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
-		def.surviveHandlers = false;
+		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
+				.withSurviveHandlers(false)
+				.build();
 		Dispatcher dsptch = Dispatcher.create(appctx, def, com.grey.logging.Factory.getLogger("no-such-logger"));
 		java.nio.channels.Pipe pipe = java.nio.channels.Pipe.open();
 		java.nio.channels.Pipe.SourceChannel rep = pipe.source();
@@ -183,8 +184,9 @@ public class IOExecWriterTest
 		org.junit.Assert.assertEquals(filebody.length, fh.length());
 
 		// create the Dispatcher and write channel
-		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
-		def.surviveHandlers = false;
+		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
+				.withSurviveHandlers(false)
+				.build();
 		Dispatcher dsptch = Dispatcher.create(appctx, def, com.grey.logging.Factory.getLogger("no-such-logger"));
 		java.nio.channels.Pipe pipe = java.nio.channels.Pipe.open();
 		java.nio.channels.Pipe.SourceChannel rep = pipe.source();

@@ -25,7 +25,7 @@ public class ClientTCP
 		super(g.dsptch, bufspec, bufspec);
 		grp = g;
 		echobuf = java.util.Arrays.copyOf(msgbuf, msgbuf.length);
-		logpfx = "Client "+getDispatcher().name+"/"+id+": ";
+		logpfx = "Client "+getDispatcher().getName()+"/"+id+": ";
 	}
 
 	public void start() {

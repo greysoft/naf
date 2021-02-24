@@ -147,8 +147,8 @@ public class App
 		int dcnt = (options.server_solo ? options.cgrpcnt + 1 : options.cgrpcnt);
 		if (dcnt == 0) dcnt++; //need at least one Dispatcher for the server
 
-		DispatcherDef def = new DispatcherDef();
-		def.hasNafman = USE_NAFMAN;
+		DispatcherDef.Builder dispatcherDefsBuilder = new DispatcherDef.Builder()
+				.withNafman(USE_NAFMAN);
 		Dispatcher[] cdispatchers = new Dispatcher[dcnt];
 		ClientGroup[] cgroups = new ClientGroup[options.cgrpcnt];
 		TSAP tsap = TSAP.build(hostport, 0, true);
@@ -182,8 +182,9 @@ public class App
 		// create the Dispatchers and initialise their callback apps
 		for (int idx = 0; idx != dcnt; idx++) {
 			boolean hasClients = (options.cgrpcnt != 0 && (!options.server_solo || idx != 0));
-			def.name = (options.server_enabled && idx == 0 ? "DS" : "");  //server resides in first Dispatcher
-			if (hasClients) def.name += "DC"+(cgnum+1); //this Dispatcher hosts clients
+			String dname = (options.server_enabled && idx == 0 ? "DS" : "");  //server resides in first Dispatcher
+			if (hasClients) dname += "DC"+(cgnum+1); //this Dispatcher hosts clients
+			DispatcherDef def = dispatcherDefsBuilder.withName(dname).build();
 			cdispatchers[idx] = Dispatcher.create(appctx, def, bootlog);
 			Dispatcher dsptch = cdispatchers[idx];
 
@@ -199,7 +200,7 @@ public class App
 						settings.put(CM_Listener.CFGMAP_IFACE, tsap.dotted_ip.toString());
 						settings.put(CM_Listener.CFGMAP_PORT, tsap.port);
 						settings.put(CM_Listener.CFGMAP_BACKLOG, options.cgrpcnt * options.cgrpsiz);
-						ConcurrentListener lstnr = ConcurrentListener.create("EchoBot-"+dsptch.name, dsptch, this, null, null, settings);
+						ConcurrentListener lstnr = ConcurrentListener.create("EchoBot-"+dsptch.getName(), dsptch, this, null, null, settings);
 						lstnr.start();
 					}
 					if (options.server_solo) continue;

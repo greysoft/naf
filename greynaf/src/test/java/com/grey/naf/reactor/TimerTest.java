@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2018 Yusef Badri - All rights reserved.
+ * Copyright 2012-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -64,8 +64,9 @@ public class TimerTest
 	@org.junit.Test
 	public void test() throws java.io.IOException
 	{
-		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
-		def.surviveHandlers = false;
+		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
+				.withSurviveHandlers(false)
+				.build();
 		Dispatcher dsptch = Dispatcher.create(appctx, def, com.grey.logging.Factory.getLogger("no-such-logger"));
 		Handler handler = new Handler();
 

@@ -50,7 +50,7 @@ abstract public class Logger
 	private final boolean withMillisecs;
 	private final boolean withLevel;
 	private final boolean withInitMark;
-	private final long flush_interval;  // interval between logfile flushes, in milliseconds
+	private final long flushInterval;  // interval between logfile flushes, in milliseconds
 	protected final int bufsiz;
 	private final java.util.Calendar dtcal = TimeOps.getCalendar(null); //merely pre-allocated for efficiency
 
@@ -88,39 +88,32 @@ abstract public class Logger
 	{
 		name = logname;
 		isMT = is_mt;
-		pthnam_tmpl = params.pthnam;
-		strm_base = params.strm;
-		maxsize = params.maxsize;
-		rotsched = (params.rotfreq == ScheduledTime.FREQ.NEVER ? null : new ScheduledTime(params.rotfreq, dtcal, null));
+		pthnam_tmpl = params.getPathname();
+		strm_base = params.getStream();
+		maxsize = params.getMaxSize();
+		rotsched = (params.getRotFreq() == ScheduledTime.FREQ.NEVER ? null : new ScheduledTime(params.getRotFreq(), dtcal, null));
 
-		boolean with_tid = (isMT ? true : params.withTID);
-		boolean with_pid = params.withPID;
+		boolean with_tid = params.withTID();
+		boolean with_pid = params.withPID();
 		boolean with_milli = true;
 		boolean with_level = true;
 		boolean with_initmark = true;
 
-		if (params.mode != null) {
-			if (params.mode.equals(Parameters.MODE_AUDIT)) {
-				with_tid = false;
-				with_pid = false;
-				with_milli = false;
-				with_level = false;
-				with_initmark = false;
-			} else {
-				System.out.println("GreyLogger: Logger="+name+" ignoring unrecognised Mode="+params.mode);
-			}
+		if (params.isQuietMode()) {
+			with_level = false;
+			with_initmark = false;
 		}
 		withPID = with_pid;
 		withTID = with_tid;
-		withThreadName = params.withThreadName;
+		withThreadName = params.withThreadName();
 		withMillisecs = with_milli;
 		withLevel = with_level;
 		withInitMark = with_initmark;
-		withDelta = (withMillisecs ? params.withDelta : false);
-		bufsiz = params.bufsiz;
-		flush_interval = params.flush_interval;
+		withDelta = (withMillisecs ? params.withDelta() : false);
+		bufsiz = params.getBufSize();
+		flushInterval = params.getFlushInterval();
 
-		set_level(params.loglevel);
+		set_level(params.getLogLevel());
 
 		String desc = (name == null ? "" : "Name="+name+" ");
 		desc += params.toString();
@@ -319,8 +312,8 @@ abstract public class Logger
 			// rotate if file exceeds max size and we are on next naming interval
 			String nextpath = ScheduledTime.embedTimestamp(null, dtcal, pthnam_tmpl, null);
 			if (!nextpath.equals(getActivePath())) open(systime, nextpath);
-		} else if (flush_interval != 0) {
-			if (systime - last_flushtime >= flush_interval) {
+		} else if (flushInterval != 0) {
+			if (systime - last_flushtime >= flushInterval) {
 				flush();
 				last_flushtime = systime;
 			}

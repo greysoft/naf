@@ -22,7 +22,7 @@ public class ListenerSet
 	{
 		dsptch = d;
 		reaper = rpr;
-		name = "Listeners-"+(lname == null ? dsptch.name : lname);
+		name = "Listeners-"+(lname == null ? dsptch.getName() : lname);
 		com.grey.base.config.XmlConfig[] listencfg = cfg.getSections(xpath+com.grey.base.config.XmlConfig.XPATH_ENABLED);
 
 		if (listencfg == null) {

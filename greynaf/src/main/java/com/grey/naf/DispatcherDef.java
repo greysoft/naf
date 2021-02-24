@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2018 Yusef Badri - All rights reserved.
+ * Copyright 2012-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf;
@@ -12,33 +12,166 @@ public class DispatcherDef
 {
 	public static final String SYSPROP_LOGNAME = "greynaf.dispatchers.logname";
 
-	public boolean zeroNafletsOK = true;
-	public boolean surviveDownstream = true;
-	public boolean surviveHandlers = true;
-	public Clock clock = Clock.systemUTC();
+	private final String name;
+	private final String logName;
+	private final boolean hasNafman;
+	private final boolean hasDNS;
+	private final boolean zeroNafletsOK;
+	private final boolean surviveDownstream;
+	private final boolean surviveHandlers;
+	private final long flushInterval;
+	private final Clock clock;
+	private final com.grey.base.config.XmlConfig[] naflets;
 
-	public String name;
-	public String logname;
-	public boolean hasNafman;
-	public boolean hasDNS;
-	public long flush_interval;
-	public com.grey.base.config.XmlConfig[] naflets;
+	private DispatcherDef(Builder bldr) {
+		name = bldr.name;
+		logName = bldr.logName;
+		hasNafman = bldr.hasNafman;
+		hasDNS = bldr.hasDNS;
+		naflets = bldr.naflets;
+		zeroNafletsOK = bldr.zeroNafletsOK;
+		surviveDownstream = bldr.surviveDownstream;
+		surviveHandlers = bldr.surviveHandlers;
+		flushInterval = bldr.flushInterval;
+		clock = bldr.clock;
+	}
 
-	public DispatcherDef() {}
-	public DispatcherDef(String n) {name=n;}
+	public String getName() {
+		return name;
+	}
 
-	public DispatcherDef(com.grey.base.config.XmlConfig cfg)
-	{
-		name = cfg.getValue("@name", true, name);
-		logname = cfg.getValue("@logname", true, SysProps.get(SYSPROP_LOGNAME, name));
-		hasNafman = cfg.getBool("@nafman", hasNafman);
-		hasDNS = cfg.getBool("@dns", hasDNS);
-		zeroNafletsOK = cfg.getBool("@zero_naflets", zeroNafletsOK);
-		surviveDownstream = cfg.getBool("@survive_downstream", surviveDownstream);
-		surviveHandlers = cfg.getBool("@survive_handlers", surviveHandlers);
-		flush_interval = cfg.getTime("@flush", flush_interval);
+	public String getLogName() {
+		return logName;
+	}
 
-		String xpath = "naflets/naflet"+com.grey.base.config.XmlConfig.XPATH_ENABLED;
-		naflets = cfg.getSections(xpath);
+	public boolean hasNafman() {
+		return hasNafman;
+	}
+
+	public boolean hasDNS() {
+		return hasDNS;
+	}
+
+	public boolean isZeroNafletsOK() {
+		return zeroNafletsOK;
+	}
+
+	public boolean isSurviveDownstream() {
+		return surviveDownstream;
+	}
+
+	public boolean isSurviveHandlers() {
+		return surviveHandlers;
+	}
+
+	public long getFlushInterval() {
+		return flushInterval;
+	}
+
+	public Clock getClock() {
+		return clock;
+	}
+
+	public com.grey.base.config.XmlConfig[] getNafletsConfig() {
+		return naflets;
+	}
+
+
+	public static class Builder {
+		private String name;
+		private String logName;
+		private boolean hasNafman;
+		private boolean hasDNS;
+		private boolean zeroNafletsOK = true;
+		private boolean surviveDownstream = true;
+		private boolean surviveHandlers = true;
+		private Clock clock = Clock.systemUTC();
+		private long flushInterval;
+		private com.grey.base.config.XmlConfig[] naflets;
+
+		public Builder() {}
+
+		public Builder(DispatcherDef defs) {
+			name = defs.name;
+			logName = defs.logName;
+			hasNafman = defs.hasNafman;
+			hasDNS = defs.hasDNS;
+			naflets = defs.naflets;
+			zeroNafletsOK = defs.zeroNafletsOK;
+			surviveDownstream = defs.surviveDownstream;
+			surviveHandlers = defs.surviveHandlers;
+			flushInterval = defs.flushInterval;
+			clock = defs.clock;
+		}
+
+		public Builder(com.grey.base.config.XmlConfig cfg)
+		{
+			DispatcherDef dflts = new Builder().build();
+			name = cfg.getValue("@name", true, dflts.getName());
+			logName = cfg.getValue("@logname", true, SysProps.get(SYSPROP_LOGNAME, dflts.getLogName() == null ? name : dflts.getLogName()));
+			hasNafman = cfg.getBool("@nafman", dflts.hasNafman());
+			hasDNS = cfg.getBool("@dns", dflts.hasDNS());
+			zeroNafletsOK = cfg.getBool("@zero_naflets", dflts.isZeroNafletsOK());
+			surviveDownstream = cfg.getBool("@survive_downstream", dflts.isSurviveDownstream());
+			surviveHandlers = cfg.getBool("@survive_handlers", dflts.isSurviveHandlers());
+			flushInterval = cfg.getTime("@flush", dflts.getFlushInterval());
+
+			String xpath = "naflets/naflet"+com.grey.base.config.XmlConfig.XPATH_ENABLED;
+			naflets = cfg.getSections(xpath);
+		}
+
+		public Builder withName(String v) {
+			this.name = v;
+			return this;
+		}
+
+		public Builder withLogName(String v) {
+			this.logName = v;
+			return this;
+		}
+
+		public Builder withNafman(boolean v) {
+			this.hasNafman = v;
+			return this;
+		}
+
+		public Builder withDNS(boolean v) {
+			this.hasDNS = v;
+			return this;
+		}
+
+		public Builder withNafletsConfig(com.grey.base.config.XmlConfig[] v) {
+			this.naflets = v;
+			return this;
+		}
+
+		public Builder withZeroNafletsOK(boolean v) {
+			this.zeroNafletsOK = v;
+			return this;
+		}
+
+		public Builder withSurviveDownstream(boolean v) {
+			this.surviveDownstream = v;
+			return this;
+		}
+
+		public Builder withSurviveHandlers(boolean v) {
+			this.surviveHandlers = v;
+			return this;
+		}
+
+		public Builder withClock(Clock v) {
+			this.clock = v;
+			return this;
+		}
+
+		public Builder withFlushInterval(long v) {
+			this.flushInterval = v;
+			return this;
+		}
+
+		public DispatcherDef build() {
+			return new DispatcherDef(this);
+		}
 	}
 }

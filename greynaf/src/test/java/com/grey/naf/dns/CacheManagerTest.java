@@ -445,8 +445,7 @@ public class CacheManagerTest
 		throws java.io.IOException, javax.naming.NamingException
 	{
 		if (dnscfg == null) dnscfg = XmlConfig.NULLCFG;
-		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
-		def.name = "CacheManagerTest";
+		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder().withName("CacheManagerTest").build();
 		dsptch = Dispatcher.create(appctx, def, logger);
 		ResolverConfig config = new ResolverConfig(dnscfg, logger);
 		DynLoader.setField(config, "cache_lowater_a", 4);

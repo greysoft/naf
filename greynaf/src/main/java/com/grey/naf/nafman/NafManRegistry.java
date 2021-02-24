@@ -76,7 +76,7 @@ public class NafManRegistry
 		final int pref;
 		CommandHandlerReg(NafManCommand.Handler h, Dispatcher d, int p) {handler=h; dsptch=d; pref=p;}
 		@Override
-		public String toString() {return "CommandHandlerReg="+handler.getClass().getName()+"/"+dsptch.name+"/pref="+pref;}
+		public String toString() {return "CommandHandlerReg="+handler.getClass().getName()+"/"+dsptch.getName()+"/pref="+pref;}
 	}
 
 	private static final DefCommand[] nafcmds = new DefCommand[] {
@@ -200,7 +200,7 @@ public class NafManRegistry
 			}
 		}
 		if (!active_commands.containsKey(cmdcode)) {
-			dsptch.getLogger().warn("NAFMAN discarding undefined cmd="+cmdcode+" for handler="+dsptch.name+"/"+handler.getClass().getName());
+			dsptch.getLogger().warn("NAFMAN discarding undefined cmd="+cmdcode+" for handler="+dsptch.getName()+"/"+handler.getClass().getName());
 			return false;
 		}
 		java.util.ArrayList<CommandHandlerReg> lst = cmd_handlers.get(cmdcode);
@@ -209,24 +209,24 @@ public class NafManRegistry
 			for (int idx = 0; idx != lst.size(); idx++) {
 				CommandHandlerReg def = lst.get(idx);
 				if (dsptch == def.dsptch && handler == def.handler) {
-					throw new NAFConfigException("Duplicate handler for cmd="+cmdcode+" in Dispatcher="+dsptch.name);
+					throw new NAFConfigException("Duplicate handler for cmd="+cmdcode+" in Dispatcher="+dsptch.getName());
 				}
 				if (pref == 0) {
 					if (def.pref == 0) continue; //new handler can co-exist with existing one
 				} else {
 					if (pref >= def.pref) {
 						dsptch.getLogger().trace("NAFMAN cmd="+cmdcode+": Existing "+def+" has higher priority than "
-								+handler.getClass().getName()+"/"+dsptch.name+"/pref="+pref);
+								+handler.getClass().getName()+"/"+dsptch.getName()+"/pref="+pref);
 						return false; //existing handler has higher priority
 					}
 				}
 				// new handler has higher priority, so displace existing one
 				if (inviolate_handlers.contains(def.dsptch)) {
 					dsptch.getLogger().trace("NAFMAN cmd="+cmdcode+": Permanent "+def+" supercedes "
-							+handler.getClass().getName()+"/"+dsptch.name+"/pref="+pref);
+							+handler.getClass().getName()+"/"+dsptch.getName()+"/pref="+pref);
 					return false; //but existing handler has been marked permanent
 				}
-				dsptch.getLogger().trace("NAFMAN cmd="+cmdcode+": "+handler.getClass().getName()+"/"+dsptch.name+"/pref="+pref
+				dsptch.getLogger().trace("NAFMAN cmd="+cmdcode+": "+handler.getClass().getName()+"/"+dsptch.getName()+"/pref="+pref
 						+" replaces "+def);
 				lst.remove(idx);
 				break; //any further handlers can only be unconditional ones, so can co-exist
@@ -302,12 +302,12 @@ public class NafManRegistry
 			for (int idx = 0; idx != lst.size(); idx++) {
 				CommandHandlerReg hdef = lst.get(idx);
 				if (xml) {
-					sb.append("<handler dispatcher=\"").append(hdef.dsptch.name);
+					sb.append("<handler dispatcher=\"").append(hdef.dsptch.getName());
 					sb.append("\" hid=\"").append(hdef.handler.nafmanHandlerID());
 					sb.append("\" pref=\"").append(hdef.pref).append("\">");
 					sb.append(hdef.handler.getClass().getName()).append("</handler>");
 				} else {
-					sb.append(dlm).append(hdef.dsptch.name).append('/').append(hdef.handler.getClass().getName());
+					sb.append(dlm).append(hdef.dsptch.getName()).append('/').append(hdef.handler.getClass().getName());
 					sb.append("/pref=").append(hdef.pref);
 					dlm = "; ";
 				}

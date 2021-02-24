@@ -5,6 +5,7 @@
 package com.grey.logging.adapters;
 
 import com.grey.base.utils.ScheduledTime;
+import com.grey.logging.Parameters;
 
 public class AdapterSLF4J
 	extends com.grey.logging.Logger
@@ -47,13 +48,14 @@ public class AdapterSLF4J
 	// remove settings that make no sense for this logger
 	private static com.grey.logging.Parameters adjust(com.grey.logging.Parameters params)
 	{
-		params.mode = com.grey.logging.Parameters.MODE_AUDIT;
-		params.pthnam = null;
-		params.strm = null;
-		params.rotfreq = ScheduledTime.FREQ.NEVER;
-		params.maxsize = 0;
-		params.bufsiz = 0;
-		params.flush_interval = 0;
-		return params;
+		Parameters.Builder bldr = new Parameters.Builder(params);
+		return bldr
+				.withPathname(null)
+				.withStream(null)
+				.withRotFreq(ScheduledTime.FREQ.NEVER)
+				.withMaxSize(0)
+				.withBufferSize(0)
+				.withFlushInterval(0)
+				.build();
 	}
 }

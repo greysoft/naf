@@ -63,17 +63,16 @@ public class Factory
 	public static Logger getLogger(Parameters params, String name) throws java.io.IOException
 	{
 		if (name == null || name.isEmpty()) name = DFLT_LOGNAME;
-		if (params == null) params = new Parameters();
-		params.reconcile();
+		if (params == null) params = new Parameters.Builder().build();
 		Logger log = null;
-		if (Logger.DIAGNOSTICS) System.out.println(Logger.DIAGMARK+"Creating Logger="+params.logclass);
+		if (Logger.DIAGNOSTICS) System.out.println(Logger.DIAGMARK+"Creating Logger="+params.getLogClass());
 		try {
-			Class<?> clss = DynLoader.loadClass(params.logclass);
+			Class<?> clss = DynLoader.loadClass(params.getLogClass());
 			java.lang.reflect.Constructor<?> ctor = clss.getDeclaredConstructor(Parameters.class, String.class);
 			ctor.setAccessible(true);
 			log = Logger.class.cast(ctor.newInstance(params, name));
 		} catch (ReflectiveOperationException ex) {
-			throw new IllegalArgumentException("Failed to create logger="+params.logclass, ex);
+			throw new IllegalArgumentException("Failed to create logger="+params.getLogClass(), ex);
 		}
 		if (Logger.DIAGNOSTICS) System.out.println(Logger.DIAGMARK+"Created Logger - "+log);
 		log.init();

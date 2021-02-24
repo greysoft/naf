@@ -35,8 +35,9 @@ public class IterativeListenerTest
 		java.net.Socket clients[] = new java.net.Socket[NUMCONNS];
 
 		// set up Dispatcher
-		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
-		def.surviveHandlers = false;
+		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
+				.withSurviveHandlers(false)
+				.build();
 		Dispatcher dsptch = Dispatcher.create(appctx, def, com.grey.logging.Factory.getLogger("no-such-logger"));
 
 		Factory fact = new Factory(clients);

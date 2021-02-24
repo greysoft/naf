@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2018 Yusef Badri - All rights reserved.
+ * Copyright 2012-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -171,8 +171,9 @@ public class ChannelMonitorTest
 		final byte[] xmtbuf = new byte[xmtsiz];
 
 		ApplicationContextNAF appctx = ApplicationContextNAF.create("CMTEST-"+directbufs);
-		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
-		def.surviveHandlers = false;
+		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
+				.withSurviveHandlers(false)
+				.build();
 		Dispatcher dsptch = Dispatcher.create(appctx, def, com.grey.logging.Factory.getLogger("no-such-logger"));
 
 		for (int idx = 0; idx != receivers.length; idx++) {

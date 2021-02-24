@@ -128,7 +128,7 @@ public class NafManCommand
 			response.append(msg);
 			return;
 		}
-		response.append("<handler dname=\"").append(dsptch.name).append("\"");
+		response.append("<handler dname=\"").append(dsptch.getName()).append("\"");
 		response.append(" hname=\"").append(handler.nafmanHandlerID()).append("\"");
 		response.append(" hclass=\"").append(handler.getClass().getName()).append("\">");
 		response.append(msg).append("</handler>");
@@ -148,7 +148,7 @@ public class NafManCommand
 		String target = args.get(ATTR_DISPATCHER);
 		if (target != null) {
 			//sent to a specific Dispatcher, so are we that Dispatcher?
-			return StringOps.sameSeq(agent.getDispatcher().name, target);
+			return StringOps.sameSeq(agent.getDispatcher().getName(), target);
 		}
 		if (def.code.equals(NafManRegistry.CMD_STOP)) {
 			//unless sent to a specific Dispatcher, STOP is only handled by the Primary

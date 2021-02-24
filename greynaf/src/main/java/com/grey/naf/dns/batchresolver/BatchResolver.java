@@ -101,7 +101,7 @@ public class BatchResolver
 		} else {
 			throw new NAFConfigException(LOGLBL+"Invalid lookup-type="+mode);
 		}
-		if (dsptch.getResolverDNS() == null) throw new NAFConfigException(LOGLBL+"Dispatcher="+dsptch.name+" does not have DNS-Resolver enabled");
+		if (dsptch.getResolverDNS() == null) throw new NAFConfigException(LOGLBL+"Dispatcher="+dsptch.getName()+" does not have DNS-Resolver enabled");
 		if (maxpending != 0 && maxpending_lowater >= maxpending)  throw new NAFConfigException(LOGLBL+"maxpending_lowater cannot exceed max - "+maxpending_lowater+" vs "+maxpending);
 		
 		if (filename_in != null && !filename_in.equals("-")) fin = new java.io.FileInputStream(filename_in);

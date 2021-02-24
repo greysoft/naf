@@ -43,10 +43,10 @@ public class PrimaryAgent
 	public PrimaryAgent(Dispatcher dsptch, NafManRegistry reg, XmlConfig cfg, DispatcherDef def) throws java.io.IOException
 	{
 		super(dsptch, reg, cfg);
-		surviveDownstream = def.surviveDownstream;
+		surviveDownstream = def.isSurviveDownstream();
 		events = new Producer<Object>(Object.class, dsptch, this);
 		events.start();
-		dsptch.getLogger().info("NAFMAN="+dsptch.name+": survive_downstream="+surviveDownstream);
+		dsptch.getLogger().info("NAFMAN="+dsptch.getName()+": survive_downstream="+surviveDownstream);
 
 		int lstnport = dsptch.getApplicationContext().getConfig().assignPort(NAFConfig.RSVPORT_NAFMAN);
 		XmlConfig lstncfg = cfg.getSection("listener");
@@ -124,8 +124,8 @@ public class PrimaryAgent
 					if (status == NafManCommand.DETACH_NOT) continue;
 					if (status == NafManCommand.DETACH_FINAL) completed = true;
 					deadsecs = true; //assume the Secondary has died
-					dsptch.getLogger().info("NAFMAN="+dsptch.name+" failed to forward cmd="+def.code+" to Secondary="
-							+agent.getDispatcher().name+" - "+com.grey.base.ExceptionUtils.summary(ex));
+					dsptch.getLogger().info("NAFMAN="+dsptch.getName()+" failed to forward cmd="+def.code+" to Secondary="
+							+agent.getDispatcher().getName()+" - "+com.grey.base.ExceptionUtils.summary(ex));
 				}
 			}
 		}
@@ -148,16 +148,16 @@ public class PrimaryAgent
 			Class<?> clss = event.getClass();
 			if (clss == SecondaryAgent.class) {
 				SecondaryAgent agent = (SecondaryAgent)event;
-				dsptch.getLogger().info("NAFMAN="+dsptch.name+" received subscription from Secondary="+agent.getDispatcher().name);
+				dsptch.getLogger().info("NAFMAN="+dsptch.getName()+" received subscription from Secondary="+agent.getDispatcher().getName());
 				secondaries.add(agent);
 			} else if (clss == String.class) {
 				SecondaryAgent agent = getSecondary((String)event);
 				if (agent == null) {
 					//can't see how this could happen in reality
-					dsptch.getLogger().warn("NAFMAN="+dsptch.name+" received unsubscription from unidentified Secondary="+event);
+					dsptch.getLogger().warn("NAFMAN="+dsptch.getName()+" received unsubscription from unidentified Secondary="+event);
 					continue;
 				}
-				dsptch.getLogger().info("NAFMAN="+dsptch.name+" received unsubscription from Secondary="+agent.getDispatcher().name);
+				dsptch.getLogger().info("NAFMAN="+dsptch.getName()+" received unsubscription from Secondary="+agent.getDispatcher().getName());
 				discardSecondary(agent);
 				secondaries.remove(agent);
 				if (!surviveDownstream) stopDispatcher();
@@ -176,7 +176,7 @@ public class PrimaryAgent
 
 	void secondaryUnsubscribed(SecondaryAgent agent) throws java.io.IOException
 	{
-		events.produce(agent.getDispatcher().name);
+		events.produce(agent.getDispatcher().getName());
 	}
 
 	void commandCompleted(NafManCommand cmd) throws java.io.IOException
@@ -199,7 +199,7 @@ public class PrimaryAgent
 	private SecondaryAgent getSecondary(String name)
 	{
 		for (int idx = 0; idx != secondaries.size(); idx++) {
-			if (secondaries.get(idx).getDispatcher().name.equals(name)) return secondaries.get(idx);
+			if (secondaries.get(idx).getDispatcher().getName().equals(name)) return secondaries.get(idx);
 		}
 		return null;
 	}

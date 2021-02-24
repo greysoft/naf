@@ -35,12 +35,12 @@ class Proxy
 
 		if (p.rslvr == null) {
 			// we haven't yet latched our master thread
-			if (p.master == null || p.master.equals(dsptch.name)) {
+			if (p.master == null || p.master.equals(dsptch.getName())) {
 				// we've found it now - we will execute within the context of this dispatcher
 				p.setDispatcher(dsptch);
 			}
 		}
-		dsptch.getLogger().info(LOGLABEL+": Dispatcher="+dsptch.name+" set as "+(p.rslvr!=null?"master":"secondary")+" client");
+		dsptch.getLogger().info(LOGLABEL+": Dispatcher="+dsptch.getName()+" set as "+(p.rslvr!=null?"master":"secondary")+" client");
 		return p;
 	}
 
@@ -48,7 +48,7 @@ class Proxy
 	{
 		this.cfg = cfg;
 		master = cfg.getValue("@master", false, null);
-		d.getLogger().info(LOGLABEL+": Proxy with master="+master+" created by Dispatcher="+d.name);
+		d.getLogger().info(LOGLABEL+": Proxy with master="+master+" created by Dispatcher="+d.getName());
 	}
 
 	private void setDispatcher(Dispatcher d) throws java.io.IOException, javax.naming.NamingException
@@ -61,7 +61,7 @@ class Proxy
 
 	protected void clientStarted(Client clnt) throws java.io.IOException
 	{
-		if (rslvr == null) throw new IllegalStateException(LOGLABEL+": Client="+clnt.getDispatcher().name+" started before setting Master");
+		if (rslvr == null) throw new IllegalStateException(LOGLABEL+": Client="+clnt.getDispatcher().getName()+" started before setting Master");
 		if (clnt.getDispatcher() == rslvr.getDispatcher()) rslvr.start(); //this is the Master, so start Resolver within its thread
 	}
 

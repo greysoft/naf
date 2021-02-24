@@ -21,13 +21,16 @@ GreyLog v${project.version}
 <a href="#overview">1&nbsp;-&nbsp;Overview</a>
 </p>
 <p>
-<a href="#config">2&nbsp;-&nbsp;Configuration</a>
+<a href="#creation">2&nbsp;-&nbsp;Logger Creation</a>
 </p>
 <p>
-<a href="#extmap">3&nbsp;-&nbsp;Foreign&nbsp;Mappings</a>
+<a href="#config">3&nbsp;-&nbsp;Configuration</a>
 </p>
 <p>
-<a href="#slf4j">4&nbsp;-&nbsp;Foreign&nbsp;Bindings</a>
+<a href="#extmap">4&nbsp;-&nbsp;Foreign&nbsp;Mappings</a>
+</p>
+<p>
+<a href="#slf4j">5&nbsp;-&nbsp;Foreign&nbsp;Bindings</a>
 </p>
 <p>
 <a href="../../NOTICE.txt">COPYRIGHT</a>
@@ -58,65 +61,36 @@ GreyLog Logging Framework
 
 <p>
 <span class="softname">GreyLog</span>
-is a fully configurable, high performance logging framework, which contains particular optimisations to support 8-bit charsets (ie. the vast majority) and single-threaded mode.
-<br/>
-It consists of the
-<span class="compcode">com.grey.logging</span>
-Java package.
-<br/> <br/>
-GreyLog differs from
-<span class="softname">Log4j12</span>, <span class="softname">JUL</span> (<span class="compcode">java.util.logging</span>)
-and other logging frameworks, in that its loggers really are logfile streams, and not merely formatting handlers that cascade into a single actual logger.
-This means that care has to be taken when instantiating GreyLog loggers via
-external interfaces such as
-<span class="softname">SLF4J</span>
-or
-<span class="softname">JCL</span> (Apache Commons Logging).
-<br/>
-SLF4J and JCL are biased towards Log4j12 and JUL, and developers typically expect to call
-<span class="compcode">org.slf4j.LoggerFactory.getLogger()</span>
-or
-<span class="compcode">org.apache.commons.logging.LogFactory.getLog()</span>
-in every module, using a different name each time, without actually creating multiple I/O streams.
-<br/>
-In the case of GreyLog, this would result in multiple logfile streams which is probably not what you intended, so the required loggers need to be created in one place and then made available (as is the case with the
-<span class="compcode">Dispatcher.logger</span>
-field provided by NAF).
+is a fully configurable, high performance logging framework, which contains particular optimisations to support 8-bit charsets (ie. the vast majority) and single-threaded mode (ie. a typical NAF context).
 <br/> <br/>
 GreyLog is part of the
 <span class="softname">NAF</span>
 suite, but it has no dependency on NAF's reactor core and is suitable for use by non-NAF applications,
 whether invoked directly or via facades like SLF4J or JCL.
+<br/>
+It consists of the
+<span class="compcode">com.grey.logging</span>
+Java package.
 </p>
 
 <hr class="pline"/>
 <h2>
-<a name="config">
-2 - Configuration
+<a name="creation">
+2 - Creation
 </a>
 </h2>
 
 <p>
 GreyLog loggers are created by the
 <span class="compcode">com.grey.logging.Factory</span> class, which provides a number of
-<span class="compcode">getLogger()</span> factory methods.
+<span class="compcode">getLogger()</span> factory methods, depending on context.
 <br/>
-All of them are based on a config file which is generically termed the
+GreyLog utilises an XML config file which is generically termed the
 <dfn>logging.xml</dfn>
-file (though it's not necessarily called that) and contains named entries, each of which specifies and defines a particular logger.
-<br/>
-If you call a <span class="compcode">getLogger()</span> variant that doesn't specify a config file, then the global default logging.xml file is used.
-<br/>
-If you call a <span class="compcode">getLogger()</span> variant that doesn't specify a named logger (or you specify a blank or null name), then a special logging.xml entry called the
-<span class="cfgvalue">default</span>
-logger is used.
-The <span class="cfgvalue">default</span> entry need not exist (though it is recommended that you do define it) and if it doesn't GreyLog will create a logger with default settings, which can be influenced by system properties (see the default constructor in the
-<span class="compcode">com.grey.logging.Parameters</span>
-source code), but is typically the standard-output stream.
-If you specify a named logger other than <span class="cfgvalue">default</span>, and it doesn't exist in the logging.xml file, then a default <span class="compcode">Logger</span> will be returned which logs to stdout.
+file (though it's not necessarily called that) and which contains named entries, each of which specifies and defines a particular logger.
 
 <br/> <br/>
-The first time the GreyLog framework tries to access the default <dfn>logging.xml</dfn> config file, it looks for it on the following search path, stopping on the first match:<br/>
+If a logging.xml config file is not explicitly supplied to Factory.getLogger() then it looks for a default config on the following search path, stopping on the first match:<br/>
 &bull; If the <span class="cfgname">grey.logger.configfile</span> system property is set, then it specifies the pathname.
 <br/>
 &bull; <span class="pathname">./logging.xml</span> (ie. look in current directory)
@@ -127,9 +101,50 @@ The first time the GreyLog framework tries to access the default <dfn>logging.xm
 <br/>
 &bull; Look for it on the classpath as <span class="pathname">./logging.xml</span>.
 <br/>
-If still not found, then <span class="compcode">getLogger()</span> calls will treat all requested loggers as non-existent, so as described above, they will be directed to stdout.
+The logging.xml file is not absolutely required to exist, and generic defaults will be used if it is absent.
 
 <br/> <br/>
+It's also possible to explicitly bypass the use of the logging.xml config file by calling the
+<span class="compcode">com.grey.logging.Parameters</span>
+variant of
+<span class="compcode">Factory.getLogger()</span>.
+
+<br/> <br/>
+Whether you supply a
+<span class="compcode">Parameters</span>
+object or a logging.xml config file to the logger factory, it takes all its default values from system properties.
+<br>
+See the
+<span class="compcode">com.grey.logging.Parameters</span>
+source code for a list of the system properties and the initialisation of its nested
+<span class="compcode">Builder</span>
+class for their default values.
+
+<br/> <br/>
+Note that all system properties can be transposed to the environment by upper-casing and replacing dots with hyphens.
+<br>
+eg. the system property
+<dfn>grey.logger.level</dfn>
+can be replaced by the environment variable
+<dfn>GREY_LOGGER_LEVEL</dfn>
+and if both are present, the environment takes precedence.
+<br/>
+This is in common with the treatment of system properties and environment variables throughout NAF.
+
+<br/> <br/>
+If the system property
+<span class="cfgname">grey.logger.diagnostics</span>
+is set to Yes, then verbose info on the process of creating the loggers will be printed to standard-output.
+</p>
+
+<hr class="pline"/>
+<h2>
+<a name="config">
+3 - Configuration
+</a>
+</h2>
+
+<p>
 The example below illustrates the structure of the logging.xml config file, and the logger name specified in the
 <span class="compcode">getLogger()</span> call is used to select the matching
 <span class="cfgname">logger</span>
@@ -178,11 +193,7 @@ If it contains the special token
 
 The attributes of the
 <span class="cfgname">file</span>
-elements are shown below.
-<br/>
-The default values for all these config attributes are determined via system properties. See the
-<span class="compcode">com.grey.logging.Parameters</span>
-source code.
+elements are listed here:
 </p>
 <ul>
 <li><span class="cfgtitle">class</span>:
@@ -265,17 +276,10 @@ is explicitly set to No.
 </li>
 </ul>
 
-<p>
-If the system property
-<span class="cfgname">grey.logger.diagnostics</span>
-is set to Yes, then progress messages on the search for the
-<dfn>logging.xml</dfn> file and the process of creating a logger will be printed to the process's standard-output.
-</p>
-
 <hr class="pline"/>
 <h2>
 <a name="extmap">
-3 - Foreign Mappings
+4 - Foreign Mappings
 </a>
 </h2>
 
@@ -311,7 +315,7 @@ environment variable) and the GreyLog logger becomes part of the external loggin
 <hr class="pline"/>
 <h2>
 <a name="slf4j">
-4 - Foreign Bindings
+5 - Foreign Bindings
 </a>
 </h2>
 

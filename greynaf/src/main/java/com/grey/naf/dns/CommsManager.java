@@ -42,7 +42,7 @@ class CommsManager
 			}
 		}
 		EndPointTCP.Factory fact = new EndPointTCP.Factory(rslvr.getDispatcher(), bufspec_tcp);
-		tcpstore = new com.grey.base.collections.ObjectWell<>(fact, "DNS_"+rslvr.getDispatcher().name);
+		tcpstore = new com.grey.base.collections.ObjectWell<>(fact, "DNS_"+rslvr.getDispatcher().getName());
 	}
 
 	public void start() throws java.io.IOException

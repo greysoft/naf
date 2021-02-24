@@ -24,7 +24,7 @@ public class ClientUDP
 	{
 		super(g.dsptch, bufspec);
 		grp = g;
-		logpfx = "Client "+getDispatcher().name+"/"+id+": ";
+		logpfx = "Client "+getDispatcher().getName()+"/"+id+": ";
 		niobuf = com.grey.base.utils.NIOBuffers.encode(msgbuf, 0, msgbuf.length, null, bufspec.directbufs);
 
 		udpchan = java.nio.channels.DatagramChannel.open();

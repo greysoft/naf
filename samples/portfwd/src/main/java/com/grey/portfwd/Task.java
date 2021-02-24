@@ -67,7 +67,7 @@ public class Task
 			if (active.size() != 0) sb.append("</ul>");
 		} else {
 			// we've obviously registered for this command, so we must be missing a Case label - clearly a bug
-			getLogger().error("NAFMAN="+getDispatcher().name+": Missing case for cmd="+cmd.getCommandDef().code);
+			getLogger().error("NAFMAN="+getDispatcher().getName()+": Missing case for cmd="+cmd.getCommandDef().code);
 			return null;
 		}
 		return sb;

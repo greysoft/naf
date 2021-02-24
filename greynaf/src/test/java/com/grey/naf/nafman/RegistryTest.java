@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2018 Yusef Badri - All rights reserved.
+ * Copyright 2013-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.nafman;
@@ -94,10 +94,11 @@ public class RegistryTest
 			= (java.util.HashMap<String, java.util.List<Object>>)DynLoader.getField(nafreg, "cmd_handlers");
 		com.grey.base.collections.HashedMap<String, java.util.ArrayList<NafManCommand.Handler>> dsptch_handlers
 			= new com.grey.base.collections.HashedMap<String, java.util.ArrayList<NafManCommand.Handler>>();
-		DispatcherDef def = new DispatcherDef();
-		def.hasNafman = true;
+		DispatcherDef def = new DispatcherDef.Builder()
+				.withNafman(true)
+				.build();
 		Dispatcher dsptch1 = Dispatcher.create(regctx, def, logger);
-		def.name = null;
+		def = new com.grey.naf.DispatcherDef.Builder(def).withName(null).build();
 		Dispatcher dsptch2 = Dispatcher.create(regctx, def, logger);
 		nafreg.loadCommands(new NafManRegistry.DefCommand[]{fakecmd1});
 		nafreg.loadCommands(new NafManRegistry.DefCommand[]{fakecmd2});

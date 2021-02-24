@@ -43,7 +43,7 @@ public class Producer<T>
 	}
 	
 	public void start() throws java.io.IOException {
-		logger.info("Dispatcher="+getDispatcher().name+" starting Producer="+this);
+		logger.info("Dispatcher="+getDispatcher().getName()+" starting Producer="+this);
 		alertspipe.start();
 	}
 

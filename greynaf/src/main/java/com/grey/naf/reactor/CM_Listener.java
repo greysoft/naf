@@ -72,9 +72,9 @@ public abstract class CM_Listener
 			srvbacklog = cfg.getInt("@backlog", false, srvbacklog);
 			lname = cfg.getValue("@name", false, lname);
 		}
-		if (lname == null) lname = getDispatcher().name+":"+port;
+		if (lname == null) lname = getDispatcher().getName()+":"+port;
 		name = lname;
-		getLogger().trace("Dispatcher="+getDispatcher().name+" - Listener="+name+": Initialising on interface="+iface+", port="+port);
+		getLogger().trace("Dispatcher="+getDispatcher().getName()+" - Listener="+name+": Initialising on interface="+iface+", port="+port);
 
 		// set up our listening socket
 		java.net.InetAddress ipaddr = (iface == null ? null : com.grey.base.utils.IP.getHostByName(iface));

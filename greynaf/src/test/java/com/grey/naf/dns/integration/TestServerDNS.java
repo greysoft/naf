@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2018 Yusef Badri - All rights reserved.
+ * Copyright 2015-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.integration;
@@ -38,9 +38,10 @@ class TestServerDNS
 	public TestServerDNS(ApplicationContextNAF appctx) throws java.io.IOException {
 		populateAnswers();
 		total_answers = unused_answers.size();
-		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef("Mock-DNS-Server");
-		def.hasDNS = false;
-		def.surviveHandlers = false;
+		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
+				.withName("Mock-DNS-Server")
+				.withSurviveHandlers(false)
+				.build();
 		Dispatcher dsptch = Dispatcher.create(appctx, def, null);
 		srvr = new com.grey.naf.dns.server.ServerDNS(this, dsptch, "127.0.0.1", 0);
 		if (srvr.getLocalPort() == PacketDNS.INETPORT) throw new IllegalStateException("DNS server not on ephemeral port");

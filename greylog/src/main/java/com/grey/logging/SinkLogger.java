@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 Yusef Badri - All rights reserved.
+ * Copyright 2011-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.logging;
@@ -11,7 +11,7 @@ public class SinkLogger
 {
 	public SinkLogger(String logname)
 	{
-		this(new Parameters(SinkLogger.class), logname);
+		this(new Parameters.Builder().withLogClass(SinkLogger.class).build(), logname);
 	}
 
 	public SinkLogger(Parameters params, String logname)
@@ -29,10 +29,12 @@ public class SinkLogger
 	// remove settings that make no sense for this logger
 	private static Parameters adjust(Parameters params)
 	{
-		params.pthnam = null;
-		params.strm = null;
-		params.bufsiz = 0;
-		params.flush_interval = 0;
-		return params;
+		Parameters.Builder bldr = new Parameters.Builder(params);
+		return bldr
+				.withPathname(null)
+				.withStream(null)
+				.withBufferSize(0)
+				.withFlushInterval(0)
+				.build();
 	}
 }

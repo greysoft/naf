@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2018 Yusef Badri - All rights reserved.
+ * Copyright 2012-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf;
@@ -37,14 +37,14 @@ public class ConfigTest
 		String dname = "testdispatcher9";
 		XmlConfig dcfg = cfg.getDispatcher(dname);
 		org.junit.Assert.assertNotNull(dcfg);
-		DispatcherDef def = new DispatcherDef(dcfg);
-		org.junit.Assert.assertEquals(dname, def.name);
-		org.junit.Assert.assertFalse(def.hasNafman);
-		org.junit.Assert.assertTrue(def.hasDNS);
-		org.junit.Assert.assertTrue(def.zeroNafletsOK);
-		org.junit.Assert.assertTrue(def.surviveDownstream);
-		org.junit.Assert.assertTrue(def.surviveHandlers);
-		org.junit.Assert.assertEquals(2, def.naflets.length);
+		DispatcherDef def = new DispatcherDef.Builder(dcfg).build();
+		org.junit.Assert.assertEquals(dname, def.getName());
+		org.junit.Assert.assertFalse(def.hasNafman());
+		org.junit.Assert.assertTrue(def.hasDNS());
+		org.junit.Assert.assertTrue(def.isZeroNafletsOK());
+		org.junit.Assert.assertTrue(def.isSurviveDownstream());
+		org.junit.Assert.assertTrue(def.isSurviveHandlers());
+		org.junit.Assert.assertEquals(2, def.getNafletsConfig().length);
 	}
 
 	@org.junit.Test
@@ -62,18 +62,18 @@ public class ConfigTest
 
 		dcfg = cfg.getDispatcher(dname);
 		org.junit.Assert.assertNotNull(dcfg);
-		DispatcherDef def = new DispatcherDef(dcfg);
+		DispatcherDef def = new DispatcherDef.Builder(dcfg).build();
 		verifyConfig(def, dname);
 	}
 
 	private static void verifyConfig(DispatcherDef def, String dname)
 	{
-		org.junit.Assert.assertEquals(dname, def.name);
-		org.junit.Assert.assertTrue(def.hasNafman);
-		org.junit.Assert.assertFalse(def.hasDNS);
-		org.junit.Assert.assertTrue(def.zeroNafletsOK);
-		org.junit.Assert.assertTrue(def.surviveDownstream);
-		org.junit.Assert.assertFalse(def.surviveHandlers);
-		org.junit.Assert.assertNull(def.naflets);
+		org.junit.Assert.assertEquals(dname, def.getName());
+		org.junit.Assert.assertTrue(def.hasNafman());
+		org.junit.Assert.assertFalse(def.hasDNS());
+		org.junit.Assert.assertTrue(def.isZeroNafletsOK());
+		org.junit.Assert.assertTrue(def.isSurviveDownstream());
+		org.junit.Assert.assertFalse(def.isSurviveHandlers());
+		org.junit.Assert.assertNull(def.getNafletsConfig());
 	}
 }

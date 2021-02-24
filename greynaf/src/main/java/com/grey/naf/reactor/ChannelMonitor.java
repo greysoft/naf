@@ -120,7 +120,7 @@ public abstract class ChannelMonitor
 					clearFlagCM(S_ISCONN);
 				}
 			} catch (Exception ex) {
-				getLogger().log(LEVEL.ERR, ex, true, "Dispatcher="+getDispatcher().name+": Failed to close ChannelMonitor=E"+cm_id+"/"+iochan
+				getLogger().log(LEVEL.ERR, ex, true, "Dispatcher="+getDispatcher().getName()+": Failed to close ChannelMonitor=E"+cm_id+"/"+iochan
 						+" in state=0x"+Integer.toHexString(cmstate));
 			}
 			iochan = null;

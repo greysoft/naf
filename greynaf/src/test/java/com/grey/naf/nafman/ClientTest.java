@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2018 Yusef Badri - All rights reserved.
+ * Copyright 2012-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.nafman;
@@ -64,7 +64,7 @@ public class ClientTest
 		com.grey.naf.Launcher.main(new String[] {"-q", "-cmd", stopcmd.code+"?"+NafManCommand.ATTR_DISPATCHER+"=no-such-dispatcher",
 				"-c", cfgpath, "-remote", "localhost:"+String.valueOf(agent.getPort())});
 		//... and the fact this doesn't error is proof that the above was ignored and Dispatcher still alive
-		com.grey.naf.Launcher.main(new String[] {"-q", "-cmd", stopcmd.code+"?"+NafManCommand.ATTR_DISPATCHER+"="+dsptch.name,
+		com.grey.naf.Launcher.main(new String[] {"-q", "-cmd", stopcmd.code+"?"+NafManCommand.ATTR_DISPATCHER+"="+dsptch.getName(),
 				"-c", cfgpath, "-remote", "localhost:"+String.valueOf(agent.getPort())});
 		waitStopped(dsptch);
 
@@ -78,14 +78,15 @@ public class ClientTest
 	public void testStopMulti() throws java.io.IOException
 	{
 		ApplicationContextNAF appctx = ApplicationContextNAF.create(null, new NAFConfig.Defs(cfgbaseport));
-		DispatcherDef def = new DispatcherDef();
-		def.name = "utest_d1";
-		def.hasNafman = true;
-		def.surviveHandlers = false;
+		DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
+				.withName("utest_d1")
+				.withNafman(true)
+				.withSurviveHandlers(false)
+				.build();
 		Dispatcher dp = Dispatcher.create(appctx, def, logger);
-		def.name = "utest_d2";
+		def = new com.grey.naf.DispatcherDef.Builder(def).withName("utest_d2").build();
 		Dispatcher ds1 = Dispatcher.create(appctx, def, logger);
-		def.name = "utest_d3";
+		def = new com.grey.naf.DispatcherDef.Builder(def).withName("utest_d3").build();
 		Dispatcher ds2 = Dispatcher.create(appctx, def, logger);
 		dp.start();
 		ds1.start();
@@ -93,7 +94,7 @@ public class ClientTest
 		org.junit.Assert.assertTrue(dp.getAgent().isPrimary());
 		org.junit.Assert.assertFalse(ds1.getAgent().isPrimary());
 		org.junit.Assert.assertFalse(ds2.getAgent().isPrimary());
-		NafManClient.submitCommand(stopcmd.code+"?"+NafManCommand.ATTR_DISPATCHER+"="+ds2.name, null, ds1.getAgent().getPort(), logger);
+		NafManClient.submitCommand(stopcmd.code+"?"+NafManCommand.ATTR_DISPATCHER+"="+ds2.getName(), null, ds1.getAgent().getPort(), logger);
 		waitStopped(ds2);
 		org.junit.Assert.assertFalse(ds2.isRunning());
 		com.grey.naf.reactor.TimerNAF.sleep(100);
@@ -109,11 +110,12 @@ public class ClientTest
 	public void testCommands() throws java.io.IOException
 	{
 		ApplicationContextNAF appctx = ApplicationContextNAF.create(null, new NAFConfig.Defs(cfgbaseport));
-		DispatcherDef def = new DispatcherDef();
-		def.name = "utest_allcmds";
-		def.hasNafman = true;
-		def.hasDNS = true;
-		def.surviveHandlers = false;
+		DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
+				.withName("utest_allcmds")
+				.withNafman(true)
+				.withDNS(true)
+				.withSurviveHandlers(false)
+				.build();
 		Dispatcher dsptch = Dispatcher.create(appctx, def, logger);
 		dsptch.start();
 		NafManRegistry reg = NafManRegistry.get(appctx);

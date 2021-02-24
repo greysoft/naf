@@ -26,10 +26,13 @@ public class LoggerTest
 	{
 		String logfile = rootpath+"gen_utest.log";
 		Class<?> clss = MTCharLogger.class;
-		Parameters params = new Parameters(LEVEL.INFO, logfile);
-		params.logclass = clss.getName();
-		params.withTID = true;
-		params.withDelta = true;
+		Parameters params = new Parameters.Builder()
+				.withLogClass(clss)
+				.withLogLevel(LEVEL.INFO)
+				.withPathname(logfile)
+				.withTID(true)
+				.withDelta(true)
+				.build();
 		Logger log = Factory.getLogger(params, "general1");
 		org.junit.Assert.assertEquals(clss, log.getClass());
 		org.junit.Assert.assertEquals("general1", log.getName());
@@ -71,12 +74,12 @@ public class LoggerTest
 		String template = rootpath+"/"+mainpart+".log";
 		Class<?> clss = MTCharLogger.class;
 		String logname = "myname1";
-		Parameters params = new Parameters(LEVEL.INFO, template);
-		params.logclass = clss.getName();
-		params.mode = "Bad-Mode";
-		params.withDelta = true;
-		params.flush_interval = 0;
-		params.reconcile();
+		Parameters params = new Parameters.Builder()
+				.withLogClass(clss)
+				.withLogLevel(LEVEL.INFO)
+				.withPathname(template)
+				.withDelta(true)
+				.build();
 		Logger log = Factory.getLogger(params, logname);
 		org.junit.Assert.assertEquals(clss, log.getClass());
 		org.junit.Assert.assertEquals(logname, log.getName());
@@ -97,9 +100,10 @@ public class LoggerTest
 		org.junit.Assert.assertTrue(fh.delete());
 		org.junit.Assert.assertFalse(fh.exists());
 
-		params.pthnam = template.replace("CCC.log", "CCC-"+ScheduledTime.TOKEN_DT+".log");
-		params.rotfreq = ScheduledTime.FREQ.HOURLY;
-		params.reconcile();
+		params = new Parameters.Builder(params)
+				.withPathname(template.replace("CCC.log", "CCC-"+ScheduledTime.TOKEN_DT+".log"))
+				.withRotFreq(ScheduledTime.FREQ.HOURLY)
+				.build();
 		log = Factory.getLogger(params, logname);
 		org.junit.Assert.assertEquals(clss, log.getClass());
 		org.junit.Assert.assertEquals(logname, log.getName());
@@ -126,9 +130,12 @@ public class LoggerTest
 	public void testMemLogger() throws java.io.IOException
 	{
 		Class<?> clss = MemLogger.class;
-		Parameters params = new Parameters(LEVEL.WARN, "any-old-name-as-will-discard-it");
-		params.logclass = clss.getName();
-		params.flush_interval = TimeOps.MSECS_PER_DAY; //just to prove flushing is meaningless here
+		Parameters params = new Parameters.Builder()
+				.withLogClass(clss)
+				.withLogLevel(LEVEL.WARN)
+				.withPathname("any-old-name-as-will-discard-it")
+				.withFlushInterval(TimeOps.MSECS_PER_DAY) //just to prove flushing is meaningless here
+				.build();
 		Logger log = Factory.getLogger(params, "mem1");
 		org.junit.Assert.assertEquals(clss, log.getClass());
 		org.junit.Assert.assertNull(log.getActivePath());
@@ -155,8 +162,11 @@ public class LoggerTest
 	public void testSinkLogger() throws java.io.IOException
 	{
 		Class<?> clss = SinkLogger.class;
-		Parameters params = new Parameters(LEVEL.INFO, (java.io.OutputStream)null);
-		params.logclass = clss.getName();
+		Parameters params = new Parameters.Builder()
+				.withLogClass(clss)
+				.withLogLevel(LEVEL.INFO)
+				.withStream(null)
+				.build();
 		Logger log = Factory.getLogger(params, "sink1");
 		org.junit.Assert.assertEquals(clss, log.getClass());
 		log.log(LEVEL.WARN, null, true, "This message should not come out");
@@ -195,8 +205,11 @@ public class LoggerTest
 	public void testAdapters() throws java.io.IOException
 	{
 		Class<?> clss = com.grey.logging.adapters.AdapterSLF4J.class;
-		Parameters params = new Parameters(LEVEL.INFO, (java.io.OutputStream)null);
-		params.logclass = clss.getName();
+		Parameters params = new Parameters.Builder()
+				.withLogClass(clss)
+				.withLogLevel(LEVEL.INFO)
+				.withStream(null)
+				.build();
 		Logger log = Factory.getLogger(params, "logname-slf4j");
 		org.junit.Assert.assertEquals(clss, log.getClass());
 		StringBuilder sb = new StringBuilder("This won't come  out unless an SLF4J logger is on our classpath and is configured");
@@ -204,8 +217,11 @@ public class LoggerTest
 		log.close();
 
 		clss = com.grey.logging.adapters.AdapterJCL.class;
-		params = new Parameters(LEVEL.INFO, (java.io.OutputStream)null);
-		params.logclass = clss.getName();
+		params = new Parameters.Builder()
+				.withLogClass(clss)
+				.withLogLevel(LEVEL.INFO)
+				.withStream(null)
+				.build();
 		log = Factory.getLogger(params, "logname-jcl");
 		org.junit.Assert.assertEquals(clss, log.getClass());
 		sb = new StringBuilder("This is the JCL adapter");

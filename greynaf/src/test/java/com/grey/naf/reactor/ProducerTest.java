@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2019 Yusef Badri - All rights reserved.
+ * Copyright 2011-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -27,9 +27,10 @@ public class ProducerTest
 			throws java.io.IOException, InterruptedException
 	{
 		FileOps.deleteDirectory(rootdir);
-		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
-		def.name = "producertest-workflow";
-		def.surviveHandlers = false;
+		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
+				.withName("producertest-workflow")
+				.withSurviveHandlers(false)
+				.build();
 		dsptch = Dispatcher.create(appctx, def, logger);
 		Producer<String> prod = new Producer<String>(String.class, dsptch, this);
 		prod.start();
@@ -66,9 +67,10 @@ public class ProducerTest
 		int benchsize = 100 * 1000;
 		benchmark_mode = true;
 		consumed_cnt = 0;
-		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef();
-		def.name = "producertest-bulk";
-		def.surviveHandlers = false;
+		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
+				.withName("producertest-bulk")
+				.withSurviveHandlers(false)
+				.build();
 		Dispatcher d = Dispatcher.create(appctx, def, logger);
 		Producer<String> p = new Producer<String>(String.class, d, this);
 		p.start();
