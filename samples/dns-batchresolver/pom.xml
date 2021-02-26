@@ -1,5 +1,5 @@
 <!--
-  Copyright 2010-2018 Yusef Badri - All rights reserved.
+  Copyright 2010-2021 Yusef Badri - All rights reserved.
   NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -7,32 +7,27 @@
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
 		<groupId>com.github.greysoft.naf</groupId>
-		<artifactId>ossnaf</artifactId>
+		<artifactId>ossnaf-samples</artifactId>
 		<version>${revision}</version>
 	</parent>
-	<artifactId>ossnaf-samples</artifactId>
-	<packaging>pom</packaging>
-	<name>NAF Samples</name>
-	<modules>
-		<module>echobot</module>
-		<module>portfwd</module>
-		<module>dns-batchresolver</module>
-	</modules>
+	<artifactId>samples-dnsbatchresolver</artifactId>
+	<name>DNS Batch Resolver</name>
+	<properties>
+		<grey.manifest.name>com/grey/dnsbatchresolver/</grey.manifest.name>
+		<grey.manifest.mainclass>com.grey.dnsbatchresolver.App</grey.manifest.mainclass>
+	</properties>
 	<dependencies>
 		<dependency>
-			<groupId>${project.groupId}</groupId>
-			<artifactId>greynaf</artifactId>
-			<version>${project.version}</version>
+			<groupId>com.github.greysoft.loggers</groupId>
+			<artifactId>slf4j-logstdio</artifactId>
+			<version>1.0.0</version>
 		</dependency>
 	</dependencies>
 	<build>
 		<plugins>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-deploy-plugin</artifactId>
-				<configuration>
-					<skip>true</skip>
-				</configuration>
+				<artifactId>maven-shade-plugin</artifactId>
 			</plugin>
 		</plugins>
 	</build>

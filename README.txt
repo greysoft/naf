@@ -35,9 +35,10 @@ The NAF jars and their dependencies will now all be under pkg/target/dependency 
 
 The Javadocs will have been generated under pkg/target/site/apidocs
 
-The two sample apps will also have been built, and their Jars can be found under:
+The sample apps will also have been built, and their Jars can be found under:
 - samples/echobot/target
 - samples/portfwd/target
+- samples/dns-batchresolver/target
 
 This build also creates a distribution package (in two formats):
 - pkg/target/naf-VERSION.zip
@@ -65,25 +66,5 @@ From now on, we'll refer to this root directory of the installed binary release 
 
 Section C - Demo Apps
 ======================
-You will find the sample apps under NAFHOME/samples and the simplest way to run them is to copy their JARs into NAFHOME/lib and their config files to NAFHOME/conf. 
-Then execute them from NAFHOME.
-
-Note that if there is already a NAF application running on the standard NAFMAN port of 13000, you can specify an alternative port on the JVM command line thus:
-	-Dgreynaf.baseport=13100
-
-The DNS Batch Resolver (which is technically a built-in NAFlet rather than a sample app) could be run by entering the following:
-    java -jar lib/greynaf-${project.version}.jar -c conf/batchresolver.xml -logger dnsbatch < infile
-This would write the results to stdout and log messages to ./dnsbatchresolver.log
-See the NAF Programmer's Guide for more info about how to run the Batch Resolver.
-Note that the actual JAR filenames will obviously depend on the current version.
-
-The Port Forwarder sample app could be run as:
-    java -jar lib/samples-portfwd-${project.version}.jar -c conf/portfwd.xml -logger portfwd &
-The logfile will be under ./var/logs
-
-The Echo Bot could run a simple TCP test like this:
-    java -Dgreynaf.dispatchers.logname=echobot -jar lib/samples-echobot-${project.version}.jar -logger echobot -server-solo -clients 10:2 18001
-Since this command creates multiple Dispatchers, which would normally use distinct loggers that are named after them, the above command sets a system property that directs them all to use the same GreyLog logger.
-
-All the above apps use GreyLog for their logging, and if you experience any issues with it, you can set the system property grey.logger.diagnostics=Y to get more information about what's going on.
-This can be done on the Java command-line, or put it in the grey.properties file, to avoid having to continually type it.
+You will find the sample apps under NAFHOME/samples.
+They each have a README file describing how to build and run and as explained above, their binaries are included in the distribution package.

@@ -1,5 +1,5 @@
 This file describes how to run EchoBot, a simple demo app that sends or echoes TCP and UDP data.
-See sections 12 and 13 of the NAF Programmer's Guide for more info.
+See sections 11 and 12 of the NAF Programmer's Guide for more info.
 
 EchoBot is an example of a NAF application that programatically creates Dispatccher and Listeners as opposed to the other sample app, PortFwd, which is entirely config-driven.
 We also illustrate here how standard SLF4J logs can be redirected to NAF's native GreyLog logging (which is the opposite redirection to that demonstrated in PortFwd).
@@ -22,13 +22,16 @@ EchoBot runs one or more client instances against an echo server, each sending i
 
 Example commands:
 This runs the echo server on port 14000 in one Dispatcher and a client in another
-	java -jar target/samples-echobot-*.jar -server-solo -clients 1 14000
+	java -jar target/samples-echobot-VERSION.jar -server-solo -clients 1 14000
 
 This runs the server and client code in the same EchoBot, with 2 client instances sending the test messages.
-	java -jar target/samples-echobot-*.jar -server -clients 1:2 14000
+	java -jar target/samples-echobot-VERSION.jar -server -clients 1:2 14000
 
 This does the same as the above, but using UDP rather than TCP and with each client sending 2 8KB messages, rather than the default of 1 4KB message.
-	java -jar target/samples-echobot-*.jar -udp -server -clients 1:2 -msg 2:8192 14000
+	java -jar target/samples-echobot-VERSION.jar -udp -server -clients 1:2 -msg 2:8192 14000
+
+To avoid creating the empty ./var dir in the working directory, you can run EchoBot like this:
+	java -Dgreynaf.paths.var=$HOME/tmp -jar target/samples-echobot-VERSION.jar -server-solo -clients 1 14000
 
 LOGGING
 --------
@@ -41,4 +44,4 @@ NAFMAN
 -------
 This sample app does not run NAFMAN by default, but if you set the system property -Dgrey.echobot.nafman=y on the command (or the env var GREY_ECHOBOT_NAFMAN=y) then it will enable NAFMAN, and you canm browse to port 13000 on the local host while EchoBot is running.
 Of course EchoBot normally runs for only an instant, but if you want time to examine its NAFMAN, you can run it in server-only mode, in which case it simply hangs waiting for input.
-	java -jar target/samples-echobot-*.jar -server 14000
+	java -jar target/samples-echobot-VERSION.jar -server 14000

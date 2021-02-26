@@ -1,8 +1,8 @@
 /*
- * Copyright 2010-2018 Yusef Badri - All rights reserved.
+ * Copyright 2010-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
-package com.grey.naf.dns.batchresolver;
+package com.grey.dnsbatchresolver;
 
 import com.grey.logging.Logger.LEVEL;
 import com.grey.base.utils.TimeOps;
@@ -206,6 +206,7 @@ public class BatchResolver
 		while ((inline = istrm.readLine()) != null) {
 			linecnt++;
 			reqcnt++;
+			inline = inline.trim();
 			if (logger.isActive(LEVEL.TRC2)) logger.log(LEVEL.TRC2, LOGLBL+"Reading name="+reqcnt+"/"+linecnt+" ["+inline+"]");
 			domnam.populate(inline.trim().toLowerCase());
 

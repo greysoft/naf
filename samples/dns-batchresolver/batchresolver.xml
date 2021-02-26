@@ -5,10 +5,10 @@
 	<dispatchers>
 		<dispatcher name="dnsbatch" dns="Y" zero_naflets="N">
 			<naflets>
-				<naflet name="batchdns" class="com.grey.naf.dns.batchresolver.BatchResolver">
+				<naflet name="batchdns" class="com.grey.dnsbatchresolver.BatchResolver">
 					<dnstype>MX</dnstype>
-					<infile>infile.txt</infile>
-					<outfile>outfile.txt</outfile>
+					<infile>${HOME}/infile.txt</infile>
+					<outfile>${HOME}/outfile.txt</outfile>
 					<maxpending>100</maxpending>
 				</naflet>
 			</naflets>

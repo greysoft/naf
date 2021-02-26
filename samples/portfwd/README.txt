@@ -1,8 +1,8 @@
 This file describes how to run PortFwd, a simple demo app that relays connections to configured backend services.
-See sections 12 and 13 of the NAF Programmer's Guide for more info.
+See sections 11 and 12 of the NAF Programmer's Guide for more info.
 
 PortFwd is an example of a NAF application driven by a naf.xml style config file (src/main/config/portfwd.xml in this case) and it serves as a basic demonstration of how to develop NAF applications, with listeners, timers and a custom NAFMAN command.
-We also ilustrate here how NAF's native GreyLog logging can be redirected to a standard SLF4J logger.
+We also illustrate here how NAF's native GreyLog logging can be redirected to a standard SLF4J logger.
 
 BUILD AND RUN
 --------------
@@ -23,8 +23,7 @@ The portfwd.xml config file specifies that the two relay services should listen 
 
 LOGGING
 --------
-To use the supplied GreyLog config, you can run as either of these commands.
-This creates a Dispatcher log under var/logs and a boot logger on stdout.
+To use NAF's native GreyLog logger with the supplied GreyLog config, you can run as either of these commands. They create a Dispatcher log under var/logs and a boot logger on stdout.
 	java -Dgrey.logger.configfile=src/main/config/logging.xml -cp target/samples-portfwd-VERSION.jar com.grey.portfwd.App -c src/main/config/portfwd.xml
 OR
 	GREY_LOGGER_CONFIGFILE=src/main/config/logging.xml java -cp target/samples-portfwd-VERSION.jar com.grey.portfwd.App -c src/main/config/portfwd.xml
@@ -36,7 +35,7 @@ To get diagnostic logging on the logging setup itself, set -Dgrey.logger.diagnos
 
 INTEGRATION WITH SLF4J LOGGERS
 -------------------------------
-This sample app has been compiled with the SLF4J logger LogBack (see pom.xml) so if you want to do your logging via LogBack instead of using NAF's native GreyLog logger, then you can run the app like this, to use a special GreyLog logger that passes its output to SLF4J.
+This sample app has been compiled with the SLF4J logger LogBack (see pom.xml) so if you want to do your logging via LogBack instead of using NAF's native GreyLog logger, then you can run the app like this, to delegate all logging to SLF4J.
 	java -Dgrey.logger.class=com.grey.logging.adapters.AdapterSLF4J -cp target/samples-portfwd-VERSION.jar com.grey.portfwd.App -c src/main/config/portfwd.xml
 
 Note that the same effect could be achieved with the logging.xml config file, if you changed the 'class' attribute from NAF's LatinLogger to com.grey.logging.adapters.AdapterSLF4J.

@@ -1,5 +1,5 @@
 <!--
-  Copyright 2012-2018 Yusef Badri - All rights reserved.
+  Copyright 2012-2021 Yusef Badri - All rights reserved.
   NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
 -->
 <assembly xmlns="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.0" 
@@ -16,7 +16,7 @@
 		 	<directory>${project.build.directory}/dependency</directory>
 		 	<outputDirectory>lib</outputDirectory>
 		 	<includes>
-		 		<include>*.jar</include>
+		 		<include>grey*.jar</include>
 		 	</includes>
 		</fileSet>
 		<fileSet>
@@ -51,28 +51,27 @@
 		 	</includes>
 		</fileSet>
 		<fileSet>
-		 	<directory>${basedir}/src/main/config</directory>
-		 	<outputDirectory>conf</outputDirectory>
-		 	<includes>
-		 		<include>batchresolver.xml</include>
-		 	</includes>
-		</fileSet>
-		<fileSet>
-		 	<directory>${basedir}/src/main/config</directory>
-		 	<outputDirectory>samples</outputDirectory>
-		 	<includes>
-		 		<include>logging.xml</include>
-		 	</includes>
-		</fileSet>
-		<fileSet>
 		 	<directory>${project.parent.basedir}/samples/portfwd/src/main/config</directory>
 		 	<outputDirectory>samples</outputDirectory>
 		 	<includes>
 		 		<include>portfwd.xml</include>
 		 	</includes>
 		</fileSet>
+		<fileSet>
+		 	<directory>${project.parent.basedir}/samples/dns-batchresolver/target</directory>
+		 	<outputDirectory>samples</outputDirectory>
+		 	<includes>
+		 		<include>samples-dnsbatchresolver*.jar</include>
+		 	</includes>
+		</fileSet>
 	</fileSets>
 	<files>
+		<file>
+		 	<source>${project.parent.basedir}/samples/echobot/README.txt</source>
+		 	<outputDirectory>samples</outputDirectory>
+		 	<destName>README-echobot.txt</destName>
+		</file>
+
 		<file>
 		 	<source>${project.parent.basedir}/samples/portfwd/README.txt</source>
 		 	<outputDirectory>samples</outputDirectory>
@@ -83,10 +82,16 @@
 		 	<outputDirectory>samples</outputDirectory>
 		 	<destName>portfwd-logging.xml</destName>
 		</file>
+
 		<file>
-		 	<source>${project.parent.basedir}/samples/echobot/README.txt</source>
-		 	<outputDirectory>samples</outputDirectory>
-		 	<destName>README-echobot.txt</destName>
+			<source>${project.parent.basedir}/samples/dns-batchresolver/README.txt</source>
+			<outputDirectory>samples</outputDirectory>
+			<destName>README-dnsbatchresolver.txt</destName>
+		</file>
+		<file>
+			<source>${project.parent.basedir}/samples/dns-batchresolver/batchresolver.xml</source>
+			<outputDirectory>samples</outputDirectory>
+			<destName>dns-batchresolver.xml</destName>
 		</file>
 	</files>
 </assembly>

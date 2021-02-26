@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2018 Yusef Badri - All rights reserved.
+ * Copyright 2010-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns;
@@ -123,7 +123,6 @@ public class ResolverService
 		pkt_tmp = new PacketDNS(Math.max(ResolverConfig.PKTSIZ_TCP, ResolverConfig.PKTSIZ_UDP), ResolverConfig.DIRECTNIOBUFS, config.minttl_initial);
 
 		fh_dump = new java.io.File(dsptch.getApplicationContext().getConfig().path_var+"/DNSdump-"+dsptch.getName()+".txt");
-		FileOps.ensureDirExists(fh_dump.getParentFile()); //flush out any permissions issues right away
 
 		if (dsptch.getAgent() != null) {
 			NafManRegistry reg = dsptch.getAgent().getRegistry();
@@ -149,6 +148,11 @@ public class ResolverService
 		if (config.dump_on_exit) {
 			cachemgr.prune(null);
 			logger.info("Dumping final cache to "+fh_dump.getAbsolutePath());
+			try {
+				FileOps.ensureDirExists(fh_dump.getParentFile());
+			} catch (Exception ex) {
+				logger.warn("Failed to ensure existence of dump directory - "+ex);
+			}
 			dumpState(fh_dump, "Dumping cache on exit");
 		}
 		xmtmgr.stop();

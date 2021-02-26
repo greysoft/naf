@@ -48,13 +48,10 @@ NAF v${project.version}
 <a href="#greybase">10&nbsp;-&nbsp;GreyBase</a>
 </p>
 <p>
-<a href="#batchresolver">11&nbsp;-&nbsp;DNS&nbsp;Batch-Resolver</a>
+<a href="#launch">11&nbsp;-&nbsp;Running&nbsp;NAF</a>
 </p>
 <p>
-<a href="#launch">12&nbsp;-&nbsp;Running&nbsp;NAF</a>
-</p>
-<p>
-<a href="#demo">13&nbsp;-&nbsp;Demo&nbsp;Apps</a>
+<a href="#demo">12&nbsp;-&nbsp;Demo&nbsp;Apps</a>
 </p>
 <p>
 <a href="../../NOTICE.txt">COPYRIGHT</a>
@@ -125,7 +122,7 @@ As well as simplifying the code, the single-threaded reactor mode of operation p
 <p>
 An overview of the main NAF components follows.
 <br/>
-To find code-level documentation, you are urged to go to the example applications provided (see section &sect;13 below), along with the API Reference (which is included in the NAF download), and of course the NAF source code itself, which is freely available.
+To find code-level documentation, you are urged to go to the example applications provided (see section &sect;12 below), along with the API Reference (which is included in the NAF download), and of course the NAF source code itself, which is freely available.
 </p>
 
 To dive straight in and pull the NAF libraries into your application so you can start coding, here is the Maven dependency.
@@ -417,7 +414,7 @@ Default is Yes.
 </ul>
 
 <p>
-As explained in the Overview section (see EchoBot), Dispatchers can be either be specified in a naf.xml file, in which case the NAF launcher automatically creates and runs them, or they can be programmatically created and started.
+As explained in the Overview section, Dispatchers can be either be specified in a naf.xml file, in which case the NAF launcher automatically creates and runs them, or they can be programmatically created and started.
 <br/>
 The latter are termed dynamic (or programmatically created) Dispatchers, as opposed to the configured ones created via naf.xml.
 The distinction is in their startup mode, and once launched, there is no difference in the resulting Dispatchers.
@@ -620,7 +617,7 @@ java -jar lib/greynaf-${project.version}.jar -remote hostname:13000 -cmd appstop
 </p>
 </div>
 <p>
-See section &sect;12 below for more general info on command-line usage.
+See section &sect;11 below for more general info on command-line usage.
 </p>
 
 <hr class="pline"/>
@@ -896,7 +893,7 @@ Note that the
 
 <h4>DNSClient API</h4>
 <p>
-The Resolver-API described above is an internal asynchronous one based on callbacks, and is intended to support NAF applications, ie. applications that are embedded within the NAF framework. The open-source Batch-Resolver described in section &sect;11 below provides an example.
+The Resolver-API described above is an internal asynchronous one based on callbacks, and is intended to support NAF applications, ie. applications that are embedded within the NAF framework. The demo Batch-Resolver described in section &sect;12 below provides an example.
 <br/>
 However, NAF also offers the
 <span class="compcode">com.grey.naf.dns.client.DNSClient</span>
@@ -1272,7 +1269,7 @@ The dividing line between the GreyBase and NAF sub-projects is that NAF is the f
 Notwithstanding that, GreyBase has evolved to serve the needs of NAF applications and will remain focussed on NAF's particular concerns and optimisations,
 such as object reuse (see <span class="compcode">ObjectWell</span>),
 interpreting byte streams as 8-bit text (a valid assumption for most Internet protocols, including HTTP, FTP &amp; SMTP headers - see <span class="compcode">ByteChars</span>)
-and avoiding incidental garbage generation (see <span class="compcode">HashedList</span> and friends).
+and avoiding incidental garbage generation (see <span class="compcode">HashedMap</span> and friends).
 <br/> <br/>
 GreyBase includes the following:<br/>
 &bull; SASL: Server and client mode support for Plain, CRAM-MD5 and External<br/>
@@ -1284,113 +1281,8 @@ GreyBase includes the following:<br/>
 
 <hr class="pline"/>
 <h2>
-<a name="batchresolver">
-11 - DNS Batch Resolver
-</a>
-</h2>
-
-<p>
-The
-<span class="softname">DNS Batch Resolver</span>
-is a built-in NAF application (technically a standalone <i>NAFlet</i>) that takes an input file containing a list of domain names and issues DNS queries to resolve them, writing out the answers. It is capable of rapidly resolving very large datasets.
-<br/>
-Although it also serves as an illustration of NAF's DNS API (see the
-<span class="compcode">com.grey.naf.dns.batchresolver</span>
-package) it is not intended as merely a sample app like the ones in section &sect;13, but is a fully functional application and is contained within the NAF JAR itself.
-<br/> <br/>
-You can run the resolver as follows, the first form being based on unzipping the binary NAF distribution and the second on having run a build at the root of the NAF project.
-</p>
-<div>
-<p class="vt220">
-java -jar lib/greynaf-${project.version}.jar -c conf/batchresolver.xml
-<br/> <br/>
-java -jar pkg/target/dependency/greynaf-${project.version}.jar -c conf/batchresolver.xml
-</p>
-</div>
-<p>
-The
-<span class="pathname">batchresolver.xml</span>
-config file as shipped specifies an input file called
-<span class="cfgvalue">infile.txt</span>
-and an output file called
-<span class="cfgvalue">outfile.txt</span>.
-<br/>
-The above command will also pick up the logger definition labelled
-<span class="cfgname">dnsbatch</span>
-in the provided
-<span class="pathname">conf/logging.xml</span>
-logging config file (the
-<span class="pathname">logging.xml</span>
-file might be under the
-<span class="pathname">samples</span>
-sub-directory initially, in which case just copy it to
-<span class="pathname">conf</span>).
-
-<br/> <br/>
-The input file should contain one record per line, but the type of the records depends on the
-<span class="cfgtitle">dnstype</span>
-setting in the batchresolver.xml config file.
-<br/>
-&bull; <span class="cfgvalue">A</span>:
-Hostname in FQDN (Fully Qualified Domain Name) form - gets resolved to IPv4 address
-<br/>
-&bull; <span class="cfgvalue">AAAA</span>:
-Hostname in FQDN (Fully Qualified Domain Name) form - gets resolved to IPv6 address
-<br/>
-&bull; <span class="cfgvalue">PTR</span>:
-Dotted IPv4 address - resolved to hostname
-<br/>
-&bull; <span class="cfgvalue">NS</span>:
-DNS domain name in FQDN form - resolved to the hostnames and addresses of the domain's name servers
-<br/>
-&bull; <span class="cfgvalue">SOA</span>:
-DNS domain name in FQDN form - resolved to the domain's SOA data
-<br/>
-&bull; <span class="cfgvalue">MX</span>:
-Email domain (mailbox part will be stripped if present) in FQDN form - resolved to hostnames and addresses of the domain's mail relays
-<br/>
-&bull; <span class="cfgvalue">SRV</span>:
-A service specification in the standard SRV <code>_service._proto.name.</code> notation - resolved to hostnames and addresses of its servers.
-<br/>
-&bull; <span class="cfgvalue">TXT</span>:
-DNS domain name in FQDN form - resolved to the domain's SRV data string
-<br/> <br/>
-The remaining config items are all set to appropriate defaults, and the source code can be viewed in the constructor of the
-<span class="softname">BatchResolver</span>
-class, but the most interesting ones are:
-<br/> <br/>
-&bull; <span class="cfgtitle">fullanswer</span>:<br/>
-A Y/N field determining whether we merely report the status (OK, NODOMAIN, etc) of each query in the output file, or the full set of Answer RRs (DNS Resource Records)
-<br/> <br/>
-&bull; <span class="cfgtitle">maxpending</span>:<br/>
-The max number of simultaneous DNS requests that can be outstanding, before the batch resolver pauses.
-<br/>
-It defaults to zero meaning no limit, but if a limit is specified, the batch resolver pauses until the pending requests fall to
-<span class="cfgname">maxpending_lowater</span>.
-<br/> <br/>
-&bull; <span class="cfgtitle">maxpending_lowater</span>:<br/>
-If
-<span class="cfgname">maxpending</span>
-is specified, this defaults to the greater of half its value, or maxpending minus 20.
-<br/> <br/>
-In terms of the standard
-<span class="cfgname">dnsresolver</span>
-attributes (see section &sect;6), you will note that the
-<span class="pathname">batchresolver.xml</span>
-comes with
-<span class="cfgname">recursive</span>
-set to No, which is recommended for large batches as it could well swamp a slow local DNS server.
-<br/>
-The
-<span class="cfgname">exitdump</span>
-attribute is also set, meaning that at the end, the batch resolver will dump the final state of its cache to
-<span class="pathname">var/DNSdump-dnsbatch.txt</span>.
-</p>
-
-<hr class="pline"/>
-<h2>
 <a name="launch">
-12 - Running NAF
+11 - Running NAF
 </a>
 </h2>
 
@@ -1454,59 +1346,82 @@ system property, and if so, you could launch your application by directly execut
 <hr class="pline"/>
 <h2>
 <a name="demo">
-13 - Demo Apps
+12 - Demo Apps
 </a>
 </h2>
 
 <p>
 In addition to the source code and Javadoc-generated
 <a href="../apidocs/index.html">API Reference</a>,
-NAF also provides 3 sample apps (both in pre-built form in the binary download and in source form in the published NAF source tree) that demonstrate its main modes of operation.
+NAF also provides 3 sample apps, whose source code is under
+<span class="pathname">NAF_SOURCE_ROOT/samples</span>
+and whose pre-built Jars are also included in the binary distribution.
 <br/>
-They also demonstrate how little Java code you need to write, to build relatively complex NAF apps.
+They demonstrate how little Java code you need to write, to build relatively complex NAF apps.
 </p>
 
 <ul>
 <li><span class="softname">Port Forwarder (portfwd)</span>:
-This is based on the naf.xml config file (see below).
+This is a port forwarder, which listens on one or more TCP ports on behalf of one or more backend services per port, and then forwards incoming connections to the backends.
 <br/>
-This app also demonstrates the use of NAF timers, configured Listeners and how to implement a NAFlet and create custom NAFMAN commands.
-<br/>
-In addition to its primary pedagogic purpose, it is a fully functioning port forwarder, which accepts TCP connections on behalf of backend services and then distributes them to one or more waiting servers.
+This app is based on a naf.xml style config file and demonstrates the use of configured Listeners, NAF timers, how to implement a NAFlet and how to create custom NAFMAN commands.
 <br/> <br/>
 </li>
 
 <li><span class="softname">Echo Bot</span>:
-This demonstrates the alternative means of launching Dispatchers, as it programmatically creates and starts multiple Dispatchers.
+This sets up pairs of clients and servers which echo a defined number of messages back to each other over TCP or UDP and then prints latency stats.
 <br/>
-The EchoBot contains full working examples of how to listen for or initiate TCP connections (with a programmatically created Listener), how to send and receive TCP data once connected, and how to send and receive UDP packets.
+This app demonstrates the alternative means of launching Dispatchers, as it programmatically creates and starts Dispatchers and Listeners, without using a naf.xl config file.
+<br/>
+From there, it shows how to send and TCP data once connected, and how to send and receive UDP packets.
 <br/> <br/>
 </li>
+
+<li><span class="softname">DNS Batch Resolver</span>:
+This takes a list of domain names and issues DNS queries to resolve them all, printing out the answers.
+<br/>
+This app demonstrates the use of NAF's non-blocking DNS API.
+</li>
 </ul>
+
+All the demo apps have a README in their source directory, with some more practical information on how to build and run them.
+
+<br/> <br/>
+<h3>
+13.1 - Port Forwarder
+</h3>
 
 <p>
 The
 <span class="softname">portfwd</span>
-demo app provides an example of how an application that is based on a <dfn>naf.xml</dfn> config file (called portfwd.xml in this case) might pass control to the NAF framework in its
+demo app provides an example of how an application that is based on a <dfn>naf.xml</dfn> config file (called portfwd.xml in this case) passed control to the NAF framework in its
 <span class="compcode">main()</span> method.
-<br/>
+<br/> <br/>
 The XML config file specifies a NAFlet
 (see <span class="compcode">com.grey.portfwd.Task()</span>)
-in the PortFwd application code, which simply creates the configured listeners and creates a custom NAFMAN command before returning control to the NAF framework which does everything else.
+in the PortFwd application code, which simply creates 2 listeners as specified in the XML config, and then creates a custom NAFMAN command before returning control to the NAF framework which does everything else.
+<br/> <br/>
+The listener config specifies the action to take for incoming connections, in the shape of the
+<span class="cfgtitle">server</span>
+config block, which specifies a
+<span class="cfgtitle">factory</span>
+(connection handler) and a
+<span class="cfgtitle">loadbalancer</span>
+to use within the connection handler.
 <br/>
-While this demo app is running, its NAFMAN commands can be accessed either by pointing your browser at the NAFMAN home page (see section &sect;5 above), where the commands are auto-published, or via the command-line as follows:
+There is only one load-balancer defined, so one listener defines it explicitly while the other one defaults to it. Note this simple load-balancer is part of PortFwd, not NAF.
 </p>
-<div>
-<p class="vt220">
-java -cp portfwd-${project.version}.jar com.grey.portfwd.App -cmd showconns
-</div>
+
+<br/>
+<h3>
+13.2 - Echo Bot
+</h3>
 
 <p>
-&nbsp;<br/>
 The
 <span class="softname">EchoBot</span>
 demo app illustrates the behaviour of an application that doesn't use a naf.xml config file, but it still leverages NAF's command-line parsing facilities.
-<br/>
+<br/> <br/>
 As you can see,
 <span class="compcode">com.grey.echobot.App</span>
 subclasses NAF's
@@ -1518,14 +1433,82 @@ which instantiates the Launcher subclass and then passes control to it.
 The EchoBot's App class defines a subclass of
 <span class="compcode">com.grey.base.utils.CommandParser.OptionsHandler</span>
 to define its own command-line options (on top of those understood by NAF), which it loads in its constructor.
-<br/>
+<br/> <br/>
 Because the App class overrides the Launcher's
 <span class="compcode">appExec()</span>
 method, NAF passes control back to it after parsing the command-line, and the EchoBot takes over from there.
+</p>
+
+<br/>
+<h3>
+13.3 - DNS Batch Resolver
+</h3>
+
+<p>
+The batch-resolver is controlled by a naf.xml style config file which is called batchresolver.xml in this case, and it resolves a list of domains contained in an input file.
 
 <br/> <br/>
-Both demo apps have a README with some more practical information on how to build and run them.
+The input file contains one record per line, but the type of the records depends on the
+<span class="cfgtitle">dnstype</span>
+setting in the batchresolver.xml config file, as follows:
+<br/>
+&bull; <span class="cfgvalue">A</span>:
+Hostname in FQDN (Fully Qualified Domain Name) form - gets resolved to IPv4 address
+<br/>
+&bull; <span class="cfgvalue">AAAA</span>:
+Hostname in FQDN (Fully Qualified Domain Name) form - gets resolved to IPv6 address
+<br/>
+&bull; <span class="cfgvalue">PTR</span>:
+Dotted IPv4 address - resolved to hostname
+<br/>
+&bull; <span class="cfgvalue">NS</span>:
+DNS domain name in FQDN form - resolved to the hostnames and addresses of the domain's name servers
+<br/>
+&bull; <span class="cfgvalue">SOA</span>:
+DNS domain name in FQDN form - resolved to the domain's SOA data
+<br/>
+&bull; <span class="cfgvalue">MX</span>:
+Email domain (mailbox part will be stripped if present) in FQDN form - resolved to hostnames and addresses of the domain's mail relays
+<br/>
+&bull; <span class="cfgvalue">SRV</span>:
+A service specification in the standard SRV <code>_service._proto.name.</code> notation - resolved to hostnames and addresses of its servers.
+<br/>
+&bull; <span class="cfgvalue">TXT</span>:
+DNS domain name in FQDN form - resolved to the domain's SRV data string
+
+<br/> <br/>
+The remaining config items are all set to appropriate defaults, and the source code can be viewed in the constructor of the
+<span class="softname">BatchResolver</span>
+class, but the most interesting config settings are:
+<br/> <br/>
+&bull; <span class="cfgtitle">fullanswer</span>:<br/>
+A Y/N field determining whether we merely report the status (OK, NODOMAIN, etc) of each query in the output file, or the full set of Answer RRs (DNS Resource Records)
+<br/> <br/>
+&bull; <span class="cfgtitle">maxpending</span>:<br/>
+The max number of simultaneous DNS requests that can be outstanding, before the batch resolver pauses.
+<br/>
+It defaults to zero meaning no limit, but if a limit is specified, the batch resolver pauses until the pending requests fall to
+<span class="cfgname">maxpending_lowater</span>.
+<br/> <br/>
+&bull; <span class="cfgtitle">maxpending_lowater</span>:<br/>
+If
+<span class="cfgname">maxpending</span>
+is specified, this defaults to the greater of half its value, or maxpending minus 20.
+<br/> <br/>
+In terms of the standard
+<span class="cfgname">dnsresolver</span>
+attributes (see section &sect;6 above), you will note that the
+<span class="pathname">batchresolver.xml</span>
+comes with
+<span class="cfgname">recursive</span>
+set to No, which is recommended for large batches as it could well swamp a slow local DNS server.
+<br/>
+The
+<span class="cfgname">exitdump</span>
+attribute is also set, meaning that at the end, the batch resolver will dump the final state of its cache to
+<span class="pathname">var/DNSdump-dnsbatch.txt</span>.
 </p>
+
 
 <br/>&nbsp;<br/>&nbsp;<br/>
 </div>

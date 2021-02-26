@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<loggers>
-	<logger name="default">
-		<file level="all">%stdout%</file>
-	</logger>
-	<logger name="dnsbatch">
-		<file level="trc" class="com.grey.logging.LatinLogger">%stdout%</file>
-	</logger>
-</loggers>
