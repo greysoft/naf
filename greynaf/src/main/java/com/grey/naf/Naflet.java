@@ -23,7 +23,7 @@ abstract public class Naflet
 	private final Dispatcher dsptch;
 	private final String cfgfile;
 
-	private XmlConfig taskcfg;
+	private final XmlConfig taskcfg;
 	private EntityReaper reaper;
 	private boolean aborted_startup;
 
@@ -31,13 +31,12 @@ abstract public class Naflet
 
 	public String getName() {return naflet_name;}
 	public Dispatcher getDispatcher() {return dsptch;}
-	protected String taskConfigFile() {return cfgfile;}
+	public String taskConfigFile() {return cfgfile;}
+	public XmlConfig taskConfig() {return taskcfg;}
 	public Logger getLogger() {return getDispatcher().getLogger();} //for convenience
 
 	protected boolean stopNaflet() {return true;}
 	protected void abortOnStartup() {aborted_startup = true;}
-
-	public XmlConfig taskConfig() {return taskcfg;}
 
 	public Naflet(String name, Dispatcher dsptch_p, XmlConfig cfg) throws java.io.IOException
 	{
@@ -48,7 +47,11 @@ abstract public class Naflet
 
 		if (cfgfile != null) {
 			String cfgroot = cfg.getValue("configfile/@root", false, null);
-			taskcfg = XmlConfig.getSection(cfgfile, cfgroot);
+			if (cfgfile.endsWith(".xml")) {
+				taskcfg = XmlConfig.getSection(cfgfile, cfgroot);
+			} else {
+				taskcfg = null; //application will have to use taskConfigFile() instead
+			}
 		} else {
 			taskcfg = cfg;
 		}
@@ -56,7 +59,6 @@ abstract public class Naflet
 
 	public final void start(EntityReaper rpr) throws java.io.IOException
 	{
-		taskcfg = null; //hand memory back to the GC
 		reaper = rpr;
 		if (aborted_startup) {
 			getLogger().info("Naflet="+naflet_name+": Aborting startup");

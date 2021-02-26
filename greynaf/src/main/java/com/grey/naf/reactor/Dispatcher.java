@@ -19,7 +19,6 @@ import com.grey.base.collections.Circulist;
 import com.grey.base.collections.ObjectQueue;
 import com.grey.base.collections.ObjectWell;
 import com.grey.base.collections.IteratorInt;
-import com.grey.base.utils.FileOps;
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
 import com.grey.naf.NAFConfig;
@@ -123,8 +122,6 @@ public class Dispatcher
 		systime_msecs = timeboot;
 		thrd_main = new Thread(this, "Dispatcher-"+name);
 		thrd_init = Thread.currentThread();
-		FileOps.ensureDirExists(nafcfg.getPathVar());
-		FileOps.ensureDirExists(nafcfg.getPathTemp());
 
 		sparetimers = new ObjectWell<>(TimerNAF.class, "Dispatcher-"+name);
 		filewritepool = new ObjectWell<>(new IOExecWriter.FileWrite.Factory(), "Dispatcher-"+name);
@@ -934,12 +931,9 @@ public class Dispatcher
 			dlst.add(d);
 		}
 
-		// log the initial config and dump the sytem-properties
+		// log the initial config
 		String txt = dumpConfig(appctx);
 		log.info("Initialisation of the configured NAF Dispatchers is now complete\n"+txt);
-		txt = System.getProperties().size()+" entries:"+SysProps.EOL;
-		txt += System.getProperties().toString().replace(", ", SysProps.EOL+"\t");
-		FileOps.writeTextFile(nafcfg.getPathVar()+"/sysprops.dump", txt+SysProps.EOL);
 
 		// Now starts the multi-threaded phase
 		for (int idx = 0; idx != dlst.size(); idx++) {

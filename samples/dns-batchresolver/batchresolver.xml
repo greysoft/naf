@@ -1,5 +1,5 @@
 <naf>
-	<dnsresolver recursive="n" exitdump="Y" class="com.grey.naf.dns.embedded.EmbeddedResolver">
+	<dnsresolver recursive="n" exitdump="Y" class="com.grey.naf.dns.resolver.embedded.EmbeddedResolver">
 		<udpsockets>10</udpsockets>
 	</dnsresolver>
 	<dispatchers>

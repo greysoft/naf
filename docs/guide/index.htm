@@ -635,18 +635,18 @@ The Resolver caches the results so that future lookups on the same domain can be
 It also caches negative answers (ie. domain name not found).
 <br/> <br/>
 The API is provided by the
-<span class="compcode">com.grey.naf.dns.ResolverDNS</span>
+<span class="compcode">com.grey.naf.dns.resolver.ResolverDNS</span>
 class.
 Any application wishing to use the DNS resolver must implement the
-<span class="compcode">com.grey.naf.dns.ResolverDNS.Client</span>
+<span class="compcode">com.grey.naf.dns.resolver.ResolverDNS.Client</span>
 interface, and the DNS resolver calls back to its
 <span class="compcode">dnsResolved()</span>
 method with the final result.
 <br/>
 The final result is represented by an instance of the
-<span class="compcode">com.grey.naf.dns.ResolverAnswer</span>
+<span class="compcode">com.grey.naf.dns.resolver.ResolverAnswer</span>
 class, within which individual Resource Records are represented by the
-<span class="compcode">com.grey.naf.dns.ResourceData</span>
+<span class="compcode">com.grey.naf.dns.resolver.ResourceData</span>
 class.
 <br/>
 If the answer was already cached, then it is returned by the Resolver API call, and there is no subsequent callback.
@@ -678,7 +678,7 @@ Despite the terminology, both resolvers are obviously embedded in your applicati
 Note that the difference between the various embedded and distributed resolvers is internal to the DNS resolver, and the application code within each Dispatcher accesses the resolver via a single API, represented by the
 <span class="compcode">Dispatcher.dnsresolv</span>
 field, which is an instance of the
-<span class="compcode">com.grey.naf.dns.Resolver</span>
+<span class="compcode">com.grey.naf.dns.resolver.Resolver</span>
 class.
 <br/>
 Application code is unaware what underlying type of DNS resolver it is calling, and it has no effect on the final answer.
@@ -699,7 +699,7 @@ The DNS config attributes are shown below.<br/>
 <table class="cfgbox">
 <tr><td>
 <pre>
-&lt;dnsresolver class="com.grey.naf.dns.embedded.EmbeddedResolver" recursive="N"
+&lt;dnsresolver class="com.grey.naf.dns.resolver.embedded.EmbeddedResolver" recursive="N"
              validate_response_ip="N" nonbailiwick_glue="Y" partialprune="N" exitdump="Y"
              minttl_initial="5m" minttl_lookup="1m" negttl="1h"&gt;
     &lt;localservers&gt;192.168.1.12 | 192.168.1.13&lt;/localservers&gt;
@@ -721,7 +721,7 @@ The DNS config attributes are shown below.<br/>
 NAF contains two alternative DNS resolvers.
 <br/>
 The default is
-<span class="compcode">com.grey.naf.dns.distributedresolver.Client.class</span>,
+<span class="compcode">com.grey.naf.dns.resolver.distributedresolver.Client.class</span>,
 for the distributed resolver, while the example above shows how to specify the embedded resolver.
 <br/>
 As explained above, these are plug-in alternatives which represent architectural choices, but are transparent to the application code.
@@ -910,7 +910,7 @@ That is to say, the DNSClient class is called from outside the Dispatcher thread
 The DNSClient callback in asynchronous mode is performed within the Dispatcher thread, so the callback should not spent too long handling the result, and should hand off to another thread if it would do so, to avoid blocking the Dispatcher.
 <br> <br>
 The <code>DNSClient</code> class returns the same
-<span class="compcode">com.grey.naf.dns.ResolverAnswer</span>
+<span class="compcode">com.grey.naf.dns.resolver.ResolverAnswer</span>
 result type as the NAF ResolverDNS API.
 <br> <br>
 The DNSClient class always has an associated Dispatcher object, and it offers constructors that can either accept an existing Dispatcher or create a new one.
