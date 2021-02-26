@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2018 Yusef Badri - All rights reserved.
+ * Copyright 2010-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf;
@@ -36,15 +36,15 @@ public class NAFConfig
 
 	public static final String PFX_CLASSPATH = "cp:";
 
-	public final String path_root;
-	public final String path_conf;
-	public final String path_var;
-	public final String path_logs;
-	public final String path_tmp; //NB: Diverges from SysProps.TMPDIR, unless SYSPROP_DIRPATH_TMP is set
-	public final int baseport;
-	public final int threadpoolSize;
-
+	private final String pathRoot;
+	private final String pathConf;
+	private final String pathVar;
+	private final String pathLogs;
+	private final String pathTemp; //NB: Diverges from SysProps.TMPDIR, unless SYSPROP_DIRPATH_TMP is set
 	private final XmlConfig cfgroot;
+	private final int basePort;
+	private final int threadPoolSize;
+	
 	private int nextport; //next port number to assign
 
 	// The param is the naf.xml config filename
@@ -76,15 +76,15 @@ public class NAFConfig
 		cfgroot = cfg;
 
 		XmlConfig cfgpaths = getNode("dirpaths");
-		path_root = getPath(cfgpaths, "root", SYSPROP_DIRPATH_ROOT, false, defaults.path_root, null);
-		path_conf = getPath(cfgpaths, "config", SYSPROP_DIRPATH_CONF, false, path_root+"/conf", null);
-		path_var = getPath(cfgpaths, "var", SYSPROP_DIRPATH_VAR, false, path_root+"/var", null);
-		path_logs = getPath(cfgpaths, "logs", SYSPROP_DIRPATH_LOGS, false, path_var+"/logs", null);
-		path_tmp = getPath(cfgpaths, "tmp", SYSPROP_DIRPATH_TMP, false, path_var+"/tmp", null);
-		threadpoolSize = cfgroot.getInt("threadpoolsize", true, defaults.threadpoolSize);
+		pathRoot = getPath(cfgpaths, "root", SYSPROP_DIRPATH_ROOT, false, defaults.path_root, null);
+		pathConf = getPath(cfgpaths, "config", SYSPROP_DIRPATH_CONF, false, pathRoot+"/conf", null);
+		pathVar = getPath(cfgpaths, "var", SYSPROP_DIRPATH_VAR, false, pathRoot+"/var", null);
+		pathLogs = getPath(cfgpaths, "logs", SYSPROP_DIRPATH_LOGS, false, pathVar+"/logs", null);
+		pathTemp = getPath(cfgpaths, "tmp", SYSPROP_DIRPATH_TMP, false, pathVar+"/tmp", null);
+		threadPoolSize = cfgroot.getInt("threadpoolsize", true, defaults.threadpoolSize);
 
-		baseport = cfgroot.getInt("baseport", true, defaults.baseport);
-		nextport = (baseport == RSVPORT_ANON ? 0 : baseport + RSVPORT_MAX + 1); //will never get used if baseport is ANON
+		basePort = cfgroot.getInt("baseport", true, defaults.baseport);
+		nextport = (basePort == RSVPORT_ANON ? 0 : basePort + RSVPORT_MAX + 1); //will never get used if baseport is ANON
 
 		// JARs that are required to bootstrap this JVM (such as the logging framework) have to be
 		// specified in Properties (see App.SYSPROP_CP) but NAFlet code can be loaded either via
@@ -105,7 +105,27 @@ public class NAFConfig
 		// One thing we can't do however, is link the location of logging.xml to our path_conf setting,
 		// since GreyLog has probably already set its path in stone before this class ever got invoked.
 		String val = SysProps.get(SYSPROP_DIRPATH_LOGS);
-		if (val == null || val.length() == 0) SysProps.set(SYSPROP_DIRPATH_LOGS, path_logs);
+		if (val == null || val.length() == 0) SysProps.set(SYSPROP_DIRPATH_LOGS, pathLogs);
+	}
+
+	public String getPathVar() {
+		return pathVar;
+	}
+
+	public String getPathLogs() {
+		return pathLogs;
+	}
+
+	public String getPathTemp() {
+		return pathTemp;
+	}
+
+	public int getBasePort() {
+		return basePort;
+	}
+
+	public int getThreadPoolSize() {
+		return threadPoolSize;
 	}
 
 	public XmlConfig[] getDispatchers()
@@ -177,7 +197,7 @@ public class NAFConfig
 	// if we really don't care which port gets assigned, ephemeral ports assigned by the OS will often be preferred to this
 	public int assignPort(int id)
 	{
-		if (baseport == RSVPORT_ANON) return 0; //want to bind to a totally random port
+		if (basePort == RSVPORT_ANON) return 0; //want to bind to a totally random port
 		if (id == RSVPORT_ANON) { //want to bind to a random port within the defined baseport range
 			synchronized (NAFConfig.class) {
 				return nextport++;
@@ -189,13 +209,13 @@ public class NAFConfig
 	// This should be called by clients to discover where to connect to, while assignPort() is called by listeners to bind to
 	public int getPort(int id)
 	{
-		if (baseport == RSVPORT_ANON) //clients need to know server port, if baseport is randon
+		if (basePort == RSVPORT_ANON) //clients need to know server port, if baseport is randon
 			throw new IllegalStateException("Reserved NAF port="+id+" is undefined when baseport is ANON");
-		return baseport + id;
+		return basePort + id;
 	}
 
 	public boolean isAnonymousBasePort() {
-		return (baseport == RSVPORT_ANON);
+		return (basePort == RSVPORT_ANON);
 	}
 
 	// NB: This is purely about constructing a path, not necessarily one that corresponds to an existing file
@@ -212,22 +232,22 @@ public class NAFConfig
 	private String tokenisePaths(String template)
 	{
 		if (template == null || template.length() == 0) return template;
-		if (path_root != null) template = template.replace(DIRTOKEN_ROOT, path_root);
-		if (path_conf != null) template = template.replace(DIRTOKEN_CONF, path_conf);
-		if (path_var != null) template = template.replace(DIRTOKEN_VAR, path_var);
-		if (path_logs != null) template = template.replace(DIRTOKEN_LOGS, path_logs);
-		if (path_tmp != null) template = template.replace(DIRTOKEN_TMP, path_tmp);
+		if (pathRoot != null) template = template.replace(DIRTOKEN_ROOT, pathRoot);
+		if (pathConf != null) template = template.replace(DIRTOKEN_CONF, pathConf);
+		if (pathVar != null) template = template.replace(DIRTOKEN_VAR, pathVar);
+		if (pathLogs != null) template = template.replace(DIRTOKEN_LOGS, pathLogs);
+		if (pathTemp != null) template = template.replace(DIRTOKEN_TMP, pathTemp);
 		return template;
 	}
 
 	public void announce(com.grey.logging.Logger log)
 	{
-		log.info("NAF Paths - Root = "+path_root);
-		log.info("NAF Paths - Config = "+path_conf);
-		log.info("NAF Paths - Var = "+path_var);
-		log.info("NAF Paths - Logs = "+path_logs);
-		log.info("NAF Paths - Temp = "+path_tmp);
-		if (baseport != RSVPORT_ANON) log.info("Base Port="+baseport+", Next="+nextport);
+		log.info("NAF Paths - Root = "+pathRoot);
+		log.info("NAF Paths - Config = "+pathConf);
+		log.info("NAF Paths - Var = "+pathVar);
+		log.info("NAF Paths - Logs = "+pathLogs);
+		log.info("NAF Paths - Temp = "+pathTemp);
+		if (basePort != RSVPORT_ANON) log.info("Base Port="+basePort+", Next="+nextport);
 	}
 
 	public static Object createEntity(XmlConfig cfg, Class<?> dflt_clss, Class<?> basetype, boolean hasName, Class<?>[] ctorSig, Object[] ctorArgs)

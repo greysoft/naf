@@ -122,7 +122,7 @@ public class ResolverService
 		qrystore = new ObjectWell<>(qryfact, "DNS_"+dsptch.getName());
 		pkt_tmp = new PacketDNS(Math.max(ResolverConfig.PKTSIZ_TCP, ResolverConfig.PKTSIZ_UDP), ResolverConfig.DIRECTNIOBUFS, config.minttl_initial);
 
-		fh_dump = new java.io.File(dsptch.getApplicationContext().getConfig().path_var+"/DNSdump-"+dsptch.getName()+".txt");
+		fh_dump = new java.io.File(dsptch.getApplicationContext().getConfig().getPathVar()+"/DNSdump-"+dsptch.getName()+".txt");
 
 		if (dsptch.getAgent() != null) {
 			NafManRegistry reg = dsptch.getAgent().getRegistry();

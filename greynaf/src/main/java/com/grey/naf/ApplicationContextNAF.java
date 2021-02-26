@@ -47,8 +47,8 @@ public class ApplicationContextNAF {
 		ApplicationContextNAF ctx = new ApplicationContextNAF(name, cfg);
 		ApplicationContextNAF dup = contextsByName.putIfAbsent(ctx.getName(), ctx);
 		if (dup != null) throw new NAFConfigException("Duplicate app-context="+ctx+" - prev="+dup);
-		if (ctx.getConfig().baseport != NAFConfig.RSVPORT_ANON) {
-			dup = contextsByPort.putIfAbsent(ctx.getConfig().baseport, ctx);
+		if (ctx.getConfig().getBasePort() != NAFConfig.RSVPORT_ANON) {
+			dup = contextsByPort.putIfAbsent(ctx.getConfig().getBasePort(), ctx);
 			if (dup != null) throw new NAFConfigException("Duplicate app-context="+ctx+" - prev="+dup);
 		}
 		return ctx;
@@ -71,7 +71,7 @@ public class ApplicationContextNAF {
 	private ApplicationContextNAF(String name, NAFConfig cfg) {
 		ctxname = name;
 		config = cfg;
-		threadpool = Executors.newFixedThreadPool(config.threadpoolSize);
+		threadpool = Executors.newFixedThreadPool(config.getThreadPoolSize());
 	}
 
 	public void register(Dispatcher d) {
@@ -145,7 +145,7 @@ public class ApplicationContextNAF {
 	@Override
 	public String toString() {
 		String txt = "ApplicationContext-"+getName();
-		if (getConfig().baseport != NAFConfig.RSVPORT_ANON) txt += ":"+getConfig().baseport;
+		if (getConfig().getBasePort() != NAFConfig.RSVPORT_ANON) txt += ":"+getConfig().getBasePort();
 		return txt;
 	}
 }

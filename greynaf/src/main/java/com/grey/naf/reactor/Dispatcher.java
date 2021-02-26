@@ -123,8 +123,8 @@ public class Dispatcher
 		systime_msecs = timeboot;
 		thrd_main = new Thread(this, "Dispatcher-"+name);
 		thrd_init = Thread.currentThread();
-		FileOps.ensureDirExists(nafcfg.path_var);
-		FileOps.ensureDirExists(nafcfg.path_tmp);
+		FileOps.ensureDirExists(nafcfg.getPathVar());
+		FileOps.ensureDirExists(nafcfg.getPathTemp());
 
 		sparetimers = new ObjectWell<>(TimerNAF.class, "Dispatcher-"+name);
 		filewritepool = new ObjectWell<>(new IOExecWriter.FileWrite.Factory(), "Dispatcher-"+name);
@@ -138,7 +138,7 @@ public class Dispatcher
 		if (logger != null) prevThreadLogger = Logger.setThreadLogger(logger);
 		if (initlog != null) initlog.info("Initialising Dispatcher="+name+" - Logger="+logname+" - "+dlog);
 		if (getLogger() != initlog) flusher.register(getLogger());
-		getLogger().info("Dispatcher="+name+": baseport="+nafcfg.baseport+", NAFMan="+def.hasNafman()+", DNS="+def.hasDNS()
+		getLogger().info("Dispatcher="+name+": baseport="+nafcfg.getBasePort()+", NAFMan="+def.hasNafman()+", DNS="+def.hasDNS()
 				+", survive_handlers="+surviveHandlers+", zero_naflets="+zeroNafletsOK
 				+", flush="+TimeOps.expandMilliTime(def.getFlushInterval()));
 		getLogger().trace("Dispatcher="+name+": Selector="+slct.getClass().getCanonicalName()
@@ -939,7 +939,7 @@ public class Dispatcher
 		log.info("Initialisation of the configured NAF Dispatchers is now complete\n"+txt);
 		txt = System.getProperties().size()+" entries:"+SysProps.EOL;
 		txt += System.getProperties().toString().replace(", ", SysProps.EOL+"\t");
-		FileOps.writeTextFile(nafcfg.path_var+"/sysprops.dump", txt+SysProps.EOL);
+		FileOps.writeTextFile(nafcfg.getPathVar()+"/sysprops.dump", txt+SysProps.EOL);
 
 		// Now starts the multi-threaded phase
 		for (int idx = 0; idx != dlst.size(); idx++) {
