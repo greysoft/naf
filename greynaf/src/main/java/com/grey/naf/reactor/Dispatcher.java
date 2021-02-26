@@ -24,7 +24,7 @@ import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
 import com.grey.naf.NAFConfig;
 import com.grey.naf.Naflet;
-import com.grey.naf.dns.ResolverDNS;
+import com.grey.naf.dns.resolver.ResolverDNS;
 import com.grey.naf.DispatcherDef;
 import com.grey.naf.EntityReaper;
 import com.grey.naf.nafman.NafManAgent;

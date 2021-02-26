@@ -9,11 +9,11 @@ import com.grey.base.config.XmlConfig;
 import com.grey.base.utils.ByteArrayRef;
 import com.grey.base.utils.ByteChars;
 import com.grey.naf.reactor.Dispatcher;
+import com.grey.naf.dns.resolver.PacketDNS;
+import com.grey.naf.dns.resolver.ResolverDNS;
+import com.grey.naf.dns.resolver.ResourceData;
 import com.grey.naf.reactor.CM_Listener;
 import com.grey.naf.reactor.ConcurrentListener;
-import com.grey.naf.dns.ResourceData;
-import com.grey.naf.dns.ResolverDNS;
-import com.grey.naf.dns.PacketDNS;
 import com.grey.logging.Logger;
 
 /**

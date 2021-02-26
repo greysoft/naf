@@ -5,7 +5,7 @@
 package com.grey.naf.dns.server;
 
 import com.grey.base.utils.ByteArrayRef;
-import com.grey.naf.dns.PacketDNS;
+import com.grey.naf.dns.resolver.PacketDNS;
 
 class TransportTCP
 	extends com.grey.naf.reactor.CM_Server

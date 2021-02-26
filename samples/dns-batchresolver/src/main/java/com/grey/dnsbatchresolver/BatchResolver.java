@@ -7,8 +7,8 @@ package com.grey.dnsbatchresolver;
 import com.grey.logging.Logger.LEVEL;
 import com.grey.base.utils.TimeOps;
 import com.grey.base.config.SysProps;
-import com.grey.naf.dns.ResolverAnswer;
-import com.grey.naf.dns.ResolverDNS;
+import com.grey.naf.dns.resolver.ResolverAnswer;
+import com.grey.naf.dns.resolver.ResolverDNS;
 import com.grey.naf.errors.NAFConfigException;
 
 /*
@@ -27,7 +27,7 @@ import com.grey.naf.errors.NAFConfigException;
  */
 public class BatchResolver
 	extends com.grey.naf.Naflet
-	implements com.grey.naf.dns.ResolverDNS.Client, com.grey.naf.reactor.TimerNAF.Handler
+	implements com.grey.naf.dns.resolver.ResolverDNS.Client, com.grey.naf.reactor.TimerNAF.Handler
 {
 	private static final long DELAY_TERM = SysProps.getTime("greynaf.batchdns.delayterm", "5s");
 	private static final String LOGLBL = "DNS-BatchResolver: ";

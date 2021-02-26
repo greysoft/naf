@@ -12,9 +12,9 @@ import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.DispatcherTest;
 import com.grey.naf.ApplicationContextNAF;
 import com.grey.naf.NAFConfig;
-import com.grey.naf.dns.ResolverAnswer;
-import com.grey.naf.dns.ResolverDNS;
 import com.grey.naf.dns.client.DNSClient;
+import com.grey.naf.dns.resolver.ResolverAnswer;
+import com.grey.naf.dns.resolver.ResolverDNS;
 
 public class SynchronousTest
 	extends ResolverTester

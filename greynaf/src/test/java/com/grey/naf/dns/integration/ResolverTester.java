@@ -11,11 +11,11 @@ import com.grey.base.config.SysProps;
 import com.grey.base.utils.StringOps;
 import com.grey.base.utils.IP;
 import com.grey.base.utils.DynLoader;
-import com.grey.naf.dns.ResolverDNS;
-import com.grey.naf.dns.ResolverAnswer;
-import com.grey.naf.dns.ResourceData;
 import com.grey.naf.ApplicationContextNAF;
-import com.grey.naf.dns.PacketDNS;
+import com.grey.naf.dns.resolver.PacketDNS;
+import com.grey.naf.dns.resolver.ResolverAnswer;
+import com.grey.naf.dns.resolver.ResolverDNS;
+import com.grey.naf.dns.resolver.ResourceData;
 
 public class ResolverTester
 {
@@ -382,10 +382,10 @@ public class ResolverTester
 
 	protected static Object getResolverService(ResolverDNS r)
 	{
-		if (r.getClass() == com.grey.naf.dns.embedded.EmbeddedResolver.class) {
+		if (r.getClass() == com.grey.naf.dns.resolver.embedded.EmbeddedResolver.class) {
 			return DynLoader.getField(r, "rslvr");
 		}
-		if (r.getClass() == com.grey.naf.dns.distributedresolver.Client.class) {
+		if (r.getClass() == com.grey.naf.dns.resolver.distributed.Client.class) {
 			Object proxy = DynLoader.getField(r, "proxy");
 			return DynLoader.getField(proxy, "rslvr");
 		}

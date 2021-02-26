@@ -12,14 +12,14 @@ import com.grey.base.utils.FileOps;
 import com.grey.base.utils.TimeOps;
 import com.grey.base.utils.IP;
 import com.grey.naf.ApplicationContextNAF;
-import com.grey.naf.dns.ResolverAnswer;
-import com.grey.naf.dns.ResolverDNS;
+import com.grey.naf.dns.resolver.ResolverAnswer;
+import com.grey.naf.dns.resolver.ResolverDNS;
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.DispatcherTest;
 
 public class ResolverTest
 	extends ResolverTester
-	implements com.grey.naf.dns.ResolverDNS.Client
+	implements com.grey.naf.dns.resolver.ResolverDNS.Client
 {
 	private static final String rootdir = DispatcherTest.initPaths(ResolverTest.class);
 	private static final java.io.File CFGFILE_ROOTS = new java.io.File(rootdir+"/rootservers");
@@ -473,7 +473,7 @@ public class ResolverTest
 
 	private Dispatcher createResolver(int flags) throws java.io.IOException
 	{
-		clss_resolver = com.grey.naf.dns.embedded.EmbeddedResolver.class;
+		clss_resolver = com.grey.naf.dns.resolver.embedded.EmbeddedResolver.class;
 		com.grey.naf.NAFConfig nafcfg = setConfig(null, flags);
 		ApplicationContextNAF appctx = ApplicationContextNAF.create(null, nafcfg);
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
@@ -490,7 +490,7 @@ public class ResolverTest
 	private Dispatcher[] createDistributedResolver(int flags, boolean local_master)
 			throws java.io.IOException
 	{
-		clss_resolver = com.grey.naf.dns.distributedresolver.Client.class;
+		clss_resolver = com.grey.naf.dns.resolver.distributed.Client.class;
 		String d1name;
 		String d2name;
 		com.grey.naf.NAFConfig nafcfg;

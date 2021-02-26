@@ -2,7 +2,7 @@
  * Copyright 2010-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
-package com.grey.naf.dns;
+package com.grey.naf.dns.resolver;
 
 import com.grey.base.config.XmlConfig;
 import com.grey.base.utils.ByteChars;
@@ -19,7 +19,7 @@ public abstract class ResolverDNS
 		public void dnsResolved(Dispatcher dsptch, ResolverAnswer answer, Object callerparam);
 	}
 
-	private static final Class<?> DFLTCLASS = com.grey.naf.dns.distributedresolver.Client.class;
+	private static final Class<?> DFLTCLASS = com.grey.naf.dns.resolver.distributed.Client.class;
 
 	public static final int FLAG_NOQRY = 1 << 0; //give up if answer not already in cache
 	public static final int FLAG_SYNTAXONLY = 1 << 1; //don't do any lookup or query at all
