@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Yusef Badri - All rights reserved.
+ * Copyright 2014-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.resolver;
@@ -9,11 +9,11 @@ import com.grey.base.utils.TSAP;
 class CommsManager
 	implements com.grey.naf.EntityReaper
 {
-	private final java.net.InetSocketAddress[] srvaddr;
-	private final EndPointUDP[] udplocal;
+	private final java.net.InetSocketAddress[] localNameServers; //local name servers to which we can issue queries
+	private final EndPointUDP[] udpLocal; //the UDP sockets on which we issue our outgoing queries
 	private final com.grey.base.collections.ObjectWell<EndPointTCP> tcpstore;
-	private int next_server;
-	private int next_udplocal;
+	private int nextServer; //allows us to round-robin through localNameServers
+	private int nextUDP; //allows us to round-robin through udpLocal
 
 	public CommsManager(ResolverService rslvr) throws java.io.IOException
 	{
@@ -22,23 +22,23 @@ class CommsManager
 		com.grey.naf.BufferSpec bufspec_udp = new com.grey.naf.BufferSpec(ResolverConfig.PKTSIZ_UDP, ResolverConfig.PKTSIZ_UDP, ResolverConfig.DIRECTNIOBUFS);
 		com.grey.naf.BufferSpec bufspec_tcp = new com.grey.naf.BufferSpec(ResolverConfig.PKTSIZ_TCP, ResolverConfig.PKTSIZ_UDP, ResolverConfig.DIRECTNIOBUFS);
 
-		if (cfg.dns_localservers == null) {
-			srvaddr = null;
+		if (!cfg.isRecursive()) {
+			localNameServers = null;
 		} else {
-			srvaddr = new java.net.InetSocketAddress[cfg.dns_localservers.length];
-			for (int idx = 0; idx != srvaddr.length; idx++) {
-				//if the server name include a port spec (ie. host:port) allow that to override dnscfg.dns_port
-				TSAP tsap = TSAP.build(cfg.dns_localservers[idx], cfg.dns_port, false);
-				srvaddr[idx] = rslvr.getCacheManager().createServerTSAP(tsap.ip, tsap.port);
+			localNameServers = new java.net.InetSocketAddress[rslvr.getLocalNameServers().length];
+			for (int idx = 0; idx != localNameServers.length; idx++) {
+				//if the server name include a port spec (ie. host:port) allow that to override the default config DNS port
+				TSAP tsap = TSAP.build(rslvr.getLocalNameServers()[idx], cfg.getDnsPort(), false);
+				localNameServers[idx] = rslvr.getCacheManager().createServerTSAP(tsap.ip, tsap.port);
 			}
 		}
 
-		if (cfg.udp_sendersockets == 0) {
-			udplocal = null;
+		if (cfg.getSenderSocketsUDP() == 0) {
+			udpLocal = null;
 		} else {
-			udplocal = new EndPointUDP[cfg.udp_sendersockets];
-			for (int idx = 0; idx != cfg.udp_sendersockets; idx++) {
-				udplocal[idx] = new EndPointUDP(rslvr, bufspec_udp, ResolverConfig.UDPSOCKBUFSIZ);
+			udpLocal = new EndPointUDP[cfg.getSenderSocketsUDP()];
+			for (int idx = 0; idx != cfg.getSenderSocketsUDP(); idx++) {
+				udpLocal[idx] = new EndPointUDP(rslvr, bufspec_udp, ResolverConfig.UDPSOCKBUFSIZ);
 			}
 		}
 		EndPointTCP.Factory fact = new EndPointTCP.Factory(rslvr.getDispatcher(), bufspec_tcp);
@@ -47,33 +47,33 @@ class CommsManager
 
 	public void start() throws java.io.IOException
 	{
-		int cnt = (udplocal == null ? 0 : udplocal.length);
+		int cnt = (udpLocal == null ? 0 : udpLocal.length);
 		for (int idx = 0; idx != cnt; idx++) {
-			udplocal[idx].start();
+			udpLocal[idx].start();
 		}
 	}
 
 	public void stop()
 	{
-		int cnt = (udplocal == null ? 0 : udplocal.length);
+		int cnt = (udpLocal == null ? 0 : udpLocal.length);
 		for (int idx = 0; idx != cnt; idx++) {
-			udplocal[idx].stop();
+			udpLocal[idx].stop();
 		}
 	}
 
-	// this is only called in recursive mode, so srvaddr is guaranteed non-null
-	public java.net.InetSocketAddress nextServer()
+	// this is only called in recursive mode, so localNameServers is guaranteed non-null
+	public java.net.InetSocketAddress nextLocalNameServer()
 	{
-		java.net.InetSocketAddress next = srvaddr[next_server++];
-		if (next_server == srvaddr.length) next_server = 0;
+		java.net.InetSocketAddress next = localNameServers[nextServer++];
+		if (nextServer == localNameServers.length) nextServer = 0;
 		return next;
 	}
 
 	public EndPointUDP nextSendPort()
 	{
-		if (udplocal == null) return null;
-		EndPointUDP next = udplocal[next_udplocal++];
-		if (next_udplocal == udplocal.length) next_udplocal = 0;
+		if (udpLocal == null) return null;
+		EndPointUDP next = udpLocal[nextUDP++];
+		if (nextUDP == udpLocal.length) nextUDP = 0;
 		return next;
 	}
 

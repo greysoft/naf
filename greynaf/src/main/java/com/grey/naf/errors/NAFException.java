@@ -35,7 +35,7 @@ public class NAFException extends RuntimeException {
 
 	@Override
 	public String toString() {
-		return super.toString()+"/error="+error();
+		return super.toString()+" - error="+error();
 	}
 
 	public static boolean isError(Throwable ex) {

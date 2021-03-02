@@ -1,19 +1,25 @@
 /*
- * Copyright 2012-2018 Yusef Badri - All rights reserved.
+ * Copyright 2012-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.resolver.embedded;
 
+import com.grey.naf.dns.resolver.ResolverConfig;
+import com.grey.naf.dns.resolver.ResolverService;
+
+/**
+ * This class provides a ResolverDNS API to create and access a resolver engine in the same Dispatcher thread.
+ */
 public class EmbeddedResolver
 	extends com.grey.naf.dns.resolver.ResolverDNS
 {
 	private final com.grey.naf.dns.resolver.ResolverService rslvr;
 
-	public EmbeddedResolver(com.grey.naf.reactor.Dispatcher dsptch, com.grey.base.config.XmlConfig cfg)
+	public EmbeddedResolver(com.grey.naf.reactor.Dispatcher dsptch, ResolverConfig config)
 			throws java.io.IOException, javax.naming.NamingException
 	{
-		super(dsptch, cfg);
-		rslvr = new com.grey.naf.dns.resolver.ResolverService(dsptch, cfg);
+		super(dsptch);
+		rslvr = new ResolverService(dsptch, config);
 	}
 
 	@Override

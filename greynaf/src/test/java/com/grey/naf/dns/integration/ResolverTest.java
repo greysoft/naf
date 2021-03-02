@@ -4,6 +4,9 @@
  */
 package com.grey.naf.dns.integration;
 
+import java.io.IOException;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import com.grey.logging.Logger.LEVEL;
 import com.grey.base.utils.ByteChars;
 import com.grey.base.utils.DynLoader;
@@ -16,6 +19,7 @@ import com.grey.naf.dns.resolver.ResolverAnswer;
 import com.grey.naf.dns.resolver.ResolverDNS;
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.DispatcherTest;
+import com.grey.naf.reactor.TimerNAF;
 
 public class ResolverTest
 	extends ResolverTester
@@ -38,9 +42,8 @@ public class ResolverTest
 	private static final int CFG_NONAUTO = 1 << 3;
 	private static final int CFG_NOMOCK = 1 << 4;
 
-	private Class<?> clss_resolver;
-	private int cnt_dnsrequests;
-	private int cnt_dnscallbacks;
+	private final AtomicInteger cnt_dnsrequests = new AtomicInteger();
+	private final AtomicInteger cnt_dnscallbacks = new AtomicInteger();
 	private boolean callback_error;
 	protected String dispatcher_name;
 
@@ -151,7 +154,7 @@ public class ResolverTest
 		dsptch.stop();
 		Dispatcher.STOPSTATUS stopsts = dsptch.waitStopped(TimeOps.MSECS_PER_SECOND * 10, true);
 		org.junit.Assert.assertEquals(Dispatcher.STOPSTATUS.STOPPED, stopsts);
-		org.junit.Assert.assertEquals(0, cnt_dnscallbacks); //no responses because we never started Dispatcher
+		org.junit.Assert.assertEquals(0, cnt_dnscallbacks.get()); //no responses because we never started Dispatcher
 		org.junit.Assert.assertFalse(callback_error);
 		//can't call validateFinalState() because two QueryHandles still pending
 		Object rs = getResolverService(resolver);
@@ -180,7 +183,7 @@ public class ResolverTest
 		validatePendingRequests(resolver1, 2, 3);
 		// Run master Dispatcher briefly, but long enough to allow any DNS responses to be received (should be none)
 		d1.start();
-		com.grey.naf.reactor.TimerNAF.sleep(4 * 1000);
+		TimerNAF.sleep(4 * 1000);
 		d1.stop();
 		boolean stopped = d2.stop();
 		Dispatcher.STOPSTATUS stopsts = d1.waitStopped(TimeOps.MSECS_PER_SECOND * 10, true);
@@ -189,7 +192,7 @@ public class ResolverTest
 		org.junit.Assert.assertTrue(stopped);
 		stopsts = d2.waitStopped(TimeOps.MSECS_PER_SECOND * 10, true);
 		org.junit.Assert.assertEquals(Dispatcher.STOPSTATUS.STOPPED, stopsts);
-		org.junit.Assert.assertEquals(0, cnt_dnscallbacks); //no responses becaise we cancelled beforehand
+		org.junit.Assert.assertEquals(0, cnt_dnscallbacks.get()); //no responses becaise we cancelled beforehand
 		org.junit.Assert.assertFalse(callback_error);
 		validateFinalState(resolver1);
 	}
@@ -199,7 +202,7 @@ public class ResolverTest
 		int cfgflags = CFG_BADSERVER;
 		if (tcp) cfgflags |= CFG_TCP;
 		String cbflags = CBFLAG_TMT;
-		cnt_dnsrequests = 4;
+		cnt_dnsrequests.set(4);
 		Dispatcher dsptch = createResolver(cfgflags);
 		ResolverDNS resolver = dsptch.getResolverDNS();
 
@@ -220,10 +223,10 @@ public class ResolverTest
 		Dispatcher.STOPSTATUS stopsts = dsptch.waitStopped(TimeOps.MSECS_PER_MINUTE * 2, true);
 		org.junit.Assert.assertEquals(Dispatcher.STOPSTATUS.STOPPED, stopsts);
 		org.junit.Assert.assertTrue(dsptch.completedOK());
-		org.junit.Assert.assertEquals(cnt_dnsrequests, cnt_dnscallbacks);
+		org.junit.Assert.assertEquals(cnt_dnsrequests.get(), cnt_dnscallbacks.get());
 		org.junit.Assert.assertFalse(callback_error);
-		org.junit.Assert.assertEquals(cnt_dnsrequests, rspcnt_tmt);
-		org.junit.Assert.assertEquals(cnt_dnsrequests, rspcnt_nodom); //because dnsResolved() does repeat query
+		org.junit.Assert.assertEquals(cnt_dnsrequests.get(), rspcnt_tmt);
+		org.junit.Assert.assertEquals(cnt_dnsrequests.get(), rspcnt_nodom); //because dnsResolved() does repeat query
 		validateFinalState(resolver);
 	}
 
@@ -291,24 +294,9 @@ public class ResolverTest
 		org.junit.Assert.assertEquals(ResolverDNS.QTYPE_A, answer.qtype);
 		org.junit.Assert.assertTrue(StringOps.sameSeq(bc, answer.qname));
 
-		//now issue Resolver calls that will result in DNS queries with async results
-		Object[][] queries = new Object[][]{{ResolverDNS.QTYPE_A, queryTargetA},
-			{ResolverDNS.QTYPE_PTR, queryTargetPTR, "192.168.240.2"},
-			{ResolverDNS.QTYPE_NS, queryTargetNS}, {ResolverDNS.QTYPE_SOA, queryTargetSOA},
-			{ResolverDNS.QTYPE_MX, queryTargetMX}, {ResolverDNS.QTYPE_SRV, queryTargetSRV},
-			{ResolverDNS.QTYPE_TXT, queryTargetTXT}, {ResolverDNS.QTYPE_AAAA, queryTargetAAAA}};
-		boolean nopiggy = remote_resolver; //can't piggyback remote requests as response-callbacks not synchronous
-		String cbdata = (remote_resolver ? CBFLAG_DISTRIBREMOTE : null);
-		for (int idx = 0; idx != queries.length; idx++) {
-			byte qtype = (byte)queries[idx][0];
-			String qname = (String)queries[idx][1];
-			qname = Character.toUpperCase(qname.charAt(0)) + qname.substring(1).toLowerCase();
-			String nonsuch = (queries[idx].length > 2 ? (String)queries[idx][2] : "no-such-"+ResolverDNS.getQTYPE(qtype)+"."+NoSuchDom);
-			issueQuery(dsptch, qname, qtype, cbdata, nopiggy);
-			issueQuery(dsptch, nonsuch, qtype, addFlag(cbdata,CBFLAG_NODOM), nopiggy);
-		}
-		issueQuery(dsptch, queryTargetCNAME, ResolverDNS.QTYPE_A, cbdata, nopiggy);
-		issueQuery(dsptch, "www."+queryTargetMX, ResolverDNS.QTYPE_MX, addFlag(cbdata,CBFLAG_NODOM), nopiggy);
+		//now issue Resolver calls that will result in DNS queries with async results - must do in Dispatcher callback after it starts
+		TimerNAF.Handler issuer = new ResolverQueryIssuer(this, remote_resolver, cnt_dnsrequests);
+		dsptch.setTimer(0, 0, issuer);
 
 		dsptch.start();
 		if (d2 != null) d2.start();
@@ -320,65 +308,10 @@ public class ResolverTest
 			stopsts = d2.waitStopped(maxtime - dsptch.getSystemTime(), true);
 			org.junit.Assert.assertEquals(Dispatcher.STOPSTATUS.STOPPED, stopsts);
 			org.junit.Assert.assertTrue(d2.completedOK());
-			org.junit.Assert.assertTrue(getResolverService(resolver) == getResolverService(d2.getResolverDNS()));
 		}
-		org.junit.Assert.assertEquals(cnt_dnsrequests, cnt_dnscallbacks);
+		org.junit.Assert.assertEquals(cnt_dnsrequests.get(), cnt_dnscallbacks.get());
 		org.junit.Assert.assertFalse(callback_error);
 		validateFinalState(resolver);
-	}
-
-	// We issue an immediate repeat query to exercise the code for piggybacking on the earlier pending one.
-	// We can't actually verify it happens though (short of examining the Resolver's debug traces).
-	private void issueQuery(Dispatcher d, CharSequence qname, int qtype, String cbdata, boolean nopiggy) throws java.io.IOException
-	{
-		ResolverDNS resolver = d.getResolverDNS();
-		ResolverAnswer answer;
-		if (qtype == ResolverDNS.QTYPE_A) {
-			ByteChars bc = new ByteChars(qname);
-			answer = resolver.resolveHostname(bc, this, cbdata, 0);
-			org.junit.Assert.assertNull(answer);
-			if (!nopiggy) answer = resolver.resolveHostname(bc, this, addFlag(cbdata,CBFLAG_PIGGY), 0);
-		} else if (qtype == ResolverDNS.QTYPE_PTR) {
-			int ip = IP.convertDottedIP(qname);
-			answer = resolver.resolveIP(ip, this, cbdata, 0);
-			org.junit.Assert.assertNull(answer);
-			if (!nopiggy) answer = resolver.resolveIP(ip, this, addFlag(cbdata,CBFLAG_PIGGY), 0);
-		} else if (qtype == ResolverDNS.QTYPE_NS) {
-			ByteChars bc = new ByteChars(qname);
-			answer = resolver.resolveNameServer(bc, this, cbdata, 0);
-			org.junit.Assert.assertNull(answer);
-			if (!nopiggy) answer = resolver.resolveNameServer(bc, this, addFlag(cbdata,CBFLAG_PIGGY), 0);
-		} else if (qtype == ResolverDNS.QTYPE_MX) {
-			ByteChars bc = new ByteChars(qname);
-			answer = resolver.resolveMailDomain(bc, this, cbdata, 0);
-			org.junit.Assert.assertNull(answer);
-			if (!nopiggy) answer = resolver.resolveMailDomain(bc, this, addFlag(cbdata,CBFLAG_PIGGY), 0);
-		} else if (qtype == ResolverDNS.QTYPE_SOA) {
-			ByteChars bc = new ByteChars(qname);
-			answer = resolver.resolveSOA(bc, this, cbdata, 0);
-			org.junit.Assert.assertNull(answer);
-			if (!nopiggy) answer = resolver.resolveSOA(bc, this, addFlag(cbdata,CBFLAG_PIGGY), 0);
-		} else if (qtype == ResolverDNS.QTYPE_SRV) {
-			ByteChars bc = new ByteChars(qname);
-			answer = resolver.resolveSRV(bc, this, cbdata, 0);
-			org.junit.Assert.assertNull(answer);
-			if (!nopiggy) answer = resolver.resolveSRV(bc, this, addFlag(cbdata,CBFLAG_PIGGY), 0);
-		} else if (qtype == ResolverDNS.QTYPE_TXT) {
-			ByteChars bc = new ByteChars(qname);
-			answer = resolver.resolveTXT(bc, this, cbdata, 0);
-			org.junit.Assert.assertNull(answer);
-			if (!nopiggy) answer = resolver.resolveTXT(bc, this, addFlag(cbdata,CBFLAG_PIGGY), 0);
-		} else if (qtype == ResolverDNS.QTYPE_AAAA) {
-			ByteChars bc = new ByteChars(qname);
-			answer = resolver.resolveAAAA(bc, this, cbdata, 0);
-			org.junit.Assert.assertNull(answer);
-			if (!nopiggy) answer = resolver.resolveAAAA(bc, this, addFlag(cbdata,CBFLAG_PIGGY), 0);
-		} else {
-			throw new RuntimeException("Missing issueQuery() case for qtype="+qtype);
-		}
-		org.junit.Assert.assertNull(answer);
-		cnt_dnsrequests++;
-		if (!nopiggy) cnt_dnsrequests++; //and there was one more
 	}
 
 	@Override
@@ -397,7 +330,7 @@ public class ResolverTest
 	// flag results in NODOMAIN for any uncached answers.
 	private void handleDnsResult(Dispatcher dsptch, ResolverAnswer answer, Object cbdata) throws java.io.IOException
 	{
-		boolean halt = (++cnt_dnscallbacks == cnt_dnsrequests);
+		boolean halt = (cnt_dnscallbacks.incrementAndGet() == cnt_dnsrequests.get());
 		String[] parts = (cbdata == null ? new String[0] : String.class.cast(cbdata).split(CBDLM));
 		java.util.List<String> cbflags = java.util.Arrays.asList(parts);
 		ResolverAnswer.STATUS exp_sts = ResolverAnswer.STATUS.OK;
@@ -408,7 +341,7 @@ public class ResolverTest
 		}
 		ResolverAnswer.STATUS exp_sts2 = (exp_sts == ResolverAnswer.STATUS.TIMEOUT ? ResolverAnswer.STATUS.NODOMAIN : exp_sts);
 		ResolverDNS resolver = dsptch.getResolverDNS();
-		logger.info("UTEST: utest.dnsResolved="+cnt_dnscallbacks+"/"+cnt_dnsrequests+": "+answer+" - cbdata="+cbdata);
+		logger.info("UTEST: utest.dnsResolved="+cnt_dnscallbacks.get()+"/"+cnt_dnsrequests.get()+": "+answer+" - cbdata="+cbdata);
 
 		if (answer.qtype == ResolverDNS.QTYPE_PTR) {
 			assertAnswer(exp_sts, answer.qtype, null, answer);
@@ -473,8 +406,8 @@ public class ResolverTest
 
 	private Dispatcher createResolver(int flags) throws java.io.IOException
 	{
-		clss_resolver = com.grey.naf.dns.resolver.embedded.EmbeddedResolver.class;
-		com.grey.naf.NAFConfig nafcfg = setConfig(null, flags);
+		Class<?> clss_resolver = com.grey.naf.dns.resolver.embedded.EmbeddedResolver.class;
+		com.grey.naf.NAFConfig nafcfg = setConfig(null, clss_resolver, flags);
 		ApplicationContextNAF appctx = ApplicationContextNAF.create(null, nafcfg);
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
 				.withName(dispatcher_name)
@@ -490,18 +423,18 @@ public class ResolverTest
 	private Dispatcher[] createDistributedResolver(int flags, boolean local_master)
 			throws java.io.IOException
 	{
-		clss_resolver = com.grey.naf.dns.resolver.distributed.Client.class;
+		Class<?> clss_resolver = com.grey.naf.dns.resolver.distributed.DistributedResolver.class;
 		String d1name;
 		String d2name;
 		com.grey.naf.NAFConfig nafcfg;
 		if (local_master) {
 			d1name = dispatcher_name+"_master";
 			d2name = dispatcher_name+"_slave";
-			nafcfg = setConfig(d1name, flags);
+			nafcfg = setConfig(d1name, clss_resolver, flags);
 		} else {
 			d1name = dispatcher_name+"_slave";
 			d2name = dispatcher_name+"_master";
-			nafcfg = setConfig(d2name, flags);
+			nafcfg = setConfig(d2name, clss_resolver, flags);
 		}
 		ApplicationContextNAF appctx = ApplicationContextNAF.create(null, nafcfg);
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
@@ -516,11 +449,10 @@ public class ResolverTest
 		Dispatcher d2 = Dispatcher.create(appctx, def, logger);
 		org.junit.Assert.assertEquals(clss_resolver, d1.getResolverDNS().getClass());
 		org.junit.Assert.assertEquals(clss_resolver, d2.getResolverDNS().getClass());
-		org.junit.Assert.assertTrue(getResolverService(d1.getResolverDNS()) == getResolverService(d2.getResolverDNS()));
 		return new Dispatcher[]{d1, d2};
 	}
 
-	private com.grey.naf.NAFConfig setConfig(String master, int flags) throws java.io.IOException
+	private com.grey.naf.NAFConfig setConfig(String master, Class<?> clss_resolver, int flags) throws java.io.IOException
 	{
 		int maxrr_ns = 9;
 		int maxrr_mx = 10;
@@ -558,5 +490,98 @@ public class ResolverTest
 	{
 		if (cbflags == null) return newflag;
 		return cbflags+CBDLM+newflag;
+	}
+
+
+	private static class ResolverQueryIssuer implements TimerNAF.Handler {
+		private final ResolverDNS.Client resolverClient;
+		private final boolean remoteResolver;
+		private final AtomicInteger requestsCounter;
+
+		public ResolverQueryIssuer(ResolverDNS.Client resolverClient, boolean remoteResolver, AtomicInteger requestsCounter) {
+			this.resolverClient = resolverClient;
+			this.remoteResolver = remoteResolver;
+			this.requestsCounter = requestsCounter;
+		}
+
+		@Override
+		public void timerIndication(TimerNAF tmr, Dispatcher dsptch) throws IOException {
+			Object[][] queries = new Object[][]{{ResolverDNS.QTYPE_A, queryTargetA},
+				{ResolverDNS.QTYPE_PTR, queryTargetPTR, "192.168.240.2"},
+				{ResolverDNS.QTYPE_NS, queryTargetNS}, {ResolverDNS.QTYPE_SOA, queryTargetSOA},
+				{ResolverDNS.QTYPE_MX, queryTargetMX}, {ResolverDNS.QTYPE_SRV, queryTargetSRV},
+				{ResolverDNS.QTYPE_TXT, queryTargetTXT}, {ResolverDNS.QTYPE_AAAA, queryTargetAAAA}};
+			boolean nopiggy = remoteResolver; //can't piggyback remote requests as response-callbacks not synchronous
+			String cbdata = (remoteResolver ? CBFLAG_DISTRIBREMOTE : null);
+			for (int idx = 0; idx != queries.length; idx++) {
+				byte qtype = (byte)queries[idx][0];
+				String qname = (String)queries[idx][1];
+				qname = Character.toUpperCase(qname.charAt(0)) + qname.substring(1).toLowerCase();
+				String nonsuch = (queries[idx].length > 2 ? (String)queries[idx][2] : "no-such-"+ResolverDNS.getQTYPE(qtype)+"."+NoSuchDom);
+				issueQuery(dsptch, qname, qtype, cbdata, nopiggy);
+				issueQuery(dsptch, nonsuch, qtype, addFlag(cbdata,CBFLAG_NODOM), nopiggy);
+			}
+			issueQuery(dsptch, queryTargetCNAME, ResolverDNS.QTYPE_A, cbdata, nopiggy);
+			issueQuery(dsptch, "www."+queryTargetMX, ResolverDNS.QTYPE_MX, addFlag(cbdata,CBFLAG_NODOM), nopiggy);
+		}
+
+		@Override
+		public void eventError(TimerNAF tmr, Dispatcher d, Throwable ex) throws IOException {
+			logger.log(LEVEL.ERR, ex, true, "Query-Issuer time error");
+		}
+
+		// We issue an immediate repeat query to exercise the code for piggybacking on the earlier pending one.
+		// We can't actually verify it happens though (short of examining the Resolver's debug traces).
+		private void issueQuery(Dispatcher d, CharSequence qname, int qtype, String cbdata, boolean nopiggy) throws java.io.IOException
+		{
+			ResolverDNS resolver = d.getResolverDNS();
+			ResolverAnswer answer;
+			if (qtype == ResolverDNS.QTYPE_A) {
+				ByteChars bc = new ByteChars(qname);
+				answer = resolver.resolveHostname(bc, resolverClient, cbdata, 0);
+				org.junit.Assert.assertNull(answer);
+				if (!nopiggy) answer = resolver.resolveHostname(bc, resolverClient, addFlag(cbdata,CBFLAG_PIGGY), 0);
+			} else if (qtype == ResolverDNS.QTYPE_PTR) {
+				int ip = IP.convertDottedIP(qname);
+				answer = resolver.resolveIP(ip, resolverClient, cbdata, 0);
+				org.junit.Assert.assertNull(answer);
+				if (!nopiggy) answer = resolver.resolveIP(ip, resolverClient, addFlag(cbdata,CBFLAG_PIGGY), 0);
+			} else if (qtype == ResolverDNS.QTYPE_NS) {
+				ByteChars bc = new ByteChars(qname);
+				answer = resolver.resolveNameServer(bc, resolverClient, cbdata, 0);
+				org.junit.Assert.assertNull(answer);
+				if (!nopiggy) answer = resolver.resolveNameServer(bc, resolverClient, addFlag(cbdata,CBFLAG_PIGGY), 0);
+			} else if (qtype == ResolverDNS.QTYPE_MX) {
+				ByteChars bc = new ByteChars(qname);
+				answer = resolver.resolveMailDomain(bc, resolverClient, cbdata, 0);
+				org.junit.Assert.assertNull(answer);
+				if (!nopiggy) answer = resolver.resolveMailDomain(bc, resolverClient, addFlag(cbdata,CBFLAG_PIGGY), 0);
+			} else if (qtype == ResolverDNS.QTYPE_SOA) {
+				ByteChars bc = new ByteChars(qname);
+				answer = resolver.resolveSOA(bc, resolverClient, cbdata, 0);
+				org.junit.Assert.assertNull(answer);
+				if (!nopiggy) answer = resolver.resolveSOA(bc, resolverClient, addFlag(cbdata,CBFLAG_PIGGY), 0);
+			} else if (qtype == ResolverDNS.QTYPE_SRV) {
+				ByteChars bc = new ByteChars(qname);
+				answer = resolver.resolveSRV(bc, resolverClient, cbdata, 0);
+				org.junit.Assert.assertNull(answer);
+				if (!nopiggy) answer = resolver.resolveSRV(bc, resolverClient, addFlag(cbdata,CBFLAG_PIGGY), 0);
+			} else if (qtype == ResolverDNS.QTYPE_TXT) {
+				ByteChars bc = new ByteChars(qname);
+				answer = resolver.resolveTXT(bc, resolverClient, cbdata, 0);
+				org.junit.Assert.assertNull(answer);
+				if (!nopiggy) answer = resolver.resolveTXT(bc, resolverClient, addFlag(cbdata,CBFLAG_PIGGY), 0);
+			} else if (qtype == ResolverDNS.QTYPE_AAAA) {
+				ByteChars bc = new ByteChars(qname);
+				answer = resolver.resolveAAAA(bc, resolverClient, cbdata, 0);
+				org.junit.Assert.assertNull(answer);
+				if (!nopiggy) answer = resolver.resolveAAAA(bc, resolverClient, addFlag(cbdata,CBFLAG_PIGGY), 0);
+			} else {
+				throw new RuntimeException("Missing issueQuery() case for qtype="+qtype);
+			}
+			org.junit.Assert.assertNull(answer);
+			requestsCounter.incrementAndGet();
+			if (!nopiggy) requestsCounter.incrementAndGet(); //and there was one more
+		}
 	}
 }

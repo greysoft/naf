@@ -104,17 +104,15 @@ public class DispatcherDef
 			clock = defs.clock;
 		}
 
-		public Builder(com.grey.base.config.XmlConfig cfg)
-		{
-			DispatcherDef dflts = new Builder().build();
-			name = cfg.getValue("@name", true, dflts.getName());
-			logName = cfg.getValue("@logname", true, SysProps.get(SYSPROP_LOGNAME, dflts.getLogName() == null ? name : dflts.getLogName()));
-			hasNafman = cfg.getBool("@nafman", dflts.hasNafman());
-			hasDNS = cfg.getBool("@dns", dflts.hasDNS());
-			zeroNafletsOK = cfg.getBool("@zero_naflets", dflts.isZeroNafletsOK());
-			surviveDownstream = cfg.getBool("@survive_downstream", dflts.isSurviveDownstream());
-			surviveHandlers = cfg.getBool("@survive_handlers", dflts.isSurviveHandlers());
-			flushInterval = cfg.getTime("@flush", dflts.getFlushInterval());
+		public Builder(com.grey.base.config.XmlConfig cfg) {
+			name = cfg.getValue("@name", true, name);
+			logName = cfg.getValue("@logname", true, SysProps.get(SYSPROP_LOGNAME, name));
+			hasNafman = cfg.getBool("@nafman", hasNafman);
+			hasDNS = cfg.getBool("@dns", hasDNS);
+			zeroNafletsOK = cfg.getBool("@zero_naflets", zeroNafletsOK);
+			surviveDownstream = cfg.getBool("@survive_downstream", surviveDownstream);
+			surviveHandlers = cfg.getBool("@survive_handlers", surviveHandlers);
+			flushInterval = cfg.getTime("@flush", flushInterval);
 
 			String xpath = "naflets/naflet"+com.grey.base.config.XmlConfig.XPATH_ENABLED;
 			naflets = cfg.getSections(xpath);

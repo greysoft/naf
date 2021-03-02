@@ -155,7 +155,7 @@ class QueryHandle
 		pkt.resetEncoder(isTCP(), false); //we only ever encode 1 question, so avoid compression overhead
 		pkt.hdr_qid = qid;
 		pkt.hdr_qcnt = 1;
-		if (rslvr.getConfig().recursive) pkt.setRecursionDesired();
+		if (rslvr.getConfig().isRecursive()) pkt.setRecursionDesired();
 		int off = pkt.encodeHeader();
 		off = pkt.encodeQuestion(off, qtype, qname);
 		java.nio.ByteBuffer niobuf = pkt.completeEncoding(off);
@@ -289,7 +289,7 @@ class QueryHandle
 		}
 		boolean authredirect_hack = false; //lets us know if F_AUTHREDIRECT is freshly set or an existing state
 		boolean parsed_auth = false;
-		boolean parse_auth = (qtype == ResolverDNS.QTYPE_NS && !rslvr.getConfig().recursive);
+		boolean parse_auth = (qtype == ResolverDNS.QTYPE_NS && !rslvr.getConfig().isRecursive());
 
 		if (!parse_auth && pkt.hdr_anscnt == 0 && pkt.hdr_authcnt != 0) {
 			// We sent our request to what was supposed to be a valid nameserver for this domain, and it's responded
@@ -378,8 +378,8 @@ class QueryHandle
 
 			// Original request must be of type NS/MX/SRV, so this is either the Authority or Additional-Info part of
 			// the original response, or the answer part of a follow-on type-A sub-query.
-			if (!rslvr.getConfig().recursive && sectiontype == PacketDNS.SECT_INFO) {
-				if (rslvr.getConfig().cache_all_glue || rsprr.getName().endsWith(qname)) {
+			if (!rslvr.getConfig().isRecursive() && sectiontype == PacketDNS.SECT_INFO) {
+				if (rslvr.getConfig().isCacheAllGlue() || rsprr.getName().endsWith(qname)) {
 					ResourceData rr = new ResourceData.RR_A((ResourceData.RR_A)rsprr, qname);
 					rslvr.getCacheManager().storeHostAddress(rr.getName(), rr);
 				}
@@ -542,7 +542,7 @@ class QueryHandle
 			int server_ip = 0;
 			ByteChars domnam = getResolvableName(rr);
 
-			if (!rslvr.getConfig().recursive && qtype == ResolverDNS.QTYPE_NS) {
+			if (!rslvr.getConfig().isRecursive() && qtype == ResolverDNS.QTYPE_NS) {
 				if (qname_ip == 0) qname_ip = getPartialAnswer();
 				ByteChars dom = rslvr.getParentDomain(ResolverDNS.QTYPE_A, domnam);
 				if (qname.equals(dom)) {
@@ -759,7 +759,7 @@ class QueryHandle
 	{
 		long ttl_unresolved = rr_unresolved.getExpiry();
 		long ttl_a = rr_a.getExpiry();
-		long ttl = (rslvr.getConfig().setminttl ? Math.min(ttl_unresolved, ttl_a) : Math.max(ttl_unresolved, ttl_a));
+		long ttl = (rslvr.getConfig().isSetMinTTL() ? Math.min(ttl_unresolved, ttl_a) : Math.max(ttl_unresolved, ttl_a));
 		rr_unresolved.setIP(rr_a.getIP());
 		rr_unresolved.setExpiry(ttl);
 	}
@@ -897,9 +897,9 @@ class QueryHandle
 		ResolverConfig cfg = rslvr.getConfig();
 		long tmt;
 		if (tcpconn == null) {
-			tmt = cfg.retrytmt + (cfg.retrystep * retrycnt) + rslvr.nextRandomInt((int)cfg.retrystep);
+			tmt = cfg.getRetryTimeout() + (cfg.getRetryStep() * retrycnt) + rslvr.nextRandomInt((int)cfg.getRetryStep());
 		} else {
-			tmt = cfg.retrytmt_tcp;
+			tmt = cfg.getRetryTimeoutTCP();
 		}
 		if (tmr == null) {
 			tmr = rslvr.getDispatcher().setTimer(tmt, type, this);
@@ -919,14 +919,14 @@ class QueryHandle
 	public void timerIndication(TimerNAF t, Dispatcher d)
 	{
 		if (rslvr.logger.isActive(ResolverConfig.DEBUGLVL)) {
-			rslvr.logger.log(ResolverConfig.DEBUGLVL, "DNS-Resolver timeout="+t.getType()+"/"+(retrycnt+1)+"/"+(rslvr.getConfig().retrymax+1)
+			rslvr.logger.log(ResolverConfig.DEBUGLVL, "DNS-Resolver timeout="+t.getType()+"/"+(retrycnt+1)+"/"+(rslvr.getConfig().getRetryMax()+1)
 					+" on "+ResolverDNS.getQTYPE(qtype)+"/"+qname);
 		}
 		tmr = null;
 		rslvr.stats_tmt++;
 
 		// one timeout is enough to fail a TCP query
-		if (isTCP() || (retrycnt == rslvr.getConfig().retrymax)) {
+		if (isTCP() || (retrycnt == rslvr.getConfig().getRetryMax())) {
 			endRequest(ResolverAnswer.STATUS.TIMEOUT);
 			return;
 		}
@@ -963,9 +963,9 @@ class QueryHandle
 	private int getMaxRRs()
 	{
 		if (qtype == ResolverDNS.QTYPE_NS) {
-			return rslvr.getConfig().ns_maxrr;
+			return rslvr.getConfig().getNsMaxRR();
 		} else if (qtype == ResolverDNS.QTYPE_MX) {
-			return rslvr.getConfig().mx_maxrr;
+			return rslvr.getConfig().getMxMaxRR();
 		}
 		return 0;
 	}

@@ -118,10 +118,15 @@ public class ApplicationContextNAF {
 
 	public <T> T getNamedItem(String name, ItemFactory<T> fact) {
 		@SuppressWarnings("unchecked") T item = (T)namedItems.get(name);
-		if (item == null) {
+		if (item == null && fact != null) {
 			item = createNamedItem(name, fact);
 		}
 		return item;
+	}
+
+	public <T> T setNamedItem(String name, T item) {
+		@SuppressWarnings("unchecked") T prev = (T)namedItems.put(name, item);
+		return prev;
 	}
 
 	public void deregisterNamedItem(String name) {
@@ -129,17 +134,14 @@ public class ApplicationContextNAF {
 	}
 
 	private <T> T createNamedItem(String name, ItemFactory<T> fact) {
-		synchronized (namedItems) {
-			@SuppressWarnings("unchecked") T item = (T)namedItems.get(name);
-			if (item != null) return item; //already exists
+		@SuppressWarnings("unchecked") T item = (T)namedItems.computeIfAbsent(name, k -> {
 			try {
-				item = fact.create(this);
+				return fact.create(this);
 			} catch (Exception ex) {
 				throw new NAFException(ex);
 			}
-			namedItems.put(name, item);
-			return item;
-		}
+		});
+		return item;
 	}
 
 	@Override

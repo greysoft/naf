@@ -1,8 +1,10 @@
 /*
- * Copyright 2010-2015 Yusef Badri - All rights reserved.
+ * Copyright 2010-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
+
+import java.time.Duration;
 
 import com.grey.base.config.SysProps;
 
@@ -23,10 +25,10 @@ public final class TimeOps
 	public static final String[] longmonths = {"January", "February", "March", "April", "May", "June", "July",
 		"August", "September", "October", "November", "December"};
 
-	public static final long MSECS_PER_SECOND = 1000L;
-	public static final long MSECS_PER_MINUTE = 60L * MSECS_PER_SECOND;
-	public static final long MSECS_PER_HOUR = 60L * MSECS_PER_MINUTE;
-	public static final long MSECS_PER_DAY = 24L * MSECS_PER_HOUR;
+	public static final long MSECS_PER_SECOND = Duration.ofSeconds(1).toMillis();
+	public static final long MSECS_PER_MINUTE = Duration.ofMinutes(1).toMillis();
+	public static final long MSECS_PER_HOUR = Duration.ofHours(1).toMillis();
+	public static final long MSECS_PER_DAY = Duration.ofDays(1).toMillis();
 
 	private static final int MAXTIME32DIGITS = Integer.toString(Integer.MAX_VALUE).length(); //gives max length of Unix 32-bit timestamp
 	private static final int MAXTIMEDIGITS = MAXTIME32DIGITS+3; //+3 for the milliseconds precision of the Java timestamp

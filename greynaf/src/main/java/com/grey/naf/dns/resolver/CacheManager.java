@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Yusef Badri - All rights reserved.
+ * Copyright 2014-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.resolver;
@@ -56,19 +56,21 @@ class CacheManager
 
 	private final java.util.Random rndgen = new java.util.Random(System.nanoTime());
 	private final com.grey.naf.reactor.Dispatcher dsptch;
-	private final com.grey.logging.Logger logger;
+	private final String[] localNameServers;
 	private final ResolverConfig config;
 	private long systime_prune;
+	private final com.grey.logging.Logger logger;
 
 	// temporary work areas, pre-allocated merely for efficiency
 	private final byte[] tmp_ipaddr = new byte[IP.IPADDR_OCTETS];
 
-	public CacheManager(com.grey.naf.reactor.Dispatcher d, ResolverConfig c)
+	public CacheManager(com.grey.naf.reactor.Dispatcher d, ResolverConfig c, String[] nameServers)
 	{
 		dsptch = d;
 		config = c;
+		localNameServers = nameServers;
 		logger = dsptch.getLogger();
-		if (!config.recursive) loadRootServers();
+		if (!config.isRecursive()) loadRootServers();
 	}
 
 	public java.net.InetSocketAddress lookupNameServer(ByteChars domnam)
@@ -101,7 +103,7 @@ class CacheManager
 			throw new UnsupportedOperationException(LOGLBL+"lookup qtype="+qtype+" - "+qname);
 		}
 		ResourceData rr = cache.get(qname);
-		long min_age = dsptch.getSystemTime() - config.minttl_lookup;
+		long min_age = dsptch.getSystemTime() - config.getLookupMinTTL();
 
 		if (rr != null && rr.isExpired(min_age)) {
 			// stale data, so remove it and say we found nothing
@@ -115,7 +117,7 @@ class CacheManager
 	{
 		if (qtype != ResolverDNS.QTYPE_PTR) throw new UnsupportedOperationException(LOGLBL+"lookup qtype="+qtype+" - "+qip);
 		ResourceData rr = cache_ptr.get(qip);
-		long min_age = dsptch.getSystemTime() - config.minttl_lookup;
+		long min_age = dsptch.getSystemTime() - config.getLookupMinTTL();
 
 		if (rr != null && rr.isExpired(min_age)) {
 			// stale data, so remove it and say we found nothing
@@ -137,7 +139,7 @@ class CacheManager
 		} else {
 			throw new UnsupportedOperationException(LOGLBL+"lookup qtype="+qtype+" - "+qname);
 		}
-		long min_age = dsptch.getSystemTime() - config.minttl_lookup;
+		long min_age = dsptch.getSystemTime() - config.getLookupMinTTL();
 		return pruneList(cache, qname, null, min_age);
 	}
 
@@ -147,7 +149,7 @@ class CacheManager
 	{
 		if (ans.result == ResolverAnswer.STATUS.NODOMAIN || ans.rrdata.size() == 0) {
 			ans.result = ResolverAnswer.STATUS.NODOMAIN;
-			long ttl = dsptch.getSystemTime() + config.negttl;
+			long ttl = dsptch.getSystemTime() + config.getNegativeTTL();
 			ResourceData rr = ResourceData.createNegativeRR(ans.qtype, ttl);
 			ans.rrdata.add(rr);
 		}
@@ -158,23 +160,23 @@ class CacheManager
 		}
 
 		if (ans.qtype == ResolverDNS.QTYPE_A) {
-			storeSingleResult("A", ans, cache_a, config.cache_lowater_a, config.cache_hiwater_a);
+			storeSingleResult("A", ans, cache_a, config.getCacheLoWaterA(), config.getCacheHiWaterA());
 		} else if (ans.qtype == ResolverDNS.QTYPE_AAAA) {
-			storeSingleResult("AAAA", ans, cache_aaaa, config.cache_lowater_a, config.cache_hiwater_a);
+			storeSingleResult("AAAA", ans, cache_aaaa, config.getCacheLoWaterA(), config.getCacheHiWaterA());
 		} else if (ans.qtype == ResolverDNS.QTYPE_NS) {
-			storeListResult("NS", ans, cache_ns, config.cache_lowater_ns, config.cache_hiwater_ns);
+			storeListResult("NS", ans, cache_ns, config.getCacheLoWaterNS(), config.getCacheHiWaterNS());
 		} else if (ans.qtype == ResolverDNS.QTYPE_MX) {
-			storeListResult("MX", ans, cache_mx, config.cache_lowater_mx, config.cache_hiwater_mx);
+			storeListResult("MX", ans, cache_mx, config.getCacheLoWaterMX(), config.getCacheHiWaterMX());
 		} else if (ans.qtype == ResolverDNS.QTYPE_SOA) {
-			storeSingleResult("SOA", ans, cache_soa, config.cache_lowater_soa, config.cache_hiwater_soa);
+			storeSingleResult("SOA", ans, cache_soa, config.getCacheLoWaterSOA(), config.getCacheHiWaterSOA());
 		} else if (ans.qtype == ResolverDNS.QTYPE_SRV) {
-			storeListResult("SRV", ans, cache_srv, config.cache_lowater_soa, config.cache_hiwater_soa);
+			storeListResult("SRV", ans, cache_srv, config.getCacheLoWaterSOA(), config.getCacheHiWaterSOA());
 		} else if (ans.qtype == ResolverDNS.QTYPE_TXT) {
-			storeSingleResult("TXT", ans, cache_txt, config.cache_lowater_soa, config.cache_hiwater_soa);
+			storeSingleResult("TXT", ans, cache_txt, config.getCacheLoWaterSOA(), config.getCacheHiWaterSOA());
 		} else if (ans.qtype == ResolverDNS.QTYPE_PTR) {
 			// the RR's domnam field is the hostname that was resolved for the IP
-			if (config.cache_hiwater_ptr != 0 && cache_ptr.size() >= config.cache_hiwater_ptr) {
-				prune("PTR", cache_ptr, config.cache_lowater_ptr, config.cache_hiwater_ptr);
+			if (config.getCacheHiWaterPTR() != 0 && cache_ptr.size() >= config.getCacheHiWaterPTR()) {
+				prune("PTR", cache_ptr, config.getCacheLoWaterPTR(), config.getCacheHiWaterPTR());
 			}
 			cache_ptr.put(ans.qip, ans.getPTR());
 		} else {
@@ -186,7 +188,7 @@ class CacheManager
 
 	public void storeHostAddress(ByteChars qname, ResourceData rr)
 	{
-		storeResult("A", qname, rr, cache_a, config.cache_lowater_a, config.cache_hiwater_a);
+		storeResult("A", qname, rr, cache_a, config.getCacheLoWaterA(), config.getCacheHiWaterA());
 	}
 
 	private void storeSingleResult(String desc, ResolverAnswer ans, HashedMap<ByteChars, ResourceData> cache, int lowater, int hiwater)
@@ -213,7 +215,8 @@ class CacheManager
 	{
 		HashedMap<ByteChars, java.util.ArrayList<ResourceData>> newroots;
 		try {
-			newroots = config.loadRootServers(logger);
+			// NB: This can reorder the localNameServers array
+			newroots = NameServerUtils.loadRootServers(localNameServers, config.getPathnameRootServers(), config.isAutoRoots(), logger);
 		} catch (Exception ex) {
 			if (ns_roots.size()==0) throw new NAFConfigException(LOGLBL+"Failed to bootstrap root servers", ex);
 			logger.warn(LOGLBL+"Keeping existing root-servers due to reload failure - "+ex);
@@ -259,11 +262,11 @@ class CacheManager
 	}
 
 	public java.net.InetSocketAddress createServerTSAP(int ip) {
-		return createServerTSAP(ip, config.dns_port);
+		return createServerTSAP(ip, config.getDnsPort());
 	}
 
 	public java.net.InetSocketAddress createServerTSAP(int ip, int port) {
-		if (config.dns_interceptor != null) return new java.net.InetSocketAddress(config.dns_interceptor, port);
+		if (config.getDnsInterceptor() != null) return config.getDnsInterceptor();
 		return TSAP.createSocketAddress(ip, port, tmp_ipaddr);
 	}
 
@@ -342,21 +345,21 @@ class CacheManager
 	{
 		systime_prune = dsptch.getSystemTime();
 		int delcnt = 0;
-		delcnt += prune("A", cache_a, config.cache_lowater_a, config.cache_hiwater_a);
-		delcnt += prune("AAAA", cache_aaaa, config.cache_lowater_a, config.cache_hiwater_a);
-		delcnt += prune("PTR", cache_ptr, config.cache_lowater_ptr, config.cache_hiwater_ptr);
-		delcnt += pruneLists("NS", cache_ns, config.cache_lowater_ns, config.cache_hiwater_ns);
-		delcnt += prune("SOA", cache_soa, config.cache_lowater_soa, config.cache_hiwater_soa);
-		delcnt += pruneLists("MX", cache_mx, config.cache_lowater_mx, config.cache_hiwater_mx);
-		delcnt += pruneLists("SRV", cache_srv, config.cache_lowater_soa, config.cache_hiwater_soa);
-		delcnt += prune("TXT", cache_txt, config.cache_lowater_soa, config.cache_hiwater_soa);
+		delcnt += prune("A", cache_a, config.getCacheLoWaterA(), config.getCacheHiWaterA());
+		delcnt += prune("AAAA", cache_aaaa, config.getCacheLoWaterA(), config.getCacheHiWaterA());
+		delcnt += prune("PTR", cache_ptr, config.getCacheLoWaterPTR(), config.getCacheHiWaterPTR());
+		delcnt += pruneLists("NS", cache_ns, config.getCacheLoWaterNS(), config.getCacheHiWaterNS());
+		delcnt += prune("SOA", cache_soa, config.getCacheLoWaterSOA(), config.getCacheHiWaterSOA());
+		delcnt += pruneLists("MX", cache_mx, config.getCacheLoWaterMX(), config.getCacheHiWaterMX());
+		delcnt += pruneLists("SRV", cache_srv, config.getCacheLoWaterSOA(), config.getCacheHiWaterSOA());
+		delcnt += prune("TXT", cache_txt, config.getCacheLoWaterSOA(), config.getCacheHiWaterSOA());
 		if (sbrsp != null) sbrsp.append("Cache prune removed entries=").append(delcnt);
 	}
 
 	private int prune(String desc, HashedMap<ByteChars, ResourceData> cache, int lowater, int hiwater)
 	{
 		// delete all expired entries
-		long min_age = dsptch.getSystemTime() - config.minttl_lookup;
+		long min_age = dsptch.getSystemTime() - config.getLookupMinTTL();
 		int oldsize = cache.size();
 		java.util.Iterator<ByteChars> itbc = cache.keysIterator();
 		while (itbc.hasNext()) {
@@ -385,7 +388,7 @@ class CacheManager
 
 	private int prune(String desc, HashedMapIntKey<ResourceData> cache, int lowater, int hiwater)
 	{
-		long min_age = dsptch.getSystemTime() - config.minttl_lookup;
+		long min_age = dsptch.getSystemTime() - config.getLookupMinTTL();
 		int oldsize = cache.size();
 		java.util.Iterator<ResourceData> itrr = cache.valuesIterator();
 		while (itrr.hasNext()) {
@@ -412,7 +415,7 @@ class CacheManager
 	private int pruneLists(String desc, HashedMap<ByteChars, java.util.ArrayList<ResourceData>> cache,
 			int lowater, int hiwater)
 	{
-		long min_age = dsptch.getSystemTime() - config.minttl_lookup;
+		long min_age = dsptch.getSystemTime() - config.getLookupMinTTL();
 		int delcnt = 0;
 		java.util.Iterator<ByteChars> it = cache.keysIterator();
 		while (it.hasNext()) {
@@ -452,7 +455,7 @@ class CacheManager
 			}
 		}
 
-		if (min_age == 0 || (pruned && !config.partial_prune)) {
+		if (min_age == 0 || (pruned && !config.isPartialPrune())) {
 			//remove the remainder of this List entry
 			if (cache == cache_ns) {
 				for (int idx = lst.size() - 1; idx != -1; idx--) {

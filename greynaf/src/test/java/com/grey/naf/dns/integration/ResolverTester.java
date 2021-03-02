@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2018 Yusef Badri - All rights reserved.
+ * Copyright 2015-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.integration;
@@ -385,8 +385,9 @@ public class ResolverTester
 		if (r.getClass() == com.grey.naf.dns.resolver.embedded.EmbeddedResolver.class) {
 			return DynLoader.getField(r, "rslvr");
 		}
-		if (r.getClass() == com.grey.naf.dns.resolver.distributed.Client.class) {
+		if (r.getClass() == com.grey.naf.dns.resolver.distributed.DistributedResolver.class) {
 			Object proxy = DynLoader.getField(r, "proxy");
+			if (proxy == null) return null;
 			return DynLoader.getField(proxy, "rslvr");
 		}
 		throw new UnsupportedOperationException("Unrecognised Resolver type="+r.getClass().getName());

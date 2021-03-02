@@ -4,12 +4,17 @@
  */
 package com.grey.naf.dns.resolver;
 
-import com.grey.base.config.XmlConfig;
 import com.grey.base.utils.StringOps;
+import com.grey.base.utils.TimeOps;
 import com.grey.base.utils.FileOps;
 import com.grey.base.utils.IP;
 import com.grey.base.utils.ByteArrayRef;
 import com.grey.base.utils.ByteChars;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
 import com.grey.base.collections.HashedMap;
 import com.grey.base.collections.HashedMapIntKey;
 import com.grey.base.collections.HashedSet;
@@ -21,6 +26,9 @@ import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.TimerNAF;
 import com.grey.logging.Logger.LEVEL;
 
+/**
+ * This class is the entry point to the resolver engine
+ */
 public class ResolverService
 	implements NafManCommand.Handler, TimerNAF.Handler
 {
@@ -30,11 +38,14 @@ public class ResolverService
 	private static final String MATTR_DUMPFILE = "df";
 	private static final String MATTR_DUMPHTML = "dh";
 
+	private static final String LOGLBL = "DNS-Resolver: ";
+
 	final com.grey.logging.Logger logger;
 	private final Dispatcher dsptch;
 	private final ResolverConfig config;
 	private final CacheManager cachemgr;
 	private final CommsManager xmtmgr;
+	private final String[] localNameServers; //local name servers to which we can issue queries (host:port)
 	private final java.io.File fh_dump;
 	private final java.util.Random rndgen = new java.util.Random(System.nanoTime());
 
@@ -92,6 +103,7 @@ public class ResolverService
 	ResolverConfig getConfig() {return config;}
 	CacheManager getCacheManager() {return cachemgr;}
 	CommsManager getCommsManager() {return xmtmgr;}
+	String[] getLocalNameServers() {return localNameServers;}
 	StringBuilder reusableStringBuilder() {return sbtmp;}
 	boolean isActive(QueryHandle qh) {return activereqs.contains(qh);}
 	QueryHandle.WrapperRR allocWrapperRR(ResourceData rr) {return rrwstore.extract().set(rr);}
@@ -106,30 +118,64 @@ public class ResolverService
 	@Override
 	public void eventError(TimerNAF tmr, Dispatcher d, Throwable ex) {}
 
-	public ResolverService(Dispatcher d, XmlConfig cfg)
+	public ResolverService(Dispatcher dsptch, ResolverConfig config)
 		throws java.io.IOException, javax.naming.NamingException
 	{
-		dsptch = d;
+		this.dsptch = dsptch;
+		this.config = config;
 		logger = dsptch.getLogger();
-		config = new ResolverConfig(cfg, logger);
-		cachemgr = new CacheManager(dsptch, config);
+
+		long tmt = config.getRetryTimeout() + (config.getRetryStep() / 2);
+		for (int idx = 0; idx <= config.getRetryMax(); idx++) {
+			tmt += config.getRetryTimeout() + (config.getRetryStep() * idx) + (config.getRetryStep() / 2);
+		}
+		if (config.getDnsInterceptor() != null) logger.info(LOGLBL+"DNS-Interceptor mode on - "+config.getDnsInterceptor());
+		logger.info(LOGLBL+"Recursive="+config.isRecursive()+(config.isRecursive()?"":" - auto="+config.isAutoRoots()+", roots-file="+config.getPathnameRootServers()));
+		logger.info(LOGLBL+"UDP-sender-sockets="+config.getSenderSocketsUDP()+"; TCP-only="+config.isAlwaysTCP());
+		logger.info(LOGLBL+"cache_nonbailiwick_glue="+config.isCacheAllGlue());
+		logger.info(LOGLBL+"retry-timeout="+TimeOps.expandMilliTime(config.getRetryTimeout())
+				+"/"+TimeOps.expandMilliTime(config.getRetryStep())
+				+"; max-retries="+config.getRetryMax()+" (window="+TimeOps.expandMilliTime(tmt)
+				+") - timeout-TCP="+TimeOps.expandMilliTime(config.getRetryTimeoutTCP()));
+		logger.trace(LOGLBL+"negative-TTL="+TimeOps.expandMilliTime(config.getNegativeTTL())
+				+"; initialMinTTL="+TimeOps.expandMilliTime(config.getInitialMinTTL())
+				+"; lookupMinTTL="+TimeOps.expandMilliTime(config.getLookupMinTTL()));
+		logger.trace(LOGLBL+"A-cache: lowater="+config.getCacheLoWaterA()+", hiwater="+config.getCacheHiWaterA());
+		logger.trace(LOGLBL+"PTR-cache: lowater="+config.getCacheLoWaterPTR()+", hiwater="+config.getCacheHiWaterPTR());
+		logger.trace(LOGLBL+"SOA-cache: lowater="+config.getCacheLoWaterSOA()+", hiwater="+config.getCacheHiWaterSOA());
+		logger.trace(LOGLBL+"NS-cache: lowater="+config.getCacheLoWaterNS()+", hiwater="+config.getCacheHiWaterNS()+", maxrr="+config.getNsMaxRR());
+		logger.trace(LOGLBL+"MX-cache: lowater="+config.getCacheLoWaterMX()+", hiwater="+config.getCacheHiWaterMX()+", maxrr="+config.getMxMaxRR());
+		logger.trace(LOGLBL+"Partial cache prune="+config.isPartialPrune()+", dump-on-exit="+config.isDumpOnExit());
+		logger.trace(LOGLBL+"directbufs="+ResolverConfig.DIRECTNIOBUFS+"; udpmax="+ResolverConfig.PKTSIZ_UDP+"; tcpmax="+ResolverConfig.PKTSIZ_TCP);
+
+		if (config.getLocalNameServers() == null || config.getLocalNameServers().length == 0) {
+			List<String> lst = NameServerUtils.getLocalServers(logger);
+			if (lst.isEmpty()) lst = Collections.singletonList("127.0.0.1");
+			localNameServers = lst.toArray(new String[lst.size()]);
+			logger.info(LOGLBL+"Auto-retrieved local name-servers: "+lst);
+		} else {
+			localNameServers = config.getLocalNameServers();
+			logger.info(LOGLBL+"Configured local name-servers: "+Arrays.asList(localNameServers));
+		}
+
+		cachemgr = new CacheManager(dsptch, config, localNameServers); // NB: This can reorder the localNameServers array
 		xmtmgr = new CommsManager(this);
 
 		bcstore = new ObjectWell<>(ByteChars.class, "DNS_"+dsptch.getName());
 		anstore = new ObjectWell<>(ResolverAnswer.class, "DNS_"+dsptch.getName());
 		rrwstore = new ObjectWell<>(QueryHandle.WrapperRR.class, "DNS_"+dsptch.getName());
+		pkt_tmp = new PacketDNS(Math.max(ResolverConfig.PKTSIZ_TCP, ResolverConfig.PKTSIZ_UDP), ResolverConfig.DIRECTNIOBUFS, config.getInitialMinTTL());
+		fh_dump = new java.io.File(dsptch.getApplicationContext().getConfig().getPathVar()+"/DNSdump-"+dsptch.getName()+".txt");
+
 		QueryHandle.Factory qryfact = new QueryHandle.Factory(this);
 		qrystore = new ObjectWell<>(qryfact, "DNS_"+dsptch.getName());
-		pkt_tmp = new PacketDNS(Math.max(ResolverConfig.PKTSIZ_TCP, ResolverConfig.PKTSIZ_UDP), ResolverConfig.DIRECTNIOBUFS, config.minttl_initial);
-
-		fh_dump = new java.io.File(dsptch.getApplicationContext().getConfig().getPathVar()+"/DNSdump-"+dsptch.getName()+".txt");
 
 		if (dsptch.getAgent() != null) {
 			NafManRegistry reg = dsptch.getAgent().getRegistry();
 			reg.registerHandler(NafManRegistry.CMD_DNSDUMP, 0, this, dsptch);
 			reg.registerHandler(NafManRegistry.CMD_DNSPRUNE, 0, this, dsptch);
 			reg.registerHandler(NafManRegistry.CMD_DNSQUERY, 0, this, dsptch);
-			if (!config.recursive) reg.registerHandler(NafManRegistry.CMD_DNSLOADROOTS, 0, this, dsptch);
+			if (!config.isRecursive()) reg.registerHandler(NafManRegistry.CMD_DNSLOADROOTS, 0, this, dsptch);
 		}
 	}
 
@@ -143,15 +189,15 @@ public class ResolverService
 	// as part of a Dispatcher shutdown (if not a JVM process termination), so there'll be nobody left to care).
 	public void stop()
 	{
-		logger.info("DNS-Resolver received shutdown request - active="+activereqs.size()+"/pending="+pendingreqs.size()
+		logger.info(LOGLBL+"Received shutdown request - active="+activereqs.size()+"/pending="+pendingreqs.size()
 				+"/wrapped="+wrapblocked.size());
-		if (config.dump_on_exit) {
+		if (config.isDumpOnExit()) {
 			cachemgr.prune(null);
-			logger.info("Dumping final cache to "+fh_dump.getAbsolutePath());
+			logger.info(LOGLBL+"Dumping final cache to "+fh_dump.getAbsolutePath());
 			try {
 				FileOps.ensureDirExists(fh_dump.getParentFile());
 			} catch (Exception ex) {
-				logger.warn("Failed to ensure existence of dump directory - "+ex);
+				logger.warn(LOGLBL+"Failed to ensure existence of dump directory - "+ex);
 			}
 			dumpState(fh_dump, "Dumping cache on exit");
 		}
@@ -274,7 +320,7 @@ public class ResolverService
 					// Whoa! We're about to piggyback on qryh, but it's already piggybacking on our caller.
 					// This can happen with NS resolution and leads to infinite recursion during caller notification,
 					// so fail this query to break the loop.
-					if (logger.isActive(LEVEL.TRC2)) logger.log(LEVEL.TRC2, "DNS-Resolver: Request="+ResolverDNS.getQTYPE(qtype)+"/"+qname
+					if (logger.isActive(LEVEL.TRC2)) logger.log(LEVEL.TRC2, LOGLBL+"Request="+ResolverDNS.getQTYPE(qtype)+"/"+qname
 							+" has deadlock with caller="+ResolverDNS.getQTYPE(qhcaller.qtype)+"/"+qhcaller.qname);
 					if (newqry) requestCompleted(qryh);
 					return answerbuf.set(ResolverAnswer.STATUS.DEADLOCK, qtype, qname);
@@ -323,8 +369,8 @@ public class ResolverService
 		java.net.InetSocketAddress nsaddr = null;
 		boolean sticky_ip = (server_ip != 0);
 
-		if (config.recursive) {
-			nsaddr = xmtmgr.nextServer();
+		if (config.isRecursive()) {
+			nsaddr = xmtmgr.nextLocalNameServer();
 		} else {
 			if (server_ip != 0) {
 				nsaddr = cachemgr.createServerTSAP(server_ip);
@@ -354,7 +400,7 @@ public class ResolverService
 		}
 
 		if (!qryh.isTCP()) {
-			if (config.always_tcp) {
+			if (config.isAlwaysTCP()) {
 				qryh.qid = 1; //we only issue one query on a TCP connection
 				ResolverAnswer.STATUS result = qryh.switchTCP(nsaddr);
 				if (result == ResolverAnswer.STATUS.OK) return null;
@@ -368,7 +414,7 @@ public class ResolverService
 				if (pendingreqs.containsKey(qryh.qid)) {
 					//we have issued so many requests so quickly that the QID has wrapped around before they're answered
 					wrapblocked.add(qryh);
-					if (tmr_wrapblocked == null) tmr_wrapblocked = dsptch.setTimer(config.wrapretryfreq, 0, this);
+					if (tmr_wrapblocked == null) tmr_wrapblocked = dsptch.setTimer(config.getWrapRetryFreq(), 0, this);
 					return null; //will resume later, when QID is no longer contended
 				}
 				pendingreqs.put(qryh.qid, qryh);
@@ -436,7 +482,7 @@ public class ResolverService
 		if (!validresponse) {
 			if (logger.isActive(ResolverConfig.DEBUGLVL)) {
 				String msg = (mapped_qryh ? "received rejection " : "discarding invalid ");
-				logger.log(ResolverConfig.DEBUGLVL, "DNS-Resolver "+msg+(is_tcp?"TCP":"UDP")+" response="+pkt.hdr_qid
+				logger.log(ResolverConfig.DEBUGLVL, LOGLBL+msg+(is_tcp?"TCP":"UDP")+" response="+pkt.hdr_qid
 						+(qryh==null? "" : "/"+ResolverDNS.getQTYPE(qryh.qtype)+"/"+qryh.qname)
 						+" from "+srvaddr+" - ans="+pkt.hdr_anscnt+"/"+pkt.hdr_authcnt+"/"+pkt.hdr_infocnt
 						+"/auth="+pkt.isAuth()+"/trunc="+pkt.isTruncated()
@@ -553,7 +599,7 @@ public class ResolverService
 			return qname; //target is already the parent domain
 		}
 		int pos = qname.indexOf((byte)ResolverDNS.DOMDLM);
-		if (pos == -1) return ResolverConfig.ROOTDOM_BC;
+		if (pos == -1) return NameServerUtils.ROOTDOM_BC;
 		tmplightbc.set(qname.buffer(), qname.offset(pos+1), qname.size()-pos-1);
 		if (qtype == ResolverDNS.QTYPE_SRV) return getParentDomain((byte)0, tmplightbc); //next level up is service-protocol, not parent domain
 		return tmplightbc;
@@ -576,11 +622,11 @@ public class ResolverService
 		}
 		LEVEL lvl = LEVEL.TRC;
 		if (logger.isActive(lvl)) {
-			String txt = "DNS-Resolver: "+cnt1+" requests blocked by QID-wraparound";
+			String txt = LOGLBL+cnt1+" requests blocked by QID-wraparound";
 			if (cnt1 != wrapblocked.size()) txt += " - reduced to "+wrapblocked.size();
 			logger.log(lvl, txt);
 		}
-		if (wrapblocked.size() != 0) tmr_wrapblocked = dsptch.setTimer(config.wrapretryfreq, 0, this);
+		if (wrapblocked.size() != 0) tmr_wrapblocked = dsptch.setTimer(config.getWrapRetryFreq(), 0, this);
 	}
 
 	ByteChars buildArpaDomain(int ip)
@@ -609,7 +655,7 @@ public class ResolverService
 			cachemgr.prune(sbrsp);
 		} else if (def.code.equals(NafManRegistry.CMD_DNSLOADROOTS)) {
 			try {
-				if (config.recursive) {
+				if (config.isRecursive()) {
 					sbrsp.append("DNS roots are not applicable, as Resolver is in recursive mode");
 				} else {
 					cachemgr.loadRootServers();
@@ -657,7 +703,7 @@ public class ResolverService
 			}
 		} else {
 			// we've obviously registered for this command, so we must be missing a clause - clearly a bug
-			logger.error("DNS-Resolver NAFMAN: Missing case for cmd="+def.code);
+			logger.error(LOGLBL+"NAFMAN: Missing case for cmd="+def.code);
 			return null;
 		}
 		return sbrsp;
@@ -680,13 +726,13 @@ public class ResolverService
 			ostrm.close();
 			ostrm = null;
 		} catch (Exception ex) {
-			logger.log(LEVEL.ERR, ex, false, "DNS-Resolver failed to create dumpfile="+fh.getAbsolutePath()+" - strm="+fout);
+			logger.log(LEVEL.ERR, ex, false, LOGLBL+"failed to create dumpfile="+fh.getAbsolutePath()+" - strm="+fout);
 		} finally {
 			try {
 				if (ostrm != null) ostrm.close();
 				if (fout != null) fout.close();
 			} catch (Exception ex) {
-				logger.log(LEVEL.ERR, ex, false, "DNS-Resolver failed to close dumpfile="+fh.getAbsolutePath());
+				logger.log(LEVEL.ERR, ex, false, LOGLBL+"failed to close dumpfile="+fh.getAbsolutePath());
 			}
 		}
 	}

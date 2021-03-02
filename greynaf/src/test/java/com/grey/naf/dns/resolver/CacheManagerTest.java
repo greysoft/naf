@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Yusef Badri - All rights reserved.
+ * Copyright 2014-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.resolver;
@@ -447,23 +447,26 @@ public class CacheManagerTest
 		org.junit.Assert.assertEquals(6, cache.size());
 	}
 
-	private void createManager(XmlConfig dnscfg)
+	private ResolverConfig createManager(XmlConfig dnscfg)
 		throws java.io.IOException, javax.naming.NamingException
 	{
 		if (dnscfg == null) dnscfg = XmlConfig.NULLCFG;
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder().withName("CacheManagerTest").build();
 		dsptch = Dispatcher.create(appctx, def, logger);
-		ResolverConfig config = new ResolverConfig(dnscfg, logger);
-		DynLoader.setField(config, "cache_lowater_a", 4);
-		DynLoader.setField(config, "cache_hiwater_a", 7);
-		DynLoader.setField(config, "cache_lowater_ns", 4);
-		DynLoader.setField(config, "cache_hiwater_ns", 7);
-		DynLoader.setField(config, "cache_lowater_ptr", 4);
-		DynLoader.setField(config, "cache_hiwater_ptr", 7);
-		DynLoader.setField(config, "partial_prune", true);
-		DynLoader.setField(config, "minttl_initial", 0);
-		DynLoader.setField(config, "minttl_lookup", 0);
-		cmgr = new CacheManager(dsptch, config);
+		ResolverConfig config = new ResolverConfig.Builder(dnscfg)
+				.withCacheLoWaterA(4)
+				.withCacheHiWaterA(7)
+				.withCacheLoWaterNS(4)
+				.withCacheHiWaterNS(7)
+				.withCacheLoWaterPTR(4)
+				.withCacheHiWaterPTR(7)
+				.withPartialPrune(true)
+				.withInitialMinTTL(0)
+				.withLookupMinTTL(0)
+				.build();
+		ResolverService rslvr = new ResolverService(dsptch, config);
+		cmgr = new CacheManager(dsptch, config, rslvr.getLocalNameServers());
+		return config;
 	}
 
 	private void storeHost(ByteChars hname, int ip, long ttl)

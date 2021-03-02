@@ -46,8 +46,8 @@ abstract public class Naflet
 		getLogger().info("Naflet="+naflet_name+": Initialising "+getClass().getName()+" - config="+cfgfile);
 
 		if (cfgfile != null) {
-			String cfgroot = cfg.getValue("configfile/@root", false, null);
 			if (cfgfile.endsWith(".xml")) {
+				String cfgroot = cfg.getValue("configfile/@root", false, null);
 				taskcfg = XmlConfig.getSection(cfgfile, cfgroot);
 			} else {
 				taskcfg = null; //application will have to use taskConfigFile() instead

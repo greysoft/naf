@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2018 Yusef Badri - All rights reserved.
+ * Copyright 2010-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.resolver;
@@ -9,17 +9,22 @@ import com.grey.base.utils.ByteChars;
 import com.grey.base.utils.DynLoader;
 import com.grey.base.utils.StringOps;
 import com.grey.base.utils.IP;
-import com.grey.naf.NAFConfig;
+import com.grey.naf.dns.resolver.distributed.DistributedResolver;
+import com.grey.naf.dns.resolver.embedded.EmbeddedResolver;
+import com.grey.naf.errors.NAFConfigException;
 import com.grey.naf.reactor.Dispatcher;
 
+/**
+ * This class represents a DNS-Resolver API for NAF applications, ie. applications running in the context of a Dispatcher.
+ * External clients should use DNSClient as their resolver API.
+ */
 public abstract class ResolverDNS
 {
+	// This interface should be implemented by all users of the DNS-Resolver API and allows them to receive responses
 	public interface Client
 	{
 		public void dnsResolved(Dispatcher dsptch, ResolverAnswer answer, Object callerparam);
 	}
-
-	private static final Class<?> DFLTCLASS = com.grey.naf.dns.resolver.distributed.Client.class;
 
 	public static final int FLAG_NOQRY = 1 << 0; //give up if answer not already in cache
 	public static final int FLAG_SYNTAXONLY = 1 << 1; //don't do any lookup or query at all
@@ -67,14 +72,30 @@ public abstract class ResolverDNS
 	private final ResolverAnswer answerA = new ResolverAnswer();
 	private final ResolverAnswer answerLocalIP = new ResolverAnswer();
 
-	public static ResolverDNS create(Dispatcher dsptch, XmlConfig cfg)
+	public static ResolverDNS create(Dispatcher dsptch, XmlConfig xmlcfg) throws java.io.IOException
 	{
-		return ResolverDNS.class.cast(NAFConfig.createEntity(cfg, DFLTCLASS, ResolverDNS.class, false,
-				new Class<?>[]{Dispatcher.class, XmlConfig.class},
-				new Object[]{dsptch, cfg}));
+		String cfgclass = com.grey.naf.dns.resolver.distributed.DistributedResolver.class.getName();
+		String master = null;
+		if (xmlcfg != null) {
+			cfgclass = xmlcfg.getValue("@class", false, cfgclass);
+			master = xmlcfg.getValue("@master", false, null);
+		}
+
+		try {
+			ResolverConfig config = new ResolverConfig.Builder(xmlcfg).build();
+
+			if (cfgclass.equals(DistributedResolver.class.getName())) {
+				return new DistributedResolver(dsptch, config, master);
+			} else if (cfgclass.equals(EmbeddedResolver.class.getName())) {
+				return new EmbeddedResolver(dsptch, config);
+			}
+		} catch (Exception ex) {
+			throw new NAFConfigException("Failed to create ResolverDNS="+cfgclass, ex);
+		}
+		throw new NAFConfigException("Unrecognised ResolverDNS class="+cfgclass);
 	}
 
-	protected ResolverDNS(Dispatcher d, XmlConfig cfg)
+	protected ResolverDNS(Dispatcher d)
 	{
 		dsptch = d;
 
