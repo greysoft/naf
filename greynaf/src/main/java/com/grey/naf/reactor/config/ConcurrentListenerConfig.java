@@ -95,9 +95,9 @@ public class ConcurrentListenerConfig extends ListenerConfig
 			return new ConcurrentListenerConfig(this);
 		}
 
-		private static Function<ConcurrentListener,ConcurrentListener.ServerFactory> createServerFactoryGenerator(Class<? extends ConcurrentListener.ServerFactory> factoryClass, XmlConfig cfg) {
+		private static Function<ConcurrentListener,ConcurrentListener.ServerFactory> createServerFactoryGenerator(Class<? extends ConcurrentListener.ServerFactory> factoryClass, Object cfg) {
 			Function<ConcurrentListener,ConcurrentListener.ServerFactory> func = (lstnr) -> {
-				Class<?>[] ctorSig = new Class<?>[]{CM_Listener.class, XmlConfig.class};
+				Class<?>[] ctorSig = new Class<?>[]{CM_Listener.class, Object.class};
 				Object[] ctorArgs = new Object[]{lstnr, cfg};
 				Object factory;
 				try {

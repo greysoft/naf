@@ -266,7 +266,7 @@ public class TCPConnectionTest
 	{
 		private final CM_Listener lstnr;
 
-		public TestServerFactory(com.grey.naf.reactor.CM_Listener l, com.grey.base.config.XmlConfig cfg) {
+		public TestServerFactory(com.grey.naf.reactor.CM_Listener l, Object cfg) {
 			lstnr = l;
 		}
 		@Override

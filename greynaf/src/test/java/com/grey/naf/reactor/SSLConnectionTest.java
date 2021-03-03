@@ -595,10 +595,11 @@ public class SSLConnectionTest
 		@Override
 		public void shutdown() {}
 
-		public TestServerFactory(com.grey.naf.reactor.CM_Listener l, XmlConfig cfg)
+		public TestServerFactory(com.grey.naf.reactor.CM_Listener l, Object cfg)
 		{
 			lstnr = l;
-			bufspec = new com.grey.naf.BufferSpec(cfg, "niobuffers", 8 * 1024, 128);
+			com.grey.base.config.XmlConfig xmlcfg = (com.grey.base.config.XmlConfig)cfg;
+			bufspec = new com.grey.naf.BufferSpec(xmlcfg, "niobuffers", 8 * 1024, 128);
 			org.junit.Assert.assertNotNull(lstnr.getSSLConfig());
 		}
 	}

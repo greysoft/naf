@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2018 Yusef Badri - All rights reserved.
+ * Copyright 2010-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.nafman;
@@ -33,11 +33,12 @@ public class NafManServer
 		private final com.grey.naf.reactor.CM_Listener lstnr;
 		private final SharedFields shared;
 
-		public Factory(com.grey.naf.reactor.CM_Listener l, com.grey.base.config.XmlConfig cfg)
+		public Factory(com.grey.naf.reactor.CM_Listener l, Object cfg)
 			throws java.io.IOException, javax.xml.transform.TransformerConfigurationException
 		{
 			lstnr = l;
-			shared = new SharedFields(PrimaryAgent.class.cast(l.getController()), cfg);
+			com.grey.base.config.XmlConfig xmlcfg = (com.grey.base.config.XmlConfig)cfg;
+			shared = new SharedFields(PrimaryAgent.class.cast(l.getController()), xmlcfg);
 		}
 
 		@Override

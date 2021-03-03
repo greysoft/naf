@@ -23,7 +23,7 @@ class TransportTCP
 		@Override
 		public void shutdown() {}
 
-		public ServerFactory(com.grey.naf.reactor.CM_Listener l, com.grey.base.config.XmlConfig cfg) {
+		public ServerFactory(com.grey.naf.reactor.CM_Listener l, Object cfg) {
 			lstnr = l;
 			//we only receive queries, so TCP BufferSpec receive-size need not be expanded
 			bufspec = new com.grey.naf.BufferSpec(ServerDNS.PKTSIZ_UDP, ServerDNS.PKTSIZ_TCP, ServerDNS.DIRECTNIOBUFS);

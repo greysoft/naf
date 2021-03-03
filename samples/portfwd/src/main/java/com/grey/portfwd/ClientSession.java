@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2018 Yusef Badri - All rights reserved.
+ * Copyright 2012-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.portfwd;
@@ -29,10 +29,11 @@ public class ClientSession
 		@Override
 		public void shutdown() {}
 
-		public Factory(com.grey.naf.reactor.CM_Listener l, com.grey.base.config.XmlConfig cfg)
+		public Factory(com.grey.naf.reactor.CM_Listener l, Object factoryConfig)
 				throws java.net.UnknownHostException
 		{
 			lstnr = l;
+			com.grey.base.config.XmlConfig cfg = (com.grey.base.config.XmlConfig)factoryConfig;
 			com.grey.base.config.XmlConfig[] servicecfg = cfg.getSections("services/service");
 			com.grey.base.config.XmlConfig balancercfg = cfg.getSection("loadbalancer");
 			bufspec = new com.grey.naf.BufferSpec(cfg, "niobuffers", 1024, 512);

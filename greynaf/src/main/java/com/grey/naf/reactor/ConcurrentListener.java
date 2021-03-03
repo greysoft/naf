@@ -16,7 +16,7 @@ public class ConcurrentListener
 	/**
 	 * In addition to providing the explicit interface methods, factory classes must also provide a constructor
 	 * with this signature:<br>
-	 * <code>classname(com.grey.naf.reactor.CM_Listener, com.grey.base.config.XmlConfig)</code>
+	 * <code>classname(com.grey.naf.reactor.CM_Listener listener, Object config)</code>
 	 */
 	public interface ServerFactory
 		extends ObjectWell.ObjectFactory

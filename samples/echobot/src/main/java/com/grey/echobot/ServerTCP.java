@@ -25,7 +25,7 @@ public class ServerTCP
 		@Override
 		public void shutdown() {}
 
-		public Factory(com.grey.naf.reactor.CM_Listener l, com.grey.base.config.XmlConfig cfg) {lstnr = l;}
+		public Factory(com.grey.naf.reactor.CM_Listener l, Object cfg) {lstnr = l;}
 	}
 
 
