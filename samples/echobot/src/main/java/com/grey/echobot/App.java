@@ -13,7 +13,7 @@ import com.grey.naf.ApplicationContextNAF;
 import com.grey.naf.BufferSpec;
 import com.grey.naf.DispatcherDef;
 import com.grey.naf.reactor.Dispatcher;
-import com.grey.naf.reactor.CM_Listener;
+import com.grey.naf.reactor.config.ConcurrentListenerConfig;
 import com.grey.naf.reactor.ConcurrentListener;
 
 import org.slf4j.LoggerFactory;
@@ -195,12 +195,14 @@ public class App
 						ServerUDP srvr = new ServerUDP(this, dsptch, tsap, sbufspec, options.sockbufsiz);
 						srvr.start();
 					} else {
-						java.util.Map<String,Object> settings = new java.util.HashMap<String,Object>();
-						settings.put(CM_Listener.CFGMAP_FACTCLASS, ServerTCP.Factory.class);
-						settings.put(CM_Listener.CFGMAP_IFACE, tsap.dotted_ip.toString());
-						settings.put(CM_Listener.CFGMAP_PORT, tsap.port);
-						settings.put(CM_Listener.CFGMAP_BACKLOG, options.cgrpcnt * options.cgrpsiz);
-						ConcurrentListener lstnr = ConcurrentListener.create("EchoBot-"+dsptch.getName(), dsptch, this, null, null, settings);
+						ConcurrentListenerConfig lcfg = new ConcurrentListenerConfig.Builder<>()
+								.withName("EchoBot-"+dsptch.getName())
+								.withInterface(tsap.dotted_ip.toString())
+								.withPort(tsap.port)
+								.withBacklog(options.cgrpcnt * options.cgrpsiz)
+								.withServerFactoryClass(ServerTCP.Factory.class)
+								.build();
+						ConcurrentListener lstnr = new ConcurrentListener(dsptch, this, null, lcfg);
 						lstnr.start();
 					}
 					if (options.server_solo) continue;

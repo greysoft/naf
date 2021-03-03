@@ -92,12 +92,12 @@ public class ApplicationContextNAF {
 	}
 
 	public void register(CM_Listener l) {
-		CM_Listener dup = listeners.putIfAbsent(l.name, l);
+		CM_Listener dup = listeners.putIfAbsent(l.getName(), l);
 		if (dup != null) throw new NAFConfigException("Duplicate listener="+l+" - prev="+dup);
 	}
 
 	public void deregister(CM_Listener l) {
-		listeners.remove(l.name);
+		listeners.remove(l.getName());
 	}
 
 	public CM_Listener getListener(String name) {

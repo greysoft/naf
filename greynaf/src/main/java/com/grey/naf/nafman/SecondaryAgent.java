@@ -1,10 +1,9 @@
 /*
- * Copyright 2010-2018 Yusef Badri - All rights reserved.
+ * Copyright 2010-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.nafman;
 
-import com.grey.base.config.XmlConfig;
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.Producer;
 
@@ -22,10 +21,9 @@ public class SecondaryAgent
 	@Override
 	public int getPort() {return primary.getPort();}
 
-	public SecondaryAgent(Dispatcher dsptch, NafManRegistry reg, XmlConfig cfg)
-			throws java.io.IOException
+	public SecondaryAgent(Dispatcher dsptch, NafManRegistry reg) throws java.io.IOException
 	{
-		super(dsptch, reg, cfg);
+		super(dsptch, reg);
 		primary = dsptch.getApplicationContext().getPrimaryAgent();
 		if (primary == null) {
 			throw new IllegalStateException("Dispatcher="+dsptch.getName()+": Cannot create Secondary NAFMAN before Primary");

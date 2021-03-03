@@ -9,6 +9,7 @@ import com.grey.naf.Naflet;
 import com.grey.naf.EntityReaper;
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.ListenerSet;
+import com.grey.naf.reactor.config.ConcurrentListenerConfig;
 import com.grey.naf.nafman.NafManCommand;
 import com.grey.naf.nafman.NafManRegistry;
 
@@ -24,7 +25,9 @@ public class Task
 	public Task(String name, Dispatcher dsptch, XmlConfig cfg) throws java.io.IOException
 	{
 		super(name, dsptch, cfg);
-		listeners = new ListenerSet("Task="+getName(), dsptch, this, this, "listeners/listener", taskConfig(), null);
+		String lname = "Task="+getName();
+		ConcurrentListenerConfig[] lcfg = ListenerSet.makeConfig(lname, dsptch, "listeners/listener", taskConfig(), 0, 0, null);
+		listeners = new ListenerSet(lname, dsptch, this, this, lcfg);
 		if (dsptch.getAgent() != null) {
 			NafManRegistry reg = dsptch.getAgent().getRegistry();
 			reg.registerHandler(CMD_SHOWCONNS, 0, this, dsptch);

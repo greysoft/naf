@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2018 Yusef Badri - All rights reserved.
+ * Copyright 2015-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.server;
@@ -9,10 +9,10 @@ import com.grey.base.config.XmlConfig;
 import com.grey.base.utils.ByteArrayRef;
 import com.grey.base.utils.ByteChars;
 import com.grey.naf.reactor.Dispatcher;
+import com.grey.naf.reactor.config.ConcurrentListenerConfig;
 import com.grey.naf.dns.resolver.PacketDNS;
 import com.grey.naf.dns.resolver.ResolverDNS;
 import com.grey.naf.dns.resolver.ResourceData;
-import com.grey.naf.reactor.CM_Listener;
 import com.grey.naf.reactor.ConcurrentListener;
 import com.grey.logging.Logger;
 
@@ -66,11 +66,15 @@ public class ServerDNS
 		responder = r;
 		handlers = new Handlers(this);
 		recursion_offered = responder.dnsRecursionAvailable();
-		XmlConfig lcfg = (cfg == null ? null : cfg.getSection("listener"));
-		java.util.Map<String,Object> cfgdflts = new java.util.HashMap<String,Object>();
-		cfgdflts.put(CM_Listener.CFGMAP_PORT, PacketDNS.INETPORT);
-		cfgdflts.put(CM_Listener.CFGMAP_FACTCLASS, TransportTCP.ServerFactory.class);
-		listener_tcp = ConcurrentListener.create("DNS-Server", d, this, null, lcfg, cfgdflts);
+
+		XmlConfig lxmlcfg = (cfg == null ? null : cfg.getSection("listener"));
+		ConcurrentListenerConfig lcfg = new ConcurrentListenerConfig.Builder<>()
+				.withName("DNS-Server")
+				.withPort(PacketDNS.INETPORT)
+				.withServerFactoryClass(TransportTCP.ServerFactory.class)
+				.withXmlConfig(lxmlcfg, dsptch.getApplicationContext())
+				.build();
+		listener_tcp = new ConcurrentListener(dsptch, this, null, lcfg);
 		transport_udp = new TransportUDP(d, this, listener_tcp.getIP(),listener_tcp.getPort());
 		dsptch.getLogger().info("DNS-Server: directbufs="+DIRECTNIOBUFS+"; udpmax="+PKTSIZ_UDP+"; tcpmax="+PKTSIZ_TCP);
 		if (IGNORE_QTRAIL) dsptch.getLogger().info("DNS-Server: Will ignore trailing bytes in incoming queries");

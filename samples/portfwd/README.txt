@@ -13,7 +13,10 @@ However you can also rebuild it from here as follows:
 When running PortFwd, replace "VERSION" in all the commands below with the version you see embedded in the Jar name in the 'target' directory.
 Note that dotted system properties transpose to upper-case environment variables with underscores, eg. -Dgrey.logger.configfile is equivalent to the env var GREY_LOGGER_CONFIGFILE=src/main/config/logging.xml
 
-Run this to get basic usage:
+The basic run command is:
+	java -jar target/samples-portfwd-VERSION.jar -c src/main/config/portfwd.xml
+
+Run this to get help on the usage:
 	java -cp target/samples-portfwd-VERSION.jar com.grey.portfwd.App -help
 
 Although this README tends to use the the classpath-and-main-class invocation syntax shown above, the PortFwd Jar is executable and can be run more simply like this:

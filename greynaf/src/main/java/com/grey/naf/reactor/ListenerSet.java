@@ -1,8 +1,11 @@
 /*
- * Copyright 2012-2018 Yusef Badri - All rights reserved.
+ * Copyright 2012-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
+
+import com.grey.base.config.XmlConfig;
+import com.grey.naf.reactor.config.ConcurrentListenerConfig;
 
 public class ListenerSet
 	implements com.grey.naf.EntityReaper
@@ -17,28 +20,24 @@ public class ListenerSet
 	public int count() {return listen_cnt;}
 	public CM_Listener getListener(int idx) {return listeners[idx];}
 
-	public ListenerSet(String lname, Dispatcher d, Object controller, com.grey.naf.EntityReaper rpr,
-			String xpath, com.grey.base.config.XmlConfig cfg, java.util.Map<String,Object> cfgdflts) throws java.io.IOException
+	public ListenerSet(String grpname, Dispatcher d, Object controller, com.grey.naf.EntityReaper rpr, ConcurrentListenerConfig[] config) throws java.io.IOException
 	{
 		dsptch = d;
 		reaper = rpr;
-		name = "Listeners-"+(lname == null ? dsptch.getName() : lname);
-		com.grey.base.config.XmlConfig[] listencfg = cfg.getSections(xpath+com.grey.base.config.XmlConfig.XPATH_ENABLED);
-
-		if (listencfg == null) {
+		name = "Listeners-"+d.getName()+"-"+grpname;
+		if (config == null || config.length == 0) {
 			listeners = null;
-			d.getLogger().warn(lname+": No listeners defined");
+			d.getLogger().warn(name+": No listeners defined");
 			return;
 		}
-		d.getLogger().info(lname+": Creating Listeners="+listencfg.length);
-		listeners = new CM_Listener[listencfg.length];
+		d.getLogger().info(name+": Creating Listeners="+config.length);
+		listeners = new CM_Listener[config.length];
 
-		for (int idx = 0; idx != listencfg.length; idx++) {
+		for (int idx = 0; idx != config.length; idx++) {
 			if (controller instanceof IterativeListener.ServerFactory) {
-				listeners[idx] = IterativeListener.create(lname, d, (IterativeListener.ServerFactory)controller,
-															reaper, listencfg[idx], cfgdflts);
+				listeners[idx] = new IterativeListener(d, (IterativeListener.ServerFactory)controller, reaper, config[idx]);
 			} else {
-				listeners[idx] = ConcurrentListener.create(lname, d, controller, this, listencfg[idx], cfgdflts);
+				listeners[idx] = new ConcurrentListener(d, controller, this, (ConcurrentListenerConfig)config[idx]);
 			}
 		}
 	}
@@ -85,7 +84,7 @@ public class ListenerSet
 			}
 		}
 		String extra = (listen_cnt==0 ? " - reaper="+reaper : "");
-		dsptch.getLogger().info(name+": Listener="+lstnr.name+" has terminated - remaining="+listen_cnt+extra);
+		dsptch.getLogger().info(name+": Listener="+lstnr.getName()+" has terminated - remaining="+listen_cnt+extra);
 		if (listen_cnt == 0 && reaper != null) reaper.entityStopped(this);
 	}
 
@@ -94,5 +93,23 @@ public class ListenerSet
 		for (int idx = 0; idx != listeners.length; idx++) {
 			if (listeners[idx] != null) listeners[idx].setReporter(r);
 		}
+	}
+
+	public static ConcurrentListenerConfig[] makeConfig(String grpname, Dispatcher d, String xpath, XmlConfig xmlcfg,
+															int port, int sslport, Class<? extends ConcurrentListener.ServerFactory> factoryClass)
+			throws java.io.IOException {
+		XmlConfig[] lxmlcfg = xmlcfg.getSections(xpath+XmlConfig.XPATH_ENABLED);
+		int cnt = (lxmlcfg == null ? 0 : lxmlcfg.length);
+		ConcurrentListenerConfig[] lcfg = new ConcurrentListenerConfig[cnt];
+		for (int idx = 0; idx != cnt; idx++) {
+			lcfg[idx] = new ConcurrentListenerConfig.Builder<>()
+					.withName(grpname+"-"+idx)
+					.withPort(port)
+					.withPortSSL(sslport)
+					.withServerFactoryClass(factoryClass)
+					.withXmlConfig(lxmlcfg[idx], d.getApplicationContext())
+					.build();
+		}
+		return lcfg;
 	}
 }

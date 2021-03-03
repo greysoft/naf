@@ -39,7 +39,7 @@ public class ClientSession
 			tmt_idle = cfg.getTime("services/@timeout", 0);
 
 			if (servicecfg == null) {
-				throw new XmlConfigException("Server="+lstnr.name+": No services found");
+				throw new XmlConfigException("Server="+lstnr.getName()+": No services found");
 			}
 			com.grey.base.utils.TSAP[] services = new com.grey.base.utils.TSAP[servicecfg.length];
 
@@ -52,7 +52,7 @@ public class ClientSession
 					new Object[]{services});
 			loadbalancer = com.grey.portfwd.balance.Balancer.class.cast(obj);
 
-			l.getLogger().info("Server for "+lstnr.name+" has LoadBalancer="+loadbalancer.getClass().getName()
+			l.getLogger().info("Server for "+lstnr.getName()+" has LoadBalancer="+loadbalancer.getClass().getName()
 					+", Controller="+lstnr.getController().getClass().getName()+", Timeout="+TimeOps.expandMilliTime(tmt_idle));
 			l.getLogger().trace("NIO-Buffers: "+bufspec);
 		}

@@ -10,6 +10,7 @@ import com.grey.base.utils.FileOps;
 import com.grey.base.utils.IP;
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
+import com.grey.naf.reactor.config.ConcurrentListenerConfig;
 
 public class TCPConnectionTest
 	implements com.grey.naf.EntityReaper, CM_Listener.Reporter
@@ -44,7 +45,13 @@ public class TCPConnectionTest
 		dsptch = Dispatcher.create(appctx, def, com.grey.logging.Factory.getLogger("no-such-logger"));
 
 		// set up the server component
-		CM_Listener lstnr = ConcurrentListener.create("utest_TCPConn", dsptch, this, this, null, TestServerFactory.class, "127.0.0.1", 0);
+		ConcurrentListenerConfig lcfg = new ConcurrentListenerConfig.Builder<>()
+				.withName("utest_TCPCon")
+				.withServerFactoryClass(TestServerFactory.class)
+				.withInterface("127.0.0.1")
+				.withPort(0)
+				.build();
+		CM_Listener lstnr = new ConcurrentListener(dsptch, this, this, lcfg);
 		lstnr.start();
 		lstnr.setReporter(this);
 

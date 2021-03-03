@@ -7,14 +7,12 @@ package com.grey.naf.nafman;
 import java.util.ArrayList;
 
 import com.grey.base.config.SysProps;
-import com.grey.base.config.XmlConfig;
-import com.grey.naf.NAFConfig;
-import com.grey.naf.DispatcherDef;
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.CM_Listener;
 import com.grey.naf.reactor.ConcurrentListener;
 import com.grey.naf.reactor.Producer;
 import com.grey.naf.reactor.TimerNAF;
+import com.grey.naf.reactor.config.ConcurrentListenerConfig;
 import com.grey.logging.Logger.LEVEL;
 
 public class PrimaryAgent
@@ -40,17 +38,14 @@ public class PrimaryAgent
 	@Override
 	public int getPort() {return lstnr.getPort();}
 
-	public PrimaryAgent(Dispatcher dsptch, NafManRegistry reg, XmlConfig cfg, DispatcherDef def) throws java.io.IOException
+	public PrimaryAgent(Dispatcher dsptch, NafManRegistry reg, ConcurrentListenerConfig lcfg, boolean surviveDownstream) throws java.io.IOException
 	{
-		super(dsptch, reg, cfg);
-		surviveDownstream = def.isSurviveDownstream();
+		super(dsptch, reg);
+		this.surviveDownstream = surviveDownstream;
 		events = new Producer<Object>(Object.class, dsptch, this);
 		events.start();
 		dsptch.getLogger().info("NAFMAN="+dsptch.getName()+": survive_downstream="+surviveDownstream);
-
-		int lstnport = dsptch.getApplicationContext().getConfig().assignPort(NAFConfig.RSVPORT_NAFMAN);
-		XmlConfig lstncfg = cfg.getSection("listener");
-		lstnr = ConcurrentListener.create("NAFMAN-Primary", dsptch, this, null, lstncfg, NafManServer.Factory.class, null, lstnport);
+		lstnr = new ConcurrentListener(dsptch, this, null, lcfg);
 
 		// these commands are only fielded by the Primary NAFMAN agent
 		reg.registerHandler(NafManRegistry.CMD_DLIST, 0, this, dsptch);

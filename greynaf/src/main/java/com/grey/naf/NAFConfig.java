@@ -250,14 +250,12 @@ public class NAFConfig
 		if (basePort != RSVPORT_ANON) log.info("Base Port="+basePort+", Next="+nextport);
 	}
 
+
 	public static Object createEntity(XmlConfig cfg, Class<?> dflt_clss, Class<?> basetype, boolean hasName, Class<?>[] ctorSig, Object[] ctorArgs)
 	{
-		Class<?> clss = getClass(cfg, dflt_clss);
+		Class<?> clss = getEntityClass(cfg, dflt_clss, basetype);
 		if (hasName && cfg != null) ctorArgs[0] = cfg.getValue("@name", false, null);
 
-		if (basetype != null && !basetype.isAssignableFrom(clss)) {
-			throw new NAFConfigException("Configured class="+clss.getName()+" is not of type "+basetype.getName());
-		}
 		java.lang.reflect.Constructor<?> ctor = null;
 		try {
 			ctor = clss.getConstructor(ctorSig);
@@ -267,17 +265,26 @@ public class NAFConfig
 		}
 	}
 
-	private static Class<?> getClass(XmlConfig cfg, Class<?> clss)
+	public static Class<?> getEntityClass(XmlConfig cfg, Class<?> dflt_clss, Class<?> basetype)
 	{
+		Class<?> clss = dflt_clss;
 		String cfgclass = null;
 		if (cfg != null) {
 			cfgclass = cfg.getValue("@factory", false, null);
-			if (cfgclass == null) cfgclass = cfg.getValue("@class", clss==null, null);
+			if (cfgclass == null) {
+				cfgclass = cfg.getValue("@class", clss==null, null);
+			}
+			if (cfgclass != null) {
+				try {
+					clss = DynLoader.loadClass(cfgclass);
+				} catch (Exception ex) {
+					throw new NAFConfigException("Failed to load configured class="+cfgclass, ex);
+				}
+			}
 		}
-		try {
-			if (cfgclass != null) clss = DynLoader.loadClass(cfgclass);
-		} catch (Exception ex) {
-			throw new NAFConfigException("Failed to load configured class="+cfgclass, ex);
+
+		if (basetype != null && !basetype.isAssignableFrom(clss)) {
+			throw new NAFConfigException("Configured class="+clss+" is not of type "+basetype.getName());
 		}
 		return clss;
 	}

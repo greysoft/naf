@@ -10,6 +10,7 @@ import com.grey.base.utils.FileOps;
 import com.grey.base.utils.IP;
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
+import com.grey.naf.reactor.config.ConcurrentListenerConfig;
 
 /*
  * Note that this test class also exercises ListenerSet, ConcurrentListener and the Naflet class.
@@ -154,19 +155,24 @@ public class SSLConnectionTest
 
 		// set up the server component
 		expected_tcpentities = (failtype == FAILTYPE.NOCONNECT ? 1 : 2);
-		java.util.Map<String,Object> cfgdflts = new java.util.HashMap<String,Object>();
-		cfgdflts.put(CM_Listener.CFGMAP_FACTCLASS, TestServerFactory.class);
 		ListenerSet listeners = null;
 		ConcurrentListener lstnr = null;
+		String lname = "utest_SSL";
 		if (lset) {
-			listeners = new ListenerSet("utest_SSL", dsptch, this, this, "listeners/listener", srvcfg, cfgdflts);
+			ConcurrentListenerConfig[] lcfg = ListenerSet.makeConfig(lname, dsptch, "listeners/listener", srvcfg, 0, 0, TestServerFactory.class);
+			listeners = new ListenerSet(lname, dsptch, this, this, lcfg);
 			listeners.start();
 			org.junit.Assert.assertEquals(1, listeners.configured());
 			org.junit.Assert.assertEquals(1, listeners.count());
 			srvport = listeners.getListener(0).getPort();
 			listeners.setReporter(this);
 		} else {
-			lstnr = ConcurrentListener.create("utest_SSL", dsptch, this, this, srvcfg, cfgdflts);
+			ConcurrentListenerConfig lcfg = new ConcurrentListenerConfig.Builder<>()
+					.withName(lname)
+					.withServerFactoryClass(TestServerFactory.class)
+					.withXmlConfig(srvcfg, dsptch.getApplicationContext())
+					.build();
+			lstnr = new ConcurrentListener(dsptch, this, this, lcfg);
 			srvport = lstnr.getPort();
 			lstnr.setReporter(this);
 			lstnr.start();
@@ -589,7 +595,7 @@ public class SSLConnectionTest
 		@Override
 		public void shutdown() {}
 
-		public TestServerFactory(com.grey.naf.reactor.CM_Listener l, com.grey.base.config.XmlConfig cfg)
+		public TestServerFactory(com.grey.naf.reactor.CM_Listener l, XmlConfig cfg)
 		{
 			lstnr = l;
 			bufspec = new com.grey.naf.BufferSpec(cfg, "niobuffers", 8 * 1024, 128);

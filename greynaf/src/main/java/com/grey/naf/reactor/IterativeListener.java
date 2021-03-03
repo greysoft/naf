@@ -1,10 +1,11 @@
 /*
- * Copyright 2010-2018 Yusef Badri - All rights reserved.
+ * Copyright 2010-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
 
 import com.grey.logging.Logger.LEVEL;
+import com.grey.naf.reactor.config.ListenerConfig;
 import com.grey.naf.errors.NAFException;
 
 public class IterativeListener
@@ -15,29 +16,16 @@ public class IterativeListener
 		public CM_Server createServer(CM_Listener l);
 	}
 
-	public static IterativeListener create(String lname, Dispatcher d,  ServerFactory fact, com.grey.naf.EntityReaper rpr,
-			com.grey.base.config.XmlConfig cfg, java.util.Map<String,Object> cfgdflts) throws java.io.IOException {
-		IterativeListener l = new IterativeListener(lname, d, fact, rpr, cfg, cfgdflts);
-		d.getApplicationContext().register(l);
-		return l;
-	}
-
-	public static IterativeListener create(String lname, Dispatcher d,  ServerFactory fact, com.grey.naf.EntityReaper rpr,
-			com.grey.base.config.XmlConfig cfg, String iface, int port) throws java.io.IOException {
-		return create(lname, d, fact, rpr, cfg, makeDefaults(null, iface, port));
-	}
-
 	private final CM_Server cnxhandler;
-	public CM_Server getConnectionHandler() {return cnxhandler;}
 
+	public CM_Server getConnectionHandler() {return cnxhandler;}
 	@Override
 	public Class<?> getServerType() {return cnxhandler.getClass();}
 
-	private IterativeListener(String lname, Dispatcher d,  ServerFactory fact, com.grey.naf.EntityReaper rpr,
-			com.grey.base.config.XmlConfig cfg, java.util.Map<String,Object> cfgdflts) throws java.io.IOException {
-		super(lname, d, fact, rpr, cfg, cfgdflts);
-		cnxhandler = fact.createServer(this);
-		getLogger().info("Listener="+name+": Iterative handler is "+cnxhandler.getClass().getName());
+	public IterativeListener(Dispatcher d,  ServerFactory factory, com.grey.naf.EntityReaper rpr, ListenerConfig config) throws java.io.IOException {
+		super(d, factory, rpr, config);
+		cnxhandler = factory.createServer(this);
+		getLogger().info("Listener="+getName()+": Iterative handler is "+cnxhandler.getClass().getName());
 	}
 
 	@Override
@@ -47,7 +35,7 @@ public class IterativeListener
 		try {
 			enableListen();
 		} catch (Throwable ex) {
-			getLogger().log(LEVEL.ERR, ex, true, "Listener="+name+" failed to resume listening");
+			getLogger().log(LEVEL.ERR, ex, true, "Listener="+getName()+" failed to resume listening");
 			stop(true);
 		}
 	}
@@ -63,7 +51,7 @@ public class IterativeListener
 			try {
 				disableListen();
 			} catch (Throwable ex) {
-				getLogger().log(LEVEL.ERR, ex, true, "Listener="+name+" failed to suspend listening");
+				getLogger().log(LEVEL.ERR, ex, true, "Listener="+getName()+" failed to suspend listening");
 				stop(true);
 				return;
 			}
@@ -73,7 +61,7 @@ public class IterativeListener
 				cnxhandler.accepted(connsock, this);
 			} catch (Throwable ex) {
 				LEVEL lvl = (NAFException.isError(ex) ? LEVEL.ERR : LEVEL.TRC);
-				getLogger().log(lvl, ex, lvl==LEVEL.ERR, "Listener="+name+": Error fielding connection");
+				getLogger().log(lvl, ex, lvl==LEVEL.ERR, "Listener="+getName()+": Error fielding connection");
 				getDispatcher().conditionalDeregisterIO(cnxhandler);
 			}
 		}

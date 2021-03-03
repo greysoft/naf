@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Yusef Badri - All rights reserved.
+ * Copyright 2014-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -9,6 +9,7 @@ import com.grey.base.utils.ByteOps;
 import com.grey.base.utils.FileOps;
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
+import com.grey.naf.reactor.config.ListenerConfig;
 
 public class IterativeListenerTest
 	implements com.grey.naf.EntityReaper
@@ -41,7 +42,10 @@ public class IterativeListenerTest
 		Dispatcher dsptch = Dispatcher.create(appctx, def, com.grey.logging.Factory.getLogger("no-such-logger"));
 
 		Factory fact = new Factory(clients);
-		IterativeListener lstnr = IterativeListener.create("utest_IterativeListener", dsptch, fact, this, null, null, 0);
+		ListenerConfig lcfg = new ListenerConfig.Builder<>()
+				.withName("utest_IterativeListener")
+				.build();
+		IterativeListener lstnr = new IterativeListener(dsptch, fact, this, lcfg);
 		TestServer srvr = (TestServer)lstnr.getConnectionHandler();
 		org.junit.Assert.assertEquals(TestServer.class, srvr.getClass());
 		org.junit.Assert.assertEquals(TestServer.class, lstnr.getServerType());

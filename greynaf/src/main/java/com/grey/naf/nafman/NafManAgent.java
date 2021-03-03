@@ -1,10 +1,9 @@
 /*
- * Copyright 2010-2018 Yusef Badri - All rights reserved.
+ * Copyright 2010-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.nafman;
 
-import com.grey.base.config.XmlConfig;
 import com.grey.base.utils.StringOps;
 import com.grey.base.collections.HashedMap;
 import com.grey.naf.Naflet;
@@ -34,7 +33,7 @@ public abstract class NafManAgent
 	public NafManRegistry getRegistry() {return registry;}
 	protected void setShutdown() {in_shutdown = true;}
 
-	protected NafManAgent(Dispatcher d, NafManRegistry reg, XmlConfig cfg)
+	protected NafManAgent(Dispatcher d, NafManRegistry reg)
 	{
 		dsptch = d;
 		registry = reg;

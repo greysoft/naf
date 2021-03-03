@@ -28,8 +28,10 @@ import com.grey.naf.DispatcherDef;
 import com.grey.naf.EntityReaper;
 import com.grey.naf.nafman.NafManAgent;
 import com.grey.naf.nafman.NafManRegistry;
+import com.grey.naf.nafman.NafManServer;
 import com.grey.naf.nafman.PrimaryAgent;
 import com.grey.naf.nafman.SecondaryAgent;
+import com.grey.naf.reactor.config.ConcurrentListenerConfig;
 import com.grey.naf.errors.NAFConfigException;
 import com.grey.logging.Logger;
 import com.grey.logging.Logger.LEVEL;
@@ -150,9 +152,17 @@ public class Dispatcher
 		if (def.hasNafman()) {
 			NafManRegistry reg = NafManRegistry.get(appctx);
 			if (appctx.getPrimaryAgent() == null) {
-				nafman = new PrimaryAgent(this, reg, nafcfg.getNafman(), def);
+				int lstnport = getApplicationContext().getConfig().assignPort(NAFConfig.RSVPORT_NAFMAN);
+				XmlConfig lxmlcfg = nafcfg.getNafman().getSection("listener");
+				ConcurrentListenerConfig lcfg = new ConcurrentListenerConfig.Builder<>()
+						.withName("NAFMAN-Primary")
+						.withPort(lstnport)
+						.withServerFactoryClass( NafManServer.Factory.class)
+						.withXmlConfig(lxmlcfg, getApplicationContext())
+						.build();
+				nafman = new PrimaryAgent(this, reg, lcfg, def.isSurviveDownstream());
 			} else {
-				nafman = new SecondaryAgent(this, reg, nafcfg.getNafman());
+				nafman = new SecondaryAgent(this, reg);
 			}
 			getLogger().info("Dispatcher="+name+": Initialised NAFMAN - "+(nafman.isPrimary() ? "Primary" : "Secondary"));
 		} else {
@@ -969,7 +979,7 @@ public class Dispatcher
 		Collection<CM_Listener> listeners = appctx.getListeners();
 		txt += "\nListeners="+listeners.size();
 		for (CM_Listener l : listeners) {
-			txt += "\n- "+l.name+": Port="+l.getPort()+", Server="+l.getServerType().getName()+" (Dispatcher="+l.getDispatcher().name+")";
+			txt += "\n- "+l.getName()+": Port="+l.getPort()+", Server="+l.getServerType().getName()+" (Dispatcher="+l.getDispatcher().name+")";
 		}
 		return txt;
 	}

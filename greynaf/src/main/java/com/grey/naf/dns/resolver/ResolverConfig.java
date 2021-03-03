@@ -10,8 +10,8 @@ import java.net.UnknownHostException;
 import com.grey.base.config.SysProps;
 import com.grey.base.utils.TSAP;
 import com.grey.base.utils.TimeOps;
-import com.grey.naf.errors.NAFConfigException;
 import com.grey.base.config.XmlConfig;
+import com.grey.naf.errors.NAFConfigException;
 
 public class ResolverConfig
 {
@@ -282,7 +282,7 @@ public class ResolverConfig
 
 		public Builder() {}
 
-		public Builder(com.grey.base.config.XmlConfig cfg) {
+		public Builder(XmlConfig cfg) {
 			recursive = cfg.getBool("@recursive", recursive);
 			localNameServers = cfg.getTuple("localservers", "|", false, null);
 			autoRoots = cfg.getBool("rootservers/@auto", autoRoots);
