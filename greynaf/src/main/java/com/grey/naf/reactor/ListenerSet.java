@@ -106,7 +106,7 @@ public class ListenerSet
 					.withName(grpname+"-"+idx)
 					.withPort(port)
 					.withPortSSL(sslport)
-					.withServerFactoryClass(factoryClass)
+					.withServerFactory(factoryClass, null)
 					.withXmlConfig(lxmlcfg[idx], d.getApplicationContext())
 					.build();
 		}

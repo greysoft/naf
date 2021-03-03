@@ -69,9 +69,9 @@ public class ConcurrentListenerConfig extends ListenerConfig
 		}
 
 		// This should be called instead of withXmlConfig() if we have no XML config, else it should be called before it, to set the default.
-		public T withServerFactoryClass(Class<? extends ConcurrentListener.ServerFactory> v) {
-			serverFactoryClass = v;
-			serverFactoryGenerator = createServerFactoryGenerator(serverFactoryClass, null);
+		public T withServerFactory(Class<? extends ConcurrentListener.ServerFactory> clss, Object config) {
+			serverFactoryClass = clss;
+			serverFactoryGenerator = createServerFactoryGenerator(serverFactoryClass, config);
 			return self();
 		}
 

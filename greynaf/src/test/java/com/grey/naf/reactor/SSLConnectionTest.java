@@ -169,7 +169,7 @@ public class SSLConnectionTest
 		} else {
 			ConcurrentListenerConfig lcfg = new ConcurrentListenerConfig.Builder<>()
 					.withName(lname)
-					.withServerFactoryClass(TestServerFactory.class)
+					.withServerFactory(TestServerFactory.class, null)
 					.withXmlConfig(srvcfg, dsptch.getApplicationContext())
 					.build();
 			lstnr = new ConcurrentListener(dsptch, this, this, lcfg);

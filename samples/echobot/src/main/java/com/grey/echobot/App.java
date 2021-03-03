@@ -200,7 +200,7 @@ public class App
 								.withInterface(tsap.dotted_ip.toString())
 								.withPort(tsap.port)
 								.withBacklog(options.cgrpcnt * options.cgrpsiz)
-								.withServerFactoryClass(ServerTCP.Factory.class)
+								.withServerFactory(ServerTCP.Factory.class, null)
 								.build();
 						ConcurrentListener lstnr = new ConcurrentListener(dsptch, this, null, lcfg);
 						lstnr.start();

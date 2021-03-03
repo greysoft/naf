@@ -71,7 +71,7 @@ public class ServerDNS
 		ConcurrentListenerConfig lcfg = new ConcurrentListenerConfig.Builder<>()
 				.withName("DNS-Server")
 				.withPort(PacketDNS.INETPORT)
-				.withServerFactoryClass(TransportTCP.ServerFactory.class)
+				.withServerFactory(TransportTCP.ServerFactory.class, null)
 				.withXmlConfig(lxmlcfg, dsptch.getApplicationContext())
 				.build();
 		listener_tcp = new ConcurrentListener(dsptch, this, null, lcfg);

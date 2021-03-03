@@ -47,7 +47,7 @@ public class TCPConnectionTest
 		// set up the server component
 		ConcurrentListenerConfig lcfg = new ConcurrentListenerConfig.Builder<>()
 				.withName("utest_TCPCon")
-				.withServerFactoryClass(TestServerFactory.class)
+				.withServerFactory(TestServerFactory.class, null)
 				.withInterface("127.0.0.1")
 				.withPort(0)
 				.build();

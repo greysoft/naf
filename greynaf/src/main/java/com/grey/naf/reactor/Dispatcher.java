@@ -157,7 +157,7 @@ public class Dispatcher
 				ConcurrentListenerConfig lcfg = new ConcurrentListenerConfig.Builder<>()
 						.withName("NAFMAN-Primary")
 						.withPort(lstnport)
-						.withServerFactoryClass( NafManServer.Factory.class)
+						.withServerFactory(NafManServer.Factory.class, null)
 						.withXmlConfig(lxmlcfg, getApplicationContext())
 						.build();
 				nafman = new PrimaryAgent(this, reg, lcfg, def.isSurviveDownstream());
