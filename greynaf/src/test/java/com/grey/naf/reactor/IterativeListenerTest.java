@@ -45,7 +45,7 @@ public class IterativeListenerTest
 		ListenerConfig lcfg = new ListenerConfig.Builder<>()
 				.withName("utest_IterativeListener")
 				.build();
-		IterativeListener lstnr = new IterativeListener(dsptch, fact, this, lcfg);
+		IterativeListener lstnr = IterativeListener.create(dsptch, fact, this, lcfg);
 		TestServer srvr = (TestServer)lstnr.getConnectionHandler();
 		org.junit.Assert.assertEquals(TestServer.class, srvr.getClass());
 		org.junit.Assert.assertEquals(TestServer.class, lstnr.getServerType());

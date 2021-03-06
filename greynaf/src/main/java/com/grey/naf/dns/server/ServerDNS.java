@@ -74,7 +74,7 @@ public class ServerDNS
 				.withServerFactory(TransportTCP.ServerFactory.class, null)
 				.withXmlConfig(lxmlcfg, dsptch.getApplicationContext())
 				.build();
-		listener_tcp = new ConcurrentListener(dsptch, this, null, lcfg);
+		listener_tcp = ConcurrentListener.create(dsptch, this, null, lcfg);
 		transport_udp = new TransportUDP(d, this, listener_tcp.getIP(),listener_tcp.getPort());
 		dsptch.getLogger().info("DNS-Server: directbufs="+DIRECTNIOBUFS+"; udpmax="+PKTSIZ_UDP+"; tcpmax="+PKTSIZ_TCP);
 		if (IGNORE_QTRAIL) dsptch.getLogger().info("DNS-Server: Will ignore trailing bytes in incoming queries");

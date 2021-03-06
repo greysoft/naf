@@ -152,7 +152,6 @@ public class IOExecWriterTest
 		rep.close();
 		org.junit.Assert.assertFalse(cm.isConnected());
 		org.junit.Assert.assertFalse(dsptch.isRunning());
-		org.junit.Assert.assertEquals(bufspec.xmtpool.size(), bufspec.xmtpool.population());
 	}
 
 	// Test file-send, with blocking conditions again

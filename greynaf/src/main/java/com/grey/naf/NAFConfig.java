@@ -265,6 +265,17 @@ public class NAFConfig
 		}
 	}
 
+	public static Object createEntity(Class<?> clss, Class<?>[] ctorSig, Object[] ctorArgs)
+	{
+		java.lang.reflect.Constructor<?> ctor = null;
+		try {
+			ctor = clss.getConstructor(ctorSig);
+			return ctor.newInstance(ctorArgs);
+		} catch (Exception ex) {
+			throw new NAFConfigException("Failed to create configured entity="+clss.getName()+", ctor="+ctor, ex);
+		}
+	}
+
 	public static Class<?> getEntityClass(XmlConfig cfg, Class<?> dflt_clss, Class<?> basetype)
 	{
 		Class<?> clss = dflt_clss;

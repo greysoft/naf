@@ -34,7 +34,11 @@ public class ConcurrentListener
 	@Override
 	public Class<?> getServerType() {return serverFactory.getServerClass();}
 
-	public ConcurrentListener(Dispatcher d, Object controller, EntityReaper rpr, ConcurrentListenerConfig config) throws java.io.IOException
+	public static ConcurrentListener create (Dispatcher d, Object controller, EntityReaper rpr, ConcurrentListenerConfig config) throws java.io.IOException {
+		return new ConcurrentListener(d, controller, rpr, config);
+	}
+
+	private ConcurrentListener(Dispatcher d, Object controller, EntityReaper rpr, ConcurrentListenerConfig config) throws java.io.IOException
 	{
 		super(d, controller, rpr, config);
 		int srvmin = config.getMinServers();

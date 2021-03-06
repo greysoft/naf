@@ -4,7 +4,6 @@
  */
 package com.grey.naf.reactor;
 
-import com.grey.base.config.XmlConfig;
 import com.grey.naf.reactor.config.ConcurrentListenerConfig;
 
 public class ListenerSet
@@ -35,9 +34,9 @@ public class ListenerSet
 
 		for (int idx = 0; idx != config.length; idx++) {
 			if (controller instanceof IterativeListener.ServerFactory) {
-				listeners[idx] = new IterativeListener(d, (IterativeListener.ServerFactory)controller, reaper, config[idx]);
+				listeners[idx] = IterativeListener.create(d, (IterativeListener.ServerFactory)controller, reaper, config[idx]);
 			} else {
-				listeners[idx] = new ConcurrentListener(d, controller, this, (ConcurrentListenerConfig)config[idx]);
+				listeners[idx] = ConcurrentListener.create(d, controller, this, config[idx]);
 			}
 		}
 	}
@@ -93,23 +92,5 @@ public class ListenerSet
 		for (int idx = 0; idx != listeners.length; idx++) {
 			if (listeners[idx] != null) listeners[idx].setReporter(r);
 		}
-	}
-
-	public static ConcurrentListenerConfig[] makeConfig(String grpname, Dispatcher d, String xpath, XmlConfig xmlcfg,
-															int port, int sslport, Class<? extends ConcurrentListener.ServerFactory> factoryClass)
-			throws java.io.IOException {
-		XmlConfig[] lxmlcfg = xmlcfg.getSections(xpath+XmlConfig.XPATH_ENABLED);
-		int cnt = (lxmlcfg == null ? 0 : lxmlcfg.length);
-		ConcurrentListenerConfig[] lcfg = new ConcurrentListenerConfig[cnt];
-		for (int idx = 0; idx != cnt; idx++) {
-			lcfg[idx] = new ConcurrentListenerConfig.Builder<>()
-					.withName(grpname+"-"+idx)
-					.withPort(port)
-					.withPortSSL(sslport)
-					.withServerFactory(factoryClass, null)
-					.withXmlConfig(lxmlcfg[idx], d.getApplicationContext())
-					.build();
-		}
-		return lcfg;
 	}
 }

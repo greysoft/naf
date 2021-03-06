@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2018 Yusef Badri - All rights reserved.
+ * Copyright 2015-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.server;
@@ -15,7 +15,7 @@ class TransportUDP
 	public TransportUDP(com.grey.naf.reactor.Dispatcher d, ServerDNS qh, java.net.InetAddress iface, int port)
 		throws java.io.IOException
 	{
-		super(d, new com.grey.naf.BufferSpec(ServerDNS.PKTSIZ_UDP, ServerDNS.PKTSIZ_UDP, ServerDNS.DIRECTNIOBUFS));
+		super(d, new com.grey.naf.BufferSpec(ServerDNS.PKTSIZ_UDP, ServerDNS.PKTSIZ_UDP, ServerDNS.DIRECTNIOBUFS, null));
 		java.net.InetSocketAddress addr = new java.net.InetSocketAddress(iface, port);
 		int sockbufsiz = ServerDNS.UDPSOCKBUFSIZ;
 		qryh = qh;

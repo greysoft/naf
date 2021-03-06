@@ -202,7 +202,7 @@ public class App
 								.withBacklog(options.cgrpcnt * options.cgrpsiz)
 								.withServerFactory(ServerTCP.Factory.class, null)
 								.build();
-						ConcurrentListener lstnr = new ConcurrentListener(dsptch, this, null, lcfg);
+						ConcurrentListener lstnr = ConcurrentListener.create(dsptch, this, null, lcfg);
 						lstnr.start();
 					}
 					if (options.server_solo) continue;

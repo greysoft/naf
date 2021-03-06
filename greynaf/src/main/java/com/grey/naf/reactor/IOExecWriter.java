@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2018 Yusef Badri - All rights reserved.
+ * Copyright 2010-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -343,15 +343,12 @@ public class IOExecWriter
 
 	private java.nio.ByteBuffer allocBuffer(int siz)
 	{
-		java.nio.ByteBuffer buf = bufspec.xmtpool.extract();
-		if (siz > buf.capacity()) buf = com.grey.base.utils.NIOBuffers.create(siz, buf.isDirect());
-		buf.clear();
-		return buf;
+		return bufspec.allocBuffer(siz);
 	}
 
 	private void releaseBuffer(java.nio.ByteBuffer buf)
 	{
-		bufspec.xmtpool.store(buf);
+		bufspec.releaseBuffer(buf);
 	}
 
 	// Note that because of methods like transmitChunked() we could have multiple FileWrite objects on the xmtq

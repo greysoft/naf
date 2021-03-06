@@ -394,12 +394,6 @@ The <span class="cfgname">greynaf.dispatchers.logname</span> system property ove
 This may be more convenient when the number of Dispatchers is very large (eg. an <span class="softname">EchoBot</span> bulk test).
 </li>
 
-<li><span class="cfgtitle">survive_downstream</span>:
-Boolean attribute which specifies whether the primary Dispatcher (as the Dispatcher which hosts the primary NAFMAN agent is termed) should survive the death or termination of any secondary Dispatchers.
-<br/>
-Default is Yes.
-</li>
-
 <li><span class="cfgtitle">survive_handlers</span>:
 Boolean attribute which specifies whether the Dispatcher should survive errors in any of its registered I/O or Timer handlers.
 Default is Yes.
@@ -516,8 +510,15 @@ method, which tells the Dispatcher to stop the NAFlet of that name, if it's runn
 
 <p>
 NAFMAN is the NAF management agent. It is web-enabled, and enables you to issue commands to a running NAF application from your browser or the command line.
+<br/> <br/>
+A NAFMAN agent is embedded in every Dispatcher by default, and the first NAFMAN-enabled Dispatcher becomes the Primary NAFMAN agent, all the others (if any) becoming its Secondaries.
+The primary agent receives NAFMAN commands and forwards them to the appropriate secondaries.
 <br/>
-A NAFMAN agent is embedded in every dispatcher by default, and the first NAFMAN-enabled Dispatcher becomes the Primary NAFMAN agent, all the others (if any) becoming its Secondaries.
+The Dispatchers in which the secondary NAFMAN agents reside are called the downstream dispatchers, while the primary Dispatcher is called their upstream.
+<br/>
+If a Dispatcher does not have NAFMAN enabled, it does not have any relationship to any other Dispatchers within the same process (whether or not they have NAFMAN enabled) and there is no sense of upstream/downstream.
+<br/> <br/>
+The rest of this section describes how to configure NAFMAN with naf.xml style config, but they can of course be created programatically via their Builder classes, without any XML config.
 <br/> <br/>
 The
 <span class="cfgname">nafman</span>
@@ -530,15 +531,19 @@ NAFMAN can only be disabled on a per-Dispatcher basis, via the Dispatcher's
 attribute.
 <br/>
 The structure of the config block is illustrated below, but you should rarely need to modify it as they are more a case of low-level tuning than anything else.
-<br/>
+<br/> <br/>
 See the
-<span class="compcode">com.grey.naf.nafman.Server</span>
-source code for all the options - plus the usual Listener attributes.
+<span class="compcode">com.grey.naf.nafman.config/NafManConfig</span>
+source code for all the NAFMAN options, in particular the
+<span class="compcode">withXmlConfig()</span>
+method, while the
+<span class="cfgname">Listener</span>
+config block has the usual Listener attributes.
 </p>
 <table class="cfgbox">
 <tr><td>
 <pre>
-&lt;nafman&gt;
+&lt;nafman survive_downstream="y"&gt;
     &lt;listener&gt;
         &lt;server&gt;
             ... see NAFMAN source ...
@@ -549,6 +554,12 @@ source code for all the options - plus the usual Listener attributes.
 </td></tr>
 </table>
 <p>
+The most important attribute is shown above, with its default value of True.
+<br/>
+The
+<span class="cfgname">survive_downstream</span>
+attribute tells the primary Dispatcher whether it should also exit whenever a secondary dies or terminates, with Yes meaning it should survive the event and carry on.
+<br/> <br/>
 The most likely option you would want to change is the TCP port on which the NAFMAN server listens, which by default is the same as the
 <span class="cfgname">baseport</span> (see &sect;2 above), ie. 13000.
 <br/>
@@ -932,7 +943,7 @@ It is a functional building block that allows you to listen on a specified TCP p
 It can be created either programmatically or by a naf.xml config file.
 While the programmatic mode allows you to create concurrent or iterative servers, the config mode only supports concurrent.
 <br/> <br/>
-The rest of this section describes how to configure listeners within naf.xml style config, but they can of course be created programatically via their Builder classes, without any XML config.
+The rest of this section describes how to configure listeners with naf.xml style config, but they can of course be created programatically via their Builder classes, without any XML config.
 <br/> <br/>
 The Listener config block can be specified in arbitrary locations within the NAFlet config, and takes the form shown below:
 </p>
@@ -1266,7 +1277,8 @@ It is a sub-project within NAF and constitutes one of the JAR files in the NAF d
 <br/>
 Broadly speaking however, NAF is considered to consist of all these JARs (including the logging ones - see &sect;9), not just the one that happens to be called greynaf.jar, so GreyBase is simply a physical subdivision within NAF.
 <br/> <br/>
-The dividing line between the GreyBase and NAF sub-projects is that NAF is the framework library and can only be used by NAF applications (indeed, using it is what defines a NAF application). GreyBase on the other hand is a utility API, which contains classes that are not intrinsically tied to NAF and can be used by any application in any context.
+The dividing line between the GreyBase and NAF sub-projects is that NAF is the framework library and can only be used by NAF applications (indeed, using it is what defines a NAF application).
+GreyBase on the other hand is a utility API, which contains classes that are not intrinsically tied to NAF and can be used by any application in any context.
 <br/> <br/>
 Notwithstanding that, GreyBase has evolved to serve the needs of NAF applications and will remain focussed on NAF's particular concerns and optimisations,
 such as object reuse (see <span class="compcode">ObjectWell</span>),
@@ -1399,9 +1411,13 @@ The
 demo app provides an example of how an application that is based on a <dfn>naf.xml</dfn> config file (called portfwd.xml in this case) passed control to the NAF framework in its
 <span class="compcode">main()</span> method.
 <br/> <br/>
-The XML config file specifies a NAFlet
-(see <span class="compcode">com.grey.portfwd.Task()</span>)
-in the PortFwd application code, which simply creates 2 listeners as specified in the XML config, and then creates a custom NAFMAN command before returning control to the NAF framework which does everything else.
+The XML config file specifies a NAFlet (see
+<span class="compcode">com.grey.portfwd.Task</span>
+class) in the PortFwd application code, which gets automatically instantiated by the NAF framework, and creates the two listeners as defined in the XML config for that NAFlet.
+<br/>
+The
+<span class="compcode">Task</span>
+constructor then configures a custom NAFMAN command before returning control to the NAF framework which then goes into its service loop, handling connections and I/O on all registered ports.
 <br/> <br/>
 The listener config specifies the action to take for incoming connections, in the shape of the
 <span class="cfgtitle">server</span>

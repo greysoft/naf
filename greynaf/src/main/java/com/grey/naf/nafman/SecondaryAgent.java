@@ -21,7 +21,7 @@ public class SecondaryAgent
 	@Override
 	public int getPort() {return primary.getPort();}
 
-	public SecondaryAgent(Dispatcher dsptch, NafManRegistry reg) throws java.io.IOException
+	public SecondaryAgent(Dispatcher dsptch, NafManRegistry reg, NafManConfig cfg) throws java.io.IOException
 	{
 		super(dsptch, reg);
 		primary = dsptch.getApplicationContext().getPrimaryAgent();

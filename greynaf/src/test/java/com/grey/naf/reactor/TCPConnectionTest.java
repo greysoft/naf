@@ -51,7 +51,7 @@ public class TCPConnectionTest
 				.withInterface("127.0.0.1")
 				.withPort(0)
 				.build();
-		CM_Listener lstnr = new ConcurrentListener(dsptch, this, this, lcfg);
+		CM_Listener lstnr = ConcurrentListener.create(dsptch, this, this, lcfg);
 		lstnr.start();
 		lstnr.setReporter(this);
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2018 Yusef Badri - All rights reserved.
+ * Copyright 2013-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.nafman;
@@ -49,7 +49,7 @@ class NafManResource
 
 		// not cached, but check if source data has changed before we have to go to the expense of XSL transforms
 		NafManRegistry.DefResource.DataGenerator gen = (def.gen == null ? this : def.gen);
-		byte[] newdata = gen.generateResourceData(def, dsptch);
+		byte[] newdata = gen.generateResourceData(dsptch);
 		if (java.util.Arrays.equals(newdata, srcdata)) return httprsp; //source-data unchanged
 
 		// we need to generate the resource data anew - unless 'newdata' is already the finished article
@@ -100,7 +100,7 @@ class NafManResource
 	// Whatever Registry.DefResource def context we were invoked in, we generate a standard data block
 	// that is not specific to it.
 	@Override
-	public byte[] generateResourceData(NafManRegistry.DefResource rd, com.grey.naf.reactor.Dispatcher d)
+	public byte[] generateResourceData(com.grey.naf.reactor.Dispatcher d)
 	{
 		NafManRegistry reg = d.getAgent().getRegistry();
 		java.util.Collection<NafManRegistry.DefCommand> cmds = reg.getCommands();

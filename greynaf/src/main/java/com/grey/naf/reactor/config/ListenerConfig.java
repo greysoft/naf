@@ -4,8 +4,6 @@
  */
 package com.grey.naf.reactor.config;
 
-import java.io.IOException;
-
 import com.grey.base.config.XmlConfig;
 import com.grey.naf.SSLConfig;
 import com.grey.naf.ApplicationContextNAF;
@@ -19,7 +17,7 @@ public class ListenerConfig
 	private final int backlog;
 	private final SSLConfig configSSL;
 
-	public ListenerConfig(Builder<?> bldr) {
+	protected ListenerConfig(Builder<?> bldr) {
 		name = bldr.name;
 		iface = bldr.iface;
 		port = bldr.port;
@@ -57,12 +55,12 @@ public class ListenerConfig
 		private int backlog = 5000;
 
 		// Call the other setter methods before this to set any defaults for name, iface, port, backlog
-		public T withXmlConfig(XmlConfig cfg, ApplicationContextNAF appctx) throws IOException {
+		public T withXmlConfig(XmlConfig cfg, ApplicationContextNAF appctx) {
 			cfg = getLinkConfig(cfg);
 			XmlConfig xmlSSL = cfg.getSection("ssl");
 			try {
 				configSSL = SSLConfig.create(xmlSSL, appctx.getConfig(), null, false);
-			} catch (java.security.GeneralSecurityException ex) {
+			} catch (Exception ex) {
 				throw new NAFConfigException("Failed to configure SSL", ex);
 			}
 			if (configSSL != null && portSSL != 0) port = portSSL;

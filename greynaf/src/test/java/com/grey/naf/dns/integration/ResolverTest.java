@@ -440,9 +440,8 @@ public class ResolverTest
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
 				.withName(d1name)
 				.withDNS(true)
-				.withNafman(true)
+				.withNafman(true) //we need NAFMAN to propagate the dsptch.stop() in handleDnsResult() to the other Dispatcher
 				.withSurviveHandlers(false)
-				.withSurviveDownstream(false)
 				.build();
 		Dispatcher d1 = Dispatcher.create(appctx, def, logger);
 		def = new com.grey.naf.DispatcherDef.Builder(def).withName(d2name).build();

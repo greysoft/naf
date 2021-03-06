@@ -4,12 +4,19 @@
  */
 package com.grey.naf.nafman;
 
+import java.util.function.Supplier;
+
 import com.grey.logging.Logger.LEVEL;
-import com.grey.naf.reactor.Dispatcher;
-import com.grey.base.utils.ByteArrayRef;
 import com.grey.base.utils.ByteChars;
+import com.grey.base.utils.ByteArrayRef;
 import com.grey.base.utils.StringOps;
 import com.grey.base.utils.TimeOps;
+import com.grey.base.utils.NIOBuffers;
+import com.grey.base.collections.ObjectWell;
+import com.grey.naf.BufferSpec;
+import com.grey.naf.reactor.Dispatcher;
+import com.grey.naf.reactor.CM_Listener;
+import com.grey.naf.reactor.TimerNAF;
 
 /*
  * This class represents an embedded HTTP server, which serves live NAFMAN data formatted according to
@@ -20,7 +27,7 @@ import com.grey.base.utils.TimeOps;
  */
 public class NafManServer
 	extends com.grey.naf.reactor.CM_Server
-	implements com.grey.naf.reactor.TimerNAF.Handler
+	implements TimerNAF.Handler
 {
 	private static final int S_PREHEADERS = 1;  //initial state, upon new connection
 	private static final int S_HEADERS = 2;  //receiving headers
@@ -30,15 +37,16 @@ public class NafManServer
 	public static final class Factory
 		implements com.grey.naf.reactor.ConcurrentListener.ServerFactory
 	{
-		private final com.grey.naf.reactor.CM_Listener lstnr;
+		private final CM_Listener lstnr;
 		private final SharedFields shared;
 
-		public Factory(com.grey.naf.reactor.CM_Listener l, Object cfg)
+		public Factory(CM_Listener l, Object cfg)
 			throws java.io.IOException, javax.xml.transform.TransformerConfigurationException
 		{
 			lstnr = l;
-			com.grey.base.config.XmlConfig xmlcfg = (com.grey.base.config.XmlConfig)cfg;
-			shared = new SharedFields(PrimaryAgent.class.cast(l.getController()), xmlcfg);
+			@SuppressWarnings("unchecked") Supplier<NafManConfig> srvcfg = (Supplier<NafManConfig>)cfg;
+			PrimaryAgent agent = PrimaryAgent.class.cast(l.getController());
+			shared = new SharedFields(agent, srvcfg.get());
 		}
 
 		@Override
@@ -54,27 +62,26 @@ public class NafManServer
 		final PrimaryAgent primary;
 		final HTTP http;
 		final ResourceManager rsrcmgr;
-		final com.grey.base.collections.ObjectWell<NafManCommand> cmdstore;
-		final com.grey.naf.BufferSpec bufspec;
+		final ObjectWell<NafManCommand> cmdstore;
+		final BufferSpec bufspec;
 		final java.nio.ByteBuffer httprsp400;
 		final java.nio.ByteBuffer httprsp404;
 		final java.nio.ByteBuffer httprsp405;
 		final long tmt_idle;
 		java.nio.ByteBuffer tmpniobuf; //temp work area, pre-allocated for efficiency
 
-		SharedFields(PrimaryAgent p, com.grey.base.config.XmlConfig cfg)
+		SharedFields(PrimaryAgent p, NafManConfig cfg)
 				throws java.io.IOException, javax.xml.transform.TransformerConfigurationException
 		{
 			primary = p;
 			Dispatcher dsptch = primary.getDispatcher();
-			com.grey.base.config.XmlConfig cfg_rsrc = cfg.getSection("resources");
-			tmt_idle = cfg.getTime("timeout", com.grey.base.utils.TimeOps.parseMilliTime("30s"));
-			long permcache = cfg.getTime("permcache", com.grey.base.utils.TimeOps.parseMilliTime("1d"));
-			long dyncache = cfg.getTime("dyncache", "5s");
-			bufspec = new com.grey.naf.BufferSpec(cfg, "niobuffers", 1024, 4*1024);
-			cmdstore = new com.grey.base.collections.ObjectWell<NafManCommand>(NafManCommand.class, "NAFMAN_"+dsptch.getName());
+			tmt_idle = cfg.getIdleConnectionTimeout();
+			long permcache = cfg.getDeclaredStaticTTL();
+			long dyncache = cfg.getDynamicResourceTTL();
+			bufspec = new BufferSpec(cfg.getBufferConfig());
+			cmdstore = new ObjectWell<NafManCommand>(NafManCommand.class, "NAFMAN_"+dsptch.getName());
 			http = new HTTP(bufspec, permcache);
-			rsrcmgr = new ResourceManager(cfg_rsrc, primary, http, dyncache);
+			rsrcmgr = new ResourceManager(primary, http, dyncache);
 			httprsp400 = http.buildErrorResponse("400 Bad request");
 			httprsp404 = http.buildErrorResponse("404 Unknown resource");
 			httprsp405 = http.buildErrorResponse("405 Method not supported");
@@ -86,7 +93,7 @@ public class NafManServer
 	}
 
 	private final SharedFields shared;
-	private com.grey.naf.reactor.TimerNAF tmr_idle;
+	private TimerNAF tmr_idle;
 	private NafManCommand cmd;
 	private int state;
 	private String http_method;
@@ -94,7 +101,7 @@ public class NafManServer
 	private String ctype;
 	private int contlen;
 
-	NafManServer(com.grey.naf.reactor.CM_Listener l, SharedFields s)
+	NafManServer(CM_Listener l, SharedFields s)
 	{
 		super(l, s.bufspec, s.bufspec);
 		shared = s;
@@ -178,7 +185,7 @@ public class NafManServer
 				commandReceived();
 				return;
 			}
-			com.grey.base.utils.ByteChars hdrval;
+			ByteChars hdrval;
 			if ((hdrval = shared.http.parseHeaderValue(HTTP.HDR_CLEN, data)) != null) {
 				contlen = (int)hdrval.parseDecimal();
 			} else if ((hdrval = shared.http.parseHeaderValue(HTTP.HDR_CTYPE, data)) != null) {
@@ -214,7 +221,7 @@ public class NafManServer
 		shared.primary.handleCommand(cmd);
 	}
 
-	void commandCompleted(com.grey.base.utils.ByteChars rspbody) throws java.io.IOException
+	void commandCompleted(ByteChars rspbody) throws java.io.IOException
 	{
 		boolean omit_body = http_method.equals(HTTP.METHOD_HEAD);
 		byte[] finaldata = null;
@@ -227,7 +234,7 @@ public class NafManServer
 			}
 		}
 		if (StringOps.stringAsBool(cmd.getArg(com.grey.naf.nafman.NafManCommand.ATTR_NOHTTP))) {
-			shared.tmpniobuf = com.grey.base.utils.NIOBuffers.encode(finaldata, shared.tmpniobuf, shared.bufspec.directbufs);
+			shared.tmpniobuf = NIOBuffers.encode(finaldata, shared.tmpniobuf, shared.bufspec.directbufs);
 		} else {
 			shared.tmpniobuf = shared.http.buildDynamicResponse(finaldata, shared.tmpniobuf);
 		}
@@ -244,7 +251,7 @@ public class NafManServer
 	}
 
 	@Override
-	public void timerIndication(com.grey.naf.reactor.TimerNAF tmr, com.grey.naf.reactor.Dispatcher d)
+	public void timerIndication(TimerNAF tmr, Dispatcher d)
 	{
 		tmr_idle = null;
 		endConnection();
@@ -252,7 +259,7 @@ public class NafManServer
 
 	// already logged by Dispatcher, we have nothing more to add
 	@Override
-	public void eventError(com.grey.naf.reactor.TimerNAF tmr, com.grey.naf.reactor.Dispatcher d, Throwable ex) {}
+	public void eventError(TimerNAF tmr, Dispatcher d, Throwable ex) {}
 
 	@Override
 	public StringBuilder dumpAppState(StringBuilder sb)

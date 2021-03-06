@@ -143,20 +143,20 @@ public class IOExecReaderTest
 	@org.junit.Test
 	public void testDirectBuffer() throws java.io.IOException
 	{
-		launch(new com.grey.naf.BufferSpec(25, 0, true));
+		launch(new com.grey.naf.BufferSpec(25, 0, true, null));
 	}
 
 	@org.junit.Test
 	public void testHeapBuffer() throws java.io.IOException
 	{
-		launch(new com.grey.naf.BufferSpec(25, 0, false));
+		launch(new com.grey.naf.BufferSpec(25, 0, false, null));
 	}
 
 	@org.junit.Test
 	public void testOffsetBuffer() throws java.io.IOException
 	{
 		int offset = 5;
-		com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(25, 0, false);
+		com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(25, 0, false, null);
 		bufspec = Mockito.spy(bufspec);
 		Mockito.when(bufspec.createReadBuffer()).thenReturn(((ByteBuffer)NIOBuffers.create(bufspec.rcvbufsiz+offset, bufspec.directbufs).position(offset)).slice());
 		launch(bufspec);

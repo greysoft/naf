@@ -42,7 +42,6 @@ public class ConfigTest
 		org.junit.Assert.assertFalse(def.hasNafman());
 		org.junit.Assert.assertTrue(def.hasDNS());
 		org.junit.Assert.assertTrue(def.isZeroNafletsOK());
-		org.junit.Assert.assertTrue(def.isSurviveDownstream());
 		org.junit.Assert.assertTrue(def.isSurviveHandlers());
 		org.junit.Assert.assertEquals(2, def.getNafletsConfig().length);
 	}
@@ -72,7 +71,6 @@ public class ConfigTest
 		org.junit.Assert.assertTrue(def.hasNafman());
 		org.junit.Assert.assertFalse(def.hasDNS());
 		org.junit.Assert.assertTrue(def.isZeroNafletsOK());
-		org.junit.Assert.assertTrue(def.isSurviveDownstream());
 		org.junit.Assert.assertFalse(def.isSurviveHandlers());
 		org.junit.Assert.assertNull(def.getNafletsConfig());
 	}

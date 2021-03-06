@@ -159,7 +159,7 @@ public class SSLConnectionTest
 		ConcurrentListener lstnr = null;
 		String lname = "utest_SSL";
 		if (lset) {
-			ConcurrentListenerConfig[] lcfg = ListenerSet.makeConfig(lname, dsptch, "listeners/listener", srvcfg, 0, 0, TestServerFactory.class);
+			ConcurrentListenerConfig[] lcfg = ConcurrentListenerConfig.buildMultiConfig(lname, dsptch, "listeners/listener", srvcfg, 0, 0, TestServerFactory.class, null);
 			listeners = new ListenerSet(lname, dsptch, this, this, lcfg);
 			listeners.start();
 			org.junit.Assert.assertEquals(1, listeners.configured());
@@ -172,7 +172,7 @@ public class SSLConnectionTest
 					.withServerFactory(TestServerFactory.class, null)
 					.withXmlConfig(srvcfg, dsptch.getApplicationContext())
 					.build();
-			lstnr = new ConcurrentListener(dsptch, this, this, lcfg);
+			lstnr = ConcurrentListener.create(dsptch, this, this, lcfg);
 			srvport = lstnr.getPort();
 			lstnr.setReporter(this);
 			lstnr.start();

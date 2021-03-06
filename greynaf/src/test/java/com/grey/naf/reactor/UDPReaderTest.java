@@ -74,7 +74,7 @@ public class UDPReaderTest
 
 		public Reader(Dispatcher d, boolean directbufs) throws java.io.IOException
 		{
-			super(d, new com.grey.naf.BufferSpec(1024, 0, directbufs));
+			super(d, new com.grey.naf.BufferSpec(1024, 0, directbufs, null));
 	        byte[] ipbytes = IP.ip2net(IP.IP_LOCALHOST, null, 0);
 	        java.net.InetAddress ipaddr_localhost = java.net.InetAddress.getByAddress(ipbytes);
 

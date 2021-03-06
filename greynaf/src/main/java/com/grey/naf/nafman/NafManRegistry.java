@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2018 Yusef Badri - All rights reserved.
+ * Copyright 2010-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.nafman;
@@ -60,13 +60,15 @@ public class NafManRegistry
 	public static class DefResource
 	{
 		public interface DataGenerator {
-			byte[] generateResourceData(DefResource def, Dispatcher d) throws java.io.IOException;
+			byte[] generateResourceData(Dispatcher d) throws java.io.IOException;
 		}
 		public final String name; //must not match any DefCommand.code values
 		public final String path;
 		public final String mimetype; //only applies to static resources, dynamic output is typed at runtime
 		public final DataGenerator gen;
 		public DefResource(String n, String p, String t, DataGenerator g) {name=n; path=p; mimetype=t; gen=g;}
+		@Override
+		public String toString() {return "DefResource="+name+", data="+mimetype+"/"+path+" - gen="+gen;}
 	}
 
 	private static class CommandHandlerReg
@@ -110,11 +112,13 @@ public class NafManRegistry
 	private String homepage;
 
 	synchronized public String getHomePage() {return homepage;}
+
 	synchronized DefCommand getCommand(String code) {return active_commands.get(code);}
-	synchronized DefResource getResource(String name) {return active_resources.get(name);}
 	synchronized java.util.Collection<DefCommand> getCommands() {return active_commands.values();}
-	synchronized java.util.Set<String> getResourceNames() {return active_resources.keySet();}
 	public boolean isCommandRegistered(String code) {return isCommandRegistered(code, null);}
+
+	synchronized DefResource getResource(String name) {return active_resources.get(name);}
+	synchronized java.util.Set<String> getResourceNames() {return active_resources.keySet();}
 
 	public static NafManRegistry get(ApplicationContextNAF appctx) {
 		return appctx.getNamedItem(NafManRegistry.class.getName(), (c) -> new NafManRegistry(c));

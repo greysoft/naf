@@ -22,7 +22,11 @@ public class IterativeListener
 	@Override
 	public Class<?> getServerType() {return cnxhandler.getClass();}
 
-	public IterativeListener(Dispatcher d,  ServerFactory factory, com.grey.naf.EntityReaper rpr, ListenerConfig config) throws java.io.IOException {
+	public static IterativeListener create (Dispatcher d,  ServerFactory factory, com.grey.naf.EntityReaper rpr, ListenerConfig config) throws java.io.IOException {
+		return new IterativeListener(d, factory, rpr, config);
+	}
+
+	private IterativeListener(Dispatcher d,  ServerFactory factory, com.grey.naf.EntityReaper rpr, ListenerConfig config) throws java.io.IOException {
 		super(d, factory, rpr, config);
 		cnxhandler = factory.createServer(this);
 		getLogger().info("Listener="+getName()+": Iterative handler is "+cnxhandler.getClass().getName());

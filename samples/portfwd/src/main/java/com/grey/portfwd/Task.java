@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2018 Yusef Badri - All rights reserved.
+ * Copyright 2012-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.portfwd;
@@ -26,7 +26,7 @@ public class Task
 	{
 		super(name, dsptch, cfg);
 		String lname = "Task="+getName();
-		ConcurrentListenerConfig[] lcfg = ListenerSet.makeConfig(lname, dsptch, "listeners/listener", taskConfig(), 0, 0, null);
+		ConcurrentListenerConfig[] lcfg = ConcurrentListenerConfig.buildMultiConfig(lname, dsptch, "listeners/listener", taskConfig(), 0, 0, null, null);
 		listeners = new ListenerSet(lname, dsptch, this, this, lcfg);
 		if (dsptch.getAgent() != null) {
 			NafManRegistry reg = dsptch.getAgent().getRegistry();

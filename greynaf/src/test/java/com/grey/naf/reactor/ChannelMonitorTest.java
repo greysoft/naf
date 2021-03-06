@@ -167,7 +167,7 @@ public class ChannelMonitorTest
 		final int numsends = 5;  //only the write() calls from CMR count towards this total, not the calls below
 		final int xmtsiz = 33 * 1024;
 		final CMR[] receivers = new CMR[paircnt];
-		final com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(xmtsiz - 1, xmtsiz, directbufs);
+		final com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(xmtsiz - 1, xmtsiz, directbufs, null);
 		final byte[] xmtbuf = new byte[xmtsiz];
 
 		ApplicationContextNAF appctx = ApplicationContextNAF.create("CMTEST-"+directbufs);
@@ -223,7 +223,6 @@ public class ChannelMonitorTest
 			cmw.pipe.close();
 			org.junit.Assert.assertFalse(cmw.pipe.isOpen());
 		}
-		org.junit.Assert.assertEquals(bufspec.xmtpool.size(), bufspec.xmtpool.population());
 	}
 
 	@Override

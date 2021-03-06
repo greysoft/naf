@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2018 Yusef Badri - All rights reserved.
+ * Copyright 2010-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.nafman;
@@ -12,7 +12,6 @@ import com.grey.naf.reactor.CM_Listener;
 import com.grey.naf.reactor.ConcurrentListener;
 import com.grey.naf.reactor.Producer;
 import com.grey.naf.reactor.TimerNAF;
-import com.grey.naf.reactor.config.ConcurrentListenerConfig;
 import com.grey.logging.Logger.LEVEL;
 
 public class PrimaryAgent
@@ -38,14 +37,14 @@ public class PrimaryAgent
 	@Override
 	public int getPort() {return lstnr.getPort();}
 
-	public PrimaryAgent(Dispatcher dsptch, NafManRegistry reg, ConcurrentListenerConfig lcfg, boolean surviveDownstream) throws java.io.IOException
+	public PrimaryAgent(Dispatcher dsptch, NafManRegistry reg, NafManConfig cfg) throws java.io.IOException
 	{
 		super(dsptch, reg);
-		this.surviveDownstream = surviveDownstream;
+		this.surviveDownstream = cfg.isSurviveDownstream();
 		events = new Producer<Object>(Object.class, dsptch, this);
 		events.start();
 		dsptch.getLogger().info("NAFMAN="+dsptch.getName()+": survive_downstream="+surviveDownstream);
-		lstnr = new ConcurrentListener(dsptch, this, null, lcfg);
+		lstnr = ConcurrentListener.create(dsptch, this, null, cfg.getListenerConfig());
 
 		// these commands are only fielded by the Primary NAFMAN agent
 		reg.registerHandler(NafManRegistry.CMD_DLIST, 0, this, dsptch);
@@ -85,7 +84,7 @@ public class PrimaryAgent
 			TimerNAF.sleep(shutdown_delay);
 		}
 		events.shutdown(true);
-		dsptch.getLogger().info("Primary shutdown completed - Secondaries="+secondaries.size()+", Commands="+activecmds.size());
+		dsptch.getLogger().info("NAFMAN Primary shutdown completed - Secondaries="+secondaries.size()+", Commands="+activecmds.size());
 	}
 
 	void handleCommand(NafManCommand cmd) throws java.io.IOException

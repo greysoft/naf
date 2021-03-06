@@ -19,8 +19,8 @@ class CommsManager
 	{
 		ResolverConfig cfg = rslvr.getConfig();
 		//we only transmit queries, so TCP BufferSpec transmit-size need not be expanded to the TCP limit
-		com.grey.naf.BufferSpec bufspec_udp = new com.grey.naf.BufferSpec(ResolverConfig.PKTSIZ_UDP, ResolverConfig.PKTSIZ_UDP, ResolverConfig.DIRECTNIOBUFS);
-		com.grey.naf.BufferSpec bufspec_tcp = new com.grey.naf.BufferSpec(ResolverConfig.PKTSIZ_TCP, ResolverConfig.PKTSIZ_UDP, ResolverConfig.DIRECTNIOBUFS);
+		com.grey.naf.BufferSpec bufspec_udp = new com.grey.naf.BufferSpec(ResolverConfig.PKTSIZ_UDP, ResolverConfig.PKTSIZ_UDP, ResolverConfig.DIRECTNIOBUFS, null);
+		com.grey.naf.BufferSpec bufspec_tcp = new com.grey.naf.BufferSpec(ResolverConfig.PKTSIZ_TCP, ResolverConfig.PKTSIZ_UDP, ResolverConfig.DIRECTNIOBUFS, null);
 
 		if (!cfg.isRecursive()) {
 			localNameServers = null;

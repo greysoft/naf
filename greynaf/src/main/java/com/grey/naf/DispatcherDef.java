@@ -17,7 +17,6 @@ public class DispatcherDef
 	private final boolean hasNafman;
 	private final boolean hasDNS;
 	private final boolean zeroNafletsOK;
-	private final boolean surviveDownstream;
 	private final boolean surviveHandlers;
 	private final long flushInterval;
 	private final Clock clock;
@@ -30,7 +29,6 @@ public class DispatcherDef
 		hasDNS = bldr.hasDNS;
 		naflets = bldr.naflets;
 		zeroNafletsOK = bldr.zeroNafletsOK;
-		surviveDownstream = bldr.surviveDownstream;
 		surviveHandlers = bldr.surviveHandlers;
 		flushInterval = bldr.flushInterval;
 		clock = bldr.clock;
@@ -56,10 +54,6 @@ public class DispatcherDef
 		return zeroNafletsOK;
 	}
 
-	public boolean isSurviveDownstream() {
-		return surviveDownstream;
-	}
-
 	public boolean isSurviveHandlers() {
 		return surviveHandlers;
 	}
@@ -83,7 +77,6 @@ public class DispatcherDef
 		private boolean hasNafman;
 		private boolean hasDNS;
 		private boolean zeroNafletsOK = true;
-		private boolean surviveDownstream = true;
 		private boolean surviveHandlers = true;
 		private Clock clock = Clock.systemUTC();
 		private long flushInterval;
@@ -98,7 +91,6 @@ public class DispatcherDef
 			hasDNS = defs.hasDNS;
 			naflets = defs.naflets;
 			zeroNafletsOK = defs.zeroNafletsOK;
-			surviveDownstream = defs.surviveDownstream;
 			surviveHandlers = defs.surviveHandlers;
 			flushInterval = defs.flushInterval;
 			clock = defs.clock;
@@ -110,7 +102,6 @@ public class DispatcherDef
 			hasNafman = cfg.getBool("@nafman", hasNafman);
 			hasDNS = cfg.getBool("@dns", hasDNS);
 			zeroNafletsOK = cfg.getBool("@zero_naflets", zeroNafletsOK);
-			surviveDownstream = cfg.getBool("@survive_downstream", surviveDownstream);
 			surviveHandlers = cfg.getBool("@survive_handlers", surviveHandlers);
 			flushInterval = cfg.getTime("@flush", flushInterval);
 
@@ -145,11 +136,6 @@ public class DispatcherDef
 
 		public Builder withZeroNafletsOK(boolean v) {
 			this.zeroNafletsOK = v;
-			return this;
-		}
-
-		public Builder withSurviveDownstream(boolean v) {
-			this.surviveDownstream = v;
 			return this;
 		}
 

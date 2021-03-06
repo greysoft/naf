@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2018 Yusef Badri - All rights reserved.
+ * Copyright 2013-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.nafman;
@@ -19,7 +19,7 @@ class ResourceManager
 	private final long cachettl;
 	private final String nafver;
 
-	ResourceManager(com.grey.base.config.XmlConfig cfg, PrimaryAgent p, HTTP h, long cachetime)
+	ResourceManager(PrimaryAgent p, HTTP h, long cachetime)
 		throws java.io.IOException, javax.xml.transform.TransformerConfigurationException
 	{
 		primary = p;
@@ -34,7 +34,7 @@ class ResourceManager
 		java.util.Iterator<String> it = rsrc_names.iterator();
 		while (it.hasNext()) {
 			String name = it.next();
-			NafManResource rsrc = loadResource(name, cfg, fact);
+			NafManResource rsrc = loadResource(name, fact);
 			resources.put(name, rsrc);
 		}
 	}
@@ -59,13 +59,12 @@ class ResourceManager
 		return resources.get(rsrc_name);
 	}
 
-	private NafManResource loadResource(String name, com.grey.base.config.XmlConfig cfg, javax.xml.transform.TransformerFactory fact)
+	private NafManResource loadResource(String name, javax.xml.transform.TransformerFactory fact)
 		throws java.io.IOException, javax.xml.transform.TransformerConfigurationException
 	{
 		NafManRegistry.DefResource def = primary.getRegistry().getResource(name);
 		if (def == null) return null;
-		String cfgkey = name.replace(':', '_').replace('.', '_').replace('-', '_');
-		String path = cfg.getValue(cfgkey, false, def.path);
+		String path = def.path;
 		if (path == null) {
 			if (def.gen != null) return new NafManResource(def, http, null, null, null);
 			return null;
@@ -86,10 +85,7 @@ class ResourceManager
 		strdata = replaceToken(TOKEN_NAFVER, nafver, strdata);
 		filedata = strdata.getBytes();
 
-		int pos = path.lastIndexOf('.');
-		String sfx = (pos == -1 ? null : path.substring(pos+1));
-
-		if (sfx != null && sfx.equalsIgnoreCase("xsl")) {
+		if (path.toLowerCase().endsWith(".xsl")) {
 			return new NafManResource(def, http, null, fact, filedata);
 		}
 		java.nio.ByteBuffer niobuf = http.buildStaticResponse(filedata, def.mimetype);
