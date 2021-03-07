@@ -11,11 +11,9 @@ public class SecondaryAgent
 	extends NafManAgent
 	implements Producer.Consumer<NafManCommand>
 {
-	private final Producer<NafManCommand> requests;
 	private final PrimaryAgent primary;
+	private final Producer<NafManCommand> requests;
 
-	@Override
-	public boolean isPrimary() {return false;}
 	@Override
 	public PrimaryAgent getPrimary() {return primary;}
 	@Override
@@ -36,10 +34,13 @@ public class SecondaryAgent
 	@Override
 	public void stop()
 	{
+		Dispatcher dsptch = getDispatcher();
+		PrimaryAgent activePrimary = dsptch.getApplicationContext().getPrimaryAgent();
+		dsptch.getLogger().info("NAFMAN Secondary="+dsptch.getName()+" shutdown with primary="+primary.getDispatcher().getName()+" - active="+activePrimary);
 		setShutdown();
 		requests.shutdown();
-		Dispatcher dsptch = getDispatcher();
-		if (dsptch.getApplicationContext().getPrimaryAgent() == null) return; //Primary has already exited, so don't signal it
+		if (activePrimary == null) return; //Primary has already exited, so don't signal it
+
 		try {
 			primary.secondaryUnsubscribed(this);
 		} catch (Exception ex) {

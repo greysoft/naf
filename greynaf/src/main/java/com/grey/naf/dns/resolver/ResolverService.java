@@ -170,8 +170,8 @@ public class ResolverService
 		QueryHandle.Factory qryfact = new QueryHandle.Factory(this);
 		qrystore = new ObjectWell<>(qryfact, "DNS_"+dsptch.getName());
 
-		if (dsptch.getAgent() != null) {
-			NafManRegistry reg = dsptch.getAgent().getRegistry();
+		if (dsptch.getNafManAgent() != null) {
+			NafManRegistry reg = dsptch.getNafManAgent().getRegistry();
 			reg.registerHandler(NafManRegistry.CMD_DNSDUMP, 0, this, dsptch);
 			reg.registerHandler(NafManRegistry.CMD_DNSPRUNE, 0, this, dsptch);
 			reg.registerHandler(NafManRegistry.CMD_DNSQUERY, 0, this, dsptch);

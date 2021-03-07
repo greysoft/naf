@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2018 Yusef Badri - All rights reserved.
+ * Copyright 2012-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -31,6 +31,12 @@ class SSLConnection
 	private final java.nio.ByteBuffer dummyShakeBuf; //for SSL-handshake Wrap ops, where source buf is ignored
 	private final String logpfx;
 
+	private final boolean isClient;
+	private final String peerCertName;
+	private final long sessionTimeout;
+	private final long shakeTimeout;
+	private final long shakeFreq;
+
 	private XmitQueue xmitq;
 	private byte iostate;
 	private long lastExpireTime;
@@ -44,12 +50,18 @@ class SSLConnection
 	public SSLConnection(CM_Stream chanmon)
 	{
 		cm = chanmon;
-		com.grey.naf.SSLConfig sslcfg = cm.getSSLConfig();
 		int peerport = (cm.getChannel() instanceof java.nio.channels.SocketChannel ?
 				cm.getSocketChannel().socket().getPort() : 0);
-		engine = sslcfg.isClient ?
-				sslcfg.ctx.createSSLEngine(sslcfg.peerCertName, peerport)
-				: sslcfg.ctx.createSSLEngine();
+		com.grey.naf.SSLConfig sslcfg = cm.getSSLConfig();
+		isClient = sslcfg.isClient();
+		peerCertName = sslcfg.getPeerCertName();
+		sessionTimeout = sslcfg.getSessionTimeout();
+		shakeTimeout = sslcfg.getShakeTimeout();
+		shakeFreq = sslcfg.getShakeFreq();
+		javax.net.ssl.SSLContext ctx = sslcfg.getContext();
+		engine = isClient ?
+				ctx.createSSLEngine(sslcfg.getPeerCertName(), peerport)
+				: ctx.createSSLEngine();
 		javax.net.ssl.SSLSession sess = engine.getSession();
 		int netbufsiz = (BUFSIZ_SSL == 0 ? sess.getPacketBufferSize() : BUFSIZ_SSL);
 		int appbufsiz = (BUFSIZ_APP == 0 ? sess.getApplicationBufferSize() : BUFSIZ_APP);
@@ -57,27 +69,27 @@ class SSLConnection
 		sslprotoRcvBuf = com.grey.base.utils.NIOBuffers.create(netbufsiz, com.grey.naf.BufferSpec.directniobufs);
 		appdataRcvBuf = com.grey.base.utils.NIOBuffers.create(appbufsiz, com.grey.naf.BufferSpec.directniobufs);
 		dummyShakeBuf = com.grey.base.utils.NIOBuffers.create(1, false); //could possibly be static?
-		engine.setUseClientMode(sslcfg.isClient); //must call this in both modes - even if getUseClientMode() already seems correct
+		engine.setUseClientMode(isClient); //must call this in both modes - even if getUseClientMode() already seems correct
 
-		if (!sslcfg.isClient) {
-			if (sslcfg.clientAuth == 1) {
+		if (!isClient) {
+			int clientAuth = sslcfg.getClientAuth();
+			if (clientAuth == 1) {
 				engine.setWantClientAuth(true);
-			} else if (sslcfg.clientAuth == 2) {
+			} else if (clientAuth == 2) {
 				engine.setNeedClientAuth(true);
 			}
 		}
 		lastExpireTime = sess.getCreationTime();
-		logpfx = "SSL-"+(sslcfg.isClient ? "Client" : "Server")+": ";
+		logpfx = "SSL-"+(isClient ? "Client" : "Server")+": ";
 	}
 
 	void start() throws java.io.IOException
 	{
-		if (cm.getSSLConfig().isClient) {
+		if (isClient) {
 			// Initiate handshake. The dummy transmit calls wrap(), which will start the handshake.
 			transmit(dummyShakeBuf, false);
 		}
-		long tmt = cm.getSSLConfig().shakeTimeout;
-		if (tmt != 0) tmr_shake = cm.getDispatcher().setTimer(tmt, 0, this);
+		if (shakeTimeout != 0) tmr_shake = cm.getDispatcher().setTimer(shakeTimeout, 0, this);
 	}
 
 	void close()
@@ -279,15 +291,14 @@ class SSLConnection
 		{
 		case FINISHED:
 		case NOT_HANDSHAKING:
-			com.grey.naf.SSLConfig sslcfg = cm.getSSLConfig();
 			if (!clearFlag(S_HANDSHAKE)) {
 				// We are not (and were not) in a handshake - but maybe it's time we did one.
 				boolean force_handshake = false;
-				if (sslcfg.sessionTimeout != 0 && cm.getSystemTime() - lastExpireTime > sslcfg.sessionTimeout) {
+				if (sessionTimeout != 0 && cm.getSystemTime() - lastExpireTime > sessionTimeout) {
 					// Invalidate current SSL session, to force a full renegotiation.
 					engine.getSession().invalidate(); //this forces full handshake
 					force_handshake = true;
-				} else if (sslcfg.shakeFreq != 0 && cm.getSystemTime() - lastShakeTime > sslcfg.shakeFreq) {
+				} else if (shakeFreq != 0 && cm.getSystemTime() - lastShakeTime > shakeFreq) {
 					force_handshake = true;
 				}
 				if (force_handshake) {
@@ -297,17 +308,16 @@ class SSLConnection
 				return false;
 			}
 			// Handshake has just completed, so verify the remote peer's identity.
-			String target = sslcfg.peerCertName;
-			if (target != null) {
+			if (peerCertName != null) {
 				java.security.cert.X509Certificate peercert = (java.security.cert.X509Certificate)(engine.getSession().getPeerCertificates()[0]);
 				boolean matches = false;
 				try {
-					matches = com.grey.base.crypto.SSLCertificate.matchSubjectHost(peercert, target);
+					matches = com.grey.base.crypto.SSLCertificate.matchSubjectHost(peercert, peerCertName);
 				} catch (java.security.cert.CertificateException ex) {
 					throw new java.io.IOException("Failed to parse certificate on "+cm.getChannel(), ex);
 				}
 				if (!matches) {
-					cm.getLogger().warn(logpfx+"Received SSL-cert ["+peercert.getSubjectDN().getName()+"] doesn't match target="+target+" on "+cm+"/"+cm.getChannel());
+					cm.getLogger().warn(logpfx+"Received SSL-cert ["+peercert.getSubjectDN().getName()+"] doesn't match target="+peerCertName+" on "+cm+"/"+cm.getChannel());
 					disconnect(false, "Invalid remote SSL-certificate ID");
 					return false;
 				}

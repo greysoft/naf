@@ -141,7 +141,7 @@ public abstract class CM_Stream extends ChannelMonitor
 	boolean isPureSSL()
 	{
 		com.grey.naf.SSLConfig sslcfg = getSSLConfig();
-		return (sslcfg != null && !sslcfg.latent);
+		return (sslcfg != null && !sslcfg.isLatent());
 	}
 
 	@Override

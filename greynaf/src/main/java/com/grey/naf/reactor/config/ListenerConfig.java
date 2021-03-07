@@ -57,13 +57,18 @@ public class ListenerConfig
 		// Call the other setter methods before this to set any defaults for name, iface, port, backlog
 		public T withXmlConfig(XmlConfig cfg, ApplicationContextNAF appctx) {
 			cfg = getLinkConfig(cfg);
+
 			XmlConfig xmlSSL = cfg.getSection("ssl");
 			try {
-				configSSL = SSLConfig.create(xmlSSL, appctx.getConfig(), null, false);
+				if (xmlSSL != null && xmlSSL.exists()) {
+					configSSL = new SSLConfig.Builder()
+							.withXmlConfig(xmlSSL, appctx.getConfig())
+							.build();
+					if (portSSL != 0) port = portSSL;
+				}
 			} catch (Exception ex) {
 				throw new NAFConfigException("Failed to configure SSL", ex);
 			}
-			if (configSSL != null && portSSL != 0) port = portSSL;
 
 			name = cfg.getValue("@name", false, name);
 			iface = cfg.getValue("@interface", false, iface);

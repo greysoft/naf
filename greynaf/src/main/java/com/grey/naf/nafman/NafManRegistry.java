@@ -195,7 +195,7 @@ public class NafManRegistry
 	// All else being equal, later registrations within same Dispatcher supercede earlier ones.
 	synchronized public boolean registerHandler(String cmdcode, int pref, NafManCommand.Handler handler, Dispatcher dsptch)
 	{
-		if (dsptch.getAgent() == null) {
+		if (dsptch.getNafManAgent() == null) {
 			// If this is an internal NAFMAN handler (primary or secondary agent) then obviously its Dispatcher is NAFMAN-enabled
 			// but we have to insert this get-out clause for internal handlers because the dsptch.nafman field is not set until
 			// after the Agent constructor returns, and that's where they call this method from.

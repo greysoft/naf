@@ -31,8 +31,6 @@ public class PrimaryAgent
 	private final ArrayList<NafManCommand> tmpcmds = new ArrayList<>();
 
 	@Override
-	public boolean isPrimary() {return true;}
-	@Override
 	public PrimaryAgent getPrimary() {return this;}
 	@Override
 	public int getPort() {return lstnr.getPort();}
@@ -42,9 +40,9 @@ public class PrimaryAgent
 		super(dsptch, reg);
 		this.surviveDownstream = cfg.isSurviveDownstream();
 		events = new Producer<Object>(Object.class, dsptch, this);
-		events.start();
-		dsptch.getLogger().info("NAFMAN="+dsptch.getName()+": survive_downstream="+surviveDownstream);
+		events.start(); //have to do this before creating any secondary agents, as they subscribe in their constructor
 		lstnr = ConcurrentListener.create(dsptch, this, null, cfg.getListenerConfig());
+		dsptch.getLogger().info("NAFMAN-Primary="+dsptch.getName()+": survive_downstream="+surviveDownstream+", lstnr="+lstnr);
 
 		// these commands are only fielded by the Primary NAFMAN agent
 		reg.registerHandler(NafManRegistry.CMD_DLIST, 0, this, dsptch);
@@ -66,7 +64,7 @@ public class PrimaryAgent
 	public void stop()
 	{
 		Dispatcher dsptch = getDispatcher();
-		dsptch.getLogger().info("NAFMAN Primary shutdown with Secondaries="+secondaries.size()+", Commands="+activecmds.size());
+		dsptch.getLogger().info("NAFMAN Primary="+dsptch.getName()+" shutdown with Secondaries="+secondaries.size()+", Commands="+activecmds.size());
 		setShutdown();
 		lstnr.stop();
 

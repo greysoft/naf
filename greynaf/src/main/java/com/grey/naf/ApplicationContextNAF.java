@@ -10,6 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
+import java.util.function.Supplier;
 
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.CM_Listener;
@@ -37,6 +38,9 @@ public class ApplicationContextNAF {
 	private final String ctxname;
 	private final NAFConfig config;
 	private final ExecutorService threadpool;
+
+	private PrimaryAgent primaryAgent;
+	private final Object primaryLock = new Object();
 
 	public String getName() {return ctxname;}
 	public NAFConfig getConfig() {return config;}
@@ -81,6 +85,13 @@ public class ApplicationContextNAF {
 
 	public void deregister(Dispatcher d) {
 		dispatchers.remove(d.getName());
+		NafManAgent agent = d.getNafManAgent();
+		if (agent != null && agent.isPrimary()) {
+			synchronized (primaryLock) {
+				// there's no reason why a primary agent wouldn't be the registered one, but do defensive check anyway
+				if (agent == primaryAgent) primaryAgent = null;
+			}
+		}
 	}
 
 	public Dispatcher getDispatcher(String name) {
@@ -108,12 +119,17 @@ public class ApplicationContextNAF {
 		return listeners.values();
 	}
 
-	public PrimaryAgent getPrimaryAgent() {
-		for (Dispatcher d : getDispatchers()) {
-			NafManAgent agent = d.getAgent();
-			if (agent != null && agent.isPrimary()) return (PrimaryAgent)agent;
+	public PrimaryAgent registerPrimaryAgent(Supplier<PrimaryAgent> supplier) {
+		synchronized (primaryLock) {
+			if (primaryAgent == null) primaryAgent = supplier.get();
+			return primaryAgent;
 		}
-		return null;
+	}
+
+	public PrimaryAgent getPrimaryAgent() {
+		synchronized (primaryLock) {
+			return primaryAgent;
+		}
 	}
 
 	public <T> T getNamedItem(String name, ItemFactory<T> fact) {

@@ -55,7 +55,7 @@ public abstract class CM_Listener
 		int srvbacklog = config.getBacklog();
 		if (lname == null) lname = getDispatcher().getName()+":"+port;
 		name = lname;
-		getLogger().trace("Dispatcher="+getDispatcher().getName()+" - Listener="+name+": Initialising on interface="+iface+", port="+port
+		getLogger().info("Listener="+name+" in Dispatcher="+getDispatcher().getName()+" initialising on interface="+iface+", port="+port
 				+" with controller="+controller+", reaper="+getReaper());
 
 		// set up our listening socket
@@ -71,7 +71,7 @@ public abstract class CM_Listener
 
 		getLogger().info("Listener="+name+" bound to "+srvsock.getInetAddress()+":"+srvport+(port==0?"/dynamic":"")
 				         +(iface==null ? "" : " on interface="+iface)+"; Backlog="+srvbacklog);
-		if (sslconfig != null) sslconfig.declare("Listener="+name+": ", getLogger());
+		if (sslconfig != null) getLogger().info("Listener="+name+": "+sslconfig);
 	}
 
 	public void start() throws java.io.IOException

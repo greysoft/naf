@@ -10,6 +10,7 @@ import com.grey.base.utils.FileOps;
 import com.grey.base.utils.IP;
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
+import com.grey.naf.SSLConfig;
 import com.grey.naf.reactor.config.ConcurrentListenerConfig;
 
 /*
@@ -71,7 +72,7 @@ public class SSLConnectionTest
 	SSLS lastsrv;
 
 	@org.junit.Test
-	public void testNonSSL() throws java.io.IOException, java.security.GeneralSecurityException
+	public void testNonSSL() throws Exception
 	{
 		String sxml = "<x>"+srvcfg_nonssl+"</x>";
 		String cxml = "<x>"+clntcfg_nonssl+"</x>";
@@ -81,7 +82,7 @@ public class SSLConnectionTest
 	}
 
 	@org.junit.Test
-	public void testPureSSL() throws java.io.IOException, java.security.GeneralSecurityException
+	public void testPureSSL() throws Exception
 	{
 		String sxml = "<listeners><listener>"+srvcfg_puressl+"</listener></listeners>";
 		String cxml = "<x>"+clntcfg_puressl+"</x>";
@@ -91,7 +92,7 @@ public class SSLConnectionTest
 	}
 
 	@org.junit.Test
-	public void testSwitchSSL() throws java.io.IOException, java.security.GeneralSecurityException
+	public void testSwitchSSL() throws Exception
 	{
 		String sxml = "<listeners><listener>"+srvcfg_switchssl+"</listener></listeners>";
 		String cxml = "<x>"+clntcfg_switchssl+"</x>";
@@ -101,7 +102,7 @@ public class SSLConnectionTest
 	}
 
 	@org.junit.Test
-	public void testAnonClient() throws java.io.IOException, java.security.GeneralSecurityException
+	public void testAnonClient() throws Exception
 	{
 		String sxml = "<x>"+srvcfg_anonclient+"</x>";
 		String cxml = "<x>"+clntcfg_anonclient+"</x>";
@@ -112,7 +113,7 @@ public class SSLConnectionTest
 
 	// Server config specifies non-matching peercert
 	@org.junit.Test
-	public void testBadClient_wrongcert_pure() throws java.io.IOException, java.security.GeneralSecurityException
+	public void testBadClient_wrongcert_pure() throws Exception
 	{
 		String sxml = "<x>"+srvcfg_badcert_pure+"</x>";
 		String cxml = "<x>"+clntcfg_badcert_pure+"</x>";
@@ -122,7 +123,7 @@ public class SSLConnectionTest
 	}
 
 	@org.junit.Test
-	public void testBadClient_wrongcert_switch() throws java.io.IOException, java.security.GeneralSecurityException
+	public void testBadClient_wrongcert_switch() throws Exception
 	{
 		String sxml = "<x>"+srvcfg_badcert_switch+"</x>";
 		String cxml = "<x>"+clntcfg_badcert_switch+"</x>";
@@ -132,7 +133,7 @@ public class SSLConnectionTest
 	}
 
 	@org.junit.Test
-	public void testBadClient_noconnect() throws java.io.IOException, java.security.GeneralSecurityException
+	public void testBadClient_noconnect() throws Exception
 	{
 		String sxml = "<listeners><listener>"+srvcfg_puressl+"</listener></listeners>";
 		String cxml = "<x>"+clntcfg_puressl+"</x>";
@@ -141,8 +142,7 @@ public class SSLConnectionTest
 		runtest(clntcfg, srvcfg, true, true, 0, FAILTYPE.NOCONNECT);
 	}
 
-	private void runtest(XmlConfig clntcfg, XmlConfig srvcfg, boolean sslmode, boolean lset, int fail_step, FAILTYPE failtype)
-			throws java.io.IOException, java.security.GeneralSecurityException
+	private void runtest(XmlConfig clntcfg, XmlConfig srvcfg, boolean sslmode, boolean lset, int fail_step, FAILTYPE failtype) throws java.io.IOException
 	{
 		FileOps.deleteDirectory(rootdir);
 
@@ -356,14 +356,20 @@ public class SSLConnectionTest
 		@Override
 		protected com.grey.naf.SSLConfig getSSLConfig() {return sslconfig;}
 
-		public SSLC(Dispatcher d, XmlConfig cfg, int port)
-				throws java.io.IOException, java.security.GeneralSecurityException
+		public SSLC(Dispatcher d, XmlConfig cfg, int port) throws java.io.IOException
 		{
 			super(d, new com.grey.naf.BufferSpec(cfg, "niobuffers", 256, 128), new com.grey.naf.BufferSpec(cfg, "niobuffers", 256, 128));
 			srvport = port;
 			XmlConfig sslcfg = (cfg == null ? XmlConfig.NULLCFG : cfg.getSection("ssl"));
-			sslconfig = com.grey.naf.SSLConfig.create(sslcfg, null, null, true);
-			org.junit.Assert.assertNotNull(getSSLConfig());
+			if (sslcfg == null || !sslcfg.exists()) {
+				sslconfig = null;
+			} else {
+				sslconfig = new SSLConfig.Builder()
+						.withIsClient(true)
+						.withXmlConfig(sslcfg, d.getApplicationContext().getConfig())
+						.build();
+				org.junit.Assert.assertNotNull(getSSLConfig());
+			}
 		}
 
 		public void start(com.grey.naf.EntityReaper rpr) throws java.io.IOException, java.net.UnknownHostException
@@ -390,7 +396,7 @@ public class SSLConnectionTest
 				completed = true;
 				return;
 			}
-			if (getSSLConfig().latent) {
+			if (getSSLConfig().isLatent()) {
 				org.junit.Assert.assertFalse(usingSSL());
 			} else {
 				org.junit.Assert.assertTrue(usingSSL());
@@ -504,7 +510,7 @@ public class SSLConnectionTest
 				chan = getChannel();
 				SSLConnectionTest harness = (SSLConnectionTest)getListener().getController();
 				harness.lastsrv = this;
-				if (getSSLConfig().latent) {
+				if (getSSLConfig().isLatent()) {
 					org.junit.Assert.assertFalse(usingSSL());
 				} else {
 					org.junit.Assert.assertTrue(usingSSL());
@@ -551,7 +557,7 @@ public class SSLConnectionTest
 				// send 2-line response, to make sure client's line-delimited receive works
 				step++;
 				getWriter().transmit("OK "+step+"a\nReady "+step+"b\n");
-				state.verifySSL(this, getSSLConfig().peerCertName != null, clnt_certname, true);
+				state.verifySSL(this, getSSLConfig().getPeerCertName() != null, clnt_certname, true);
 			}
 
 			if (step == iomessages.length) {
@@ -636,8 +642,8 @@ public class SSLConnectionTest
 					org.junit.Assert.assertNull(peerchain);
 				}
 			} else {
-				if (cm.getSSLConfig().mdty && switchssl) {
-					org.junit.Assert.assertTrue(cm.getSSLConfig().latent);
+				if (cm.getSSLConfig().isMandatory() && switchssl) {
+					org.junit.Assert.assertTrue(cm.getSSLConfig().isLatent());
 					cm.startSSL();
 					switched = true;
 				}

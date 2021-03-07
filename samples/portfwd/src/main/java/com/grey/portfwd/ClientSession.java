@@ -4,10 +4,17 @@
  */
 package com.grey.portfwd;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.grey.base.utils.ByteArrayRef;
 import com.grey.base.utils.TimeOps;
+import com.grey.base.utils.TSAP;
 import com.grey.base.config.XmlConfig.XmlConfigException;
 import com.grey.naf.NAFConfig;
+import com.grey.portfwd.balance.Balancer;
+import com.grey.portfwd.balance.RoundRobin;
+import com.grey.logging.Logger;
 import com.grey.logging.Logger.LEVEL;
 
 public class ClientSession
@@ -18,7 +25,7 @@ public class ClientSession
 		implements com.grey.naf.reactor.ConcurrentListener.ServerFactory
 	{
 		final com.grey.naf.reactor.CM_Listener lstnr;
-		final com.grey.portfwd.balance.Balancer loadbalancer;
+		final Balancer loadbalancer;
 		final com.grey.naf.BufferSpec bufspec;
 		final long tmt_idle;
 
@@ -42,19 +49,19 @@ public class ClientSession
 			if (servicecfg == null) {
 				throw new XmlConfigException("Server="+lstnr.getName()+": No services found");
 			}
-			com.grey.base.utils.TSAP[] services = new com.grey.base.utils.TSAP[servicecfg.length];
+			List<TSAP> services = new ArrayList<>(servicecfg.length);
 
-			for (int idx = 0; idx != services.length; idx++) {
+			for (int idx = 0; idx != servicecfg.length; idx++) {
 				String address = servicecfg[idx].getValue("@address", true, null);
-				services[idx] = com.grey.base.utils.TSAP.build(address, 0, true);
+				services.add(TSAP.build(address, 0, true));
 			}
-			Object obj = NAFConfig.createEntity(balancercfg, com.grey.portfwd.balance.RoundRobin.class, com.grey.portfwd.balance.Balancer.class, false,
-					new Class<?>[]{com.grey.base.utils.TSAP[].class},
-					new Object[]{services});
-			loadbalancer = com.grey.portfwd.balance.Balancer.class.cast(obj);
+			Object obj = NAFConfig.createEntity(balancercfg, RoundRobin.class, Balancer.class, false,
+					new Class<?>[]{List.class, Logger.class},
+					new Object[]{services, lstnr.getLogger()});
+			loadbalancer = Balancer.class.cast(obj);
 
-			l.getLogger().info("Server for "+lstnr.getName()+" has LoadBalancer="+loadbalancer.getClass().getName()
-					+", Controller="+lstnr.getController().getClass().getName()+", Timeout="+TimeOps.expandMilliTime(tmt_idle));
+			l.getLogger().info("Server for "+lstnr.getName()+" has LoadBalancer="+loadbalancer
+					+", Controller="+lstnr.getController()+", Timeout="+TimeOps.expandMilliTime(tmt_idle));
 			l.getLogger().trace("NIO-Buffers: "+bufspec);
 		}
 	}

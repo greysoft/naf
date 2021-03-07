@@ -38,7 +38,7 @@ public class ClientTest
 		String dname = "testdispatcher1";
 
 		Dispatcher dsptch = Dispatcher.createConfigured(appctx, dname, logger);
-		NafManAgent agent = dsptch.getAgent();
+		NafManAgent agent = dsptch.getNafManAgent();
 		org.junit.Assert.assertTrue(agent.isPrimary());
 		org.junit.Assert.assertSame(agent, appctx.getPrimaryAgent());
 		dsptch.start();
@@ -46,14 +46,14 @@ public class ClientTest
 		waitStopped(dsptch);
 
 		dsptch = Dispatcher.createConfigured(appctx, dname, logger);
-		agent = dsptch.getAgent();
+		agent = dsptch.getNafManAgent();
 		dsptch.start();
 		com.grey.naf.Launcher.main(new String[] {"-q", "-cmd", stopcmd.code,
 				"-remote", "localhost:"+String.valueOf(agent.getPort())});
 		waitStopped(dsptch);
 
 		dsptch = Dispatcher.createConfigured(appctx, dname, logger);
-		agent = dsptch.getAgent();
+		agent = dsptch.getNafManAgent();
 		dsptch.start();
 		// this should be ignored by the Dispatcher as it has no handlers
 		com.grey.naf.Launcher.main(new String[] {"-q", "-cmd", fakecmd1.code, "-c", cfgpath,
@@ -91,16 +91,16 @@ public class ClientTest
 		dp.start();
 		ds1.start();
 		ds2.start();
-		org.junit.Assert.assertTrue(dp.getAgent().isPrimary());
-		org.junit.Assert.assertFalse(ds1.getAgent().isPrimary());
-		org.junit.Assert.assertFalse(ds2.getAgent().isPrimary());
-		NafManClient.submitCommand(stopcmd.code+"?"+NafManCommand.ATTR_DISPATCHER+"="+ds2.getName(), null, ds1.getAgent().getPort(), logger);
+		org.junit.Assert.assertTrue(dp.getNafManAgent().isPrimary());
+		org.junit.Assert.assertFalse(ds1.getNafManAgent().isPrimary());
+		org.junit.Assert.assertFalse(ds2.getNafManAgent().isPrimary());
+		NafManClient.submitCommand(stopcmd.code+"?"+NafManCommand.ATTR_DISPATCHER+"="+ds2.getName(), null, ds1.getNafManAgent().getPort(), logger);
 		waitStopped(ds2);
 		org.junit.Assert.assertFalse(ds2.isRunning());
 		com.grey.naf.reactor.TimerNAF.sleep(100);
 		org.junit.Assert.assertTrue(dp.isRunning());
 		org.junit.Assert.assertTrue(ds1.isRunning());
-		NafManClient.submitCommand(stopcmd.code, null, ds1.getAgent().getPort(), logger);
+		NafManClient.submitCommand(stopcmd.code, null, ds1.getNafManAgent().getPort(), logger);
 		waitStopped(dp);
 		waitStopped(ds1);
 	}
@@ -119,7 +119,7 @@ public class ClientTest
 		Dispatcher dsptch = Dispatcher.create(appctx, def, logger);
 		dsptch.start();
 		NafManRegistry reg = NafManRegistry.get(appctx);
-		int port = dsptch.getAgent().getPort();
+		int port = dsptch.getNafManAgent().getPort();
 		NafManClient.submitCommand(reg.getCommand(NafManRegistry.CMD_DLIST).code, null, port, dsptch.getLogger());
 		NafManClient.submitCommand(reg.getCommand(NafManRegistry.CMD_DSHOW).code, null, port, dsptch.getLogger());
 		NafManClient.submitCommand(reg.getCommand(NafManRegistry.CMD_FLUSH).code, null, port, dsptch.getLogger());

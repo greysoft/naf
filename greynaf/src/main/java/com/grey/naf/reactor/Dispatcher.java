@@ -10,6 +10,7 @@ import java.util.Collection;
 import java.util.Set;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 import java.time.Clock;
 
 import com.grey.base.config.SysProps;
@@ -50,7 +51,7 @@ public class Dispatcher
 
 	private final String name;
 	private final ApplicationContextNAF appctx;
-	private final NafManAgent nafman;
+	private final NafManAgent nafmanAgent;
 	private final ResolverDNS dnsresolv;
 	private final Flusher flusher;
 	private final Logger logger;
@@ -94,7 +95,7 @@ public class Dispatcher
 	public String getName() {return name;}
 	public long getTimeBoot() {return timeboot;}
 	public ApplicationContextNAF getApplicationContext() {return appctx;}
-	public NafManAgent getAgent() {return nafman;}
+	public NafManAgent getNafManAgent() {return nafmanAgent;}
 	public ResolverDNS getResolverDNS() {return dnsresolv;}
 	public Flusher getFlusher() {return flusher;}
 	public Logger getLogger() {return logger;}
@@ -151,16 +152,24 @@ public class Dispatcher
 		if (def.hasNafman()) {
 			NafManRegistry reg = NafManRegistry.get(appctx);
 			NafManConfig configNafMan = new NafManConfig.Builder()
-					.withXmlConfig(nafcfg.getNafman(), getApplicationContext())
+					.withXmlConfig(nafcfg.getNafman(), appctx)
 					.build();
-			if (appctx.getPrimaryAgent() == null) {
-				nafman = new PrimaryAgent(this, reg, configNafMan);
+			Supplier<PrimaryAgent> supplier = () -> {
+				try {
+					return new PrimaryAgent(this, reg, configNafMan);
+				} catch (Exception ex) {
+					throw new NAFConfigException("Failed to create primary NAFMAN agent", ex);
+				}
+			};
+			NafManAgent agent = appctx.registerPrimaryAgent(supplier);
+			if (agent.getDispatcher() != this) {
+				nafmanAgent = new SecondaryAgent(this, reg, configNafMan);
 			} else {
-				nafman = new SecondaryAgent(this, reg, configNafMan);
+				nafmanAgent = agent;
 			}
-			getLogger().info("Dispatcher="+name+": Initialised NAFMAN - "+(nafman.isPrimary() ? "Primary" : "Secondary"));
+			getLogger().info("Dispatcher="+name+": Initialised NAFMAN - "+(nafmanAgent.isPrimary() ? "Primary" : "Secondary"));
 		} else {
-			nafman = null;
+			nafmanAgent = null;
 		}
 
 		if (def.hasDNS()) {
@@ -206,7 +215,7 @@ public class Dispatcher
 		boolean ok = true;
 
 		try {
-			if (nafman != null) nafman.start();
+			if (getNafManAgent() != null) getNafManAgent().start();
 			if (dnsresolv != null) dnsresolv.start();
 
 			Naflet[] arr = listNaflets();
@@ -282,7 +291,7 @@ public class Dispatcher
 			getLogger().log(LEVEL.INFO, ex, false, "Dispatcher="+getName()+": Failed to close NIO Selector");
 		}
 		if (dnsresolv != null)  dnsresolv.stop();
-		if (nafman != null) nafman.stop();
+		if (getNafManAgent() != null) getNafManAgent().stop();
 		dynamicLoader.shutdown();
 
 		int reaper_cnt = 0;
@@ -742,7 +751,7 @@ public class Dispatcher
 		dtcal.setTimeInMillis(timeboot);
 		sb.append("<infonodes>");
 		sb.append("<infonode name=\"Disposition\" dispatcher=\"").append(getName()).append("\">");
-		sb.append("NAFMAN = ").append(nafman == null ? "No" : (nafman.isPrimary() ? "Primary" : "Secondary"));
+		sb.append("NAFMAN = ").append(getNafManAgent() == null ? "No" : (getNafManAgent().isPrimary() ? "Primary" : "Secondary"));
 		sb.append("<br/>DNS = ").append(dnsresolv == null ? "No" : dnsresolv);
 		sb.append("<br/>Log-Level = ").append(getLogger().getLevel());
 		sb.append("<br/>Boot-Time = ");

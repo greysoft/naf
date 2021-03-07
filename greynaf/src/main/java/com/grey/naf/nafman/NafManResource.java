@@ -102,9 +102,10 @@ class NafManResource
 	@Override
 	public byte[] generateResourceData(com.grey.naf.reactor.Dispatcher d)
 	{
-		NafManRegistry reg = d.getAgent().getRegistry();
+		NafManAgent agent = d.getNafManAgent();
+		NafManRegistry reg = agent.getRegistry();
 		java.util.Collection<NafManRegistry.DefCommand> cmds = reg.getCommands();
-		CharSequence xml_dispatchers = d.getAgent().listDispatchers();
+		CharSequence xml_dispatchers = agent.listDispatchers();
 		com.grey.base.utils.ByteChars bc = new com.grey.base.utils.ByteChars();
 		long timeboot = d.getTimeBoot();
 		long uptime = d.getSystemTime() - timeboot;

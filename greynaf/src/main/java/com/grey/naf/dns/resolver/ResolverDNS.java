@@ -72,7 +72,7 @@ public abstract class ResolverDNS
 	private final ResolverAnswer answerA = new ResolverAnswer();
 	private final ResolverAnswer answerLocalIP = new ResolverAnswer();
 
-	public static ResolverDNS create(Dispatcher dsptch, XmlConfig xmlcfg) throws java.io.IOException
+	public static ResolverDNS create(Dispatcher dsptch, XmlConfig xmlcfg)
 	{
 		String cfgclass = com.grey.naf.dns.resolver.distributed.DistributedResolver.class.getName();
 		String master = null;

@@ -21,7 +21,6 @@ public abstract class NafManAgent
 	//temp objects pre-allocated merely for efficiency
 	private final StringBuilder sbtmp = new StringBuilder();
 
-	public abstract boolean isPrimary();
 	public abstract PrimaryAgent getPrimary();
 	public abstract int getPort();
 	public abstract void stop();
@@ -29,6 +28,7 @@ public abstract class NafManAgent
 	@Override
 	public CharSequence nafmanHandlerID() {return "Agent";}
 
+	public boolean isPrimary() {return (this == getPrimary());}
 	public Dispatcher getDispatcher() {return dsptch;}
 	public NafManRegistry getRegistry() {return registry;}
 	protected void setShutdown() {in_shutdown = true;}
@@ -61,7 +61,10 @@ public abstract class NafManAgent
 		try {
 			processCommand(cmd);
 		} finally {
-			if (cmd.detach(this) == NafManCommand.DETACH_FINAL) getPrimary().commandCompleted(cmd);
+			if (cmd.detach(this) == NafManCommand.DETACH_FINAL) {
+				PrimaryAgent primary = getPrimary();
+				if (primary != null) primary.commandCompleted(cmd);
+			}
 		}
 	}
 
@@ -156,7 +159,7 @@ public abstract class NafManAgent
 		for (Dispatcher d : dsptch.getApplicationContext().getDispatchers()) {
 			Naflet[] apps = d.listNaflets();
 			String nafman = "No";
-			if (d.getAgent() != null) nafman = (d.getAgent().isPrimary() ? "Primary" : "Secondary");
+			if (d.getNafManAgent() != null) nafman = (d.getNafManAgent().isPrimary() ? "Primary" : "Secondary");
 			sb.append("<dispatcher name=\"").append(d.getName());
 			sb.append("\" log=\"").append(d.getLogger().getLevel());
 			sb.append("\" nafman=\"").append(nafman);
@@ -177,5 +180,10 @@ public abstract class NafManAgent
 	{
 		if (in_shutdown) return true;  //Dispatcher has already told us to stop
 		return dsptch.stop();
+	}
+
+	@Override
+	public String toString() {
+		return super.toString()+" for Dispatcher="+getDispatcher().getName()+" with primary="+getPrimary().getDispatcher().getName();
 	}
 }

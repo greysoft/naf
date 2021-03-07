@@ -28,8 +28,8 @@ public class Task
 		String lname = "Task="+getName();
 		ConcurrentListenerConfig[] lcfg = ConcurrentListenerConfig.buildMultiConfig(lname, dsptch, "listeners/listener", taskConfig(), 0, 0, null, null);
 		listeners = new ListenerSet(lname, dsptch, this, this, lcfg);
-		if (dsptch.getAgent() != null) {
-			NafManRegistry reg = dsptch.getAgent().getRegistry();
+		if (dsptch.getNafManAgent() != null) {
+			NafManRegistry reg = dsptch.getNafManAgent().getRegistry();
 			reg.registerHandler(CMD_SHOWCONNS, 0, this, dsptch);
 		}
 	}

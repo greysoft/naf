@@ -15,7 +15,12 @@ import com.grey.naf.reactor.Dispatcher;
 
 public class ConcurrentListenerConfig extends ListenerConfig
 {
+	// The server factory creates a server instance to handle each incoming connection on the listener.
+	// The factory's constructor takes the Listener as one arg and a factory-specific object as another, so this config
+	// needs to specify the factory class and its user-defined parameter.
+	// If the factory constructor requires more args than that, you must supply them as an array.
 	private final Function<ConcurrentListener,ConcurrentListener.ServerFactory> serverFactoryGenerator;
+
 	private final int serversMin;
 	private final int serversMax;
 	private final int serversIncrement;
