@@ -164,7 +164,7 @@ public class SSLConfig
 	@Override
 	public String toString()
 	{
-		String txt = "SSL="+getContext().getProtocol()+"/"+getContext().getProvider().getClass().getName()
+		String txt = super.toString()+": Context="+getContext().getProtocol()+"/"+getContext().getProvider().getClass().getName()
 				+"; server="+!isClient+(isClient()?"":"/client-auth="+getClientAuth())
 				+"; latent="+isLatent()+(isLatent() ? "/mandatory="+isMandatory() : "")
 				+"; session-cache="+TimeOps.expandMilliTime(getSessionTimeout())+"/"+getSessionCacheSize()+"; shake="+TimeOps.expandMilliTime(getShakeFreq())

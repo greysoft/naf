@@ -12,7 +12,7 @@ public class SecondaryAgent
 	implements Producer.Consumer<NafManCommand>
 {
 	private final PrimaryAgent primary;
-	private final Producer<NafManCommand> requests;
+	private final Producer<NafManCommand> requests; //for receiving commands from the primary agent
 
 	@Override
 	public PrimaryAgent getPrimary() {return primary;}
@@ -27,8 +27,10 @@ public class SecondaryAgent
 			throw new IllegalStateException("Dispatcher="+dsptch.getName()+": Cannot create Secondary NAFMAN before Primary");
 		}
 		requests = new Producer<NafManCommand>(NafManCommand.class, dsptch, this);
-		requests.start();
+
+		// we have to subscribe to the Primary in our constructor due to unit-test timings, but 'requests' producer could be started in our start()
 		primary.secondarySubscribed(this);
+		requests.start();
 	}
 
 	@Override

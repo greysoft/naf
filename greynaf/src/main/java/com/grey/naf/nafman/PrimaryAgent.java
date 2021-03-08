@@ -23,7 +23,7 @@ public class PrimaryAgent
 	private final CM_Listener lstnr;
 	private final ArrayList<SecondaryAgent> secondaries = new ArrayList<>();
 	private final ArrayList<NafManCommand> activecmds = new ArrayList<>();
-	private final Producer<Object> events;
+	private final Producer<Object> events;  //for receiving events from the secondary agents
 	private final boolean surviveDownstream;
 
 	//preallocated purely for efficiency
@@ -40,7 +40,6 @@ public class PrimaryAgent
 		super(dsptch, reg);
 		this.surviveDownstream = cfg.isSurviveDownstream();
 		events = new Producer<Object>(Object.class, dsptch, this);
-		events.start(); //have to do this before creating any secondary agents, as they subscribe in their constructor
 		lstnr = ConcurrentListener.create(dsptch, this, null, cfg.getListenerConfig());
 		dsptch.getLogger().info("NAFMAN-Primary="+dsptch.getName()+": survive_downstream="+surviveDownstream+", lstnr="+lstnr);
 
@@ -57,6 +56,7 @@ public class PrimaryAgent
 			getDispatcher().getLogger().trace(getRegistry().dumpState(null, false));
 		}
 		super.start();
+		events.start();
 		lstnr.start();
 	}
 
@@ -95,7 +95,7 @@ public class PrimaryAgent
 		cmd.attach(this);
 		tmpagents.clear();
 		cmd.getAttachedAgents(tmpagents); //synchronises on cmd, before we pass it to secondaries
-		LEVEL lvl = LEVEL.TRC2;
+		LEVEL lvl = LEVEL.TRC;
 		if (dsptch.getLogger().isActive(lvl)) {
 			dsptch.getLogger().log(lvl, "NAFMAN Primary fielding command="+def.code+" for Agents="
 						+tmpagents.size()+"/"+(secondaries.size()+1)+" - ActiveCmds="+activecmds.size());

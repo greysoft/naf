@@ -14,6 +14,7 @@ import com.grey.naf.ApplicationContextNAF;
 import com.grey.naf.dns.resolver.PacketDNS;
 import com.grey.naf.dns.resolver.ResolverDNS;
 import com.grey.naf.dns.resolver.ResourceData;
+import com.grey.naf.dns.server.DnsServerConfig;
 import com.grey.naf.reactor.Dispatcher;
 
 import java.util.HashSet;
@@ -43,7 +44,11 @@ class TestServerDNS
 				.withSurviveHandlers(false)
 				.build();
 		Dispatcher dsptch = Dispatcher.create(appctx, def, null);
-		srvr = new com.grey.naf.dns.server.ServerDNS(this, dsptch, "127.0.0.1", 0);
+
+		DnsServerConfig.Builder bldr = new DnsServerConfig.Builder();
+		bldr.getListenerConfig().withPort(0).withInterface("127.0.0.1");
+		srvr = new com.grey.naf.dns.server.ServerDNS(dsptch, this, bldr.build());
+
 		if (srvr.getLocalPort() == PacketDNS.INETPORT) throw new IllegalStateException("DNS server not on ephemeral port");
 		if (IP.convertIP(srvr.getLocalIP()) != IP.IP_LOCALHOST) throw new IllegalStateException("DNS server not on localhost");
 		rawsock = new java.net.DatagramSocket();

@@ -5,11 +5,9 @@
 package com.grey.naf.dns.server;
 
 import com.grey.base.config.SysProps;
-import com.grey.base.config.XmlConfig;
 import com.grey.base.utils.ByteArrayRef;
 import com.grey.base.utils.ByteChars;
 import com.grey.naf.reactor.Dispatcher;
-import com.grey.naf.reactor.config.ConcurrentListenerConfig;
 import com.grey.naf.dns.resolver.PacketDNS;
 import com.grey.naf.dns.resolver.ResolverDNS;
 import com.grey.naf.dns.resolver.ResourceData;
@@ -53,30 +51,16 @@ public class ServerDNS
 	public int getLocalPort() {return transport_udp.getLocalPort();}
 	public Dispatcher getDispatcher() {return dsptch;}
 
-	// Binds server to random ephemeral port, if port param is zero
-	public ServerDNS(DNSQuestionResolver responder, Dispatcher dsptch, String iface, int port) throws java.io.IOException
-	{
-		this(responder, dsptch, makeConfig(iface, port));
-	}
-
-	// Binds server to the standard DNS port, if cfg param is null or doesn't specify the listener port
-	public ServerDNS(DNSQuestionResolver r, Dispatcher d, XmlConfig cfg) throws java.io.IOException
+	public ServerDNS(Dispatcher d, DNSQuestionResolver r, DnsServerConfig cfg) throws java.io.IOException
 	{
 		dsptch = d;
 		responder = r;
 		handlers = new Handlers(this);
 		recursion_offered = responder.dnsRecursionAvailable();
 
-		XmlConfig lxmlcfg = (cfg == null ? null : cfg.getSection("listener"));
-		ConcurrentListenerConfig lcfg = new ConcurrentListenerConfig.Builder<>()
-				.withName("DNS-Server")
-				.withPort(PacketDNS.INETPORT)
-				.withServerFactory(TransportTCP.ServerFactory.class, null)
-				.withXmlConfig(lxmlcfg, dsptch.getApplicationContext())
-				.build();
-		listener_tcp = ConcurrentListener.create(dsptch, this, null, lcfg);
+		listener_tcp = ConcurrentListener.create(dsptch, this, null, cfg.getListenerConfig());
 		transport_udp = new TransportUDP(d, this, listener_tcp.getIP(),listener_tcp.getPort());
-		dsptch.getLogger().info("DNS-Server: directbufs="+DIRECTNIOBUFS+"; udpmax="+PKTSIZ_UDP+"; tcpmax="+PKTSIZ_TCP);
+		dsptch.getLogger().info("DNS-Server: Port="+cfg.getListenerConfig().getPort()+", directbufs="+DIRECTNIOBUFS+"; udpmax="+PKTSIZ_UDP+"; tcpmax="+PKTSIZ_TCP);
 		if (IGNORE_QTRAIL) dsptch.getLogger().info("DNS-Server: Will ignore trailing bytes in incoming queries");
 	}
 
@@ -216,13 +200,6 @@ public class ServerDNS
 			transport_udp.sendResponse(niobuf, remote_addr);
 		}
 		return dnspkt.isTruncated();
-	}
-
-	private static XmlConfig makeConfig(String iface, int port)
-	{
-		String xml_iface = (iface == null ? "" : " interface=\""+iface+"\"");
-		String xml = "<srvdns><listener port=\""+port+"\""+xml_iface+"/></srvdns>";
-		return XmlConfig.makeSection(xml, "srvdns"); //dummy root name that gets stripped off
 	}
 
 	

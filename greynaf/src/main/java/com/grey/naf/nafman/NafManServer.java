@@ -34,7 +34,7 @@ public class NafManServer
 	private static final int S_BODY = 3;  //receiving content
 	private static final int S_PROC = 4; //command has been accepted and is being processed
 
-	public static final class Factory
+	static final class Factory
 		implements com.grey.naf.reactor.ConcurrentListener.ServerFactory
 	{
 		private final CM_Listener lstnr;

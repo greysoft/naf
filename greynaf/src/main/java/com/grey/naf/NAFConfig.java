@@ -270,6 +270,7 @@ public class NAFConfig
 		java.lang.reflect.Constructor<?> ctor = null;
 		try {
 			ctor = clss.getConstructor(ctorSig);
+			ctor.setAccessible(true);
 			return ctor.newInstance(ctorArgs);
 		} catch (Exception ex) {
 			throw new NAFConfigException("Failed to create configured entity="+clss.getName()+", ctor="+ctor, ex);

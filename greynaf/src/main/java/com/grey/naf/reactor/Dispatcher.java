@@ -526,7 +526,7 @@ public class Dispatcher
 	{
 		if (activechannels.put(cm.getCMID(), cm) != null) {
 			throw new IllegalStateException("Illegal registerIO on CM="+cm.getClass().getName()+"/E"+cm.getCMID()
-					+" - Ops="+showInterestOps(cm.getRegistrationKey()));
+					+" - Ops="+showInterestOps(cm.getRegistrationKey())+" - "+cm);
 		}
 	}
 
@@ -534,7 +534,7 @@ public class Dispatcher
 	{
 		if (activechannels.remove(cm.getCMID()) == null) {
 			throw new IllegalStateException("Illegal deregisterIO on CM="+cm.getClass().getName()+"/E"+cm.getCMID()
-					+" - Ops="+showInterestOps(cm.getRegistrationKey()));
+					+" - Ops="+showInterestOps(cm.getRegistrationKey())+" - "+cm);
 		}
 		if (cm.getRegistrationKey() != null) {
 			cm.getRegistrationKey().cancel();

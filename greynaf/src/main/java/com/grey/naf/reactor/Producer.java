@@ -152,7 +152,7 @@ public class Producer<T>
 	
 	@Override
 	public String toString() {
-		return super.toString()+" Consumer="+consumerType+"/"+consumer;
+		return super.toString()+" Consumer="+consumerType+"/"+consumer+" - alertspipe="+alertspipe.getCMID();
 	}
 
 

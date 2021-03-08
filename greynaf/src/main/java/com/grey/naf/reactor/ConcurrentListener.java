@@ -32,7 +32,7 @@ public class ConcurrentListener
 	private boolean in_sync_stop;
 
 	@Override
-	public Class<?> getServerType() {return serverFactory.getServerClass();}
+	public Class<?> getServerType() {return serverFactory == null ? null : serverFactory.getServerClass();} //would only be null if toString() called in constructor
 
 	public static ConcurrentListener create (Dispatcher d, Object controller, EntityReaper rpr, ConcurrentListenerConfig config) throws java.io.IOException {
 		return new ConcurrentListener(d, controller, rpr, config);

@@ -29,7 +29,7 @@ public class NafManConfig
 		dynamicResourceTTL = bldr.dynamicResourceTTL;
 		declaredStaticTTL = bldr.declaredStaticTTL;
 		idleConnectionTimeout = bldr.idleConnectionTimeout;
-		listenerConfig = bldr.listenerConfig;
+		listenerConfig = bldr.getListenerConfig().build();
 		bufferConfig = bldr.bufferConfig;
 	}
 
@@ -59,12 +59,16 @@ public class NafManConfig
 
 
 	public static class Builder {
+		private ConcurrentListenerConfig.Builder<?> listenerConfig = defaultListener();
 		private boolean surviveDownstream = true;
 		private long dynamicResourceTTL = Duration.ofSeconds(5).toMillis();
 		private long declaredStaticTTL = Duration.ofDays(1).toMillis();
 		private long idleConnectionTimeout = Duration.ofSeconds(30).toMillis();
-		private ConcurrentListenerConfig listenerConfig;
 		private BufferSpec.BufferConfig bufferConfig = new BufferSpec.BufferConfig(1024, true, BufferSpec.directniobufs, null);
+
+		public ConcurrentListenerConfig.Builder<?> getListenerConfig() {
+			return listenerConfig;
+		}
 
 		public Builder withXmlConfig(XmlConfig cfg, ApplicationContextNAF appctx) {
 			surviveDownstream = cfg.getBool("@survive_downstream", surviveDownstream);
@@ -75,14 +79,7 @@ public class NafManConfig
 
 			XmlConfig lxmlcfg = cfg.getSection("listener");
 			int lstnport = appctx.getConfig().assignPort(NAFConfig.RSVPORT_NAFMAN);
-			Supplier<NafManConfig> srvcfg = () -> this.build();
-
-			listenerConfig = new ConcurrentListenerConfig.Builder<>()
-					.withName("NAFMAN-Primary")
-					.withPort(lstnport)
-					.withServerFactory(NafManServer.Factory.class, srvcfg)
-					.withXmlConfig(lxmlcfg, appctx)
-					.build();
+			getListenerConfig().withPort(lstnport).withXmlConfig(lxmlcfg, appctx);
 			return this;
 		}
 
@@ -106,11 +103,6 @@ public class NafManConfig
 			return this;
 		}
 
-		public Builder withListenerConfig(ConcurrentListenerConfig v) {
-			listenerConfig = v;
-			return this;
-		}
-
 		public Builder withBufferConfig(BufferSpec.BufferConfig v) {
 			bufferConfig = v;
 			return this;
@@ -118,6 +110,13 @@ public class NafManConfig
 
 		public NafManConfig build() {
 			return new NafManConfig(this);
+		}
+
+		private ConcurrentListenerConfig.Builder<?> defaultListener() {
+			Supplier<NafManConfig> srvcfg = () -> this.build();
+			return new ConcurrentListenerConfig.Builder<>()
+					.withName("NAFMAN-Primary")
+					.withServerFactory(NafManServer.Factory.class, srvcfg);
 		}
 	}
 }
