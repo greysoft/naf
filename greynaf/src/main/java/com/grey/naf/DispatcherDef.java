@@ -14,7 +14,6 @@ public class DispatcherDef
 
 	private final String name;
 	private final String logName;
-	private final boolean hasNafman;
 	private final boolean hasDNS;
 	private final boolean zeroNafletsOK;
 	private final boolean surviveHandlers;
@@ -25,7 +24,6 @@ public class DispatcherDef
 	private DispatcherDef(Builder bldr) {
 		name = bldr.name;
 		logName = bldr.logName;
-		hasNafman = bldr.hasNafman;
 		hasDNS = bldr.hasDNS;
 		naflets = bldr.naflets;
 		zeroNafletsOK = bldr.zeroNafletsOK;
@@ -40,10 +38,6 @@ public class DispatcherDef
 
 	public String getLogName() {
 		return logName;
-	}
-
-	public boolean hasNafman() {
-		return hasNafman;
 	}
 
 	public boolean hasDNS() {
@@ -74,7 +68,6 @@ public class DispatcherDef
 	public static class Builder {
 		private String name;
 		private String logName;
-		private boolean hasNafman;
 		private boolean hasDNS;
 		private boolean zeroNafletsOK = true;
 		private boolean surviveHandlers = true;
@@ -87,7 +80,6 @@ public class DispatcherDef
 		public Builder(DispatcherDef defs) {
 			name = defs.name;
 			logName = defs.logName;
-			hasNafman = defs.hasNafman;
 			hasDNS = defs.hasDNS;
 			naflets = defs.naflets;
 			zeroNafletsOK = defs.zeroNafletsOK;
@@ -99,7 +91,6 @@ public class DispatcherDef
 		public Builder(com.grey.base.config.XmlConfig cfg) {
 			name = cfg.getValue("@name", true, name);
 			logName = cfg.getValue("@logname", true, SysProps.get(SYSPROP_LOGNAME, name));
-			hasNafman = cfg.getBool("@nafman", hasNafman);
 			hasDNS = cfg.getBool("@dns", hasDNS);
 			zeroNafletsOK = cfg.getBool("@zero_naflets", zeroNafletsOK);
 			surviveHandlers = cfg.getBool("@survive_handlers", surviveHandlers);
@@ -116,11 +107,6 @@ public class DispatcherDef
 
 		public Builder withLogName(String v) {
 			this.logName = v;
-			return this;
-		}
-
-		public Builder withNafman(boolean v) {
-			this.hasNafman = v;
 			return this;
 		}
 

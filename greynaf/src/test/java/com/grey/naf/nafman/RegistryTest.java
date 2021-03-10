@@ -10,12 +10,13 @@ import com.grey.naf.ApplicationContextNAF;
 import com.grey.naf.DispatcherDef;
 import com.grey.naf.errors.NAFConfigException;
 import com.grey.naf.reactor.Dispatcher;
+import com.grey.naf.TestUtils;
 
 public class RegistryTest
 {
-	private static final ApplicationContextNAF regctx = ApplicationContextNAF.create(null);
-	private static final NafManRegistry nafreg = NafManRegistry.get(regctx);
-	private static final String rootdir = com.grey.naf.reactor.DispatcherTest.initPaths(RegistryTest.class);
+	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, true);
+	private static final NafManRegistry nafreg = NafManRegistry.get(appctx);
+	private static final String rootdir = com.grey.naf.TestUtils.initPaths(RegistryTest.class);
 	private static final NafManRegistry.DefCommand fakecmd1 = new NafManRegistry.DefCommand("fake-cmd-1", "utest", "fake1", null, false);
 	private static final NafManRegistry.DefCommand fakecmd2 = new NafManRegistry.DefCommand("fake-cmd-2", "utest", "fake2", null, false);
 	private static final NafManRegistry.DefCommand stopcmd = nafreg.getCommand(NafManRegistry.CMD_STOP);
@@ -72,7 +73,7 @@ public class RegistryTest
 		nafreg.loadCommands(new NafManRegistry.DefCommand[]{fakecmd1});
 		org.junit.Assert.assertSame(fakecmd1, nafreg.getCommand(fakecmd1.code));
 		org.junit.Assert.assertEquals(NafManRegistry.CMD_STOP, stopcmd.code);
-		org.junit.Assert.assertNull(regctx.getPrimaryAgent());
+		org.junit.Assert.assertNull(appctx.getPrimaryAgent());
 		org.junit.Assert.assertEquals(cnt1+1, nafreg.getCommands().size());
 
 		// make sure duplicate command defs are discarded
@@ -94,12 +95,10 @@ public class RegistryTest
 			= (java.util.HashMap<String, java.util.List<Object>>)DynLoader.getField(nafreg, "cmd_handlers");
 		com.grey.base.collections.HashedMap<String, java.util.ArrayList<NafManCommand.Handler>> dsptch_handlers
 			= new com.grey.base.collections.HashedMap<String, java.util.ArrayList<NafManCommand.Handler>>();
-		DispatcherDef def = new DispatcherDef.Builder()
-				.withNafman(true)
-				.build();
-		Dispatcher dsptch1 = Dispatcher.create(regctx, def, logger);
+		DispatcherDef def = new DispatcherDef.Builder().build();
+		Dispatcher dsptch1 = Dispatcher.create(appctx, def, logger);
 		def = new com.grey.naf.DispatcherDef.Builder(def).withName(null).build();
-		Dispatcher dsptch2 = Dispatcher.create(regctx, def, logger);
+		Dispatcher dsptch2 = Dispatcher.create(appctx, def, logger);
 		nafreg.loadCommands(new NafManRegistry.DefCommand[]{fakecmd1});
 		nafreg.loadCommands(new NafManRegistry.DefCommand[]{fakecmd2});
 		reg_handlers.clear();
@@ -199,11 +198,10 @@ public class RegistryTest
 		org.junit.Assert.assertEquals(2, reg_handlers.size());
 		org.junit.Assert.assertEquals(1, reg_handlers.get(fakecmd2.code).size());
 
+		// ensure that duplicate hander is skipped wothout erroring
 		reg_inviolate.clear();
-		try {
-			nafreg.registerHandler(fakecmd2.code, 0, h, dsptch1);
-			org.junit.Assert.fail("Failed to trap duplicate handler");
-		} catch (NAFConfigException ex) {}
+		mod = nafreg.registerHandler(fakecmd2.code, 0, h, dsptch1);
+		org.junit.Assert.assertFalse(mod);
 
 		String cmdcode = "no-such-command";
 		mod = nafreg.registerHandler(cmdcode, 0, new DummyHandler(), dsptch1);

@@ -11,17 +11,18 @@ import com.grey.base.utils.IP;
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
 import com.grey.naf.reactor.config.ConcurrentListenerConfig;
+import com.grey.naf.TestUtils;
 
 public class TCPConnectionTest
 	implements com.grey.naf.EntityReaper, CM_Listener.Reporter
 {
-	private static final String rootdir = DispatcherTest.initPaths(TCPConnectionTest.class);
+	private static final String rootdir = TestUtils.initPaths(TCPConnectionTest.class);
 	private static final int NUM_CLIENTS = 10; //must be even and greater than 2
 	private static final int INTSIZE = 4;
 	private static final int REQ_INCR = 1000;
 	private static final int RSP_INCR = 1;
 
-	private static final ApplicationContextNAF appctx = ApplicationContextNAF.create("TCPConnectionTest");
+	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext("TCPConnectionTest", true);
 
 	private Dispatcher dsptch;
 	private int reapcnt_clients;

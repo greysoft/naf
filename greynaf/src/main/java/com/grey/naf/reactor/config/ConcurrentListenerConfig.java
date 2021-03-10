@@ -8,10 +8,8 @@ import java.util.function.Function;
 
 import com.grey.base.config.XmlConfig;
 import com.grey.naf.NAFConfig;
-import com.grey.naf.ApplicationContextNAF;
 import com.grey.naf.reactor.CM_Listener;
 import com.grey.naf.reactor.ConcurrentListener;
-import com.grey.naf.reactor.Dispatcher;
 
 public class ConcurrentListenerConfig extends ListenerConfig
 {
@@ -49,7 +47,7 @@ public class ConcurrentListenerConfig extends ListenerConfig
 		return serversIncrement;
 	}
 
-	public static ConcurrentListenerConfig[] buildMultiConfig(String grpname, Dispatcher d, String xpath, XmlConfig xmlcfg,
+	public static ConcurrentListenerConfig[] buildMultiConfig(String grpname, NAFConfig nafConfig, String xpath, XmlConfig xmlcfg,
 															  int port, int sslport,
 															  Class<? extends ConcurrentListener.ServerFactory> serverFactory, Object factoryParam) {
 		XmlConfig[] lxmlcfg = xmlcfg.getSections(xpath+XmlConfig.XPATH_ENABLED);
@@ -61,7 +59,7 @@ public class ConcurrentListenerConfig extends ListenerConfig
 					.withPort(port)
 					.withPortSSL(sslport)
 					.withServerFactory(serverFactory, factoryParam)
-					.withXmlConfig(lxmlcfg[idx], d.getApplicationContext())
+					.withXmlConfig(lxmlcfg[idx], nafConfig)
 					.build();
 		}
 		return lcfg;
@@ -87,9 +85,9 @@ public class ConcurrentListenerConfig extends ListenerConfig
 		private int serversIncrement;
 
 		@Override
-		public T withXmlConfig(XmlConfig cfg, ApplicationContextNAF appctx) {
+		public T withXmlConfig(XmlConfig cfg, NAFConfig nafConfig) {
 			cfg = getLinkConfig(cfg);
-			super.withXmlConfig(cfg, appctx);
+			super.withXmlConfig(cfg, nafConfig);
 
 			XmlConfig servercfg = cfg.getSection("server");
 			serverFactoryClass = getServerFactoryClass(servercfg, serverFactoryClass);

@@ -8,11 +8,12 @@ import com.grey.base.utils.ByteArrayRef;
 import com.grey.base.utils.FileOps;
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
+import com.grey.naf.TestUtils;
 
 public class ChannelMonitorTest
 	implements com.grey.naf.EntityReaper
 {
-	private static final String rootdir = DispatcherTest.initPaths(ChannelMonitorTest.class);
+	private static final String rootdir = TestUtils.initPaths(ChannelMonitorTest.class);
 	private int reapcnt_receivers;
 	private int reapcnt_senders;
 	int cmcnt;
@@ -170,7 +171,7 @@ public class ChannelMonitorTest
 		final com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(xmtsiz - 1, xmtsiz, directbufs, null);
 		final byte[] xmtbuf = new byte[xmtsiz];
 
-		ApplicationContextNAF appctx = ApplicationContextNAF.create("CMTEST-"+directbufs);
+		ApplicationContextNAF appctx = TestUtils.createApplicationContext("CMTEST-"+directbufs, true);
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
 				.withSurviveHandlers(false)
 				.build();

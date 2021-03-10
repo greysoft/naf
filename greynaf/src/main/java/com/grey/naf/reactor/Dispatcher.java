@@ -110,8 +110,21 @@ public class Dispatcher
 	private boolean error_abort;
 	public boolean completedOK() {return thread_completed && !error_abort;}
 
-	private Dispatcher(ApplicationContextNAF appctx, DispatcherDef def, Logger initlog) throws java.io.IOException
-	{
+
+	public static Dispatcher create(ApplicationContextNAF appctx, DispatcherDef def, Logger log) throws java.io.IOException {
+		if (def == null) {
+			def = new DispatcherDef.Builder().build();
+		}
+		if (def.getName() == null || def.getName().isEmpty()) {
+			String name = appctx.getName()+"-AnonDispatcher-"+anonDispatcherCount.incrementAndGet();
+			def = new DispatcherDef.Builder(def).withName(name).build();
+		}
+		Dispatcher d = new Dispatcher(appctx, def, log);
+		appctx.register(d);
+		return d;
+	}
+
+	private Dispatcher(ApplicationContextNAF appctx, DispatcherDef def, Logger initlog) throws java.io.IOException {
 		this.appctx = appctx;
 		clock = def.getClock();
 		timeboot = clock.millis();
@@ -129,6 +142,7 @@ public class Dispatcher
 		flusher = new Flusher(this, def.getFlushInterval());
 		slct = java.nio.channels.Selector.open();
 		NAFConfig nafcfg = appctx.getConfig();
+		NafManConfig nafmanConfig = appctx.getNafManConfig();
 
 		Logger dlog = null;
 		Logger prevThreadLogger = null;
@@ -137,7 +151,7 @@ public class Dispatcher
 		if (logger != null) prevThreadLogger = Logger.setThreadLogger(logger);
 		if (initlog != null) initlog.info("Initialising Dispatcher="+name+" - Logger="+logname+" - "+dlog);
 		if (getLogger() != initlog) flusher.register(getLogger());
-		getLogger().info("Dispatcher="+name+": baseport="+nafcfg.getBasePort()+", NAFMan="+def.hasNafman()+", DNS="+def.hasDNS()
+		getLogger().info("Dispatcher="+name+": baseport="+nafcfg.getBasePort()+", NAFMan="+(nafmanConfig!=null)+", DNS="+def.hasDNS()
 				+", survive_handlers="+surviveHandlers+", zero_naflets="+zeroNafletsOK
 				+", flush="+TimeOps.expandMilliTime(def.getFlushInterval()));
 		getLogger().trace("Dispatcher="+name+": Selector="+slct.getClass().getCanonicalName()
@@ -149,31 +163,28 @@ public class Dispatcher
 		dynamicLoader = new Producer<>(Object.class, this, this);
 		dynamicLoader.start();
 
-		if (def.hasNafman()) {
+		if (nafmanConfig == null) {
+			nafmanAgent = null;
+		} else {
 			NafManRegistry reg = NafManRegistry.get(appctx);
-			NafManConfig configNafMan = new NafManConfig.Builder()
-					.withXmlConfig(nafcfg.getNafman(), appctx)
-					.build();
 			Supplier<PrimaryAgent> supplier = () -> {
 				try {
-					return new PrimaryAgent(this, reg, configNafMan);
+					return new PrimaryAgent(this, reg, nafmanConfig);
 				} catch (Exception ex) {
 					throw new NAFConfigException("Failed to create primary NAFMAN agent", ex);
 				}
 			};
 			NafManAgent agent = appctx.registerPrimaryAgent(supplier);
 			if (agent.getDispatcher() != this) {
-				nafmanAgent = new SecondaryAgent(this, reg, configNafMan);
+				nafmanAgent = new SecondaryAgent(this, reg, nafmanConfig);
 			} else {
 				nafmanAgent = agent;
 			}
 			getLogger().info("Dispatcher="+name+": Initialised NAFMAN - "+(nafmanAgent.isPrimary() ? "Primary" : "Secondary"));
-		} else {
-			nafmanAgent = null;
 		}
 
 		if (def.hasDNS()) {
-			dnsresolv = ResolverDNS.create(this, nafcfg.getDNS());
+			dnsresolv = ResolverDNS.create(this, nafcfg.getNode("dnsresolver"));
 			getLogger().info("Dispatcher="+name+": Initialised DNS Resolver="+dnsresolv.getClass().getName());
 		} else {
 			dnsresolv = null;
@@ -307,7 +318,9 @@ public class Dispatcher
 				+", Timers="+activetimers.size()+":"+pendingtimers.size()
 				+", reapers="+reaper_cnt
 				+" (well="+sparetimers.size()+"/"+sparetimers.population()+")");
-		if (activeNaflets.size() != 0) getLogger().trace("Naflets: "+activeNaflets);
+		synchronized (activeNaflets) {
+			if (activeNaflets.size() != 0) getLogger().trace("Naflets: "+activeNaflets);
+		}
 		if (activetimers.size()+pendingtimers.size() != 0) getLogger().trace("Timers: Active="+activetimers+" - Pending="+pendingtimers);
 		if (activechannels.size() != 0) {
 			getLogger().trace("Channels: "+activechannels);
@@ -909,59 +922,6 @@ public class Dispatcher
 	@Override
 	public String toString() {
 		return "Dispatcher="+getName()+"/"+threadInfo()+"/"+getNafletCount()+"/"+activechannels.size()+"/"+activetimers.size();
-	}
-
-	public static Dispatcher create(ApplicationContextNAF appctx, DispatcherDef def, Logger log)
-		throws java.io.IOException
-	{
-		if (def == null) {
-			def = new DispatcherDef.Builder().build();
-		}
-		if (def.getName() == null || def.getName().isEmpty()) {
-			String name = appctx.getName()+"-AnonDispatcher-"+anonDispatcherCount.incrementAndGet();
-			def = new DispatcherDef.Builder(def).withName(name).build();
-		}
-		Dispatcher d = new Dispatcher(appctx, def, log);
-		appctx.register(d);
-		return d;
-	}
-
-	public static List<Dispatcher> launchConfigured(ApplicationContextNAF appctx, Logger log)
-		throws java.io.IOException
-	{
-		NAFConfig nafcfg = appctx.getConfig();
-		XmlConfig[] cfgdispatchers = nafcfg.getDispatchers();
-		if (cfgdispatchers == null) return null;
-		List<Dispatcher> dlst = new ArrayList<>(cfgdispatchers.length);
-		log.info("NAF: Launching configured Dispatchers="+cfgdispatchers.length);
-
-		// Do separate loops to create and start the Dispatchers, so that they're all guaranteed to be in single-threaded
-		// mode while initialising.
-		// First NAFMAN-enabled Dispatcher becomes the primary.
-		for (int idx = 0; idx < cfgdispatchers.length; idx++) {
-			DispatcherDef def = new DispatcherDef.Builder(cfgdispatchers[idx]).build();
-			Dispatcher d = create(appctx, def, log);
-			dlst.add(d);
-		}
-
-		// log the initial config
-		String txt = dumpConfig(appctx);
-		log.info("Initialisation of the configured NAF Dispatchers is now complete\n"+txt);
-
-		// Now starts the multi-threaded phase
-		for (int idx = 0; idx != dlst.size(); idx++) {
-			dlst.get(idx).start();
-		}
-		return dlst;
-	}
-
-	public static Dispatcher createConfigured(ApplicationContextNAF appctx, String dname, Logger log)
-		throws java.io.IOException
-	{
-		XmlConfig cfg = appctx.getConfig().getDispatcher(dname);
-		if (cfg == null) return null;
-		DispatcherDef def = new DispatcherDef.Builder(cfg).build();
-		return create(appctx, def, log);
 	}
 
 	public static String dumpConfig(ApplicationContextNAF appctx)

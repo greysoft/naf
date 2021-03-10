@@ -16,6 +16,7 @@ import com.grey.naf.dns.resolver.PacketDNS;
 import com.grey.naf.dns.resolver.ResolverAnswer;
 import com.grey.naf.dns.resolver.ResolverDNS;
 import com.grey.naf.dns.resolver.ResourceData;
+import com.grey.naf.TestUtils;
 
 public class ResolverTester
 {
@@ -74,7 +75,8 @@ public class ResolverTester
 	public static void beforeClass() throws java.io.IOException
 	{
 		if (!USE_REAL_DNS) {
-			mockserver = new TestServerDNS(ApplicationContextNAF.create(null));
+			ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, true);
+			mockserver = new TestServerDNS(appctx);
 			mockserver.start();
 		}
 	}

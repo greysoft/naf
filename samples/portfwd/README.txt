@@ -45,10 +45,11 @@ Note that the same effect could be achieved with the logging.xml config file, if
 
 NAFMAN
 --------
+NAFMAN is running by default even though it's absent from the portfwd.xml, as it is considered to be enabled unless explicitly disabled.
 If you browse to port 13000 on your localhost while PortFwd is running, you will see the NAFMAN monitoring screens (see NAF Guide for more info).
 If you wish to specify an alternative port such as 14000, you can can simply add -Dgreynaf.baseport=14000 to the command line (or set the env var GREYNAF_BASEPORT=14000).
 
-The NAFMAN screen shows a list of available commands at the bottom, which consist of a set of generic NAFMAN commands plus the bespoke SHOWCONNS command that was registered by this sample app.
+The NAFMAN screen shows a list of available commands at the bottom, which consist of a set of generic NAFMAN commands plus this application's bespoke SHOWCONNS command, which it registers on startup.
 You can click on any of the commands to execute them and see their output.
 
 You can also execute NAFMAN commands from the command line.
@@ -58,4 +59,4 @@ This runs a generic NAFMAN command to show the available NAFMAN commands:
 	java -cp target/samples-portfwd-VERSION.jar com.grey.portfwd.App -remote localhost:13000 -cmd showcmds?nohttp=y
 
 You can also use the executable NAF jar to run NAFMAN commands. Run this command from the root of the repo.
-	java -jar pkg/target/dependency/greynaf-dev-VERSION.jar -remote localhost:13000 -cmd showconns
+	java -jar pkg/target/dependency/greynaf-VERSION.jar -remote localhost:13000 -cmd showconns

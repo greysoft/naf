@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2019 Yusef Badri - All rights reserved.
+ * Copyright 2014-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.integration;
@@ -9,9 +9,9 @@ import com.grey.base.utils.StringOps;
 import com.grey.base.utils.FileOps;
 import com.grey.base.utils.IP;
 import com.grey.naf.reactor.Dispatcher;
-import com.grey.naf.reactor.DispatcherTest;
 import com.grey.naf.ApplicationContextNAF;
 import com.grey.naf.NAFConfig;
+import com.grey.naf.TestUtils;
 import com.grey.naf.dns.client.DNSClient;
 import com.grey.naf.dns.resolver.ResolverAnswer;
 import com.grey.naf.dns.resolver.ResolverDNS;
@@ -19,7 +19,7 @@ import com.grey.naf.dns.resolver.ResolverDNS;
 public class SynchronousTest
 	extends ResolverTester
 {
-	private static final String rootdir = DispatcherTest.initPaths(SynchronousTest.class);
+	private static final String rootdir = TestUtils.initPaths(SynchronousTest.class);
 	private static final String DNAME = "TEST-SyncDNS";
 
 	private DNSClient resolver;
@@ -155,9 +155,8 @@ public class SynchronousTest
 	private void init(String tag, boolean recursive, boolean use_mockserver) throws java.io.IOException
 	{
 		String nafcfg_path = createConfig(tag, recursive, use_mockserver);
-		NAFConfig nafcfg = NAFConfig.load(nafcfg_path);
-		ApplicationContextNAF appctx = ApplicationContextNAF.create(null, nafcfg);
-		resolver = new DNSClient(null, appctx, DNAME+"-"+tag, false, logger);
+		ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, nafcfg_path, true);
+		resolver = new DNSClient(null, appctx, DNAME+"-"+tag, logger);
 		resolver.init();
 	}
 

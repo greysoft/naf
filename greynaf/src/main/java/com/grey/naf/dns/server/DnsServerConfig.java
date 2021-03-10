@@ -5,7 +5,7 @@
 package com.grey.naf.dns.server;
 
 import com.grey.base.config.XmlConfig;
-import com.grey.naf.ApplicationContextNAF;
+import com.grey.naf.NAFConfig;
 import com.grey.naf.dns.resolver.PacketDNS;
 import com.grey.naf.reactor.config.ConcurrentListenerConfig;
 
@@ -29,9 +29,9 @@ public class DnsServerConfig
 			return listenerConfig;
 		}
 
-		public Builder withXmlConfig(XmlConfig cfg, ApplicationContextNAF appctx) {
+		public Builder withXmlConfig(XmlConfig cfg, NAFConfig nafConfig) {
 			XmlConfig lxmlcfg = cfg.getSection("listener");
-			getListenerConfig().withXmlConfig(lxmlcfg, appctx);
+			getListenerConfig().withXmlConfig(lxmlcfg, nafConfig);
 			return this;
 		}
 

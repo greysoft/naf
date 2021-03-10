@@ -20,14 +20,15 @@ import com.grey.naf.dns.resolver.ResolverConfig;
 import com.grey.naf.dns.resolver.ResolverDNS;
 import com.grey.naf.dns.resolver.ResourceData;
 import com.grey.naf.reactor.Dispatcher;
+import com.grey.naf.TestUtils;
 
 public class CacheManagerTest
 {
-	private static final String rootdir = com.grey.naf.reactor.DispatcherTest.initPaths(CacheManagerTest.class);
+	private static final String rootdir = com.grey.naf.TestUtils.initPaths(CacheManagerTest.class);
 	private static final com.grey.logging.Logger logger = com.grey.logging.Factory.getLoggerNoEx("no-such-logger");
 	private static final java.io.File CFGFILE_ROOTS = new java.io.File(rootdir+"/rootservers");
 
-	private static final ApplicationContextNAF appctx = ApplicationContextNAF.create(null);
+	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, true);
 	private Dispatcher dsptch;
 	private CacheManager cmgr;
 
@@ -453,7 +454,8 @@ public class CacheManagerTest
 		if (dnscfg == null) dnscfg = XmlConfig.NULLCFG;
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder().withName("CacheManagerTest").build();
 		dsptch = Dispatcher.create(appctx, def, logger);
-		ResolverConfig config = new ResolverConfig.Builder(dnscfg)
+		ResolverConfig config = new ResolverConfig.Builder()
+				.withXmlConfig(dnscfg)
 				.withCacheLoWaterA(4)
 				.withCacheHiWaterA(7)
 				.withCacheLoWaterNS(4)

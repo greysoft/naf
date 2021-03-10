@@ -5,6 +5,7 @@
 package com.grey.naf.dns.resolver;
 
 import java.time.Duration;
+import java.util.Arrays;
 import java.net.UnknownHostException;
 
 import com.grey.base.config.SysProps;
@@ -280,11 +281,10 @@ public class ResolverConfig
 		private int nsMaxRR;
 		private int mxMaxRR;
 
-		public Builder() {}
-
-		public Builder(XmlConfig cfg) {
+		public Builder withXmlConfig(XmlConfig cfg) {
+			String srvlist = (localNameServers == null ? null : String.join("|", Arrays.asList(localNameServers)));
 			recursive = cfg.getBool("@recursive", recursive);
-			localNameServers = cfg.getTuple("localservers", "|", false, null);
+			localNameServers = cfg.getTuple("localservers", "|", false, srvlist);
 			autoRoots = cfg.getBool("rootservers/@auto", autoRoots);
 			pathnameRootServers = cfg.getValue("rootservers", false, pathnameRootServers);
 			alwaysTCP = cfg.getBool("@alwaystcp", alwaysTCP);
@@ -315,6 +315,7 @@ public class ResolverConfig
 			mxMaxRR = cfg.getInt("cache_mx/@maxrr", false, mxMaxRR);
 			partialPrune = cfg.getBool("@partialprune", partialPrune);
 			dumpOnExit = cfg.getBool("@exitdump", dumpOnExit);
+			return this;
 		}
 
 		public Builder withRecursive(boolean v) {

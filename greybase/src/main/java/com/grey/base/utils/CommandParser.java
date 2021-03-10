@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2018 Yusef Badri - All rights reserved.
+ * Copyright 2012-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -60,7 +60,8 @@ public final class CommandParser
 		return parse(args, 0);
 	}
 
-	// returns index of first param (ie. first non-options arg)
+	// Parses the options and returns index of first param (ie. first non-options arg)
+	// Returns -1 to indicate invalid args.
 	public int parse(String[] args, int arg)
 	{
 		int arg0 = arg;

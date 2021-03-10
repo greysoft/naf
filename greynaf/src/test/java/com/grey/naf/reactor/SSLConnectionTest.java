@@ -12,6 +12,7 @@ import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
 import com.grey.naf.SSLConfig;
 import com.grey.naf.reactor.config.ConcurrentListenerConfig;
+import com.grey.naf.TestUtils;
 
 /*
  * Note that this test class also exercises ListenerSet, ConcurrentListener and the Naflet class.
@@ -20,7 +21,7 @@ public class SSLConnectionTest
 	implements com.grey.naf.EntityReaper, CM_Listener.Reporter, TimerNAF.Handler
 {
 	private enum FAILTYPE {NONE, NOCONNECT, BADCERT_PURE, BADCERT_SWITCH};
-	private static final String rootdir = DispatcherTest.initPaths(SSLConnectionTest.class);
+	private static final String rootdir = TestUtils.initPaths(SSLConnectionTest.class);
 	static final int filesize = (int)(IOExecWriter.MAXBUFSIZ * 1.5) + 1;
 	static final String pthnam_sendfile = rootdir+"/sendfile";
 
@@ -59,7 +60,7 @@ public class SSLConnectionTest
 		"This is the second message from the client",
 		"The final message"};
 
-	private static final ApplicationContextNAF appctx = ApplicationContextNAF.create("SSLConnectionTest");
+	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext("SSLConnectionTest", true);
 
 	private Dispatcher dsptch;
 	private SSLTask ctask;
@@ -159,7 +160,7 @@ public class SSLConnectionTest
 		ConcurrentListener lstnr = null;
 		String lname = "utest_SSL";
 		if (lset) {
-			ConcurrentListenerConfig[] lcfg = ConcurrentListenerConfig.buildMultiConfig(lname, dsptch, "listeners/listener", srvcfg, 0, 0, TestServerFactory.class, null);
+			ConcurrentListenerConfig[] lcfg = ConcurrentListenerConfig.buildMultiConfig(lname, appctx.getConfig(), "listeners/listener", srvcfg, 0, 0, TestServerFactory.class, null);
 			listeners = new ListenerSet(lname, dsptch, this, this, lcfg);
 			listeners.start();
 			org.junit.Assert.assertEquals(1, listeners.configured());
@@ -170,7 +171,7 @@ public class SSLConnectionTest
 			ConcurrentListenerConfig lcfg = new ConcurrentListenerConfig.Builder<>()
 					.withName(lname)
 					.withServerFactory(TestServerFactory.class, null)
-					.withXmlConfig(srvcfg, dsptch.getApplicationContext())
+					.withXmlConfig(srvcfg, appctx.getConfig())
 					.build();
 			lstnr = ConcurrentListener.create(dsptch, this, this, lcfg);
 			srvport = lstnr.getPort();

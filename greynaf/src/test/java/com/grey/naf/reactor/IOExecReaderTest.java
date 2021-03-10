@@ -11,13 +11,14 @@ import com.grey.base.utils.FileOps;
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
 import com.grey.base.utils.NIOBuffers;
+import com.grey.naf.TestUtils;
 
 import org.mockito.Mockito;
 
 public class IOExecReaderTest
 {
-	private static final String rootdir = DispatcherTest.initPaths(IOExecReaderTest.class);
-	private static final ApplicationContextNAF appctx = ApplicationContextNAF.create("IORtest");
+	private static final String rootdir = TestUtils.initPaths(IOExecReaderTest.class);
+	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext("IORtest", true);
 
 	private static class CMR
 		extends CM_Stream

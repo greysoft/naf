@@ -8,7 +8,6 @@ import java.time.Duration;
 import java.util.function.Supplier;
 
 import com.grey.base.config.XmlConfig;
-import com.grey.naf.ApplicationContextNAF;
 import com.grey.naf.BufferSpec;
 import com.grey.naf.NAFConfig;
 import com.grey.naf.reactor.config.ConcurrentListenerConfig;
@@ -57,20 +56,31 @@ public class NafManConfig
 		return bufferConfig;
 	}
 
+	@Override
+	public String toString() {
+		return super.toString()+" on port="+getListenerConfig().getPort()+" with survive-downstream="+isSurviveDownstream();
+	}
+
 
 	public static class Builder {
-		private ConcurrentListenerConfig.Builder<?> listenerConfig = defaultListener();
+		private final NAFConfig nafConfig;
+		private final ConcurrentListenerConfig.Builder<?> listenerConfig;
 		private boolean surviveDownstream = true;
 		private long dynamicResourceTTL = Duration.ofSeconds(5).toMillis();
 		private long declaredStaticTTL = Duration.ofDays(1).toMillis();
 		private long idleConnectionTimeout = Duration.ofSeconds(30).toMillis();
 		private BufferSpec.BufferConfig bufferConfig = new BufferSpec.BufferConfig(1024, true, BufferSpec.directniobufs, null);
 
+		public Builder(NAFConfig nafConfig) {
+			this.nafConfig = nafConfig;
+			listenerConfig = defaultListener();
+		}
+
 		public ConcurrentListenerConfig.Builder<?> getListenerConfig() {
 			return listenerConfig;
 		}
 
-		public Builder withXmlConfig(XmlConfig cfg, ApplicationContextNAF appctx) {
+		public Builder withXmlConfig(XmlConfig cfg) {
 			surviveDownstream = cfg.getBool("@survive_downstream", surviveDownstream);
 			dynamicResourceTTL = cfg.getTime("@dyncache", dynamicResourceTTL);
 			declaredStaticTTL = cfg.getTime("@permcache", declaredStaticTTL);
@@ -78,8 +88,7 @@ public class NafManConfig
 			bufferConfig = BufferSpec.BufferConfig.create(cfg, "niobuffers", bufferConfig);
 
 			XmlConfig lxmlcfg = cfg.getSection("listener");
-			int lstnport = appctx.getConfig().assignPort(NAFConfig.RSVPORT_NAFMAN);
-			getListenerConfig().withPort(lstnport).withXmlConfig(lxmlcfg, appctx);
+			getListenerConfig().withXmlConfig(lxmlcfg, nafConfig);
 			return this;
 		}
 
@@ -114,9 +123,14 @@ public class NafManConfig
 
 		private ConcurrentListenerConfig.Builder<?> defaultListener() {
 			Supplier<NafManConfig> srvcfg = () -> this.build();
-			return new ConcurrentListenerConfig.Builder<>()
+			ConcurrentListenerConfig.Builder<?> bldr = new ConcurrentListenerConfig.Builder<>()
 					.withName("NAFMAN-Primary")
 					.withServerFactory(NafManServer.Factory.class, srvcfg);
+			if (nafConfig != null) {
+				int port = nafConfig.assignPort(NAFConfig.RSVPORT_NAFMAN);
+				bldr.withPort(port);
+			}
+			return bldr;
 		}
 	}
 }

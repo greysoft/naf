@@ -7,6 +7,7 @@ package com.grey.portfwd;
 import com.grey.base.config.XmlConfig;
 import com.grey.naf.Naflet;
 import com.grey.naf.EntityReaper;
+import com.grey.naf.NAFConfig;
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.ListenerSet;
 import com.grey.naf.reactor.config.ConcurrentListenerConfig;
@@ -26,7 +27,8 @@ public class Task
 	{
 		super(name, dsptch, cfg);
 		String lname = "Task="+getName();
-		ConcurrentListenerConfig[] lcfg = ConcurrentListenerConfig.buildMultiConfig(lname, dsptch, "listeners/listener", taskConfig(), 0, 0, null, null);
+		NAFConfig nafcfg = dsptch.getApplicationContext().getConfig();
+		ConcurrentListenerConfig[] lcfg = ConcurrentListenerConfig.buildMultiConfig(lname, nafcfg, "listeners/listener", taskConfig(), 0, 0, null, null);
 		listeners = new ListenerSet(lname, dsptch, this, this, lcfg);
 		if (dsptch.getNafManAgent() != null) {
 			NafManRegistry reg = dsptch.getNafManAgent().getRegistry();
@@ -37,7 +39,7 @@ public class Task
 	@Override
 	protected void startNaflet() throws java.io.IOException
 	{
-		getLogger().info("Loaded JARs: "+com.grey.base.utils.PkgInfo.getLoadedJARs());
+		getDispatcher().getLogger().info("Loaded JARs: "+com.grey.base.utils.PkgInfo.getLoadedJARs());
 		listeners.start();
 	}
 
@@ -70,7 +72,7 @@ public class Task
 			if (active.size() != 0) sb.append("</ul>");
 		} else {
 			// we've obviously registered for this command, so we must be missing a Case label - clearly a bug
-			getLogger().error("NAFMAN="+getDispatcher().getName()+": Missing case for cmd="+cmd.getCommandDef().code);
+			getDispatcher().getLogger().error("NAFMAN="+getDispatcher().getName()+": Missing case for cmd="+cmd.getCommandDef().code);
 			return null;
 		}
 		return sb;

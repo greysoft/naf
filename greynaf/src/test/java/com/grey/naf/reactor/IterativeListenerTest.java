@@ -10,6 +10,7 @@ import com.grey.base.utils.FileOps;
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
 import com.grey.naf.reactor.config.ListenerConfig;
+import com.grey.naf.TestUtils;
 
 public class IterativeListenerTest
 	implements com.grey.naf.EntityReaper
@@ -22,8 +23,8 @@ public class IterativeListenerTest
 		public CM_Server createServer(CM_Listener l) {return new TestServer(l, clients);}
 	}
 
-	private static final String rootdir = DispatcherTest.initPaths(IterativeListenerTest.class);
-	private static final ApplicationContextNAF appctx = ApplicationContextNAF.create("IterativeListenerTest");
+	private static final String rootdir = TestUtils.initPaths(IterativeListenerTest.class);
+	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext("IterativeListenerTest", true);
 	private static final int NUMCONNS = 5;
 	private static final int INTSIZE = 4;
 

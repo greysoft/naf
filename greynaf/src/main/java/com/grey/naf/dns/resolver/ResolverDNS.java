@@ -82,7 +82,7 @@ public abstract class ResolverDNS
 		}
 
 		try {
-			ResolverConfig config = new ResolverConfig.Builder(xmlcfg).build();
+			ResolverConfig config = new ResolverConfig.Builder().withXmlConfig(xmlcfg).build();
 
 			if (cfgclass.equals(DistributedResolver.class.getName())) {
 				return new DistributedResolver(dsptch, config, master);

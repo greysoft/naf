@@ -6,7 +6,7 @@ package com.grey.naf.reactor.config;
 
 import com.grey.base.config.XmlConfig;
 import com.grey.naf.SSLConfig;
-import com.grey.naf.ApplicationContextNAF;
+import com.grey.naf.NAFConfig;
 import com.grey.naf.errors.NAFConfigException;
 
 public class ListenerConfig
@@ -55,14 +55,14 @@ public class ListenerConfig
 		private int backlog = 5000;
 
 		// Call the other setter methods before this to set any defaults for name, iface, port, backlog
-		public T withXmlConfig(XmlConfig cfg, ApplicationContextNAF appctx) {
+		public T withXmlConfig(XmlConfig cfg, NAFConfig nafConfig) {
 			cfg = getLinkConfig(cfg);
 
 			XmlConfig xmlSSL = cfg.getSection("ssl");
 			try {
 				if (xmlSSL != null && xmlSSL.exists()) {
 					configSSL = new SSLConfig.Builder()
-							.withXmlConfig(xmlSSL, appctx.getConfig())
+							.withXmlConfig(xmlSSL, nafConfig)
 							.build();
 					if (portSSL != 0) port = portSSL;
 				}

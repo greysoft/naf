@@ -7,12 +7,13 @@ package com.grey.naf.reactor;
 import com.grey.base.utils.FileOps;
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
+import com.grey.naf.TestUtils;
 
 public class ProducerTest
 	implements Producer.Consumer<String>
 {
-	private static final String rootdir = DispatcherTest.initPaths(ProducerTest.class);
-	private static final ApplicationContextNAF appctx = ApplicationContextNAF.create("ProducerTest");
+	private static final String rootdir = TestUtils.initPaths(ProducerTest.class);
+	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext("ProducerTest", true);
 	private Dispatcher dsptch;
 
 	private static final com.grey.logging.Logger logger = com.grey.logging.Factory.getLoggerNoEx("");

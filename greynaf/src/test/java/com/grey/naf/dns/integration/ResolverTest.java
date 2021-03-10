@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.grey.logging.Logger.LEVEL;
+import com.grey.base.config.XmlConfig;
 import com.grey.base.utils.ByteChars;
 import com.grey.base.utils.DynLoader;
 import com.grey.base.utils.StringOps;
@@ -15,17 +16,18 @@ import com.grey.base.utils.FileOps;
 import com.grey.base.utils.TimeOps;
 import com.grey.base.utils.IP;
 import com.grey.naf.ApplicationContextNAF;
+import com.grey.naf.NAFConfig;
 import com.grey.naf.dns.resolver.ResolverAnswer;
 import com.grey.naf.dns.resolver.ResolverDNS;
 import com.grey.naf.reactor.Dispatcher;
-import com.grey.naf.reactor.DispatcherTest;
 import com.grey.naf.reactor.TimerNAF;
+import com.grey.naf.TestUtils;
 
 public class ResolverTest
 	extends ResolverTester
 	implements com.grey.naf.dns.resolver.ResolverDNS.Client
 {
-	private static final String rootdir = DispatcherTest.initPaths(ResolverTest.class);
+	private static final String rootdir = TestUtils.initPaths(ResolverTest.class);
 	private static final java.io.File CFGFILE_ROOTS = new java.io.File(rootdir+"/rootservers");
 
 	private static final String NoSuchDom = "nonsuchdomain6812.com";
@@ -408,7 +410,7 @@ public class ResolverTest
 	{
 		Class<?> clss_resolver = com.grey.naf.dns.resolver.embedded.EmbeddedResolver.class;
 		com.grey.naf.NAFConfig nafcfg = setConfig(null, clss_resolver, flags);
-		ApplicationContextNAF appctx = ApplicationContextNAF.create(null, nafcfg);
+		ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, nafcfg, true);
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
 				.withName(dispatcher_name)
 				.withDNS(true)
@@ -436,11 +438,11 @@ public class ResolverTest
 			d2name = dispatcher_name+"_master";
 			nafcfg = setConfig(d2name, clss_resolver, flags);
 		}
-		ApplicationContextNAF appctx = ApplicationContextNAF.create(null, nafcfg);
+		//we need NAFMAN to propagate the dsptch.stop() in handleDnsResult() to the other Dispatcher
+		ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, nafcfg, true);
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
 				.withName(d1name)
 				.withDNS(true)
-				.withNafman(true) //we need NAFMAN to propagate the dsptch.stop() in handleDnsResult() to the other Dispatcher
 				.withSurviveHandlers(false)
 				.build();
 		Dispatcher d1 = Dispatcher.create(appctx, def, logger);
@@ -482,7 +484,8 @@ public class ResolverTest
 			sb.append("<retry timeout=\"3s\" timeout_tcp=\"10s\" max=\"2\" backoff=\"200\"/>");
 		}
 		sb.append("</dnsresolver></naf>");
-		return com.grey.naf.NAFConfig.synthesise(sb.toString());
+		XmlConfig xmlcfg = XmlConfig.makeSection(sb.toString(), "/naf");
+		return new NAFConfig.Builder().withXmlConfig(xmlcfg).build();
 	}
 
 	private static String addFlag(String cbflags, String newflag)

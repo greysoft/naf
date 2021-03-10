@@ -15,6 +15,7 @@ import java.util.function.Supplier;
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.CM_Listener;
 import com.grey.naf.nafman.NafManAgent;
+import com.grey.naf.nafman.NafManConfig;
 import com.grey.naf.nafman.PrimaryAgent;
 import com.grey.naf.errors.NAFException;
 import com.grey.naf.errors.NAFConfigException;
@@ -36,46 +37,45 @@ public class ApplicationContextNAF {
 	private final ConcurrentMap<String, Object> namedItems = new ConcurrentHashMap<>();
 
 	private final String ctxname;
-	private final NAFConfig config;
+	private final NAFConfig nafConfig;
+	private final NafManConfig nafmanConfig;
 	private final ExecutorService threadpool;
 
 	private PrimaryAgent primaryAgent;
 	private final Object primaryLock = new Object();
 
 	public String getName() {return ctxname;}
-	public NAFConfig getConfig() {return config;}
+	public NAFConfig getConfig() {return nafConfig;}
+	public NafManConfig getNafManConfig() {return nafmanConfig;}
 	public ExecutorService getThreadpool() {return threadpool;}
 
-	public static ApplicationContextNAF create(String name, NAFConfig cfg) {
+	public static ApplicationContextNAF create(String name, NAFConfig cfg, NafManConfig nafmanConfig) {
 		if (name == null) name = "AnonAppContext-"+anonCount.incrementAndGet();
-		ApplicationContextNAF ctx = new ApplicationContextNAF(name, cfg);
+		ApplicationContextNAF ctx = new ApplicationContextNAF(name, cfg, nafmanConfig);
+		
 		ApplicationContextNAF dup = contextsByName.putIfAbsent(ctx.getName(), ctx);
 		if (dup != null) throw new NAFConfigException("Duplicate app-context="+ctx+" - prev="+dup);
+		
 		if (ctx.getConfig().getBasePort() != NAFConfig.RSVPORT_ANON) {
 			dup = contextsByPort.putIfAbsent(ctx.getConfig().getBasePort(), ctx);
-			if (dup != null) throw new NAFConfigException("Duplicate app-context="+ctx+" - prev="+dup);
+			if (dup != null) {
+				contextsByName.remove(ctx.getName());
+				throw new NAFConfigException("Duplicate app-context port for "+ctx+" - prev="+dup);
+			}
 		}
 		return ctx;
 	}
 
-	public static ApplicationContextNAF create(String name, NAFConfig.Defs defs) {
-		NAFConfig cfg;
-		try {
-			cfg = NAFConfig.load(defs);
-		} catch (Exception ex) { //this exception can't really happen in this code path
-			throw new NAFConfigException("Failed to synthesise NAFConfig");
-		}
-		return create(name, cfg);
-	}
-
-	public static ApplicationContextNAF create(String name) {
-		return create(name, new NAFConfig.Defs(NAFConfig.RSVPORT_ANON));
-	}
-
-	private ApplicationContextNAF(String name, NAFConfig cfg) {
+	private ApplicationContextNAF(String name, NAFConfig cfg, NafManConfig nafmanConfig) {
 		ctxname = name;
-		config = cfg;
-		threadpool = Executors.newFixedThreadPool(config.getThreadPoolSize());
+		nafConfig = cfg;
+		this.nafmanConfig = nafmanConfig;
+
+		if (nafConfig.getThreadPoolSize() == -1) {
+			threadpool = Executors.newCachedThreadPool();
+		} else {
+			threadpool = Executors.newFixedThreadPool(nafConfig.getThreadPoolSize());
+		}
 	}
 
 	public void register(Dispatcher d) {

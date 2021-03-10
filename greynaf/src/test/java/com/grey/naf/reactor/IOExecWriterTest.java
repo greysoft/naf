@@ -9,11 +9,12 @@ import com.grey.base.utils.FileOps;
 import com.grey.base.utils.StringOps;
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
+import com.grey.naf.TestUtils;
 
 public class IOExecWriterTest
 {
-	private static final String rootdir = DispatcherTest.initPaths(IOExecWriterTest.class);
-	private static final ApplicationContextNAF appctx = ApplicationContextNAF.create("IOWtest");
+	private static final String rootdir = TestUtils.initPaths(IOExecWriterTest.class);
+	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext("IOWtest", true);
 
 	private static class CMW extends CM_Stream
 	{

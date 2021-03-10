@@ -9,13 +9,14 @@ import com.grey.base.utils.FileOps;
 import com.grey.base.utils.IP;
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
+import com.grey.naf.TestUtils;
 
 // This tests the UDP mode of IOExecReader
 public class UDPReaderTest
 {
-	private static final String rootdir = DispatcherTest.initPaths(UDPReaderTest.class);
+	private static final String rootdir = TestUtils.initPaths(UDPReaderTest.class);
 	static final String[] iomessages = new String[]{"Message 1", "Message 2", "Here is another message", "The final message"};
-	private static final ApplicationContextNAF appctx = ApplicationContextNAF.create("UDPReaderTest");
+	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext("UDPReaderTest", true);
 
 	@org.junit.Test
 	public void testDirect() throws java.io.IOException

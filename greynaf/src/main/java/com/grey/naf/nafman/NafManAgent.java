@@ -184,6 +184,9 @@ public abstract class NafManAgent
 
 	@Override
 	public String toString() {
-		return super.toString()+" for Dispatcher="+getDispatcher().getName()+" with primary="+getPrimary().getDispatcher().getName();
+		// guard against null fields during initialisation
+		String dname = (getDispatcher() == null ? null : getDispatcher().getName());
+		Dispatcher pd = (getPrimary() == null ? null : getPrimary().getDispatcher());
+		return super.toString()+" for Dispatcher="+dname+" with primary="+(pd==null?null:pd.getName());
 	}
 }

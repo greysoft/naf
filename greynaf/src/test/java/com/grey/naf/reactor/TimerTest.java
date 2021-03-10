@@ -6,14 +6,15 @@ package com.grey.naf.reactor;
 
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
+import com.grey.naf.TestUtils;
 
 public class TimerTest
 {
 	static {
-		DispatcherTest.initPaths(TimerTest.class);
+		TestUtils.initPaths(TimerTest.class);
 	}
 
-	private static final ApplicationContextNAF appctx = ApplicationContextNAF.create("TimerTest");
+	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext("TimerTest", true);
 
 	private static class Handler
 		implements TimerNAF.Handler

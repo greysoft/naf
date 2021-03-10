@@ -13,7 +13,7 @@ public class App
 {
 	public static void main(String[] args) throws Exception {
 		App app = new App(args);
-		app.exec("portfwd", true);
+		app.execute("portfwd");
 	}
 
 	private static final NafManRegistry.DefCommand[] nafman_cmds = new NafManRegistry.DefCommand[] {

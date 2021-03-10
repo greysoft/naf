@@ -11,7 +11,7 @@ public class App
 {
 	public static void main(String[] args) throws Exception {
 		App app = new App(args);
-		app.exec("dnsbatchresolver", true);
+		app.execute("dnsbatchresolver");
 	}
 
 	public App(String[] args) {

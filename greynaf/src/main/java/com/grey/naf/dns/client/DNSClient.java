@@ -31,9 +31,9 @@ public class DNSClient
 	private final QueryCallback asyncCallback;
 	private final boolean ownDispatcher;
 
-	public DNSClient(QueryCallback cb, ApplicationContextNAF appctx, String dname, boolean withNafman, com.grey.logging.Logger logger)
+	public DNSClient(QueryCallback cb, ApplicationContextNAF appctx, String dname, com.grey.logging.Logger logger)
 			throws java.io.IOException {
-		this(createDispatcher(appctx, dname, withNafman, logger), true, cb);
+		this(createDispatcher(appctx, dname, logger), true, cb);
 	}
 
 	public DNSClient(Dispatcher d, QueryCallback cb) throws java.io.IOException {
@@ -131,7 +131,7 @@ public class DNSClient
 		return dnsreq.answer;
 	}
 	
-	private static Dispatcher createDispatcher(ApplicationContextNAF appctx, String dname, boolean withNafman, com.grey.logging.Logger logger)
+	private static Dispatcher createDispatcher(ApplicationContextNAF appctx, String dname, com.grey.logging.Logger logger)
 			throws java.io.IOException {
 		DispatcherDef.Builder bldr = new DispatcherDef.Builder();
 		if (dname != null) {
@@ -142,10 +142,8 @@ public class DNSClient
 				bldr = new DispatcherDef.Builder(dcfg);
 			}
 		}
-		bldr = bldr.withDNS(true)
-				.withNafman(withNafman);
+		bldr = bldr.withDNS(true);
 		if (bldr.build().getLogName() == null) bldr = bldr.withLogName(LOGNAME);
-
 		DispatcherDef def = bldr.build();
 
 		if (logger == null) {

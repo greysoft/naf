@@ -169,7 +169,6 @@ The top-level structure of a naf.xml file is outlined below.
         &lt;tmp&gt;%DIRVAR%/tmp&lt;/tmp&gt;
     &lt;/dirpaths&gt;
     &lt;baseport&gt;13000&lt;/baseport&gt;
-    &lt;dependjars&gt;app1.jar : app2.jar&lt;/dependjars&gt;
     &lt;nafman&gt; ... &lt;/nafman&gt;
     &lt;dnsresolver&gt; ... &lt;/dnsresolver&gt;
     &lt;dispatchers&gt; ... &lt;/dispatchers&gt;
@@ -278,24 +277,6 @@ If this config item is absent, the setting is obtained from the
 system property, and if that is also absent, the ultimate default is 13000.
 </p>
 
-<p> <span class="cfgtitle">dependjars</span><br/>
-A colon-separated list of dependent JAR files to dynamically load.
-<br/>
-Some of the list items may be directory paths rather than a JAR pathname, and if so, then:<br/>
-- If directory spec ends in / (forward slash): NAF loads any .jar files found in that directory.<br/>
-- Else, the directory itself is placed on the live classpath.
-<br/> <br/>
-Note that the
-<span class="cfgname">greynaf.cp</span>
-system property can be used as an alternative to the
-<span class="cfgname">dependjars</span>
-config element.
-<br/>
-Their syntax and treatment is identical, but the system property is evaluated a fraction earlier during application startup.
-<br/>
-It is a matter of personal preference as to whether you would prefer to specify extra JARs in the naf.xml file or via system properties.
-</p>
-
 <hr class="pline"/>
 <h2>
 <a name="dispatcher">
@@ -309,7 +290,7 @@ Multiple Dispatchers can exist within one JVM process, and they are completely i
 In a widely used terminology, each Dispatcher represents an event loop.
 <br/>
 Users can simply regard a Dispatchers as a single-threaded execution context within which their applications reside.
-Dispatchers monitor all events (eg. I/O) in which their applications have registered an interest, and they also provide built-in services such as DNS resolution, NAFMAN and logging.
+Dispatchers monitor all events (eg. I/O) in which their applications have registered an interest, and they also provide built-in services such as NAFMAN and logging.
 <br/> <br/>
 An illustrative
 <span class="cfgname">dispatchers</span>
@@ -378,13 +359,6 @@ interface and has been passed to the
 method in order to be periodically flushed, and it is typically a logger or similiar.
 <br/>
 The rationale behind this facility is that a buffered log file might not get flushed for an indefinite period if no further log messages were written to it, so this attribute guarantees a maximum interval before the last log message is visible in the log file.
-</li>
-
-<li><span class="cfgtitle">nafman</span>:
-Boolean attribute which specifies whether a NAFMAN agent will be activated in this Dispatcher.
-Default is No.
-<br/>
-Beware that turning NAFMAN off will (at the very least) often leave you with no graceful way of shutting down a NAF application.
 </li>
 
 <li><span class="cfgtitle">name</span>:
@@ -517,8 +491,10 @@ The primary agent receives NAFMAN commands and forwards them to the appropriate 
 The Dispatchers in which the secondary NAFMAN agents reside are called the downstream dispatchers, while the primary Dispatcher is called their upstream.
 <br/>
 If a Dispatcher does not have NAFMAN enabled, it does not have any relationship to any other Dispatchers within the same process (whether or not they have NAFMAN enabled) and there is no sense of upstream/downstream.
+
 <br/> <br/>
 The rest of this section describes how to configure NAFMAN with naf.xml style config, but they can of course be created programatically via their Builder classes, without any XML config.
+
 <br/> <br/>
 The
 <span class="cfgname">nafman</span>
@@ -526,24 +502,37 @@ config block is typically absent from the
 <span class="pathname">naf.xml</span>
 config file,
 but that does not mean NAFMAN is disabled, merely that it's operating with its default settings.
-NAFMAN can only be disabled on a per-Dispatcher basis, via the Dispatcher's
-<span class="cfgname">nafman</span>
-attribute.
 <br/>
-The structure of the config block is illustrated below, but you should rarely need to modify it as they are more a case of low-level tuning than anything else.
+NAFMAN can only be disabled within a naf.xml config file by explicitly specifying the
+<span class="cfgname">nafman</span>
+config block with the
+<span class="cfgname">enabled</span>
+attribute set to N.
+<br/>
+For applications that use the NAF API without a naf.xml config file, they can disable NAFMAN within a particular application context (a related set of Dispatchers) by passing a null
+<span class="compcode">NafManConfig</span>
+argument to the
+<span class="compcode">com.grey.naf.ApplicationContextNAF</span>
+constructor.
+
 <br/> <br/>
-See the
-<span class="compcode">com.grey.naf.nafman.config/NafManConfig</span>
-source code for all the NAFMAN options, in particular the
+The structure of the config block is illustrated below, but you should rarely need to modify it as they are more a case of low-level tuning than anything else.
+<br/>
+Only the most important attributes have been depicted (with their default values) but see the
+<span class="compcode">com.grey.naf.nafman.NafManConfig</span>
+source code for the full set of NAFMAN options, in particular its
 <span class="compcode">withXmlConfig()</span>
-method, while the
+method.
+<br/>
+The embedded
 <span class="cfgname">Listener</span>
 config block has the usual Listener attributes.
 </p>
+
 <table class="cfgbox">
 <tr><td>
 <pre>
-&lt;nafman survive_downstream="y"&gt;
+&lt;nafman enabled="y" survive_downstream="y"&gt;
     &lt;listener&gt;
         &lt;server&gt;
             ... see NAFMAN source ...
@@ -553,9 +542,8 @@ config block has the usual Listener attributes.
 </pre>
 </td></tr>
 </table>
+
 <p>
-The most important attribute is shown above, with its default value of True.
-<br/>
 The
 <span class="cfgname">survive_downstream</span>
 attribute tells the primary Dispatcher whether it should also exit whenever a secondary dies or terminates, with Yes meaning it should survive the event and carry on.
@@ -1348,13 +1336,6 @@ However if you're running from the project root after doing a build, you would i
 
 <br/> <br/>
 However you would normally launch your own application directly as in the 3rd example above, as it would have NAF and all other dependencies already on its classpath.
-<br/>
-As noted in section &sect;2 above though, you could specify all the JARs your application requires in the
-<span class="cfgname">dependjars</span>
-config item or the
-<span class="cfgname">greynaf.cp</span>
-system property, and if so, you could launch your application by directly executing
-<span class="pathname">greynaf.jar</span>
 </p>
 
 <hr class="pline"/>
@@ -1402,14 +1383,16 @@ All the demo apps have a README in their source directory, with some more practi
 
 <br/> <br/>
 <h3>
-13.1 - Port Forwarder
+12.1 - Port Forwarder
 </h3>
 
 <p>
 The
 <span class="softname">portfwd</span>
-demo app provides an example of how an application that is based on a <dfn>naf.xml</dfn> config file (called portfwd.xml in this case) passed control to the NAF framework in its
-<span class="compcode">main()</span> method.
+demo app provides an example of how an application that is based on a <dfn>naf.xml</dfn> config file (called
+<span class="pathname">portfwd.xml</span>
+in this case) and passes control to the NAF framework in its
+<span class="compcode">main()</span> method to let it launch the application based on the config file.
 <br/> <br/>
 The XML config file specifies a NAFlet (see
 <span class="compcode">com.grey.portfwd.Task</span>
@@ -1432,7 +1415,7 @@ There is only one load-balancer defined, so one listener defines it explicitly w
 
 <br/>
 <h3>
-13.2 - Echo Bot
+12.2 - Echo Bot
 </h3>
 
 <p>
@@ -1446,7 +1429,7 @@ subclasses NAF's
 <span class="compcode">com.grey.naf.Launcher</span>
 class (as does PortFwd) and contains the EchoBot's
 <span class="compcode">main()</span>
-which instantiates the Launcher subclass and then passes control to it.
+which instantiates the Launcher subclass and then passes control to NAF's Launcher class.
 <br/>
 The EchoBot's App class defines a subclass of
 <span class="compcode">com.grey.base.utils.CommandParser.OptionsHandler</span>
@@ -1459,16 +1442,20 @@ method, NAF passes control back to it after parsing the command-line, and the Ec
 
 <br/>
 <h3>
-13.3 - DNS Batch Resolver
+12.3 - DNS Batch Resolver
 </h3>
 
 <p>
-The batch-resolver is controlled by a naf.xml style config file which is called batchresolver.xml in this case, and it resolves a list of domains contained in an input file.
+The batch-resolver is controlled by a naf.xml style config file which is called
+<span class="pathname">batchresolver.xml</span>
+in this case, and it resolves a list of domains contained in an input file.
 
 <br/> <br/>
 The input file contains one record per line, but the type of the records depends on the
 <span class="cfgtitle">dnstype</span>
-setting in the batchresolver.xml config file, as follows:
+setting in the
+<span class="pathname">batchresolver.xml</span>
+config file, as follows:
 <br/>
 &bull; <span class="cfgvalue">A</span>:
 Hostname in FQDN (Fully Qualified Domain Name) form - gets resolved to IPv4 address
@@ -1495,9 +1482,12 @@ A service specification in the standard SRV <code>_service._proto.name.</code> n
 DNS domain name in FQDN form - resolved to the domain's SRV data string
 
 <br/> <br/>
-The remaining config items are all set to appropriate defaults, and the source code can be viewed in the constructor of the
+The remaining
+<span class="pathname">batchresolver.xml</span>
+config items are absent and therefore default to appropriate values.
+All the config items can be inspected in the source code in the constructor of the
 <span class="softname">BatchResolver</span>
-class, but the most interesting config settings are:
+class, but the most interesting ones are:
 <br/> <br/>
 &bull; <span class="cfgtitle">fullanswer</span>:<br/>
 A Y/N field determining whether we merely report the status (OK, NODOMAIN, etc) of each query in the output file, or the full set of Answer RRs (DNS Resource Records)

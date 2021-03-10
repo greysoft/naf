@@ -193,18 +193,17 @@ public class SysProps
 		Class<?> clss = com.grey.base.ExceptionUtils.class;
 		java.util.Properties props = null;
 		try {
-			String txt;
-			if (pthnam == null || pthnam.isEmpty() || NULLMARKER.equals(pthnam)) {
-				txt = "No Grey-Properties found";
-			} else {
+			String txt = "";
+			if (pthnam != null &&!pthnam.isEmpty() && !NULLMARKER.equals(pthnam)) {
 				props = load(pthnam);
 				if (props == null) {
 					txt = "Grey-Properties file="+pthnam+" not found";
 				} else {
 					txt = "Grey-Properties="+props.size()+" loaded from "+pthnam;
 				}
+				txt += " - ";
 			}
-			com.grey.base.utils.PkgInfo.announceJAR(clss, "greybase", txt+" - Java="+JAVA_VERSION_MAJOR+"/"+System.getProperty("java.version"));
+			com.grey.base.utils.PkgInfo.announceJAR(clss, "greybase", txt+"Java="+JAVA_VERSION_MAJOR+"/"+System.getProperty("java.version"));
 		} catch (Exception ex) {
 			throw new RuntimeException("Failed to load Grey-Properties from "+pthnam, ex);
 		}

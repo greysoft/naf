@@ -4,13 +4,17 @@
  */
 package com.grey.naf;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 import com.grey.base.config.SysProps;
 import com.grey.base.config.XmlConfig;
 import com.grey.base.utils.FileOps;
 import com.grey.base.utils.DynLoader;
 import com.grey.naf.errors.NAFConfigException;
 
-/** Represents (and parses) a naf.xml config file.
+/**
+ * This class represents the NAF config for an ApplicationContextNAF instance.
+ * If the application context is driven by a naf.xml style config file, then this class represents (and parses) that config file.
  */
 public class NAFConfig
 {
@@ -40,102 +44,92 @@ public class NAFConfig
 	private final String pathConf;
 	private final String pathVar;
 	private final String pathLogs;
-	private final String pathTemp; //NB: Diverges from SysProps.TMPDIR, unless SYSPROP_DIRPATH_TMP is set
-	private final XmlConfig cfgroot;
+	private final String pathTemp;
+
 	private final int basePort;
 	private final int threadPoolSize;
-	
-	private int nextport; //next port number to assign
+	private final XmlConfig configRoot;
 
-	// The param is the naf.xml config filename
-	public static NAFConfig load(String cfgpath, Defs defaults) throws java.io.IOException
-	{
-		XmlConfig cfg = XmlConfig.getSection(cfgpath, "naf");
-		return new NAFConfig(cfg, defaults);
-	}
+	//next port number to assign - will never get used if baseport is ANON
+	private final AtomicInteger nextPort = new AtomicInteger();
 
-	public static NAFConfig load(String cfgpath) throws java.io.IOException
-	{
-		return load(cfgpath, null);
-	}
+	private NAFConfig(Builder bldr) {
+		configRoot = bldr.configRoot;
+		threadPoolSize = bldr.threadPoolSize;
 
-	public static NAFConfig load(Defs defs) throws java.io.IOException
-	{
-		return new NAFConfig(XmlConfig.BLANKCFG, defs);
-	}
-
-	public static NAFConfig synthesise(String cfgxml) throws java.io.IOException
-	{
-		XmlConfig cfg = XmlConfig.makeSection(cfgxml, "/naf");
-		return new NAFConfig(cfg, null);
-	}
-
-	private NAFConfig(XmlConfig cfg, Defs defaults) throws java.io.IOException
-	{
-		if (defaults == null) defaults = new Defs();
-		cfgroot = cfg;
-
-		XmlConfig cfgpaths = getNode("dirpaths");
-		pathRoot = getPath(cfgpaths, "root", SYSPROP_DIRPATH_ROOT, false, defaults.path_root, null);
-		pathConf = getPath(cfgpaths, "config", SYSPROP_DIRPATH_CONF, false, pathRoot+"/conf", null);
-		pathVar = getPath(cfgpaths, "var", SYSPROP_DIRPATH_VAR, false, pathRoot+"/var", null);
-		pathLogs = getPath(cfgpaths, "logs", SYSPROP_DIRPATH_LOGS, false, pathVar+"/logs", null);
-		pathTemp = getPath(cfgpaths, "tmp", SYSPROP_DIRPATH_TMP, false, pathVar+"/tmp", null);
-		threadPoolSize = cfgroot.getInt("threadpoolsize", true, defaults.threadpoolSize);
-
-		basePort = cfgroot.getInt("baseport", true, defaults.baseport);
-		nextport = (basePort == RSVPORT_ANON ? 0 : basePort + RSVPORT_MAX + 1); //will never get used if baseport is ANON
-
-		// JARs that are required to bootstrap this JVM (such as the logging framework) have to be
-		// specified in Properties (see App.SYSPROP_CP) but NAFlet code can be loaded either via
-		// this config item or from the same Properties path as the logger - it's up to the user.
-		String cp = cfgroot.getValue("dependjars", false, null);
-		cp = tokenisePaths(cp);
-		if (cp != null) {
-			try {
-				java.util.ArrayList<java.net.URL> urls = DynLoader.load(cp);
-				System.out.println("Loaded URLs="+(urls==null ? "NULL" : (urls.size()+": "+urls)));
-			} catch (Throwable ex) {
-				throw new NAFConfigException("Failed to load NAF classpath", ex);
-			}
+		try {
+			pathRoot = getPath(bldr.pathRoot, null);
+			pathVar = getPath(bldr.pathVar, null);
+			pathTemp = getPath(bldr.pathTemp, null);
+			pathLogs = getPath(bldr.pathLogs, null);
+			pathConf = getPath(bldr.pathConf, null);
+		} catch (Exception ex) {
+			throw new NAFConfigException("Failed to set up paths", ex);
 		}
+
+		basePort = bldr.basePort;
+		nextPort.set(basePort == RSVPORT_ANON ? 0 : basePort + RSVPORT_MAX + 1);
 
 		// The GreyLog logging framework may not be in use at all, but if it is, this will align the path
 		// tokens in its logging.xml config file with the settings we've determined above.
-		// One thing we can't do however, is link the location of logging.xml to our path_conf setting,
+		// One thing we can't do however, is link the location of logging.xml to our pathConf setting,
 		// since GreyLog has probably already set its path in stone before this class ever got invoked.
 		String val = SysProps.get(SYSPROP_DIRPATH_LOGS);
 		if (val == null || val.length() == 0) SysProps.set(SYSPROP_DIRPATH_LOGS, pathLogs);
+	}
+
+	public String getPathRoot() {
+		return pathRoot;
 	}
 
 	public String getPathVar() {
 		return pathVar;
 	}
 
-	public String getPathLogs() {
-		return pathLogs;
-	}
-
 	public String getPathTemp() {
 		return pathTemp;
 	}
 
-	public int getBasePort() {
-		return basePort;
+	public String getPathLogs() {
+		return pathLogs;
+	}
+
+	public String getPathConf() {
+		return pathConf;
 	}
 
 	public int getThreadPoolSize() {
 		return threadPoolSize;
 	}
 
-	public XmlConfig[] getDispatchers()
-	{
-		String xpath = "dispatchers/dispatcher"+XmlConfig.XPATH_ENABLED;
-		return cfgroot.getSections(xpath);
+	public int getBasePort() {
+		return basePort;
 	}
 
-	public XmlConfig getDispatcher(String name)
-	{
+	// if we really don't care which port gets assigned, ephemeral ports assigned by the OS will often be preferred to this
+	public int assignPort(int id) {
+		if (basePort == RSVPORT_ANON) return 0; //want to bind to a totally random port
+		if (id == RSVPORT_ANON) return nextPort.getAndIncrement(); //want to bind to a random port within the defined baseport range
+		return getPort(id);
+	}
+
+	// This should be called by clients to discover where to connect to, while assignPort() is called by listeners to bind to
+	public int getPort(int id) {
+		if (basePort == RSVPORT_ANON) //clients need to know server port, if baseport is randon
+			throw new IllegalStateException("Reserved NAF port="+id+" is undefined when baseport is ANON");
+		return basePort + id;
+	}
+
+	public boolean isAnonymousBasePort() {
+		return (basePort == RSVPORT_ANON);
+	}
+
+	public XmlConfig[] getDispatchers() {
+		String xpath = "dispatchers/dispatcher"+XmlConfig.XPATH_ENABLED;
+		return configRoot.getSections(xpath);
+	}
+
+	public XmlConfig getDispatcher(String name) {
 		if (name == null || name.length() == 0) {
 			XmlConfig[] all = getDispatchers();
 			return (all != null && all.length == 1 ? all[0] : null);
@@ -145,25 +139,17 @@ public class NAFConfig
 		return (cfg.exists() ? cfg : null);
 	}
 
-	public XmlConfig getNafman()
-	{
-		return getNode("nafman");
+	public XmlConfig getNode(String xpath) {
+		return configRoot.getSection(xpath);
 	}
 
-	public XmlConfig getDNS()
-	{
-		return getNode("dnsresolver");
-	}
-
-	public String getPath(XmlConfig cfg, String xpath, String propname, boolean mdty, String dflt, Class<?> clss)
-			throws java.io.IOException
+	public String getPath(XmlConfig cfg, String xpath, String propname, boolean mdty, String dflt, Class<?> clss) throws java.io.IOException
 	{
 		String path = get(cfg, xpath, propname, mdty, dflt);
 		return getPath(path, clss);
 	}
 
-	public String getPath(String path, Class<?> clss)
-			throws java.io.IOException
+	public String getPath(String path, Class<?> clss) throws java.io.IOException
 	{
 		if (path != null && path.startsWith(PFX_CLASSPATH)) {
 			java.net.URL url = DynLoader.getResource(path.substring(PFX_CLASSPATH.length()), clss);
@@ -172,8 +158,7 @@ public class NAFConfig
 		return makePath(path);
 	}
 
-	public java.net.URL getURL(XmlConfig cfg, String xpath, String propname, boolean mdty, String dflt, Class<?> clss)
-			throws java.io.IOException
+	public java.net.URL getURL(XmlConfig cfg, String xpath, String propname, boolean mdty, String dflt, Class<?> clss) throws java.io.IOException
 	{
 		String path = getPath(cfg, xpath, propname, mdty, dflt, clss);
 		if (path == null) return null;
@@ -184,38 +169,9 @@ public class NAFConfig
 
 	private String get(XmlConfig cfg, String xpath, String propnam, boolean mdty, String dflt)
 	{
-		if (cfg == null) cfg = cfgroot;
+		if (cfg == null) cfg = configRoot;
 		if (propnam != null) dflt = SysProps.get(propnam, dflt);
 		return cfg.getValue(xpath, mdty, dflt);
-	}
-
-	private XmlConfig getNode(String xpath)
-	{
-		return cfgroot.getSection(xpath);
-	}
-
-	// if we really don't care which port gets assigned, ephemeral ports assigned by the OS will often be preferred to this
-	public int assignPort(int id)
-	{
-		if (basePort == RSVPORT_ANON) return 0; //want to bind to a totally random port
-		if (id == RSVPORT_ANON) { //want to bind to a random port within the defined baseport range
-			synchronized (NAFConfig.class) {
-				return nextport++;
-			}
-		}
-		return getPort(id);
-	}
-
-	// This should be called by clients to discover where to connect to, while assignPort() is called by listeners to bind to
-	public int getPort(int id)
-	{
-		if (basePort == RSVPORT_ANON) //clients need to know server port, if baseport is randon
-			throw new IllegalStateException("Reserved NAF port="+id+" is undefined when baseport is ANON");
-		return basePort + id;
-	}
-
-	public boolean isAnonymousBasePort() {
-		return (basePort == RSVPORT_ANON);
 	}
 
 	// NB: This is purely about constructing a path, not necessarily one that corresponds to an existing file
@@ -238,16 +194,6 @@ public class NAFConfig
 		if (pathLogs != null) template = template.replace(DIRTOKEN_LOGS, pathLogs);
 		if (pathTemp != null) template = template.replace(DIRTOKEN_TMP, pathTemp);
 		return template;
-	}
-
-	public void announce(com.grey.logging.Logger log)
-	{
-		log.info("NAF Paths - Root = "+pathRoot);
-		log.info("NAF Paths - Config = "+pathConf);
-		log.info("NAF Paths - Var = "+pathVar);
-		log.info("NAF Paths - Logs = "+pathLogs);
-		log.info("NAF Paths - Temp = "+pathTemp);
-		if (basePort != RSVPORT_ANON) log.info("Base Port="+basePort+", Next="+nextport);
 	}
 
 
@@ -302,18 +248,73 @@ public class NAFConfig
 	}
 
 
-	public static class Defs {
-		private static final int DFLT_BASEPORT = SysProps.get(SYSPROP_BASEPORT, 13000);
-		public String path_root = ".";
-		public int baseport = DFLT_BASEPORT;
-		public int threadpoolSize = Math.max(32, 8 * Runtime.getRuntime().availableProcessors());
+	public static class Builder {
+		private int basePort = SysProps.get(SYSPROP_BASEPORT, 13000);
+		private String pathRoot = SysProps.get(SYSPROP_DIRPATH_ROOT, ".");
+		private String pathVar = SysProps.get(SYSPROP_DIRPATH_VAR, pathRoot+"/var");
+		private String pathTemp = SysProps.get(SYSPROP_DIRPATH_TMP, pathVar+"/tmp");
+		private String pathLogs = SysProps.get(SYSPROP_DIRPATH_LOGS, pathVar+"/logs");
+		private String pathConf = SysProps.get(SYSPROP_DIRPATH_CONF, pathRoot+"/conf");
+		private XmlConfig configRoot = XmlConfig.BLANKCFG;
+		private int threadPoolSize = -1;
 
-		public Defs() {
-			this(RSVPORT_NAFMAN);
+		// The param is the naf.xml config filename
+		public Builder withConfigFile(String cfgpath) {
+			XmlConfig cfg = XmlConfig.getSection(cfgpath, "naf");
+			return withXmlConfig(cfg);
 		}
 
-		public Defs(int baseport) {
-			if (baseport != RSVPORT_NAFMAN) this.baseport = baseport;
+		public Builder withXmlConfig(XmlConfig cfg) {
+			configRoot = cfg;
+			basePort = cfg.getInt("baseport", false, basePort);
+			threadPoolSize = cfg.getInt("threadpoolsize", false, threadPoolSize);
+
+			XmlConfig cfgpaths = cfg.getSection("dirpaths");
+			pathRoot = cfgpaths.getValue("root", false, pathRoot);
+			pathConf = cfgpaths.getValue("config", false, pathRoot+"/conf");
+			pathVar = cfgpaths.getValue("var", false, pathRoot+"/var");
+			pathLogs = cfgpaths.getValue("logs", false, pathVar+"/logs");
+			pathTemp = cfgpaths.getValue("tmp", false, pathVar+"/tmp");			
+			return this;
+		}
+
+		public Builder withBasePort(int v) {
+			basePort = v;
+			return this;
+		}
+
+		public Builder withPathRoot(String v) {
+			pathRoot = v;
+			return this;
+		}
+
+		public Builder withPathVar(String v) {
+			pathVar = v;
+			return this;
+		}
+
+		public Builder withPathTemp(String v) {
+			pathTemp = v;
+			return this;
+		}
+
+		public Builder withPathLogs(String v) {
+			pathLogs = v;
+			return this;
+		}
+
+		public Builder withPathConf(String v) {
+			pathConf = v;
+			return this;
+		}
+
+		public Builder withThreadPoolSize(int v) {
+			threadPoolSize = v;
+			return this;
+		}
+
+		public NAFConfig build() {
+			return new NAFConfig(this);
 		}
 	}
 }

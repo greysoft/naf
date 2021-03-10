@@ -16,9 +16,6 @@ import com.grey.naf.errors.NAFConfigException;
  */
 public class NafManRegistry
 {
-	static {
-		com.grey.naf.Launcher.announceNAF();
-	}
 	private static final boolean THROW_ON_DUP = SysProps.get("greynaf.nafman.registry.dupthrow", false);
 
 	// the built-in NAF commands
@@ -213,7 +210,9 @@ public class NafManRegistry
 			for (int idx = 0; idx != lst.size(); idx++) {
 				CommandHandlerReg def = lst.get(idx);
 				if (dsptch == def.dsptch && handler == def.handler) {
-					throw new NAFConfigException("Duplicate handler for cmd="+cmdcode+" in Dispatcher="+dsptch.getName());
+					// there are valid reasons for this, eg. multiple listeners with same server
+					dsptch.getLogger().warn("Dispatcher="+dsptch.getName()+" skipping NAFMAN registration cmd="+cmdcode+"/"+handler+" due to existing - "+def.handler);
+					return false;
 				}
 				if (pref == 0) {
 					if (def.pref == 0) continue; //new handler can co-exist with existing one
@@ -241,7 +240,7 @@ public class NafManRegistry
 		}
 		CommandHandlerReg def = new CommandHandlerReg(handler, dsptch, pref);
 		lst.add(def);
-		dsptch.getLogger().trace("NAFMAN cmd="+cmdcode+": Installed "+def);
+		dsptch.getLogger().trace("Dispatcher="+dsptch.getName()+" registered NAFMAN cmd="+cmdcode+" handler - "+def);
 		return true;
 	}
 

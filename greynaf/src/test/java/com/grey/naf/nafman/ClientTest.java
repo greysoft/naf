@@ -4,24 +4,22 @@
  */
 package com.grey.naf.nafman;
 
+import com.grey.base.config.XmlConfig;
 import com.grey.base.utils.DynLoader;
 import com.grey.base.utils.FileOps;
 import com.grey.base.utils.TimeOps;
 import com.grey.logging.Logger;
 import com.grey.naf.ApplicationContextNAF;
 import com.grey.naf.DispatcherDef;
-import com.grey.naf.NAFConfig;
+import com.grey.naf.TestUtils;
 import com.grey.naf.reactor.Dispatcher;
 
 public class ClientTest
 {
-	private static final NafManRegistry nafreg = NafManRegistry.get(ApplicationContextNAF.create(null));
-	private static final String rootdir = com.grey.naf.reactor.DispatcherTest.initPaths(ClientTest.class);
+	private static final String rootdir = com.grey.naf.TestUtils.initPaths(ClientTest.class);
 	private static final NafManRegistry.DefCommand fakecmd1 = new NafManRegistry.DefCommand("fake-cmd-1", "utest", "fake1", null, false);
 	private static final NafManRegistry.DefCommand fakecmd2 = new NafManRegistry.DefCommand("fake-cmd-2", "utest", "fake2", null, false);
-	private static final NafManRegistry.DefCommand stopcmd = nafreg.getCommand(NafManRegistry.CMD_STOP);
 	private static final com.grey.logging.Logger logger = com.grey.logging.Factory.getLoggerNoEx("");
-	private static final int cfgbaseport = NAFConfig.RSVPORT_ANON; //same as in resources:naf.xml
 
 	public ClientTest() throws java.io.IOException {
 		FileOps.deleteDirectory(rootdir);
@@ -33,11 +31,15 @@ public class ClientTest
 	{
 		java.net.URL url = DynLoader.getResource("/naf.xml", getClass());
 		String cfgpath = new java.io.File(url.toURI()).getCanonicalPath();
-		com.grey.naf.NAFConfig nafcfg = com.grey.naf.NAFConfig.load(cfgpath);
-		ApplicationContextNAF appctx = ApplicationContextNAF.create(null, nafcfg);
-		String dname = "testdispatcher1";
+		ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, cfgpath, true);
+		NafManRegistry nafreg = NafManRegistry.get(appctx);
+		NafManRegistry.DefCommand stopcmd = nafreg.getCommand(NafManRegistry.CMD_STOP);
 
-		Dispatcher dsptch = Dispatcher.createConfigured(appctx, dname, logger);
+		String dname = "testdispatcher1";
+		XmlConfig dcfg = appctx.getConfig().getDispatcher(dname);
+		DispatcherDef def = new DispatcherDef.Builder(dcfg).build();
+
+		Dispatcher dsptch = Dispatcher.create(appctx, def, logger);
 		NafManAgent agent = dsptch.getNafManAgent();
 		org.junit.Assert.assertTrue(agent.isPrimary());
 		org.junit.Assert.assertSame(agent, appctx.getPrimaryAgent());
@@ -45,14 +47,14 @@ public class ClientTest
 		com.grey.naf.Launcher.main(new String[] {"-q", "-cmd", stopcmd.code, "-remote", String.valueOf(agent.getPort())});
 		waitStopped(dsptch);
 
-		dsptch = Dispatcher.createConfigured(appctx, dname, logger);
+		dsptch = Dispatcher.create(appctx, def, logger);
 		agent = dsptch.getNafManAgent();
 		dsptch.start();
 		com.grey.naf.Launcher.main(new String[] {"-q", "-cmd", stopcmd.code,
 				"-remote", "localhost:"+String.valueOf(agent.getPort())});
 		waitStopped(dsptch);
 
-		dsptch = Dispatcher.createConfigured(appctx, dname, logger);
+		dsptch = Dispatcher.create(appctx, def, logger);
 		agent = dsptch.getNafManAgent();
 		dsptch.start();
 		// this should be ignored by the Dispatcher as it has no handlers
@@ -69,7 +71,7 @@ public class ClientTest
 		waitStopped(dsptch);
 
 		try {
-			NafManClient.submitLocalCommand(stopcmd.code, agent.getPort(), null);
+			NafManClient.submitCommand(stopcmd.code, null, agent.getPort(), null);
 			org.junit.Assert.fail("Failed to trap command submission to stopped Dispatcher");
 		} catch (java.io.IOException ex) {}
 	}
@@ -77,10 +79,11 @@ public class ClientTest
 	@org.junit.Test
 	public void testStopMulti() throws java.io.IOException
 	{
-		ApplicationContextNAF appctx = ApplicationContextNAF.create(null, new NAFConfig.Defs(cfgbaseport));
+		ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, true);
+		NafManRegistry nafreg = NafManRegistry.get(appctx);
+		NafManRegistry.DefCommand stopcmd = nafreg.getCommand(NafManRegistry.CMD_STOP);
 		DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
 				.withName("utest_d1")
-				.withNafman(true)
 				.withSurviveHandlers(false)
 				.build();
 		Dispatcher dp = Dispatcher.create(appctx, def, logger);
@@ -109,24 +112,20 @@ public class ClientTest
 	@org.junit.Test
 	public void testCommands() throws java.io.IOException
 	{
-		ApplicationContextNAF appctx = ApplicationContextNAF.create(null, new NAFConfig.Defs(cfgbaseport));
+		ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, true);
+		NafManRegistry reg = NafManRegistry.get(appctx);
+		NafManRegistry.DefCommand stopcmd = reg.getCommand(NafManRegistry.CMD_STOP);
 		DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
 				.withName("utest_allcmds")
-				.withNafman(true)
-				.withDNS(true)
 				.withSurviveHandlers(false)
 				.build();
 		Dispatcher dsptch = Dispatcher.create(appctx, def, logger);
 		dsptch.start();
-		NafManRegistry reg = NafManRegistry.get(appctx);
 		int port = dsptch.getNafManAgent().getPort();
 		NafManClient.submitCommand(reg.getCommand(NafManRegistry.CMD_DLIST).code, null, port, dsptch.getLogger());
 		NafManClient.submitCommand(reg.getCommand(NafManRegistry.CMD_DSHOW).code, null, port, dsptch.getLogger());
 		NafManClient.submitCommand(reg.getCommand(NafManRegistry.CMD_FLUSH).code, null, port, dsptch.getLogger());
 		NafManClient.submitCommand(reg.getCommand(NafManRegistry.CMD_SHOWCMDS).code, null, port, dsptch.getLogger());
-		NafManClient.submitCommand(reg.getCommand(NafManRegistry.CMD_DNSDUMP).code, null, port, dsptch.getLogger());
-		NafManClient.submitCommand(reg.getCommand(NafManRegistry.CMD_DNSPRUNE).code, null, port, dsptch.getLogger());
-		NafManClient.submitCommand(reg.getCommand(NafManRegistry.CMD_DNSQUERY).code, null, port, dsptch.getLogger());
 		NafManClient.submitCommand(reg.getCommand(NafManRegistry.CMD_APPSTOP).code, null, port, dsptch.getLogger()); //missing args
 		String cmd = NafManRegistry.CMD_APPSTOP+"?"+NafManCommand.ATTR_DISPATCHER+"=no-such-disp&"+NafManCommand.ATTR_NAFLET+"=no-such-app";
 		NafManClient.submitCommand(cmd, null, port, dsptch.getLogger()); //missing args
@@ -140,7 +139,7 @@ public class ClientTest
 		waitStopped(dsptch);
 		org.junit.Assert.assertFalse(dsptch.isRunning());
 	}
-	
+
 	private static void waitStopped(Dispatcher dsptch) {
 		Dispatcher.STOPSTATUS stopsts = dsptch.waitStopped(TimeOps.MSECS_PER_SECOND * 10, true);
 		org.junit.Assert.assertEquals(Dispatcher.STOPSTATUS.STOPPED, stopsts);

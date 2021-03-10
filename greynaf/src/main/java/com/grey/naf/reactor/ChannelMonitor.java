@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2018 Yusef Badri - All rights reserved.
+ * Copyright 2010-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -265,7 +265,9 @@ public abstract class ChannelMonitor
 		int prevlen = sb.length();
 		sb.append("ID=").append(cm_id).append(": ");
 		if (this instanceof CM_Listener) {
-			sb.append(clss.getSimpleName()).append('/').append(((CM_Listener)this).getServerType().getName());
+			sb.append(clss.getSimpleName())
+				.append('/').append(((CM_Listener)this).getServerType().getName())
+				.append('/').append(((CM_Listener)this).getName());
 		} else if (clss == Producer.AlertsPipe.class) {
 			if (!verbose) {
 				//omit this object altogether

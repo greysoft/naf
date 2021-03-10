@@ -39,9 +39,3 @@ The main point about the logging in this sample app, is to demonstrate how SLF4J
 Unlike the reverse redirection which is illustrated in PortFwd, this does not require any config settings. The redirection of SLF4J to GreyLog happens simply byt virtue of adding greylog-slf4j to our classpath (see the pom.xml build script) which is an SLF4J adapter that routes all logging to GreyLog.
 
 As with PortFwd, you can obtain additional logging diagnostics by specifying -Dgrey.logger.diagnostics=true on the command line (or setting the env var GREY_LOGGER_DIAGNOSTICS=true).
-
-NAFMAN
--------
-This sample app does not run NAFMAN by default, but if you set the system property -Dgrey.echobot.nafman=y on the command (or the env var GREY_ECHOBOT_NAFMAN=y) then it will enable NAFMAN, and you canm browse to port 13000 on the local host while EchoBot is running.
-Of course EchoBot normally runs for only an instant, but if you want time to examine its NAFMAN, you can run it in server-only mode, in which case it simply hangs waiting for input.
-	java -jar target/samples-echobot-VERSION.jar -server 14000

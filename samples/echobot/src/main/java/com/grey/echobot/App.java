@@ -6,7 +6,6 @@ package com.grey.echobot;
 
 import com.grey.base.utils.FileOps;
 import com.grey.base.utils.TSAP;
-import com.grey.base.config.SysProps;
 import com.grey.base.utils.CommandParser;
 import com.grey.logging.Logger;
 import com.grey.naf.ApplicationContextNAF;
@@ -22,16 +21,15 @@ public class App
 	extends com.grey.naf.Launcher
 {
 	private static final org.slf4j.Logger Logger = LoggerFactory.getLogger(App.class);
-	static final boolean USE_NAFMAN = SysProps.get("grey.echobot.nafman", false);
 
 	static final String[] opts = new String[]{"udp", "server", "server-solo", "clients:", "msg:", "cbuf:", "sbuf:", "sockbuf:", "verify"};
 	static final int HDRSIZ = 0; //no message header is defined
 
 	public static void main(String[] args) throws Exception
 	{
-		Logger.info("Starting EchoBot with NAFMAN="+USE_NAFMAN+", logger="+Logger.getClass().getName()+"/"+Logger);
+		Logger.info("Starting EchoBot with logger="+Logger.getClass().getName()+"/"+Logger);
 		App app = new App(args);
-		app.exec("echobot", USE_NAFMAN);
+		app.execute("echobot");
 	}
 
 	private static class OptsHandler extends CommandParser.OptionsHandler
@@ -121,7 +119,7 @@ public class App
 	}
 
 	@Override
-	protected void appExec(ApplicationContextNAF appctx, int param1, Logger bootlog) throws java.io.IOException
+	protected void appExecute(ApplicationContextNAF appctx, int param1, Logger bootlog) throws java.io.IOException
 	{
 		if (!options.server_enabled && options.cgrpcnt == 0) {
 			cmdParser.usage(cmdlineArgs, "Must specify client and/or server mode");
@@ -147,8 +145,7 @@ public class App
 		int dcnt = (options.server_solo ? options.cgrpcnt + 1 : options.cgrpcnt);
 		if (dcnt == 0) dcnt++; //need at least one Dispatcher for the server
 
-		DispatcherDef.Builder dispatcherDefsBuilder = new DispatcherDef.Builder()
-				.withNafman(USE_NAFMAN);
+		DispatcherDef.Builder dispatcherDefsBuilder = new DispatcherDef.Builder();
 		Dispatcher[] cdispatchers = new Dispatcher[dcnt];
 		ClientGroup[] cgroups = new ClientGroup[options.cgrpcnt];
 		TSAP tsap = TSAP.build(hostport, 0, true);

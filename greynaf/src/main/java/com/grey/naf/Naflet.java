@@ -5,7 +5,6 @@
 package com.grey.naf;
 
 import com.grey.base.config.XmlConfig;
-import com.grey.logging.Logger;
 import com.grey.naf.reactor.Dispatcher;
 
 /**
@@ -21,29 +20,27 @@ abstract public class Naflet
 {
 	private final String naflet_name;
 	private final Dispatcher dsptch;
+	private final XmlConfig taskcfg;
 	private final String cfgfile;
 
-	private final XmlConfig taskcfg;
 	private EntityReaper reaper;
 	private boolean aborted_startup;
 
+	// applications can override these
 	abstract protected void startNaflet() throws java.io.IOException;
-
-	public String getName() {return naflet_name;}
-	public Dispatcher getDispatcher() {return dsptch;}
-	public String taskConfigFile() {return cfgfile;}
-	public XmlConfig taskConfig() {return taskcfg;}
-	public Logger getLogger() {return getDispatcher().getLogger();} //for convenience
-
 	protected boolean stopNaflet() {return true;}
 	protected void abortOnStartup() {aborted_startup = true;}
 
-	public Naflet(String name, Dispatcher dsptch_p, XmlConfig cfg) throws java.io.IOException
-	{
+	public String getName() {return naflet_name;}
+	public Dispatcher getDispatcher() {return dsptch;}
+	public XmlConfig taskConfig() {return taskcfg;}
+	public String taskConfigFile() {return cfgfile;}
+
+	public Naflet(String name, Dispatcher dsptch_p, XmlConfig cfg) throws java.io.IOException {
 		naflet_name = name;
 		dsptch = dsptch_p;
 		cfgfile = getDispatcher().getApplicationContext().getConfig().getPath(cfg, "configfile", null, false, null, null);
-		getLogger().info("Naflet="+naflet_name+": Initialising "+getClass().getName()+" - config="+cfgfile);
+		getDispatcher().getLogger().info("Naflet="+naflet_name+": Initialising "+getClass().getName()+" - config="+cfgfile);
 
 		if (cfgfile != null) {
 			if (cfgfile.endsWith(".xml")) {
@@ -57,29 +54,26 @@ abstract public class Naflet
 		}
 	}
 
-	public final void start(EntityReaper rpr) throws java.io.IOException
-	{
+	public final void start(EntityReaper rpr) throws java.io.IOException {
 		reaper = rpr;
 		if (aborted_startup) {
-			getLogger().info("Naflet="+naflet_name+": Aborting startup");
+			getDispatcher().getLogger().info("Naflet="+naflet_name+": Aborting startup");
 			nafletStopped();
 			return;
 		}
-		getLogger().info("Naflet="+naflet_name+": Starting - reaper="+reaper);
+		getDispatcher().getLogger().info("Naflet="+naflet_name+": Starting - reaper="+reaper);
 		startNaflet();
 	}
 
-	public final boolean stop()
-	{
-		getLogger().info("Naflet="+naflet_name+": Received Stop request");
+	public final boolean stop() {
+		getDispatcher().getLogger().info("Naflet="+naflet_name+": Received Stop request");
 		boolean done = stopNaflet();
 		if (done) nafletStopped();
 		return done;
 	}
 	
-	protected final void nafletStopped()
-	{
-		getLogger().info("Naflet="+naflet_name+" has terminated - reaper="+reaper);
+	protected final void nafletStopped() {
+		getDispatcher().getLogger().info("Naflet="+naflet_name+" has terminated - reaper="+reaper);
 		if (reaper != null) reaper.entityStopped(this);
 	}
 	
