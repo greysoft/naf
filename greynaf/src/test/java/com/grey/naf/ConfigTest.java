@@ -33,7 +33,7 @@ public class ConfigTest
 		String dname = "testdispatcher9";
 		XmlConfig dcfg = cfg.getDispatcher(dname);
 		org.junit.Assert.assertNotNull(dcfg);
-		DispatcherDef def = new DispatcherDef.Builder(dcfg).build();
+		DispatcherDef def = new DispatcherDef.Builder().withXmlConfig(dcfg).build();
 		org.junit.Assert.assertEquals(dname, def.getName());
 		org.junit.Assert.assertTrue(def.hasDNS());
 		org.junit.Assert.assertTrue(def.isZeroNafletsOK());
@@ -54,7 +54,7 @@ public class ConfigTest
 
 		dcfg = cfg.getDispatcher(dname);
 		org.junit.Assert.assertNotNull(dcfg);
-		DispatcherDef def = new DispatcherDef.Builder(dcfg).build();
+		DispatcherDef def = new DispatcherDef.Builder().withXmlConfig(dcfg).build();
 		verifyConfig(def, dname);
 	}
 

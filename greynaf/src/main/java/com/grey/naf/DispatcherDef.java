@@ -7,6 +7,7 @@ package com.grey.naf;
 import java.time.Clock;
 
 import com.grey.base.config.SysProps;
+import com.grey.base.config.XmlConfig;
 
 public class DispatcherDef
 {
@@ -14,21 +15,21 @@ public class DispatcherDef
 
 	private final String name;
 	private final String logName;
-	private final boolean hasDNS;
-	private final boolean zeroNafletsOK;
 	private final boolean surviveHandlers;
+	private final boolean zeroNafletsOK;
 	private final long flushInterval;
+	private final boolean hasDNS;
+	private final XmlConfig[] naflets;
 	private final Clock clock;
-	private final com.grey.base.config.XmlConfig[] naflets;
 
 	private DispatcherDef(Builder bldr) {
 		name = bldr.name;
 		logName = bldr.logName;
+		surviveHandlers = bldr.surviveHandlers;
+		zeroNafletsOK = bldr.zeroNafletsOK;
+		flushInterval = bldr.flushInterval;
 		hasDNS = bldr.hasDNS;
 		naflets = bldr.naflets;
-		zeroNafletsOK = bldr.zeroNafletsOK;
-		surviveHandlers = bldr.surviveHandlers;
-		flushInterval = bldr.flushInterval;
 		clock = bldr.clock;
 	}
 
@@ -40,103 +41,104 @@ public class DispatcherDef
 		return logName;
 	}
 
-	public boolean hasDNS() {
-		return hasDNS;
+	public boolean isSurviveHandlers() {
+		return surviveHandlers;
 	}
 
 	public boolean isZeroNafletsOK() {
 		return zeroNafletsOK;
 	}
 
-	public boolean isSurviveHandlers() {
-		return surviveHandlers;
-	}
-
 	public long getFlushInterval() {
 		return flushInterval;
+	}
+
+	public boolean hasDNS() {
+		return hasDNS;
+	}
+
+	public XmlConfig[] getNafletsConfig() {
+		return naflets;
 	}
 
 	public Clock getClock() {
 		return clock;
 	}
 
-	public com.grey.base.config.XmlConfig[] getNafletsConfig() {
-		return naflets;
-	}
-
 
 	public static class Builder {
 		private String name;
-		private String logName;
-		private boolean hasDNS;
-		private boolean zeroNafletsOK = true;
+		private String logName = SysProps.get(SYSPROP_LOGNAME, name);
 		private boolean surviveHandlers = true;
-		private Clock clock = Clock.systemUTC();
+		private boolean zeroNafletsOK = true;
 		private long flushInterval;
-		private com.grey.base.config.XmlConfig[] naflets;
+		private boolean hasDNS;
+		private XmlConfig[] naflets;
+		private Clock clock = Clock.systemUTC();
 
 		public Builder() {}
 
 		public Builder(DispatcherDef defs) {
 			name = defs.name;
 			logName = defs.logName;
+			surviveHandlers = defs.surviveHandlers;
+			zeroNafletsOK = defs.zeroNafletsOK;
+			flushInterval = defs.flushInterval;
 			hasDNS = defs.hasDNS;
 			naflets = defs.naflets;
-			zeroNafletsOK = defs.zeroNafletsOK;
-			surviveHandlers = defs.surviveHandlers;
-			flushInterval = defs.flushInterval;
 			clock = defs.clock;
 		}
 
-		public Builder(com.grey.base.config.XmlConfig cfg) {
+		public Builder withXmlConfig(XmlConfig cfg) {
 			name = cfg.getValue("@name", true, name);
-			logName = cfg.getValue("@logname", true, SysProps.get(SYSPROP_LOGNAME, name));
-			hasDNS = cfg.getBool("@dns", hasDNS);
-			zeroNafletsOK = cfg.getBool("@zero_naflets", zeroNafletsOK);
+			logName = cfg.getValue("@logname", true, logName == null ? name : logName);
 			surviveHandlers = cfg.getBool("@survive_handlers", surviveHandlers);
+			zeroNafletsOK = cfg.getBool("@zero_naflets", zeroNafletsOK);
 			flushInterval = cfg.getTime("@flush", flushInterval);
+			hasDNS = cfg.getBool("@dns", hasDNS);
 
-			String xpath = "naflets/naflet"+com.grey.base.config.XmlConfig.XPATH_ENABLED;
+			String xpath = "naflets/naflet"+XmlConfig.XPATH_ENABLED;
 			naflets = cfg.getSections(xpath);
+			return this;
 		}
 
 		public Builder withName(String v) {
-			this.name = v;
+			name = v;
 			return this;
 		}
 
 		public Builder withLogName(String v) {
-			this.logName = v;
-			return this;
-		}
-
-		public Builder withDNS(boolean v) {
-			this.hasDNS = v;
-			return this;
-		}
-
-		public Builder withNafletsConfig(com.grey.base.config.XmlConfig[] v) {
-			this.naflets = v;
-			return this;
-		}
-
-		public Builder withZeroNafletsOK(boolean v) {
-			this.zeroNafletsOK = v;
+			logName = v;
 			return this;
 		}
 
 		public Builder withSurviveHandlers(boolean v) {
-			this.surviveHandlers = v;
+			surviveHandlers = v;
 			return this;
 		}
 
-		public Builder withClock(Clock v) {
-			this.clock = v;
+		public Builder withZeroNafletsOK(boolean v) {
+			zeroNafletsOK = v;
 			return this;
 		}
 
 		public Builder withFlushInterval(long v) {
-			this.flushInterval = v;
+			flushInterval = v;
+			return this;
+		}
+
+		public Builder withDNS(boolean v) {
+			hasDNS = v;
+			return this;
+		}
+
+		public Builder withNafletsConfig(XmlConfig[] v) {
+			naflets = v;
+			return this;
+		}
+
+		public Builder withClock(Clock v) {
+			clock = v;
 			return this;
 		}
 

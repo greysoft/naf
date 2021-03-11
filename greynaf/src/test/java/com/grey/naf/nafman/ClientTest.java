@@ -37,7 +37,7 @@ public class ClientTest
 
 		String dname = "testdispatcher1";
 		XmlConfig dcfg = appctx.getConfig().getDispatcher(dname);
-		DispatcherDef def = new DispatcherDef.Builder(dcfg).build();
+		DispatcherDef def = new DispatcherDef.Builder().withXmlConfig(dcfg).build();
 
 		Dispatcher dsptch = Dispatcher.create(appctx, def, logger);
 		NafManAgent agent = dsptch.getNafManAgent();

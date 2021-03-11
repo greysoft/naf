@@ -47,7 +47,7 @@ public class DispatcherTest
 
 		String dname = "testdispatcher1";
 		XmlConfig dcfg = appctx.getConfig().getDispatcher(dname);
-		DispatcherDef def = new DispatcherDef.Builder(dcfg).build();
+		DispatcherDef def = new DispatcherDef.Builder().withXmlConfig(dcfg).build();
 		Dispatcher dsptch = Dispatcher.create(appctx, def, bootlog);
 		org.junit.Assert.assertEquals(dname, dsptch.getName());
 		org.junit.Assert.assertFalse(dsptch.isRunning());

@@ -36,15 +36,19 @@ abstract public class Naflet
 	public XmlConfig taskConfig() {return taskcfg;}
 	public String taskConfigFile() {return cfgfile;}
 
-	public Naflet(String name, Dispatcher dsptch_p, XmlConfig cfg) throws java.io.IOException {
+	/**
+	 * Applications that are not based on naf.xml style config would pass a null XmlConfig arg in here
+	 */
+	protected Naflet(String name, Dispatcher d, XmlConfig cfg) throws java.io.IOException {
 		naflet_name = name;
-		dsptch = dsptch_p;
-		cfgfile = getDispatcher().getApplicationContext().getConfig().getPath(cfg, "configfile", null, false, null, null);
+		dsptch = d;
+		NAFConfig nafcfg = dsptch.getApplicationContext().getConfig();
+		cfgfile = nafcfg.getPath(cfg, "configfile", null, false, null, null);
 		getDispatcher().getLogger().info("Naflet="+naflet_name+": Initialising "+getClass().getName()+" - config="+cfgfile);
 
 		if (cfgfile != null) {
 			if (cfgfile.endsWith(".xml")) {
-				String cfgroot = cfg.getValue("configfile/@root", false, null);
+				String cfgroot = nafcfg.get(cfg, "configfile/@root", null, true, null);
 				taskcfg = XmlConfig.getSection(cfgfile, cfgroot);
 			} else {
 				taskcfg = null; //application will have to use taskConfigFile() instead

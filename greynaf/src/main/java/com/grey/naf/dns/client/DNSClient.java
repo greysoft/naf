@@ -139,7 +139,7 @@ public class DNSClient
 			if (dcfg == null) {
 				bldr = bldr.withName(dname);
 			} else {
-				bldr = new DispatcherDef.Builder(dcfg);
+				bldr = new DispatcherDef.Builder().withXmlConfig(dcfg);
 			}
 		}
 		bldr = bldr.withDNS(true);

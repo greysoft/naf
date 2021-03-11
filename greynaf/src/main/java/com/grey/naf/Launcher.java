@@ -222,7 +222,7 @@ public class Launcher
 		// mode while initialising.
 		// First NAFMAN-enabled Dispatcher becomes the primary.
 		for (int idx = 0; idx < cfgdispatchers.length; idx++) {
-			DispatcherDef def = new DispatcherDef.Builder(cfgdispatchers[idx]).build();
+			DispatcherDef def = new DispatcherDef.Builder().withXmlConfig(cfgdispatchers[idx]).build();
 			Dispatcher d = Dispatcher.create(appctx, def, log);
 			dlst.add(d);
 		}

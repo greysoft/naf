@@ -167,7 +167,7 @@ public class NAFConfig
 		return url;
 	}
 
-	private String get(XmlConfig cfg, String xpath, String propnam, boolean mdty, String dflt)
+	public String get(XmlConfig cfg, String xpath, String propnam, boolean mdty, String dflt)
 	{
 		if (cfg == null) cfg = configRoot;
 		if (propnam != null) dflt = SysProps.get(propnam, dflt);
