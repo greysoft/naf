@@ -7,6 +7,7 @@ package com.grey.naf.nafman;
 import com.grey.base.utils.StringOps;
 import com.grey.base.collections.HashedMap;
 import com.grey.naf.Naflet;
+import com.grey.naf.dns.resolver.ResolverDNS;
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.logging.Logger;
 
@@ -157,13 +158,15 @@ public abstract class NafManAgent
 	{
 		sb.append("<dispatchers>");
 		for (Dispatcher d : dsptch.getApplicationContext().getDispatchers()) {
+			NafManAgent agent = d.getNafManAgent();
+			ResolverDNS dns = d.getResolverDNS();
 			Naflet[] apps = d.listNaflets();
 			String nafman = "No";
-			if (d.getNafManAgent() != null) nafman = (d.getNafManAgent().isPrimary() ? "Primary" : "Secondary");
+			if (agent != null) nafman = (agent.isPrimary() ? "Primary" : "Secondary");
 			sb.append("<dispatcher name=\"").append(d.getName());
 			sb.append("\" log=\"").append(d.getLogger().getLevel());
 			sb.append("\" nafman=\"").append(nafman);
-			sb.append("\" dns=\"").append(d.getResolverDNS() == null ? "No" : d.getResolverDNS()).append("\">");
+			sb.append("\" dns=\"").append(dns == null ? "No" : dns).append("\">");
 			sb.append("<naflets>");
 			for (int idx2 = 0; idx2 != apps.length; idx2++) {
 				Naflet app = apps[idx2];

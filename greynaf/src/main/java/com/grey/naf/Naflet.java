@@ -44,7 +44,7 @@ abstract public class Naflet
 		dsptch = d;
 		NAFConfig nafcfg = dsptch.getApplicationContext().getConfig();
 		cfgfile = nafcfg.getPath(cfg, "configfile", null, false, null, null);
-		getDispatcher().getLogger().info("Naflet="+naflet_name+": Initialising "+getClass().getName()+" - config="+cfgfile);
+		getDispatcher().getLogger().info("Naflet="+naflet_name+": Initialising "+getClass().getName()+" in Dispatcher="+d.getName()+" - config="+cfgfile);
 
 		if (cfgfile != null) {
 			if (cfgfile.endsWith(".xml")) {

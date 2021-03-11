@@ -291,8 +291,24 @@ In a widely used terminology, each Dispatcher represents an event loop.
 <br/>
 Users can simply regard a Dispatchers as a single-threaded execution context within which their applications reside.
 Dispatchers monitor all events (eg. I/O) in which their applications have registered an interest, and they also provide built-in services such as NAFMAN and logging.
+
 <br/> <br/>
-An illustrative
+As explained in the Overview section, Dispatchers can be either be specified in a
+<span class="pathname">naf.xml</span>
+style config file, in which case the NAF framework automatically creates and runs them on application startup, or they can be programmatically created and started.
+<br/>
+The latter are termed dynamic (or programmatically created) Dispatchers, as opposed to the configured ones created via naf.xml.
+The distinction between configured and dynamic Disatchers lies only in how they are created, and once launched, there is no difference.
+<br/> <br/>
+Dispatchers are dynamically created by calling a static method in the Dispatcher class:<br/>
+<span class="compcode">com.grey.naf.Dispatcher.create(com.grey.naf.DispatcherDef, com.grey.naf.Config, com.grey.logging.Logger)</span>
+<br/>
+Afterwards, you simply call the Dispatcher's
+<span class="compcode">start()</span>
+method to launch it in its own execution thread.
+
+<br/> <br/>
+For Dispatchers that are defined in a naf.xml style config file, an illustrative
 <span class="cfgname">dispatchers</span>
 config block is shown below, and as can be seen, each individual
 <span class="cfgname">dispatcher</span>
@@ -381,22 +397,6 @@ Default is Yes.
 </li>
 </ul>
 
-<p>
-As explained in the Overview section, Dispatchers can be either be specified in a naf.xml file, in which case the NAF launcher automatically creates and runs them, or they can be programmatically created and started.
-<br/>
-The latter are termed dynamic (or programmatically created) Dispatchers, as opposed to the configured ones created via naf.xml.
-The distinction is in their startup mode, and once launched, there is no difference in the resulting Dispatchers.
-<br/>
-Dispatchers are dynamically created by either of these static methods:<br/>
-&bull; <span class="compcode">com.grey.naf.Dispatcher.create(com.grey.naf.DispatcherDef, com.grey.naf.Config, com.grey.logging.Logger)</span>
-<br/>
-&bull; <span class="compcode">com.grey.naf.Dispatcher.create(com.grey.naf.DispatcherDef, int baseport, com.grey.logging.Logger)</span>
-<br/>
-Once they have been created and set up, you simply call their
-<span class="compcode">start()</span>
-method.
-</p>
-
 <hr class="pline"/>
 <h2>
 <a name="naflet">
@@ -413,11 +413,39 @@ Naflets are independent processing tasks which are unaware of other Naflets exec
 <br/> <br/>
 When we say that NAF is a single-threaded framework, what we really mean is that individual NAFlets execute in a single-threaded context (ie. the Dispatcher).
 However, real-world applications may comprise multiple NAFlets, which in turn may or may not be distributed over multiple Dispatchers (ie. multiple threads).
-The important point is that the Dispatchers are independent of one another and co-exist without incurring any synchronisation overhead, it's ultimately up to the developer how closely coupled their own bespoke NAFlets are, and whether they require synchronisation across multiple threads.
+<br/>
+The important point is that the Dispatchers are independent of one another and co-exist without incurring any synchronisation overhead, but it's ultimately up to the developer how closely coupled their own bespoke NAFlets are, and whether they require synchronisation across multiple threads.
 </p>
 
+There are two ways a NAFlet can be loaded into a NAF process:
+<ul><li>
+One way is to define it in a
+<span class="pathname">naf.xml</span>
+config file as described above, and the NAF framework will then take care of automatically instantiating and running the NAFlets, when the application starts up.
+</li><li>
+The other way, is to programmatically create the NAFlet object, and then pass it to a running Dispatcher by calling the Dispatcher's
+<span class="compcode">loadNaflet(com.grey.naf.Naflet)</span>
+method.
+<br/>
+The 
+<span class="compcode">loadNaflet()</span>
+method can be called before or after the Dispatcher's
+<span class="compcode">start()</span>
+invocation.
+</li></ul>
 <p>
-The NAFlet config block is illustrated in the Dispatchers section above, and there are 3 top-level attributes.
+However the Naflet was created and loaded, the Dispatcher will call the NAFlet's
+<span class="compcode">start()</span>
+method from within its own execution thread (so it must not have been called already) and the NAFlet would then be live.
+<br/> <br/>
+The Dispatcher class also has an
+<span class="compcode">unloadNaflet(String nafletName)</span>
+method, which tells it to stop the NAFlet of that name - it calls the Naflet's
+<span class="compcode">stop()</span>
+method.
+
+<br/> <br/>
+For Naflets that are defined in a naf.xml style config file, the NAFlet config block is illustrated in the Dispatchers section above, and there are 3 top-level attributes.
 </p>
 
 <ul>
@@ -452,28 +480,6 @@ If the
 element is present, then any other elements are ignored, as the configuration is redirected to the indicated external location.
 </li>
 </ul>
-
-There are two ways a NAFlet can be loaded into a NAF process:
-<ul><li>
-One way is to define it in a naf.xml config file as described above, and that will take care of automatically instantiating and run them when NAF starts up.
-</li><li>
-The other way, is to programmatically create the NAFlet object, and then pass it to a running Dispatcher by calling its
-<span class="compcode">loadNaflet(com.grey.naf.Naflet, com.grey.naf.Dispatcher)</span>
-method.
-</li></ul>
-<p>
-The Dispatcher will call the NAFlet's
-<span class="compcode">start()</span>
-method from within its own thread (so it must not have been called already) and the NAFlet would then be live.
-This method can be used to load new NAFlets whether the Dispatcher was originally launched from a naf.xml file or programmatically.
-<br/>
-The Dispatcher argument indicates which Dispatcher the calling code is associated with, and would be set to Null if it's not running within a Dispatcher.
-If you are calling loadNaflet() on a Dispatcher which you have just created programmatically but not yet started, then you should pass in <span class="compcode">null</span> as the Dispatcher reference, and it will load the NAFlet once it starts up.
-<br/> <br/>
-There is also an
-<span class="compcode">unloadNaflet(String naflet_name, com.grey.naf.Dispatcher)</span>
-method, which tells the Dispatcher to stop the NAFlet of that name, if it's running.
-</p>
 
 <hr class="pline"/>
 <h2>

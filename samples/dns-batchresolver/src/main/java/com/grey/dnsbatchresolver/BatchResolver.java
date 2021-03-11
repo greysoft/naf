@@ -7,6 +7,7 @@ package com.grey.dnsbatchresolver;
 import com.grey.logging.Logger.LEVEL;
 import com.grey.base.utils.TimeOps;
 import com.grey.base.config.SysProps;
+import com.grey.base.config.XmlConfig;
 import com.grey.naf.dns.resolver.ResolverAnswer;
 import com.grey.naf.dns.resolver.ResolverDNS;
 import com.grey.naf.errors.NAFConfigException;
@@ -45,6 +46,7 @@ public class BatchResolver
 	private final java.io.BufferedReader istrm;
 	private final java.io.PrintStream ostrm;
 	private final int[] stats = new int[ResolverAnswer.STATUS.values().length];
+	private final ResolverDNS resolver;
 	private final com.grey.logging.Logger logger;
 
 	private com.grey.naf.reactor.TimerNAF tmr_batch;
@@ -62,14 +64,15 @@ public class BatchResolver
 	private final com.grey.base.utils.ByteChars tmplightbc = new com.grey.base.utils.ByteChars(-1);  //lightweight object without own storage
 	private final StringBuilder tmpsb = new StringBuilder();
 
-	public BatchResolver(String name, com.grey.naf.reactor.Dispatcher dsptch, com.grey.base.config.XmlConfig cfg)
+	public BatchResolver(String name, com.grey.naf.reactor.Dispatcher dsptch, XmlConfig cfg)
 			throws java.io.IOException
 	{
 		super(name, dsptch, cfg);
 		java.io.InputStream fin = System.in;
 		java.io.OutputStream fout = System.out;
 		logger = dsptch.getLogger();
-		com.grey.base.config.XmlConfig taskcfg = taskConfig();
+		XmlConfig taskcfg = taskConfig();
+		resolver = getDispatcher().getResolverDNS();
 
 		String mode = taskcfg.getValue("dnstype", false, "A").toUpperCase();
 		batchsize = taskcfg.getInt("batchsize", false, 10);
@@ -101,7 +104,7 @@ public class BatchResolver
 		} else {
 			throw new NAFConfigException(LOGLBL+"Invalid lookup-type="+mode);
 		}
-		if (dsptch.getResolverDNS() == null) throw new NAFConfigException(LOGLBL+"Dispatcher="+dsptch.getName()+" does not have DNS-Resolver enabled");
+		if (resolver == null) throw new NAFConfigException(LOGLBL+"Dispatcher="+dsptch.getName()+" does not have DNS-Resolver enabled");
 		if (maxpending != 0 && maxpending_lowater >= maxpending)  throw new NAFConfigException(LOGLBL+"maxpending_lowater cannot exceed max - "+maxpending_lowater+" vs "+maxpending);
 		
 		if (filename_in != null && !filename_in.equals("-")) fin = new java.io.FileInputStream(filename_in);
@@ -136,7 +139,7 @@ public class BatchResolver
 		}
 		if (pendingcnt != 0) {
 			try {
-				getDispatcher().getResolverDNS().cancel(this);
+				resolver.cancel(this);
 			} catch (Exception ex) {
 				logger.log(LEVEL.ERR, ex, true, LOGLBL+"Failed to cancel DNS ops");
 			}
@@ -198,7 +201,6 @@ public class BatchResolver
 		if (logger.isActive(LEVEL.TRC)) {
 			logger.log(LEVEL.TRC, LOGLBL+"Starting batchsize="+batchlimit+" with reqcnt="+reqcnt+", pending="+pendingcnt);
 		}
-		ResolverDNS resolver = getDispatcher().getResolverDNS();
 		int linecnt = 0;
 		ResolverAnswer answer;
 		String inline;

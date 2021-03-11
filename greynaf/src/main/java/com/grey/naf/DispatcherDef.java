@@ -19,7 +19,6 @@ public class DispatcherDef
 	private final boolean zeroNafletsOK;
 	private final long flushInterval;
 	private final boolean hasDNS;
-	private final XmlConfig[] naflets;
 	private final Clock clock;
 
 	private DispatcherDef(Builder bldr) {
@@ -29,7 +28,6 @@ public class DispatcherDef
 		zeroNafletsOK = bldr.zeroNafletsOK;
 		flushInterval = bldr.flushInterval;
 		hasDNS = bldr.hasDNS;
-		naflets = bldr.naflets;
 		clock = bldr.clock;
 	}
 
@@ -57,10 +55,6 @@ public class DispatcherDef
 		return hasDNS;
 	}
 
-	public XmlConfig[] getNafletsConfig() {
-		return naflets;
-	}
-
 	public Clock getClock() {
 		return clock;
 	}
@@ -73,7 +67,6 @@ public class DispatcherDef
 		private boolean zeroNafletsOK = true;
 		private long flushInterval;
 		private boolean hasDNS;
-		private XmlConfig[] naflets;
 		private Clock clock = Clock.systemUTC();
 
 		public Builder() {}
@@ -85,7 +78,6 @@ public class DispatcherDef
 			zeroNafletsOK = defs.zeroNafletsOK;
 			flushInterval = defs.flushInterval;
 			hasDNS = defs.hasDNS;
-			naflets = defs.naflets;
 			clock = defs.clock;
 		}
 
@@ -96,9 +88,6 @@ public class DispatcherDef
 			zeroNafletsOK = cfg.getBool("@zero_naflets", zeroNafletsOK);
 			flushInterval = cfg.getTime("@flush", flushInterval);
 			hasDNS = cfg.getBool("@dns", hasDNS);
-
-			String xpath = "naflets/naflet"+XmlConfig.XPATH_ENABLED;
-			naflets = cfg.getSections(xpath);
 			return this;
 		}
 
@@ -129,11 +118,6 @@ public class DispatcherDef
 
 		public Builder withDNS(boolean v) {
 			hasDNS = v;
-			return this;
-		}
-
-		public Builder withNafletsConfig(XmlConfig[] v) {
-			naflets = v;
 			return this;
 		}
 

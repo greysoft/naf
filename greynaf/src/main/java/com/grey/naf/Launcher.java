@@ -39,6 +39,7 @@ public class Launcher
 	protected final String[] cmdlineArgs;
 
 	/**
+	 * Create the default NAFMAN config.
 	 * Applications that with to customise the NAFMAN options (before loading naf.xml config file) should override this.
 	 * They can disable NAFMAN by returning null.
 	 */
@@ -194,6 +195,7 @@ public class Launcher
 		bootlog.info("NAF BOOTED in time="+(systime2-systime_boot)+"ms - Dispatchers="+dispatchers.size());
 		FileOps.flush(bootlog);
 
+		// wait for Dispatchers to exit - if they ever do
 		while (dispatchers.size() != 0) {
 			for (int idx = 0; idx != dispatchers.size(); idx++) {
 				Dispatcher d = dispatchers.get(idx);
@@ -219,12 +221,31 @@ public class Launcher
 		log.info("NAF: Launching configured Dispatchers="+cfgdispatchers.length);
 
 		// Do separate loops to create and start the Dispatchers, so that they're all guaranteed to be in single-threaded
-		// mode while initialising.
-		// First NAFMAN-enabled Dispatcher becomes the primary.
-		for (int idx = 0; idx < cfgdispatchers.length; idx++) {
-			DispatcherDef def = new DispatcherDef.Builder().withXmlConfig(cfgdispatchers[idx]).build();
-			Dispatcher d = Dispatcher.create(appctx, def, log);
-			dlst.add(d);
+		// mode until all have initialised.
+		for (XmlConfig dcfg : cfgdispatchers) {
+			DispatcherDef def = new DispatcherDef.Builder().withXmlConfig(dcfg).build();
+			Dispatcher dsptch = Dispatcher.create(appctx, def, log);
+			dlst.add(dsptch);
+
+			/*
+			 * Create any Naflets that are defined in the config file.
+			 * Of course applications can also create their own Naflets and inject them into a Dispatcher via the same
+			 * loadNaflet() method used here, which can be called before or after the Dispatcher's start() method.
+			 */
+			XmlConfig[] nafletsConfig = dcfg.getSections("naflets/naflet"+XmlConfig.XPATH_ENABLED);
+			if (nafletsConfig != null) {
+				dsptch.getLogger().info("Dispatcher="+dsptch.getName()+": Creating Naflets="+nafletsConfig.length);
+				for (XmlConfig appcfg : nafletsConfig) {
+					Object obj = NAFConfig.createEntity(appcfg, null, Naflet.class, true,
+							new Class<?>[]{String.class, dsptch.getClass(), appcfg.getClass()},
+							new Object[]{null, dsptch, appcfg});
+					Naflet app = Naflet.class.cast(obj);
+					if (app.getName().charAt(0) == '_') {
+						throw new NAFConfigException("Dispatcher="+dsptch.getName()+" has invalid Naflet name (starts with underscore) - "+app.getName());
+					}
+					dsptch.loadNaflet(app);
+				}
+			}
 		}
 
 		// log the initial config

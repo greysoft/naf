@@ -14,7 +14,6 @@ import java.util.function.Supplier;
 import java.time.Clock;
 
 import com.grey.base.config.SysProps;
-import com.grey.base.config.XmlConfig;
 import com.grey.base.collections.HashedMapIntKey;
 import com.grey.base.collections.Circulist;
 import com.grey.base.collections.ObjectQueue;
@@ -51,8 +50,6 @@ public class Dispatcher
 
 	private final String name;
 	private final ApplicationContextNAF appctx;
-	private final NafManAgent nafmanAgent;
-	private final ResolverDNS dnsresolv;
 	private final Flusher flusher;
 	private final Logger logger;
 	private final Clock clock;
@@ -79,6 +76,11 @@ public class Dispatcher
 	private boolean shutdownPerformed;
 	private long systime_msecs;
 
+	private NafManAgent nafmanAgent;
+	private ResolverDNS dnsResolver;
+	private final Object nafmanLock = new Object();
+	private final Object dnsLock = new Object();
+
 	// temp working buffers, preallocated (on demand) for efficiency
 	private final java.util.Calendar dtcal = TimeOps.getCalendar(null);
 	private final StringBuilder tmpsb = new StringBuilder();
@@ -95,8 +97,6 @@ public class Dispatcher
 	public String getName() {return name;}
 	public long getTimeBoot() {return timeboot;}
 	public ApplicationContextNAF getApplicationContext() {return appctx;}
-	public NafManAgent getNafManAgent() {return nafmanAgent;}
-	public ResolverDNS getResolverDNS() {return dnsresolv;}
 	public Flusher getFlusher() {return flusher;}
 	public Logger getLogger() {return logger;}
 
@@ -119,94 +119,80 @@ public class Dispatcher
 			String name = appctx.getName()+"-AnonDispatcher-"+anonDispatcherCount.incrementAndGet();
 			def = new DispatcherDef.Builder(def).withName(name).build();
 		}
-		Dispatcher d = new Dispatcher(appctx, def, log);
-		appctx.register(d);
-		return d;
+		Dispatcher dsptch = new Dispatcher(appctx, def, log);
+		appctx.register(dsptch);
+
+		// Create the NAFMAN agent (if any)
+		NafManConfig nafmanConfig = appctx.getNafManConfig();
+		if (nafmanConfig != null) {
+			NafManRegistry reg = NafManRegistry.get(appctx);
+			Supplier<PrimaryAgent> supplier = () -> {
+				try {
+					return new PrimaryAgent(dsptch, reg, nafmanConfig);
+				} catch (Exception ex) {
+					throw new NAFConfigException("Failed to create primary NAFMAN agent for Dispatcher="+dsptch.getName(), ex);
+				}
+			};
+			NafManAgent agent = appctx.registerPrimaryAgent(supplier);
+			if (agent.getDispatcher() != dsptch) {
+				agent = new SecondaryAgent(dsptch, reg, nafmanConfig);
+			}
+			synchronized (dsptch.nafmanLock) {
+				dsptch.nafmanAgent = agent;
+			}
+			dsptch.getLogger().info("Dispatcher="+dsptch.getName()+": Initialised NAFMAN - "+(agent.isPrimary() ? "Primary" : "Secondary"));
+		}
+
+		// Create the DNS resolver (if any)
+		if (def.hasDNS()) {
+			NAFConfig nafcfg = appctx.getConfig();
+			ResolverDNS dnsresolv = ResolverDNS.create(dsptch, nafcfg.getNode("dnsresolver"));
+			synchronized (dsptch.dnsLock) {
+				dsptch.dnsResolver = dnsresolv;
+			}
+			dsptch.getLogger().info("Dispatcher="+dsptch.getName()+": Initialised DNS Resolver="+dnsresolv.getClass().getName());
+		}
+
+		return dsptch;
 	}
 
 	private Dispatcher(ApplicationContextNAF appctx, DispatcherDef def, Logger initlog) throws java.io.IOException {
 		this.appctx = appctx;
+		name = def.getName();
+		surviveHandlers = def.isSurviveHandlers();
+		zeroNafletsOK = def.isZeroNafletsOK();
+
 		clock = def.getClock();
 		timeboot = clock.millis();
-		name = def.getName();
-		String logname = def.getLogName();
-		zeroNafletsOK = def.isZeroNafletsOK();
-		surviveHandlers = def.isSurviveHandlers();
-
 		systime_msecs = timeboot;
+
+		String logname = def.getLogName();
+		Logger dlog = initlog;
+		if (logname != null || initlog == null) dlog = com.grey.logging.Factory.getLogger(logname == null ? name : logname);
+		logger = dlog;
+		if (initlog != null) initlog.info("Initialising Dispatcher="+name+" - Logger="+logname+" => "+dlog);
+
 		thrd_main = new Thread(this, "Dispatcher-"+name);
 		thrd_init = Thread.currentThread();
 
 		sparetimers = new ObjectWell<>(TimerNAF.class, "Dispatcher-"+name);
 		filewritepool = new ObjectWell<>(new IOExecWriter.FileWrite.Factory(), "Dispatcher-"+name);
-		flusher = new Flusher(this, def.getFlushInterval());
 		slct = java.nio.channels.Selector.open();
-		NAFConfig nafcfg = appctx.getConfig();
-		NafManConfig nafmanConfig = appctx.getNafManConfig();
 
-		Logger dlog = null;
-		Logger prevThreadLogger = null;
-		if (logname != null || initlog == null) dlog = com.grey.logging.Factory.getLogger(logname);
-		logger = (dlog == null ? initlog : dlog);
-		if (logger != null) prevThreadLogger = Logger.setThreadLogger(logger);
-		if (initlog != null) initlog.info("Initialising Dispatcher="+name+" - Logger="+logname+" - "+dlog);
-		if (getLogger() != initlog) flusher.register(getLogger());
-		getLogger().info("Dispatcher="+name+": baseport="+nafcfg.getBasePort()+", NAFMan="+(nafmanConfig!=null)+", DNS="+def.hasDNS()
-				+", survive_handlers="+surviveHandlers+", zero_naflets="+zeroNafletsOK
-				+", flush="+TimeOps.expandMilliTime(def.getFlushInterval()));
-		getLogger().trace("Dispatcher="+name+": Selector="+slct.getClass().getCanonicalName()
-				+", Provider="+slct.provider().getClass().getCanonicalName()
-				+" - half-duplex="+ChannelMonitor.halfduplex+", jitter="+TimerNAF.JITTER_THRESHOLD
-				+", wbufs="+IOExecWriter.MAXBUFSIZ+"/"+IOExecWriter.FILEBUFSIZ);
-
-		//this has to be done after creating slct, and might as well wait till logger exists as well
 		dynamicLoader = new Producer<>(Object.class, this, this);
 		dynamicLoader.start();
 
-		if (nafmanConfig == null) {
-			nafmanAgent = null;
-		} else {
-			NafManRegistry reg = NafManRegistry.get(appctx);
-			Supplier<PrimaryAgent> supplier = () -> {
-				try {
-					return new PrimaryAgent(this, reg, nafmanConfig);
-				} catch (Exception ex) {
-					throw new NAFConfigException("Failed to create primary NAFMAN agent", ex);
-				}
-			};
-			NafManAgent agent = appctx.registerPrimaryAgent(supplier);
-			if (agent.getDispatcher() != this) {
-				nafmanAgent = new SecondaryAgent(this, reg, nafmanConfig);
-			} else {
-				nafmanAgent = agent;
-			}
-			getLogger().info("Dispatcher="+name+": Initialised NAFMAN - "+(nafmanAgent.isPrimary() ? "Primary" : "Secondary"));
-		}
+		flusher = new Flusher(this, def.getFlushInterval());
+		if (getLogger() != initlog) flusher.register(getLogger());
 
-		if (def.hasDNS()) {
-			dnsresolv = ResolverDNS.create(this, nafcfg.getNode("dnsresolver"));
-			getLogger().info("Dispatcher="+name+": Initialised DNS Resolver="+dnsresolv.getClass().getName());
-		} else {
-			dnsresolv = null;
-		}
-
-		XmlConfig[] nafletsConfig = def.getNafletsConfig();
-		if (nafletsConfig != null) {
-			getLogger().info("Dispatcher="+name+": Creating Naflets="+nafletsConfig.length);
-			for (int idx = 0; idx != nafletsConfig.length; idx++) {
-				XmlConfig appcfg = nafletsConfig[idx];
-				Object obj = NAFConfig.createEntity(appcfg, null, Naflet.class, true,
-						new Class<?>[]{String.class, getClass(), appcfg.getClass()},
-						new Object[]{null, this, appcfg});
-				Naflet app = Naflet.class.cast(obj);
-				if (app.getName().charAt(0) == '_') {
-					throw new NAFConfigException("Invalid Naflet name (starts with underscore) - "+app.getName());
-				}
-				addNaflet(app);
-			}
-		}
-		getLogger().info("Dispatcher="+name+": Init complete - Naflets="+getNafletCount());
-		if (logger != null) Logger.setThreadLogger(prevThreadLogger);
+		getLogger().info("Dispatcher="+name+": Initialised with baseport="+appctx.getConfig().getBasePort()
+				+", NAFMan="+(appctx.getNafManConfig()!=null)+", DNS="+def.hasDNS()+", Naflets="+getNafletCount()
+				+", survive_handlers="+surviveHandlers+", zero_naflets="+zeroNafletsOK
+				+", flush="+TimeOps.expandMilliTime(def.getFlushInterval()));
+		getLogger().info("Dispatcher="+name+": Selector="+slct.getClass().getCanonicalName()
+				+", Provider="+slct.provider().getClass().getCanonicalName()
+				+" - half-duplex="+ChannelMonitor.halfduplex+", jitter="+TimerNAF.JITTER_THRESHOLD
+				+", wbufs="+IOExecWriter.MAXBUFSIZ+"/"+IOExecWriter.FILEBUFSIZ);
 	}
 
 	public Thread start()
@@ -227,14 +213,9 @@ public class Dispatcher
 
 		try {
 			if (getNafManAgent() != null) getNafManAgent().start();
-			if (dnsresolv != null) dnsresolv.start();
+			if (getResolverDNS() != null) getResolverDNS().start();
 
-			Naflet[] arr = listNaflets();
-			for (int idx = 0; idx != arr.length; idx++) {
-				arr[idx].start(this);
-			}
-
-			// Enter main loop
+			// Enter our main execution loop
 			activate();	
 		} catch (Throwable ex) {
 			String msg = "Dispatcher="+name+" has terminated abnormally";
@@ -301,7 +282,7 @@ public class Dispatcher
 		} catch (Throwable ex) {
 			getLogger().log(LEVEL.INFO, ex, false, "Dispatcher="+getName()+": Failed to close NIO Selector");
 		}
-		if (dnsresolv != null)  dnsresolv.stop();
+		if (getResolverDNS() != null) getResolverDNS().stop();
 		if (getNafManAgent() != null) getNafManAgent().stop();
 		dynamicLoader.shutdown();
 
@@ -350,22 +331,6 @@ public class Dispatcher
 		stop();
 		if (waitStopped(TMT_FORCEDSTOP, false) == STOPSTATUS.STOPPED) return STOPSTATUS.FORCED;
 		return STOPSTATUS.ALIVE; //failed to stop it - could only happen if blocked in an application callback
-	}
-
-	/**
-	 * This should only be called within the Dispatcher thread.
-	 */
-	@Override
-	public long getSystemTime() {
-		if (systime_msecs == 0) systime_msecs = getRealTime();
-		return systime_msecs;
-	}
-	
-	/**
-	 * This returns the instantaneous system time, and is thread-safe.
-	 */
-	public long getRealTime() {
-		return clock.millis();
 	}
 
 	// This is the Dispatcher's main loop.
@@ -479,7 +444,7 @@ public class Dispatcher
 		try {
 			if (bpex
 					&& ((CM_Stream.BrokenPipeException)ex).cm == cmerr
-					&& cmerr != null //should be non-null if prior conditions  hold, but make double sure
+					&& cmerr != null //should be non-null if prior conditions hold, but make double sure
 					&& !(cmerr instanceof CM_UDP)) {
 				cmerr.failed(true, ex);
 			} else {
@@ -535,18 +500,16 @@ public class Dispatcher
 	// ChannelMonitors must bookend all their activity between a single call to this method and another one
 	// to deregisterlIO().
 	// In between, they can can call monitorIO() multiple times to stop and start listening for specific I/O events.
-	void registerIO(ChannelMonitor cm)
-	{
+	void registerIO(ChannelMonitor cm) {
 		if (activechannels.put(cm.getCMID(), cm) != null) {
-			throw new IllegalStateException("Illegal registerIO on CM="+cm.getClass().getName()+"/E"+cm.getCMID()
+			throw new IllegalStateException("Dispatcher="+name+": Illegal registerIO on CM="+cm.getClass().getName()+"/E"+cm.getCMID()
 					+" - Ops="+showInterestOps(cm.getRegistrationKey())+" - "+cm);
 		}
 	}
 
-	void deregisterIO(ChannelMonitor cm)
-	{
+	void deregisterIO(ChannelMonitor cm) {
 		if (activechannels.remove(cm.getCMID()) == null) {
-			throw new IllegalStateException("Illegal deregisterIO on CM="+cm.getClass().getName()+"/E"+cm.getCMID()
+			throw new IllegalStateException("Dispatcher="+name+": Illegal deregisterIO on CM="+cm.getClass().getName()+"/E"+cm.getCMID()
 					+" - Ops="+showInterestOps(cm.getRegistrationKey())+" - "+cm);
 		}
 		if (cm.getRegistrationKey() != null) {
@@ -555,13 +518,11 @@ public class Dispatcher
 		}
 	}
 
-	void conditionalDeregisterIO(ChannelMonitor cm)
-	{
+	void conditionalDeregisterIO(ChannelMonitor cm) {
 		if (activechannels.containsKey(cm.getCMID())) deregisterIO(cm);
 	}
 
-	void monitorIO(ChannelMonitor cm, int ops) throws java.nio.channels.ClosedChannelException
-	{
+	void monitorIO(ChannelMonitor cm, int ops) throws java.nio.channels.ClosedChannelException {
 		if (shutdownPerformed) return;
 		if (cm.getRegistrationKey() == null) { //equivalent to !cm.iochan.isRegistered(), but obviously cheaper
 			//3rd arg has same effect as calling attach(handler) on returned SelectionKey
@@ -575,8 +536,7 @@ public class Dispatcher
 		return setTimer(interval, type, handler, null);
 	}
 
-	public TimerNAF setTimer(long interval, int type, TimerNAF.Handler handler, Object attachment)
-	{
+	public TimerNAF setTimer(long interval, int type, TimerNAF.Handler handler, Object attachment) {
 		TimerNAF tmr = sparetimers.extract().init(this, handler, interval, type, ++uniqid_timer, attachment);
 		if (shutdownRequested && interval < shutdown_timer_advance) {
 			//This timer will never get fired, so if it was intended as a zero-second (or similiar)
@@ -596,8 +556,7 @@ public class Dispatcher
 		return tmr;
 	}
 
-	void cancelTimer(TimerNAF tmr)
-	{
+	void cancelTimer(TimerNAF tmr) {
 		//remove from scheduled queue
 		if (!activetimers.remove(tmr)) {
 			//remove from ready-to-fire queue
@@ -611,8 +570,7 @@ public class Dispatcher
 		sparetimers.store(tmr.clear());
 	}
 
-	void resetTimer(TimerNAF tmr)
-	{
+	void resetTimer(TimerNAF tmr) {
 		tmr.resetExpiry();
 		int idx = activetimers.indexOf(tmr);
 
@@ -628,8 +586,7 @@ public class Dispatcher
 		activateTimer(tmr);
 	}
 
-	private void activateTimer(TimerNAF tmr)
-	{
+	private void activateTimer(TimerNAF tmr) {
 		int pos = 0; // will insert new timer at head of list, if we don't find any earlier timers
 		if (tmr.getInterval() != 0) {
 			//zero-sec timers go straight to front of queue, even ahead of other zero-sec ones
@@ -645,10 +602,17 @@ public class Dispatcher
 	}
 
 	@Override
-	public void producerIndication(Producer<Object> p) throws java.io.IOException
-	{
+	public void entityStopped(Object entity) {
+		Naflet app = Naflet.class.cast(entity);
+		boolean exists = removeNaflet(app);
+		if (!exists) return;  // duplicate notification - ignore
+		getLogger().info("Dispatcher="+getName()+": Naflet="+app.getName()+" has terminated - remaining="+getNafletCount());
+	}
+
+	@Override
+	public void producerIndication(Producer<Object> producer) throws java.io.IOException {
 		Object event;
-		while ((event = dynamicLoader.consume()) != null) {
+		while ((event = producer.consume()) != null) {
 			getLogger().info("Dispatcher="+getName()+": Loading dynamic handler - "+event);
 			if (event.getClass() == String.class) {
 				String evtname = (String)event;
@@ -684,12 +648,8 @@ public class Dispatcher
 						getLogger().warn("Dispatcher="+getName()+" Rejecting dynamic Producer from wrong dispatcher="+prod.getDispatcher().getName());
 						return;
 					}
-					if (dynamicProducers.remove(prod)) {
-						prod.shutdown();
-					} else {
-						dynamicProducers.add(prod);
-						prod.start();
-					}
+					dynamicProducers.add(prod);
+					prod.start();
 				} else {
 					getLogger().warn("Dispatcher="+getName()+": Rejecting unknown dynamic handler - "+event);
 				}
@@ -700,57 +660,120 @@ public class Dispatcher
 	// This method can be (and is meant to be) called by other threads.
 	// The Naflet is expected to be merely constructed, and we will call its start() method from
 	// within the Dispatcher thread once it's been loaded.
-	public void loadNaflet(Naflet app) throws java.io.IOException
-	{
+	public void loadNaflet(Naflet app) throws java.io.IOException {
 		if (app.getName().charAt(0) == '_') {
-			throw new IllegalArgumentException("Invalid Naflet name (starts with underscore) - "+app.getName());
+			throw new IllegalArgumentException("Dispatcher="+name+" rejecting invalid Naflet name (starts with underscore) - "+app.getName());
 		}
 		dynamicLoader.produce(app);
 	}
 
-	public void unloadNaflet(String naflet_name) throws java.io.IOException
-	{
+	public void unloadNaflet(String naflet_name) throws java.io.IOException {
 		dynamicLoader.produce(naflet_name);
 	}
 
-	public void loadProducer(Producer<?> prod) throws java.io.IOException
-	{
+	public void loadProducer(Producer<?> prod) throws java.io.IOException {
 		dynamicLoader.produce(prod);
 	}
 
-	public void unloadProducer(Producer<?> prod) throws java.io.IOException
-	{
+	public void unloadProducer(Producer<?> prod) throws java.io.IOException {
 		dynamicLoader.produce(prod);
 	}
 
-	@Override
-	public void entityStopped(Object entity)
-	{
-		Naflet app = Naflet.class.cast(entity);
-		boolean exists = removeNaflet(app);
-		if (!exists) return;  // duplicate notification - ignore
-		getLogger().info("Dispatcher="+getName()+": Naflet="+app.getName()+" has terminated - remaining="+getNafletCount());
-	}
-
-	private void stopNaflet(Naflet app)
-	{
+	private void stopNaflet(Naflet app) {
 		app.stop();
 	}
 
 	// This can be called from other threads
-	public void registerReaper(EntityReaper reaper)
-	{
+	public void registerReaper(EntityReaper reaper) {
 		synchronized (reapers) {
 			if (!reapers.contains(reaper)) reapers.add(reaper);
 		}
 	}
 
 	// This can be called from other threads
-	public void cancelReaper(EntityReaper reaper)
-	{
+	public void cancelReaper(EntityReaper reaper) {
 		synchronized (reapers) {
 			reapers.remove(reaper);
 		}
+	}
+
+	// This lets us take a snapshot of the Naflets to iterate over.
+	// It's not safe to iterate over the original 'naflets' list as it can be modified (Senders can exit) during the loop.
+	// This is only intended for startup and shutdown, so don't worry about the memory allocation.
+	// This method is also used by other threads (eg. NAFMAN) to get a snapshot of the current NAFlets, and it is for this
+	// reason that it is synchronised. This method needs to be synchronised against local actions that add/remove entries from
+	// the Naflets list.
+	public Naflet[] listNaflets() {
+		synchronized (activeNaflets) {
+			return activeNaflets.toArray(new Naflet[getNafletCount()]);
+		}
+	}
+
+	private Naflet getNaflet(String naflet_name) {
+		synchronized (activeNaflets) {
+			for (int idx = 0; idx != getNafletCount(); idx++) {
+				if (activeNaflets.get(idx).getName().equals(naflet_name)) return activeNaflets.get(idx);
+			}
+		}
+		return null;
+	}
+
+	private void addNaflet(Naflet app) {
+		synchronized (activeNaflets) {
+			activeNaflets.add(app);
+		}
+	}
+
+	private boolean removeNaflet(Naflet app) {
+		synchronized (activeNaflets) {
+			return activeNaflets.remove(app);
+		}
+	}
+
+	private int getNafletCount() {
+		synchronized (activeNaflets) {
+			return activeNaflets.size();
+		}
+	}
+
+	public NafManAgent getNafManAgent() {
+		synchronized (nafmanLock) {
+			return nafmanAgent;
+		}
+	}
+
+	public ResolverDNS getResolverDNS() {
+		synchronized (dnsLock) {
+			return dnsResolver;
+		}
+	}
+
+	/**
+	 * This should only be called within the Dispatcher thread.
+	 */
+	@Override
+	public long getSystemTime() {
+		if (systime_msecs == 0) systime_msecs = getRealTime();
+		return systime_msecs;
+	}
+
+	/**
+	 * This returns the instantaneous system time, and is thread-safe.
+	 */
+	public long getRealTime() {
+		return clock.millis();
+	}
+
+	// Since ChannelMonitors are reused, a non-zero stime arg protects against killing a previous incarnation.
+	// Actually ChannelMonitor IDs are now (since 2nd March 2014) unique per incarnation, but leave in the
+	// start-time check anyway for robustness.
+	public boolean killConnection(int id, long stime, String diag) throws java.io.IOException
+	{
+		ChannelMonitor cm = activechannels.get(id);
+		if (cm == null) return false;
+		if (stime != 0 && stime != cm.getStartTime()) return false;
+		cm.ioDisconnected(diag);
+		return true;
 	}
 
 	// NB: This is not a performance-critical method, expected to be rarely called
@@ -765,7 +788,7 @@ public class Dispatcher
 		sb.append("<infonodes>");
 		sb.append("<infonode name=\"Disposition\" dispatcher=\"").append(getName()).append("\">");
 		sb.append("NAFMAN = ").append(getNafManAgent() == null ? "No" : (getNafManAgent().isPrimary() ? "Primary" : "Secondary"));
-		sb.append("<br/>DNS = ").append(dnsresolv == null ? "No" : dnsresolv);
+		sb.append("<br/>DNS = ").append(getResolverDNS() == null ? "No" : getResolverDNS());
 		sb.append("<br/>Log-Level = ").append(getLogger().getLevel());
 		sb.append("<br/>Boot-Time = ");
 		TimeOps.makeTimeLogger(dtcal, sb, true, false);
@@ -825,62 +848,6 @@ public class Dispatcher
 		sb.append("</infonode>");
 		sb.append("</infonodes>");
 		return sb;
-	}
-
-	// Since ChannelMonitors are reused, a non-zero stime arg protects against killing a previous incarnation.
-	// Actually ChannelMonitor IDs are now (since 2nd March 2014) unique per incarnation, but leave in the
-	// start-time check anyway for robustness.
-	public boolean killConnection(int id, long stime, String diag) throws java.io.IOException
-	{
-		ChannelMonitor cm = activechannels.get(id);
-		if (cm == null) return false;
-		if (stime != 0 && stime != cm.getStartTime()) return false;
-		cm.ioDisconnected(diag);
-		return true;
-	}
-
-	// This lets us take a snapshot of the Naflets to iterate over.
-	// It's not safe to iterate over the original 'naflets' list as it can be modified (Senders can exit) during the loop.
-	// This is only intended for startup and shutdown, so don't worry about the memory allocation.
-	// This method is also used by other threads (eg. NAFMAN) to get a snapshot of the current NAFlets, and it is for this
-	// reason that it is synchronised. This method needs to be synchronised against local actions that add/remove entries from
-	// the Naflets list.
-	public Naflet[] listNaflets()
-	{
-		synchronized (activeNaflets) {
-			return activeNaflets.toArray(new Naflet[getNafletCount()]);
-		}
-	}
-
-	private Naflet getNaflet(String naflet_name)
-	{
-		synchronized (activeNaflets) {
-			for (int idx = 0; idx != getNafletCount(); idx++) {
-				if (activeNaflets.get(idx).getName().equals(naflet_name)) return activeNaflets.get(idx);
-			}
-		}
-		return null;
-	}
-
-	private void addNaflet(Naflet app)
-	{
-		synchronized (activeNaflets) {
-			activeNaflets.add(app);
-		}
-	}
-
-	private boolean removeNaflet(Naflet app)
-	{
-		synchronized (activeNaflets) {
-			return activeNaflets.remove(app);
-		}
-	}
-	
-	private int getNafletCount()
-	{
-		synchronized (activeNaflets) {
-			return activeNaflets.size();
-		}
 	}
 
 	// convenience method which leverages a single pre-allocated transfer buffer for this thread

@@ -44,7 +44,7 @@ public class DNSClient
 		if (d.getResolverDNS() == null) throw new IllegalArgumentException("Non-DNS Dispatcher for DNS client - "+d);
 		ownDispatcher = owner;
 		dsptch = d;
-		RequestHandler reqHandler = new RequestHandler();
+		RequestHandler reqHandler = new RequestHandler(d.getResolverDNS());
 		reqSubmitter = new Producer<RequestBlock>(RequestBlock.class, d, reqHandler);
 		asyncCallback = cb;
 	}
@@ -160,10 +160,15 @@ public class DNSClient
 	private static final class RequestHandler
 		implements Producer.Consumer<RequestBlock>, ResolverDNS.Client
 	{
+		private final ResolverDNS resolver;
+
+		public RequestHandler(ResolverDNS resolver) {
+			this.resolver = resolver;
+		}
+
 		@Override
 		public void producerIndication(Producer<RequestBlock> prod) {
 			Dispatcher dsptch = prod.getDispatcher();
-			ResolverDNS resolver = dsptch.getResolverDNS();
 			RequestBlock dnsreq;
 			while ((dnsreq = prod.consume()) != null) {
 				ResolverAnswer answer = null;

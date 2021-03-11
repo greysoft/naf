@@ -32,13 +32,14 @@ public class ConfigTest
 
 		String dname = "testdispatcher9";
 		XmlConfig dcfg = cfg.getDispatcher(dname);
+		XmlConfig[] nafletsConfig = dcfg.getSections("naflets/naflet"+XmlConfig.XPATH_ENABLED);
 		org.junit.Assert.assertNotNull(dcfg);
 		DispatcherDef def = new DispatcherDef.Builder().withXmlConfig(dcfg).build();
 		org.junit.Assert.assertEquals(dname, def.getName());
 		org.junit.Assert.assertTrue(def.hasDNS());
 		org.junit.Assert.assertTrue(def.isZeroNafletsOK());
 		org.junit.Assert.assertTrue(def.isSurviveHandlers());
-		org.junit.Assert.assertEquals(2, def.getNafletsConfig().length);
+		org.junit.Assert.assertEquals(2, nafletsConfig.length);
 	}
 
 	@org.junit.Test
@@ -64,6 +65,5 @@ public class ConfigTest
 		org.junit.Assert.assertFalse(def.hasDNS());
 		org.junit.Assert.assertTrue(def.isZeroNafletsOK());
 		org.junit.Assert.assertFalse(def.isSurviveHandlers());
-		org.junit.Assert.assertNull(def.getNafletsConfig());
 	}
 }
