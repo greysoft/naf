@@ -73,7 +73,7 @@ public class RegistryTest
 		nafreg.loadCommands(new NafManRegistry.DefCommand[]{fakecmd1});
 		org.junit.Assert.assertSame(fakecmd1, nafreg.getCommand(fakecmd1.code));
 		org.junit.Assert.assertEquals(NafManRegistry.CMD_STOP, stopcmd.code);
-		org.junit.Assert.assertNull(appctx.getPrimaryAgent());
+		org.junit.Assert.assertNull(appctx.getNamedItem(PrimaryAgent.class.getName(), null));
 		org.junit.Assert.assertEquals(cnt1+1, nafreg.getCommands().size());
 
 		// make sure duplicate command defs are discarded

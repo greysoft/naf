@@ -11,6 +11,7 @@ import com.grey.naf.dns.resolver.ResolverAnswer;
 import com.grey.naf.dns.resolver.ResolverConfig;
 import com.grey.naf.dns.resolver.ResolverDNS;
 import com.grey.naf.dns.resolver.ResolverService;
+import com.grey.naf.errors.NAFConfigException;
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.Producer;
 import com.grey.logging.Logger.LEVEL;
@@ -37,14 +38,22 @@ class Proxy
 	public static Supplier<Proxy> get(Dispatcher dsptch, ResolverConfig cfg, String master)
 	{
 		dsptch.getLogger().info(LOGLABEL+": Acquiring Proxy in Dispatcher="+dsptch.getName()+" for master="+master);
-		Proxy p;
+		Proxy proxy = null;
 		if (master == null || master.equals(dsptch.getName())) {
-			p = dsptch.getApplicationContext().getNamedItem(APPCONTEXTNAME, (c) -> new Proxy(dsptch, cfg));
+			Supplier<Proxy> func = () -> {
+				try {
+					return new Proxy(dsptch, cfg);
+				} catch (Exception ex) {
+					throw new NAFConfigException("Failed to create Proxy DNS resolver", ex);
+				}
+			};
+			proxy = dsptch.getApplicationContext().getNamedItem(APPCONTEXTNAME, func);
 		} else {
-			p = dsptch.getApplicationContext().getNamedItem(APPCONTEXTNAME, null);
+			proxy = dsptch.getApplicationContext().getNamedItem(APPCONTEXTNAME, null);
 		}
-		dsptch.getLogger().info(LOGLABEL+": Dispatcher="+dsptch.getName()+" has latched Proxy="+(p==null?null:p.getMasterDispatcher().getName()));
-		return () -> dsptch.getApplicationContext().getNamedItem(APPCONTEXTNAME, null);
+		dsptch.getLogger().info(LOGLABEL+": Dispatcher="+dsptch.getName()+" has latched Proxy="+(proxy==null?null:proxy.getMasterDispatcher().getName()));
+		Proxy p = proxy;
+		return () -> p;
 	}
 
 	private Proxy(Dispatcher dsptch, ResolverConfig cfg) throws java.io.IOException, javax.naming.NamingException
@@ -70,7 +79,7 @@ class Proxy
 		if (clnt.getDispatcher() == rslvr.getDispatcher()) {
 			// The master Dispatcher is shutting down.
 			rslvr.stop();
-			clnt.getDispatcher().getApplicationContext().deregisterNamedItem(APPCONTEXTNAME);
+			clnt.getDispatcher().getApplicationContext().removeNamedItem(APPCONTEXTNAME);
 		}
 	}
 

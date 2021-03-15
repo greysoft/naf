@@ -118,7 +118,7 @@ public class NafManRegistry
 	synchronized java.util.Set<String> getResourceNames() {return active_resources.keySet();}
 
 	public static NafManRegistry get(ApplicationContextNAF appctx) {
-		return appctx.getNamedItem(NafManRegistry.class.getName(), (c) -> new NafManRegistry(c));
+		return appctx.getNamedItem(NafManRegistry.class.getName(), () -> new NafManRegistry(appctx));
 	}
 
 	private NafManRegistry(ApplicationContextNAF appctx) {

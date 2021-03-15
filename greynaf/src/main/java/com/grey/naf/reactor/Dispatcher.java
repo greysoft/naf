@@ -132,7 +132,7 @@ public class Dispatcher
 					throw new NAFConfigException("Failed to create primary NAFMAN agent for Dispatcher="+dsptch.getName(), ex);
 				}
 			};
-			NafManAgent agent = appctx.registerPrimaryAgent(supplier);
+			NafManAgent agent = appctx.getNamedItem(PrimaryAgent.class.getName(), supplier);
 			if (agent.getDispatcher() != dsptch) {
 				agent = new SecondaryAgent(dsptch, reg, nafmanConfig);
 			}

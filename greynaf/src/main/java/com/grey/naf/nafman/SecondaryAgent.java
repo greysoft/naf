@@ -22,7 +22,7 @@ public class SecondaryAgent
 	public SecondaryAgent(Dispatcher dsptch, NafManRegistry reg, NafManConfig cfg) throws java.io.IOException
 	{
 		super(dsptch, reg);
-		primary = dsptch.getApplicationContext().getPrimaryAgent();
+		primary = dsptch.getApplicationContext().getNamedItem(PrimaryAgent.class.getName(), null);
 		if (primary == null) {
 			throw new IllegalStateException("Dispatcher="+dsptch.getName()+": Cannot create Secondary NAFMAN before Primary");
 		}
@@ -37,7 +37,7 @@ public class SecondaryAgent
 	public void stop()
 	{
 		Dispatcher dsptch = getDispatcher();
-		PrimaryAgent activePrimary = dsptch.getApplicationContext().getPrimaryAgent();
+		PrimaryAgent activePrimary = dsptch.getApplicationContext().getNamedItem(PrimaryAgent.class.getName(), null);
 		dsptch.getLogger().info("NAFMAN Secondary="+dsptch.getName()+" shutdown with primary="+primary.getDispatcher().getName()+" - active="+activePrimary);
 		setShutdown();
 		requests.shutdown();

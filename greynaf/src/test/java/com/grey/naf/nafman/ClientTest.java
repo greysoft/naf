@@ -42,7 +42,7 @@ public class ClientTest
 		Dispatcher dsptch = Dispatcher.create(appctx, def, logger);
 		NafManAgent agent = dsptch.getNafManAgent();
 		org.junit.Assert.assertTrue(agent.isPrimary());
-		org.junit.Assert.assertSame(agent, appctx.getPrimaryAgent());
+		org.junit.Assert.assertSame(agent, appctx.getNamedItem(PrimaryAgent.class.getName(), null));
 		dsptch.start();
 		com.grey.naf.Launcher.main(new String[] {"-q", "-cmd", stopcmd.code, "-remote", String.valueOf(agent.getPort())});
 		waitStopped(dsptch);
