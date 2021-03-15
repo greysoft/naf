@@ -4,7 +4,8 @@
  */
 package com.grey.naf.dns.resolver;
 
-import com.grey.base.config.XmlConfig;
+import java.util.function.Supplier;
+
 import com.grey.base.utils.ByteChars;
 import com.grey.base.utils.DynLoader;
 import com.grey.base.utils.StringOps;
@@ -57,6 +58,7 @@ public abstract class ResolverDNS
 	private static final String[] qtype_txt = DynLoader.generateSymbolNames(ResolverDNS.class, "QTYPE_", 255);
 	public static String getQTYPE(int qtype) {return qtype_txt[qtype & 0xff];}
 
+	abstract public Dispatcher getMasterDispatcher();
 	abstract public void start() throws java.io.IOException;
 	abstract public void stop();
 	abstract public int cancel(Client caller) throws java.io.IOException;
@@ -72,27 +74,18 @@ public abstract class ResolverDNS
 	private final ResolverAnswer answerA = new ResolverAnswer();
 	private final ResolverAnswer answerLocalIP = new ResolverAnswer();
 
-	public static ResolverDNS create(Dispatcher dsptch, XmlConfig xmlcfg)
-	{
-		String cfgclass = com.grey.naf.dns.resolver.distributed.DistributedResolver.class.getName();
-		String master = null;
-		if (xmlcfg != null) {
-			cfgclass = xmlcfg.getValue("@class", false, cfgclass);
-			master = xmlcfg.getValue("@master", false, null);
-		}
-
-		try {
-			ResolverConfig config = new ResolverConfig.Builder().withXmlConfig(xmlcfg).build();
-
-			if (cfgclass.equals(DistributedResolver.class.getName())) {
-				return new DistributedResolver(dsptch, config, master);
-			} else if (cfgclass.equals(EmbeddedResolver.class.getName())) {
-				return new EmbeddedResolver(dsptch, config);
+	public static ResolverDNS create(Dispatcher d, ResolverConfig config) {
+		Supplier<ResolverDNS> func = () -> {
+			ResolverDNS r = null;
+			try {
+				r = (config.isDistributed() ? new DistributedResolver(d, config) : new EmbeddedResolver(d, config));
+				r.start();
+			} catch (Exception ex) {
+				throw new NAFConfigException("Failed to start DNS-Resolver="+r+" for Dispatcher="+d.getName()+" with distributed="+config.isDistributed(), ex);
 			}
-		} catch (Exception ex) {
-			throw new NAFConfigException("Failed to create ResolverDNS="+cfgclass, ex);
-		}
-		throw new NAFConfigException("Unrecognised ResolverDNS class="+cfgclass);
+			return r;
+		};
+		return d.getNamedItem(ResolverDNS.class.getName(), func);
 	}
 
 	protected ResolverDNS(Dispatcher d)

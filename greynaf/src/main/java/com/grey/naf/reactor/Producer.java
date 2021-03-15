@@ -4,7 +4,12 @@
  */
 package com.grey.naf.reactor;
 
+import java.util.List;
+
+import com.grey.base.collections.Circulist;
 import com.grey.base.utils.ByteArrayRef;
+import com.grey.base.utils.NIOBuffers;
+import com.grey.naf.BufferSpec;
 import com.grey.logging.Logger.LEVEL;
 
 /*
@@ -24,20 +29,20 @@ public class Producer<T>
 
 	public final String consumerType; //this is purely descriptive
 	private final Consumer<T> consumer;
-	private final com.grey.base.collections.Circulist<T> exchgq;  //MT queue, on which Dispatcher receives items from producer
-	private final com.grey.base.collections.Circulist<T> availq;  //non-MT staging queue, only accessed by the Dispatcher
+	private final Circulist<T> exchgq;  //MT queue, on which Dispatcher receives items from producer
+	private final Circulist<T> availq;  //non-MT staging queue, only accessed by the Dispatcher
 	private final AlertsPipe<T> alertspipe;
 	private final com.grey.logging.Logger logger;
 	private boolean in_shutdown;
 
 	public Dispatcher getDispatcher() {return alertspipe.getDispatcher();}
-	public void shutdown(){shutdown(false);}
+	public void shutdown() {shutdown(false);}
 
 	public Producer(Class<T> clss, Dispatcher dsptch, Consumer<T> cons) throws java.io.IOException {
 		consumer = cons;
 		consumerType = consumer.getClass().getName()+"/"+clss.getName();
-		exchgq = new com.grey.base.collections.Circulist<T>(clss);
-		availq = new com.grey.base.collections.Circulist<T>(clss);
+		exchgq = new Circulist<T>(clss);
+		availq = new Circulist<T>(clss);
 		alertspipe = new AlertsPipe<T>(dsptch, this);
 		logger = dsptch.getLogger();
 	}
@@ -83,7 +88,7 @@ public class Producer<T>
 		produce(cnt);
 	}
 
-	public void produce(java.util.ArrayList<T> items) throws java.io.IOException {
+	public void produce(List<T> items) throws java.io.IOException {
 		int cnt;
 		synchronized (exchgq) {
 			cnt = exchgq.size();
@@ -174,14 +179,14 @@ public class Producer<T>
 
 		// Note that 'rep' and 'CM_Stream.iochan' are one and the same, but recording it as rep allows us to avoid casting iochan.
 		private AlertsPipe(Dispatcher d, Producer<T> p) throws java.io.IOException {
-			super(d, new com.grey.naf.BufferSpec(0, 0), null); //we will do our own reads
+			super(d, new BufferSpec(0, 0), null); //we will do our own reads
 			producer = p;
 
 			java.nio.channels.Pipe pipe = java.nio.channels.Pipe.open();
 			rep = pipe.source(); //Read end-point
 			wep = pipe.sink();
 			wep.configureBlocking(false); //guaranteed not to block in practice
-			rcvbuf = com.grey.base.utils.NIOBuffers.create(16, true);
+			rcvbuf = NIOBuffers.create(16, true);
 		}
 
 		// enable event notifications on the read (consumer) endpoint of our pipe		
@@ -200,7 +205,7 @@ public class Producer<T>
 		// consumer has to read, but merely kicking it into action, and if the pipe is full, then the
 		// consumer will surely be signalled that I/O is pending.
 		private synchronized void signalConsumer() throws java.io.IOException {
-			java.nio.ByteBuffer buf = com.grey.base.utils.NIOBuffers.create(1, false);
+			java.nio.ByteBuffer buf = NIOBuffers.create(1, false);
 			wep.write(buf);
 		}
 

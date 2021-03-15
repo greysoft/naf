@@ -72,7 +72,6 @@ public class DispatcherTest
 		String dname = "utest_dynamic1";
 		DispatcherDef def = new DispatcherDef.Builder()
 				.withName(dname)
-				.withDNS(true)
 				.withSurviveHandlers(false)
 				.build();
 		Dispatcher dsptch = Dispatcher.create(appctx, def, bootlog);

@@ -4,17 +4,22 @@
  */
 package com.grey.naf.dns.integration;
 
-import com.grey.base.utils.DynLoader;
 import com.grey.base.utils.StringOps;
+
 import com.grey.base.utils.FileOps;
 import com.grey.base.utils.IP;
 import com.grey.naf.reactor.Dispatcher;
+
 import com.grey.naf.ApplicationContextNAF;
+import com.grey.naf.DispatcherDef;
 import com.grey.naf.NAFConfig;
 import com.grey.naf.TestUtils;
 import com.grey.naf.dns.client.DNSClient;
 import com.grey.naf.dns.resolver.ResolverAnswer;
+import com.grey.naf.dns.resolver.ResolverConfig;
 import com.grey.naf.dns.resolver.ResolverDNS;
+
+import org.junit.Assert;
 
 public class SynchronousTest
 	extends ResolverTester
@@ -23,6 +28,8 @@ public class SynchronousTest
 	private static final String DNAME = "TEST-SyncDNS";
 
 	private DNSClient resolver;
+	private Dispatcher dsptch; //this is the Dispatcher the DNSClient references
+	private Dispatcher dsptchOther; //the other Dispatcher for a pair of DistributedResolvers, may be the master
 
 	@org.junit.Before
 	public void beforeTest() throws java.io.IOException
@@ -38,9 +45,22 @@ public class SynchronousTest
 	}
 
 	@org.junit.Test
-	public void testResolver() throws java.io.IOException
+	public void testResolverLocal() throws java.io.IOException
 	{
-		init("std", true, true);
+		init("std", true, true, true);
+		testResolver();
+	}
+
+	@org.junit.Test
+	public void testResolverRemote() throws java.io.IOException
+	{
+		init("std", false, true, true);
+		testResolver();
+	}
+
+	private void testResolver() throws java.io.IOException
+	{
+		init("std", true, true, true);
 		String hostname = "101.25.32.1"; //any old IP
 		int ip = IP.convertDottedIP(hostname);
 		ResolverAnswer answer = resolver.resolveHostname(hostname);
@@ -110,7 +130,7 @@ public class SynchronousTest
 	public void testDelegationDetection() throws java.io.IOException
 	{
 		org.junit.Assume.assumeTrue(HAVE_DNS_SERVICE || USE_REAL_DNS);
-		init("delegation", false, false);
+		init("delegation", true, false, false);
 		ResolverAnswer answer = resolver.resolveNameServer("ny.us.ibm.com"); //there are no more delegations under ibm.com
 		assertAnswer(ResolverAnswer.STATUS.NODOMAIN, ResolverDNS.QTYPE_NS, 0, answer);
 		answer = resolver.resolveHostname("e31.co.us.ibm.com");
@@ -131,7 +151,7 @@ public class SynchronousTest
 	public void testDeadlockAvoidance() throws java.io.IOException
 	{
 		org.junit.Assume.assumeTrue(HAVE_DNS_SERVICE || USE_REAL_DNS);
-		init("avoidloop", false, false);
+		init("avoidloop", true, false, false);
 		ResolverAnswer answer = resolver.resolveNameServer("dns.pipex.net");
 		assertAnswer(ResolverAnswer.STATUS.OK, ResolverDNS.QTYPE_NS, 0, answer);
 	}
@@ -145,30 +165,68 @@ public class SynchronousTest
 	public void testAuthorityRedirect() throws java.io.IOException
 	{
 		org.junit.Assume.assumeTrue(HAVE_DNS_SERVICE || USE_REAL_DNS);
-		init("authredirect", false, false);
+		init("authredirect", true, false, false);
 		ResolverAnswer answer = resolver.resolveMailDomain("415digital.com"); //comes with glue records
 		assertAnswer(ResolverAnswer.STATUS.OK, ResolverDNS.QTYPE_MX, 0, answer);
 		answer = resolver.resolveMailDomain("anglia.nl"); //response has no glue
 		assertAnswer(ResolverAnswer.STATUS.OK, ResolverDNS.QTYPE_MX, 0, answer);
 	}
 
-	private void init(String tag, boolean recursive, boolean use_mockserver) throws java.io.IOException
+	private void init(String tag, boolean master, boolean recursive, boolean use_mockserver) throws java.io.IOException
 	{
 		String nafcfg_path = createConfig(tag, recursive, use_mockserver);
 		ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, nafcfg_path, true);
-		resolver = new DNSClient(null, appctx, DNAME+"-"+tag, logger);
-		resolver.init();
+		NAFConfig nafcfg = appctx.getConfig();
+		String d1name = DNAME+"-"+tag;
+		String d2name = d1name;
+		if (master) {
+			d1name += "_master";
+			d2name += "_slave";
+		} else {
+			d1name += "_slave";
+			d2name += "_master";
+		}
+		DispatcherDef def = new DispatcherDef.Builder()
+				.withName(d1name)
+				.withSurviveHandlers(false)
+				.build();
+		ResolverConfig rcfg = new ResolverConfig.Builder()
+				.withXmlConfig(nafcfg.getNode("dnsresolver"))
+				.build();
+		dsptch = Dispatcher.create(appctx, def, logger);
+		def = new DispatcherDef.Builder(def).withName(d2name).build();
+		dsptchOther = Dispatcher.create(appctx, def, logger);
+		ResolverDNS r1;
+		if (master) {
+			r1 = ResolverDNS.create(dsptch, rcfg);
+			ResolverDNS r2 = ResolverDNS.create(dsptchOther, rcfg);
+			Assert.assertSame(dsptch, r1.getDispatcher());
+			Assert.assertSame(dsptch, r1.getMasterDispatcher());
+			Assert.assertSame(dsptchOther, r2.getDispatcher());
+			Assert.assertSame(dsptch, r2.getMasterDispatcher());
+		} else {
+			ResolverDNS r2 = ResolverDNS.create(dsptchOther, rcfg); //this one becomes the DistributedResolver master
+			r1 = ResolverDNS.create(dsptch, rcfg);
+			Assert.assertSame(dsptch, r1.getDispatcher());
+			Assert.assertSame(dsptchOther, r1.getMasterDispatcher());
+			Assert.assertSame(dsptchOther, r2.getDispatcher());
+			Assert.assertSame(dsptchOther, r2.getMasterDispatcher());
+		}
+		resolver = new DNSClient(r1, null);
+		dsptch.start();
+		dsptchOther.start();
 	}
 
 	private void shutdown() throws java.io.IOException
 	{
-		Dispatcher d = (Dispatcher)DynLoader.getField(resolver, "dsptch");
-		Dispatcher.STOPSTATUS stopsts = resolver.shutdown();
+		resolver.shutdown();
+		dsptch.stop();
+		dsptchOther.stop();
+		Dispatcher.STOPSTATUS stopsts = dsptch.waitStopped(5_000, true);
 		org.junit.Assert.assertEquals(Dispatcher.STOPSTATUS.STOPPED, stopsts);
-		org.junit.Assert.assertTrue(d.completedOK());
-		stopsts = resolver.shutdown(); //verify excess calls return same result
-		org.junit.Assert.assertEquals(Dispatcher.STOPSTATUS.STOPPED, stopsts);
-		validateFinalState(d.getResolverDNS());
+		org.junit.Assert.assertTrue(dsptch.completedOK());
+		ResolverDNS r = dsptch.getNamedItem(ResolverDNS.class.getName(), null);
+		validateFinalState(r);
 	}
 
 	private String createConfig(String tag, boolean recursive, boolean use_mockserver) throws java.io.IOException
@@ -192,8 +250,6 @@ public class SynchronousTest
 			sb.append("<retry timeout=\"15s\" timeout_tcp=\"10s\" max=\"2\" backoff=\"200\"/>");
 		}
 		sb.append("</dnsresolver>");
-		sb.append("<dispatchers><dispatcher name=\""+DNAME+"-"+tag+"\" survive_handlers=\"N\"/>");
-		sb.append("</dispatchers>");
 		sb.append("</naf>");
 		String pthnam = rootdir+"/naf.xml";
 		FileOps.writeTextFile(pthnam, sb.toString());

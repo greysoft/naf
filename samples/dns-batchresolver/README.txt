@@ -16,7 +16,7 @@ When running the batch resolver, replace "VERSION" in all the commands below wit
 
 The supplied batchresolver.xml resolves a list of DNS domains of a specified type, which is specified in batchresolver.xml as MX (see 'dnstype' setting).
 The list of DNS domains is in an input file, which is specified in batchresolver.xml as $HOME/infile.txt.
-So you can just create infile.txt with the following 2 lines:
+So you can create infile.txt with something as simple as the following 2 lines:
 	gmail.com
 	localhost
 This means you are asking the batch-resolver to return the mailservers (MX RRs) for these two domains, and localhost should obviously return not-found.

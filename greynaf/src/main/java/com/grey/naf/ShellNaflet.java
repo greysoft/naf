@@ -8,8 +8,7 @@ import java.io.IOException;
 
 /*
  * This is an empty shell of a Naflet which performs no bespoke processing of its own.
- * It can be used as a placeholder in naf.xml, on which to hang responsibility for NAFMAN or
- * DNS processing, etc.
+ * It can be used as a placeholder in naf.xml, to initialise a Dispatcher with no other Naflets.
  */
 public class ShellNaflet
 	extends com.grey.naf.Naflet

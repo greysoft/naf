@@ -3,7 +3,7 @@
 		<udpsockets>10</udpsockets>
 	</dnsresolver>
 	<dispatchers>
-		<dispatcher name="dnsbatch" dns="Y" zero_naflets="N">
+		<dispatcher name="dnsbatch" zero_naflets="N">
 			<naflets>
 				<naflet name="batchdns" class="com.grey.dnsbatchresolver.BatchResolver">
 					<dnstype>MX</dnstype>

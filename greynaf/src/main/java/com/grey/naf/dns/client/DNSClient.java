@@ -4,74 +4,34 @@
  */
 package com.grey.naf.dns.client;
 
-import com.grey.base.config.SysProps;
-import com.grey.base.config.XmlConfig;
-import com.grey.naf.ApplicationContextNAF;
-import com.grey.naf.DispatcherDef;
 import com.grey.naf.dns.resolver.ResolverAnswer;
 import com.grey.naf.dns.resolver.ResolverDNS;
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.Producer;
 import com.grey.naf.errors.NAFException;
 import com.grey.logging.Logger;
-import com.grey.logging.Parameters;
 
 public class DNSClient
 {
 	public interface QueryCallback {
 		void dnsQueryCompleted(ResolverAnswer answer);
 	}
-	
-	private static final String LOGNAME = SysProps.get("greynaf.synchdns.logname", "SynchDNS");
-	private static final String LOGLVL = SysProps.get("greynaf.synchdns.loglevel", Logger.LEVEL.INFO.toString());
-	private static final long TMT_SHUTDOWN = SysProps.getTime("greynaf.synchdns.shutdowntime", "5s");
 
 	private final Dispatcher dsptch;
-	private final Producer<RequestBlock> reqSubmitter; //injects requests into a consumer within Dispatcher thread
+	private final Producer<RequestBlock> reqSubmitter; //the consumer side of this runs inside 'dsptch'
 	private final QueryCallback asyncCallback;
-	private final boolean ownDispatcher;
 
-	public DNSClient(QueryCallback cb, ApplicationContextNAF appctx, String dname, com.grey.logging.Logger logger)
-			throws java.io.IOException {
-		this(createDispatcher(appctx, dname, logger), true, cb);
-	}
-
-	public DNSClient(Dispatcher d, QueryCallback cb) throws java.io.IOException {
-		this(d, false, cb);
-	}
-
-	private DNSClient(Dispatcher d, boolean owner, QueryCallback cb) throws java.io.IOException {
-		if (d.getResolverDNS() == null) throw new IllegalArgumentException("Non-DNS Dispatcher for DNS client - "+d);
-		ownDispatcher = owner;
-		dsptch = d;
-		RequestHandler reqHandler = new RequestHandler(d.getResolverDNS());
-		reqSubmitter = new Producer<RequestBlock>(RequestBlock.class, d, reqHandler);
+	public DNSClient(ResolverDNS resolver, QueryCallback cb) throws java.io.IOException {
+		dsptch = resolver.getMasterDispatcher();
 		asyncCallback = cb;
-	}
-
-	/**
-	 * Launches the background thread in which the resolution of DNS requests is performed asynchronously.
-	 * This should only be invoked once, and it then supports any number of synchronous-DNS threads.
-	 */
-	public void init() throws java.io.IOException {
-		if (ownDispatcher) {
-			if (dsptch.isRunning()) throw new IllegalStateException("SynchDNS: Dispatcher="+dsptch.getName()+" already running");
-			dsptch.start();
-		}
+		RequestHandler reqHandler = new RequestHandler(resolver);
+		reqSubmitter = new Producer<RequestBlock>(RequestBlock.class, dsptch, reqHandler);
 		dsptch.loadProducer(reqSubmitter);
 	}
 
-	/*
-	 * This shuts down the background DNS-Resolver thread spawned by init().
-	 * It can be called from any thread and is safe to call multiple times.
-	 */
-	public Dispatcher.STOPSTATUS shutdown() throws java.io.IOException {
-		if (ownDispatcher) {
-			dsptch.stop();
-			return dsptch.waitStopped(TMT_SHUTDOWN, true);
-		}
+	// Can be called from any thread and is safe to call multiple times.
+	public void shutdown() throws java.io.IOException {
 		dsptch.unloadProducer(reqSubmitter);
-		return null;
 	}
 
 	public ResolverAnswer resolveHostname(CharSequence hostname) throws java.io.IOException {
@@ -129,31 +89,6 @@ public class DNSClient
 			}
 		}
 		return dnsreq.answer;
-	}
-	
-	private static Dispatcher createDispatcher(ApplicationContextNAF appctx, String dname, com.grey.logging.Logger logger)
-			throws java.io.IOException {
-		DispatcherDef.Builder bldr = new DispatcherDef.Builder();
-		if (dname != null) {
-			XmlConfig dcfg = appctx.getConfig().getDispatcher(dname);
-			if (dcfg == null) {
-				bldr = bldr.withName(dname);
-			} else {
-				bldr = new DispatcherDef.Builder().withXmlConfig(dcfg);
-			}
-		}
-		bldr = bldr.withDNS(true);
-		if (bldr.build().getLogName() == null) bldr = bldr.withLogName(LOGNAME);
-		DispatcherDef def = bldr.build();
-
-		if (logger == null) {
-			Parameters params = new Parameters.Builder()
-					.withStream(System.out)
-					.withLogLevel(Logger.LEVEL.valueOf(LOGLVL))
-					.build();
-			logger = com.grey.logging.Factory.getLogger(params, def.getLogName());
-		}
-		return Dispatcher.create(appctx, def, logger);
 	}
 
 
@@ -216,7 +151,7 @@ public class DNSClient
 		}
 
 		@Override
-		public void dnsResolved(Dispatcher dsptch, ResolverAnswer answer, Object cbdata) {
+		public void dnsResolved(Dispatcher d, ResolverAnswer answer, Object cbdata) {
 			issueResponse(answer, (RequestBlock)cbdata);
 		}
 

@@ -18,7 +18,6 @@ public class DispatcherDef
 	private final boolean surviveHandlers;
 	private final boolean zeroNafletsOK;
 	private final long flushInterval;
-	private final boolean hasDNS;
 	private final Clock clock;
 
 	private DispatcherDef(Builder bldr) {
@@ -27,7 +26,6 @@ public class DispatcherDef
 		surviveHandlers = bldr.surviveHandlers;
 		zeroNafletsOK = bldr.zeroNafletsOK;
 		flushInterval = bldr.flushInterval;
-		hasDNS = bldr.hasDNS;
 		clock = bldr.clock;
 	}
 
@@ -51,10 +49,6 @@ public class DispatcherDef
 		return flushInterval;
 	}
 
-	public boolean hasDNS() {
-		return hasDNS;
-	}
-
 	public Clock getClock() {
 		return clock;
 	}
@@ -66,7 +60,6 @@ public class DispatcherDef
 		private boolean surviveHandlers = true;
 		private boolean zeroNafletsOK = true;
 		private long flushInterval;
-		private boolean hasDNS;
 		private Clock clock = Clock.systemUTC();
 
 		public Builder() {}
@@ -77,7 +70,6 @@ public class DispatcherDef
 			surviveHandlers = defs.surviveHandlers;
 			zeroNafletsOK = defs.zeroNafletsOK;
 			flushInterval = defs.flushInterval;
-			hasDNS = defs.hasDNS;
 			clock = defs.clock;
 		}
 
@@ -87,7 +79,6 @@ public class DispatcherDef
 			surviveHandlers = cfg.getBool("@survive_handlers", surviveHandlers);
 			zeroNafletsOK = cfg.getBool("@zero_naflets", zeroNafletsOK);
 			flushInterval = cfg.getTime("@flush", flushInterval);
-			hasDNS = cfg.getBool("@dns", hasDNS);
 			return this;
 		}
 
@@ -113,11 +104,6 @@ public class DispatcherDef
 
 		public Builder withFlushInterval(long v) {
 			flushInterval = v;
-			return this;
-		}
-
-		public Builder withDNS(boolean v) {
-			hasDNS = v;
 			return this;
 		}
 

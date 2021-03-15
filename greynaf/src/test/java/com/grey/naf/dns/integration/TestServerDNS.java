@@ -8,6 +8,7 @@ import com.grey.base.utils.ByteChars;
 import com.grey.base.utils.IP;
 import com.grey.base.utils.StringOps;
 import com.grey.base.utils.TimeOps;
+import com.grey.logging.Logger;
 import com.grey.base.collections.HashedMap;
 import com.grey.base.collections.HashedMapIntKey;
 import com.grey.naf.ApplicationContextNAF;
@@ -25,8 +26,7 @@ class TestServerDNS
 	private static final String TMTDOMAIN = "simulate-timeout.net";
 	private static final String TRUNCDOMAIN = "forced-truncation.net";
 
-	private final HashedMapIntKey<HashedMap<String,ResourceData[][]>> answers
-				= new HashedMapIntKey<HashedMap<String,ResourceData[][]>>();
+	private final HashedMapIntKey<HashedMap<String,ResourceData[][]>> answers= new HashedMapIntKey<>();
 	private final HashSet<String> unused_answers = new HashSet<String>();
 	private final int total_answers;
 	private final com.grey.naf.dns.server.ServerDNS srvr;
@@ -43,7 +43,8 @@ class TestServerDNS
 				.withName("Mock-DNS-Server")
 				.withSurviveHandlers(false)
 				.build();
-		Dispatcher dsptch = Dispatcher.create(appctx, def, null);
+		Logger log = com.grey.logging.Factory.getLoggerNoEx("no-such-initlogger");
+		Dispatcher dsptch = Dispatcher.create(appctx, def, log);
 
 		DnsServerConfig.Builder bldr = new DnsServerConfig.Builder();
 		bldr.getListenerConfig().withPort(0).withInterface("127.0.0.1");

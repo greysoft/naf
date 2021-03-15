@@ -28,9 +28,9 @@ class Proxy
 	private static final String APPCONTEXTNAME = Proxy.class.getName();
 
 	private final ResolverService rslvr;
-	private final Producer<Request> prod; //receives requests from non-master Dispatchers
+	private final Producer<Request> distributedReceiver; //receives requests from non-master Dispatchers, consumer side runs in master Dispatcher
 
-	public Dispatcher getMaster() {return rslvr.getDispatcher();}
+	public Dispatcher getMasterDispatcher() {return rslvr.getDispatcher();}
 
 	// The getNamedItem() call in here is synchronised and so will synchronise our callers.
 	// Our users are long-lived objects who locate us in their constructor, so no need to be super-optimal about avoiding synchronisation here.
@@ -43,7 +43,7 @@ class Proxy
 		} else {
 			p = dsptch.getApplicationContext().getNamedItem(APPCONTEXTNAME, null);
 		}
-		dsptch.getLogger().info(LOGLABEL+": Dispatcher="+dsptch.getName()+" has latched Proxy="+(p==null?null:p.getMaster().getName()));
+		dsptch.getLogger().info(LOGLABEL+": Dispatcher="+dsptch.getName()+" has latched Proxy="+(p==null?null:p.getMasterDispatcher().getName()));
 		return () -> dsptch.getApplicationContext().getNamedItem(APPCONTEXTNAME, null);
 	}
 
@@ -51,8 +51,8 @@ class Proxy
 	{
 		dsptch.getLogger().info(LOGLABEL+": Master Dispatcher="+dsptch.getName()+" is creating Proxy");
 		rslvr = new ResolverService(dsptch, cfg);
-		prod = new Producer<>(Request.class, dsptch, this);
-		prod.start();
+		distributedReceiver = new Producer<>(Request.class, dsptch, this);
+		distributedReceiver.start();
 	}
 
 	protected void clientStarted(DistributedResolver clnt) throws java.io.IOException
@@ -82,7 +82,7 @@ class Proxy
 		}
 		Request req = clnt.allocateRequestBlock();
 		req.setQuery(caller, qtype, qname, 0, cbdata, flags);
-		prod.produce(req);
+		distributedReceiver.produce(req);
 		return null;
 	}
 
@@ -94,7 +94,7 @@ class Proxy
 		}
 		Request req = clnt.allocateRequestBlock();
 		req.setQuery(caller, qtype, null, qip, cbdata, flags);
-		prod.produce(req);
+		distributedReceiver.produce(req);
 		return null;
 	}
 
@@ -110,7 +110,7 @@ class Proxy
 	public void producerIndication(Producer<Request> p) throws java.io.IOException
 	{
 		Request req;
-		while ((req = prod.consume()) != null) {
+		while ((req = distributedReceiver.consume()) != null) {
 			issueRequest(req);
 		}
 	}

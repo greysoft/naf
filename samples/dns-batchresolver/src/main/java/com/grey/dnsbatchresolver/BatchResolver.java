@@ -9,6 +9,7 @@ import com.grey.base.utils.TimeOps;
 import com.grey.base.config.SysProps;
 import com.grey.base.config.XmlConfig;
 import com.grey.naf.dns.resolver.ResolverAnswer;
+import com.grey.naf.dns.resolver.ResolverConfig;
 import com.grey.naf.dns.resolver.ResolverDNS;
 import com.grey.naf.errors.NAFConfigException;
 
@@ -72,7 +73,12 @@ public class BatchResolver
 		java.io.OutputStream fout = System.out;
 		logger = dsptch.getLogger();
 		XmlConfig taskcfg = taskConfig();
-		resolver = getDispatcher().getResolverDNS();
+
+		// Create the DNS resolver, retrieving the existing one if any have already been defined on this Dispatcher
+		ResolverConfig rcfg = new ResolverConfig.Builder()
+				.withXmlConfig(dsptch.getApplicationContext().getConfig().getNode("dnsresolver"))
+				.build();
+		resolver = ResolverDNS.create(dsptch, rcfg);
 
 		String mode = taskcfg.getValue("dnstype", false, "A").toUpperCase();
 		batchsize = taskcfg.getInt("batchsize", false, 10);

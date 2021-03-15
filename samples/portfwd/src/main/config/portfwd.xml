@@ -1,6 +1,6 @@
 <naf>
 	<dispatchers>
-		<dispatcher name="portfwd" nafman="Y" zero_naflets="N">
+		<dispatcher name="portfwd" zero_naflets="N">
 			<naflets>
 				<naflet name="portfwd" class="com.grey.portfwd.Task">
 					<listeners>

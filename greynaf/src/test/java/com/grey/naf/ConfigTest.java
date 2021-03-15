@@ -18,7 +18,7 @@ public class ConfigTest
 		String cfgxml = "<naf>"
 				+"<baseport>"+NAFConfig.RSVPORT_ANON+"</baseport>"
 				+"<dispatchers>"
-					+"<dispatcher name=\"testdispatcher9\" nafman=\"N\" dns=\"y\">"
+					+"<dispatcher name=\"testdispatcher9\">"
 						+"<naflets>"
 							+"<naflet name=\"app1\">blah</naflet>"
 							+"<naflet name=\"app2\">blah</naflet>"
@@ -36,7 +36,6 @@ public class ConfigTest
 		org.junit.Assert.assertNotNull(dcfg);
 		DispatcherDef def = new DispatcherDef.Builder().withXmlConfig(dcfg).build();
 		org.junit.Assert.assertEquals(dname, def.getName());
-		org.junit.Assert.assertTrue(def.hasDNS());
 		org.junit.Assert.assertTrue(def.isZeroNafletsOK());
 		org.junit.Assert.assertTrue(def.isSurviveHandlers());
 		org.junit.Assert.assertEquals(2, nafletsConfig.length);
@@ -62,7 +61,6 @@ public class ConfigTest
 	private static void verifyConfig(DispatcherDef def, String dname)
 	{
 		org.junit.Assert.assertEquals(dname, def.getName());
-		org.junit.Assert.assertFalse(def.hasDNS());
 		org.junit.Assert.assertTrue(def.isZeroNafletsOK());
 		org.junit.Assert.assertFalse(def.isSurviveHandlers());
 	}

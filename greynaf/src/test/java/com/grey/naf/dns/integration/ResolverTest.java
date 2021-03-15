@@ -16,8 +16,10 @@ import com.grey.base.utils.FileOps;
 import com.grey.base.utils.TimeOps;
 import com.grey.base.utils.IP;
 import com.grey.naf.ApplicationContextNAF;
+import com.grey.naf.DispatcherDef;
 import com.grey.naf.NAFConfig;
 import com.grey.naf.dns.resolver.ResolverAnswer;
+import com.grey.naf.dns.resolver.ResolverConfig;
 import com.grey.naf.dns.resolver.ResolverDNS;
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.TimerNAF;
@@ -140,7 +142,7 @@ public class ResolverTest
 	{
 		//Specify a bad port because we're not interested in reponses, and don't want to spam an actual server
 		Dispatcher dsptch = createResolver(CFG_BADSERVER);
-		ResolverDNS resolver = dsptch.getResolverDNS();
+		ResolverDNS resolver = dsptch.getNamedItem(ResolverDNS.class.getName(), null);
 
 		ByteChars bc = new ByteChars("any-old-badname.cancel");
 		resolver.resolveHostname(bc, this, null, 0);
@@ -172,8 +174,8 @@ public class ResolverTest
 		Dispatcher[] dispatchers = createDistributedResolver(CFG_BADSERVER, true);
 		Dispatcher d1 = dispatchers[0];
 		Dispatcher d2 = dispatchers[1];
-		ResolverDNS resolver1 = d1.getResolverDNS();
-		ResolverDNS resolver2 = d2.getResolverDNS();
+		ResolverDNS resolver1 = d1.getNamedItem(ResolverDNS.class.getName(), null);
+		ResolverDNS resolver2 = d2.getNamedItem(ResolverDNS.class.getName(), null);
 
 		ByteChars bc = new ByteChars("any-old-badname.canceldist");
 		int cnt = resolver2.cancel(this);
@@ -206,7 +208,7 @@ public class ResolverTest
 		String cbflags = CBFLAG_TMT;
 		cnt_dnsrequests.set(4);
 		Dispatcher dsptch = createResolver(cfgflags);
-		ResolverDNS resolver = dsptch.getResolverDNS();
+		ResolverDNS resolver = dsptch.getNamedItem(ResolverDNS.class.getName(), null);
 
 		ByteChars bc = new ByteChars(queryTargetA);
 		ResolverAnswer answer = resolver.resolveHostname(bc, this, cbflags, 0);
@@ -238,7 +240,7 @@ public class ResolverTest
 	private void execColocated(Dispatcher dsptch, Dispatcher d2) throws java.io.IOException
 	{
 		ByteChars bc = new ByteChars("noncached.no.such.domain2");
-		ResolverDNS resolver = dsptch.getResolverDNS();
+		ResolverDNS resolver = dsptch.getNamedItem(ResolverDNS.class.getName(), null);
 		ResolverAnswer answer = resolver.resolveHostname(bc, this, null, ResolverDNS.FLAG_NOQRY);
 		logger.info("UTEST: Answer for query-only: "+answer);
 		org.junit.Assert.assertEquals(ResolverAnswer.STATUS.NODOMAIN, answer.result);
@@ -264,12 +266,14 @@ public class ResolverTest
 		execColocated(dsptch, null);
 	}
 
+	// The dsptch arg is our local Dispatcher.
+	// If running a distributed resolver, then d2 is the other Dispatcher and is the master if remote_resolver is true
 	private void execDNS(Dispatcher dsptch, Dispatcher d2, boolean remote_resolver) throws java.io.IOException
 	{
 		//First test a few Resolver calls that should not even get sent to the resolver service
 		ByteChars bc = new ByteChars("101.25.32.1"); //any old IP
 		int ip = IP.convertDottedIP(bc);
-		ResolverDNS resolver = dsptch.getResolverDNS();
+		ResolverDNS resolver = dsptch.getNamedItem(ResolverDNS.class.getName(), null);
 		ResolverAnswer answer = resolver.resolveHostname(bc, this, null, 0);
 		assertAnswer(ResolverAnswer.STATUS.OK, ResolverDNS.QTYPE_A, ip, answer);
 
@@ -342,7 +346,7 @@ public class ResolverTest
 			exp_sts = ResolverAnswer.STATUS.NODOMAIN;
 		}
 		ResolverAnswer.STATUS exp_sts2 = (exp_sts == ResolverAnswer.STATUS.TIMEOUT ? ResolverAnswer.STATUS.NODOMAIN : exp_sts);
-		ResolverDNS resolver = dsptch.getResolverDNS();
+		ResolverDNS resolver = dsptch.getNamedItem(ResolverDNS.class.getName(), null);
 		logger.info("UTEST: utest.dnsResolved="+cnt_dnscallbacks.get()+"/"+cnt_dnsrequests.get()+": "+answer+" - cbdata="+cbdata);
 
 		if (answer.qtype == ResolverDNS.QTYPE_PTR) {
@@ -411,13 +415,15 @@ public class ResolverTest
 		Class<?> clss_resolver = com.grey.naf.dns.resolver.embedded.EmbeddedResolver.class;
 		com.grey.naf.NAFConfig nafcfg = setConfig(null, clss_resolver, flags);
 		ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, nafcfg, true);
-		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
+		DispatcherDef def = new DispatcherDef.Builder()
 				.withName(dispatcher_name)
-				.withDNS(true)
 				.withSurviveHandlers(false)
 				.build();
+		ResolverConfig rcfg = new ResolverConfig.Builder()
+				.withXmlConfig(nafcfg.getNode("dnsresolver"))
+				.build();
 		Dispatcher dsptch = Dispatcher.create(appctx, def, logger);
-		org.junit.Assert.assertEquals(clss_resolver, dsptch.getResolverDNS().getClass());
+		ResolverDNS.create(dsptch, rcfg);
 		return dsptch;
 	}
 
@@ -438,18 +444,25 @@ public class ResolverTest
 			d2name = dispatcher_name+"_master";
 			nafcfg = setConfig(d2name, clss_resolver, flags);
 		}
-		//we need NAFMAN to propagate the dsptch.stop() in handleDnsResult() to the other Dispatcher
+		//we need NAFMAN (enabled by default) to propagate the dsptch.stop() in handleDnsResult() to the other Dispatcher
 		ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, nafcfg, true);
-		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
+		DispatcherDef def = new DispatcherDef.Builder()
 				.withName(d1name)
-				.withDNS(true)
 				.withSurviveHandlers(false)
 				.build();
+		ResolverConfig rcfg = new ResolverConfig.Builder()
+				.withXmlConfig(nafcfg.getNode("dnsresolver"))
+				.build();
 		Dispatcher d1 = Dispatcher.create(appctx, def, logger);
-		def = new com.grey.naf.DispatcherDef.Builder(def).withName(d2name).build();
+		def = new DispatcherDef.Builder(def).withName(d2name).build();
 		Dispatcher d2 = Dispatcher.create(appctx, def, logger);
-		org.junit.Assert.assertEquals(clss_resolver, d1.getResolverDNS().getClass());
-		org.junit.Assert.assertEquals(clss_resolver, d2.getResolverDNS().getClass());
+		if (local_master) { //first resolver to be created becomes the master
+			ResolverDNS.create(d1, rcfg);
+			ResolverDNS.create(d2, rcfg);
+		} else {
+			ResolverDNS.create(d2, rcfg);
+			ResolverDNS.create(d1, rcfg);
+		}
 		return new Dispatcher[]{d1, d2};
 	}
 
@@ -536,7 +549,7 @@ public class ResolverTest
 		// We can't actually verify it happens though (short of examining the Resolver's debug traces).
 		private void issueQuery(Dispatcher d, CharSequence qname, int qtype, String cbdata, boolean nopiggy) throws java.io.IOException
 		{
-			ResolverDNS resolver = d.getResolverDNS();
+			ResolverDNS resolver = d.getNamedItem(ResolverDNS.class.getName(), null);
 			ResolverAnswer answer;
 			if (qtype == ResolverDNS.QTYPE_A) {
 				ByteChars bc = new ByteChars(qname);

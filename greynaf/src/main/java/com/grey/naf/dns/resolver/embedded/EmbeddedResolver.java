@@ -6,6 +6,7 @@ package com.grey.naf.dns.resolver.embedded;
 
 import com.grey.naf.dns.resolver.ResolverConfig;
 import com.grey.naf.dns.resolver.ResolverService;
+import com.grey.naf.reactor.Dispatcher;
 
 /**
  * This class provides a ResolverDNS API to create and access a resolver engine in the same Dispatcher thread.
@@ -15,11 +16,18 @@ public class EmbeddedResolver
 {
 	private final com.grey.naf.dns.resolver.ResolverService rslvr;
 
+	@Override
+	public Dispatcher getMasterDispatcher() {return rslvr.getDispatcher();}
+
+	/**
+	 * Applications should call ResolverDNS.create() rather than this, as that sets it up for execution within a Dispatcher
+	 */
 	public EmbeddedResolver(com.grey.naf.reactor.Dispatcher dsptch, ResolverConfig config)
 			throws java.io.IOException, javax.naming.NamingException
 	{
 		super(dsptch);
 		rslvr = new ResolverService(dsptch, config);
+		dsptch.getLogger().info("Created embedded DNS-resolver in Dispatcher="+dsptch.getName());
 	}
 
 	@Override

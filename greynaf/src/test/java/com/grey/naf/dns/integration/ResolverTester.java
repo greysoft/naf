@@ -388,8 +388,9 @@ public class ResolverTester
 			return DynLoader.getField(r, "rslvr");
 		}
 		if (r.getClass() == com.grey.naf.dns.resolver.distributed.DistributedResolver.class) {
-			Object proxy = DynLoader.getField(r, "proxy");
+			Object proxy = DynLoader.getField(r, "proxyRef");
 			if (proxy == null) return null;
+			proxy = DynLoader.getField(proxy, "proxy");
 			return DynLoader.getField(proxy, "rslvr");
 		}
 		throw new UnsupportedOperationException("Unrecognised Resolver type="+r.getClass().getName());

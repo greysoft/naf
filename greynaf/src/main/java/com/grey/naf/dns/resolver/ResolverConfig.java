@@ -12,6 +12,8 @@ import com.grey.base.config.SysProps;
 import com.grey.base.utils.TSAP;
 import com.grey.base.utils.TimeOps;
 import com.grey.base.config.XmlConfig;
+import com.grey.naf.dns.resolver.distributed.DistributedResolver;
+import com.grey.naf.dns.resolver.embedded.EmbeddedResolver;
 import com.grey.naf.errors.NAFConfigException;
 
 public class ResolverConfig
@@ -67,6 +69,10 @@ public class ResolverConfig
 	private final int nsMaxRR; //the max no. of answer RRs to return for an MX query - zero means return all
 	private final int mxMaxRR; //the max no. of answer RRs to return for an NS query - zero means return all
 
+	// The above fields are all for the resolver engine config, but these 2 are for its ResolverDNS API
+	private final boolean distributed;
+	private final String distributedMaster;
+
 	public ResolverConfig(Builder bldr) throws UnknownHostException {
 		recursive = bldr.recursive;
 		localNameServers = bldr.localNameServers;
@@ -94,6 +100,8 @@ public class ResolverConfig
 		dumpOnExit = bldr.dumpOnExit;
 		nsMaxRR = bldr.nsMaxRR;
 		mxMaxRR = bldr.mxMaxRR;
+		distributed = bldr.distributed;
+		distributedMaster = bldr.distributedMaster;
 
 		if (recursive) {
 			pathnameRootServers = null;
@@ -230,6 +238,14 @@ public class ResolverConfig
 		return cacheHiWaterMX;
 	}
 
+	public boolean isPartialPrune() {
+		return partialPrune;
+	}
+
+	public boolean isDumpOnExit() {
+		return dumpOnExit;
+	}
+
 	public int getNsMaxRR() {
 		return nsMaxRR;
 	}
@@ -238,12 +254,12 @@ public class ResolverConfig
 		return mxMaxRR;
 	}
 
-	public boolean isPartialPrune() {
-		return partialPrune;
+	public boolean isDistributed() {
+		return distributed;
 	}
 
-	public boolean isDumpOnExit() {
-		return dumpOnExit;
+	public String getDistributedMaster() {
+		return distributedMaster;
 	}
 
 
@@ -280,6 +296,8 @@ public class ResolverConfig
 		private boolean dumpOnExit;
 		private int nsMaxRR;
 		private int mxMaxRR;
+		private boolean distributed = true;
+		private String distributedMaster;
 
 		public Builder withXmlConfig(XmlConfig cfg) {
 			String srvlist = (localNameServers == null ? null : String.join("|", Arrays.asList(localNameServers)));
@@ -311,10 +329,20 @@ public class ResolverConfig
 			cacheLoWaterNS = getLowater(cfg, "cache_ns/@lowater", cacheHiWaterNS);
 			cacheHiWaterMX = cfg.getInt("cache_mx/@hiwater", false, cacheHiWaterMX);
 			cacheLoWaterMX = getLowater(cfg, "cache_mx/@lowater", cacheHiWaterMX);
-			nsMaxRR = cfg.getInt("cache_ns/@maxrr", false, nsMaxRR);
-			mxMaxRR = cfg.getInt("cache_mx/@maxrr", false, mxMaxRR);
 			partialPrune = cfg.getBool("@partialprune", partialPrune);
 			dumpOnExit = cfg.getBool("@exitdump", dumpOnExit);
+			nsMaxRR = cfg.getInt("cache_ns/@maxrr", false, nsMaxRR);
+			mxMaxRR = cfg.getInt("cache_mx/@maxrr", false, mxMaxRR);
+
+			String resolverClass = cfg.getValue("@class", false, null);
+			if (DistributedResolver.class.getName().equals(resolverClass)) {
+				distributed = true;
+			} else if (EmbeddedResolver.class.getName().equals(resolverClass)) {
+				distributed = false;
+			} else if (resolverClass != null) {
+				throw new NAFConfigException("Unrecognised ResolverDNS class="+resolverClass);
+			}
+			distributedMaster = cfg.getValue("@master", false, distributedMaster);
 			return this;
 		}
 
@@ -474,6 +502,16 @@ public class ResolverConfig
 					.withCacheLoWaterSOA(v);
 		}
 
+		public Builder withPartialPrune(boolean v) {
+			partialPrune = v;
+			return this;
+		}
+
+		public Builder withDumpOnExit(boolean v) {
+			dumpOnExit = v;
+			return this;
+		}
+
 		public Builder withNsMaxRR(int v) {
 			nsMaxRR = v;
 			return this;
@@ -484,13 +522,13 @@ public class ResolverConfig
 			return this;
 		}
 
-		public Builder withDumpOnExit(boolean v) {
-			dumpOnExit = v;
+		public Builder withDistributed(boolean v) {
+			distributed = v;
 			return this;
 		}
 
-		public Builder withPartialPrune(boolean v) {
-			partialPrune = v;
+		public Builder withDistributedMaster(String v) {
+			distributedMaster = v;
 			return this;
 		}
 

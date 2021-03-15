@@ -300,9 +300,10 @@ Creates a JCL logger with the same name as the GreyLog logger.
 <br/> <br/>
 The net effect is that the calling code will still be using a GreyLog logger instance
 (ie. of type <span class="compcode">com.grey.logging.Logger</span>)
-but all log messages will be forwarded to the external SLF4J or JCL logger.
+but all log messages will be forwarded to an SLF4J or JCL logger
 <br/>
 If you already manage and configure all your logging via another framework, this allows GreyLog users to tap into that without changing any Java code.
+<br/>
 Simply modify the
 <span class="pathname">logging.xml</span>
 config file (or specify the logger class via the
@@ -320,7 +321,7 @@ environment variable) and the GreyLog logger becomes part of the external loggin
 </h2>
 
 <p>
-This section is the reverse of the above, and describes how external facades such as SLF4J, JCL and JUL can be redirected to GreyLog.
+This section is the reverse of the above, and describes how external facades such as SLF4J, JCL and JUL can have their logs redirected to GreyLog.
 <br/>
 As such, this is not relevant to NAF, which invokes the GreyLog framework directly, but it allows GreyLog to be transparently plugged into non-NAF code, or any code which doesn't have static (compile-time) bindings to GreyLog.
 
