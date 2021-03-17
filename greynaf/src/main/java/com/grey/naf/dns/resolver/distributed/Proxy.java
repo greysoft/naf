@@ -60,8 +60,7 @@ class Proxy
 	{
 		dsptch.getLogger().info(LOGLABEL+": Master Dispatcher="+dsptch.getName()+" is creating Proxy");
 		rslvr = new ResolverService(dsptch, cfg);
-		distributedReceiver = new Producer<>(Request.class, dsptch, this);
-		distributedReceiver.start();
+		distributedReceiver = new Producer<>("DNS-distrib-proxyreq", Request.class, dsptch, this);
 	}
 
 	protected void clientStarted(DistributedResolver clnt) throws java.io.IOException
@@ -70,6 +69,7 @@ class Proxy
 		if (clnt.getDispatcher() == rslvr.getDispatcher()) {
 			// this is the Master, so start Resolver within its thread
 			rslvr.start();
+			distributedReceiver.startDispatcherRunnable();
 		}
 	}
 
@@ -77,7 +77,8 @@ class Proxy
 	{
 		clnt.getDispatcher().getLogger().info(LOGLABEL+": Client="+clnt+" has stopped - master="+rslvr.getDispatcher().getName());
 		if (clnt.getDispatcher() == rslvr.getDispatcher()) {
-			// The master Dispatcher is shutting down.
+			// The master Dispatcher is shutting down
+			distributedReceiver.stopDispatcherRunnable();
 			rslvr.stop();
 			clnt.getDispatcher().getApplicationContext().removeNamedItem(APPCONTEXTNAME);
 		}
@@ -131,7 +132,7 @@ class Proxy
 		try {
 			requestResolved(req, answer);
 		} catch (Exception ex) {
-			d.getLogger().log(LEVEL.ERR, ex, true, LOGLABEL+": Failed on answer="+answer+" for client-dispatcher="+req.client.getDispatcher().getName());
+			d.getLogger().log(LEVEL.ERR, ex, true, LOGLABEL+": Failed on answer="+answer+" for client-dispatcher="+req.issuer.getDispatcher().getName());
 		}
 	}
 
@@ -149,6 +150,6 @@ class Proxy
 	private void requestResolved(Request req, ResolverAnswer answer) throws java.io.IOException
 	{
 		req.setResponse(answer);
-		req.client.produce(req);
+		req.issuer.issueResponse(req);
 	}
 }

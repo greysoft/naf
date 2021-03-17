@@ -25,7 +25,7 @@ public class DistributedResolver
 	extends ResolverDNS
 	implements Producer.Consumer<Request>
 {
-	private final Producer<Request> proxyReceiver; //receives responses from Proxy, if we're not the master Dispatcher
+	private final Producer<Request> proxyReceiver; //receives responses from Proxy, is null if we're the master Dispatcher
 	private final HashedSet<ResolverDNS.Client> cancelledCallers;
 	private final ObjectWell<Request> reqPool;
 	private final ProxyReference proxyRef;
@@ -43,10 +43,9 @@ public class DistributedResolver
 		if (getMasterDispatcher() != dsptch) {
 			// the resolver engine is not running in this thread, so we will access it via the Producer's message-passing API
 			cancelledCallers = new HashedSet<>();
-			proxyReceiver = new Producer<>(Request.class, dsptch, this);
-			RequestFactory factory = new RequestFactory(proxyReceiver);
+			proxyReceiver = new Producer<>("DNS-distrib-proxyrsp", Request.class, dsptch, this);
+			RequestFactory factory = new RequestFactory(this);
 			reqPool = new ObjectWell<>(Request.class, factory, "DNS_Client_"+dsptch.getName(), 0, 0, 1);
-			proxyReceiver.start();
 		} else {
 			// the resolver engine is running in this thread, so we will invoke it directly
 			proxyReceiver = null;
@@ -63,16 +62,19 @@ public class DistributedResolver
 
 	// This is called in the Dispatcher thread, and we will be running within that thread from now on
 	@Override
-	public void start() throws java.io.IOException {
+	public void startDispatcherRunnable() throws java.io.IOException {
 		Proxy proxy = getProxy();
 		if (proxy == null) throw new NAFConfigException("Client="+this+" starting before Proxy exists");
 		proxy.clientStarted(this);
+		if (proxyReceiver != null) proxyReceiver.startDispatcherRunnable();
 	}
 
 	@Override
-	public void stop() {
+	public boolean stopDispatcherRunnable() {
 		Proxy proxy = getProxy();
 		if (proxy != null) proxy.clientStopped(this);
+		if (proxyReceiver != null) proxyReceiver.stopDispatcherRunnable();
+		return true;
 	}
 
 	@Override
@@ -110,6 +112,10 @@ public class DistributedResolver
 		}
 	}
 
+	public void issueResponse(Request req) throws java.io.IOException {
+		proxyReceiver.produce(req);
+	}
+
 	Request allocateRequestBlock() {
 		synchronized (reqPool) {
 			return reqPool.extract();
@@ -125,15 +131,15 @@ public class DistributedResolver
 	public static final class RequestFactory
 		implements ObjectWell.ObjectFactory
 	{
-		private final Producer<Request> prod;
+		private final DistributedResolver resolver;
 
-		public RequestFactory(Producer<Request> prod) {
-			this.prod = prod;
+		public RequestFactory(DistributedResolver resolver) {
+			this.resolver = resolver;
 		}
 
 		@Override
 		public Request factory_create() {
-			return new Request(prod);
+			return new Request(resolver);
 		}
 	}
 

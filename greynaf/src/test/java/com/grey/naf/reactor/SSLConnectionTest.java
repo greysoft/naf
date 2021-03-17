@@ -162,7 +162,7 @@ public class SSLConnectionTest
 		if (lset) {
 			ConcurrentListenerConfig[] lcfg = ConcurrentListenerConfig.buildMultiConfig(lname, appctx.getConfig(), "listeners/listener", srvcfg, 0, 0, TestServerFactory.class, null);
 			listeners = new ListenerSet(lname, dsptch, this, this, lcfg);
-			listeners.start();
+			listeners.start(false);
 			org.junit.Assert.assertEquals(1, listeners.configured());
 			org.junit.Assert.assertEquals(1, listeners.count());
 			srvport = listeners.getListener(0).getPort();
@@ -176,7 +176,7 @@ public class SSLConnectionTest
 			lstnr = ConcurrentListener.create(dsptch, this, this, lcfg);
 			srvport = lstnr.getPort();
 			lstnr.setReporter(this);
-			lstnr.start();
+			dsptch.loadRunnable(lstnr);
 		}
 
 		// set up the client component
@@ -190,8 +190,7 @@ public class SSLConnectionTest
 
 		// set up a no-op Naflet which simply goes through the motions
 		ctask = new SSLTask("utest_sslc", dsptch);
-		dsptch.loadNaflet(ctask);
-		org.junit.Assert.assertTrue(ctask.started);
+		dsptch.loadRunnable(ctask);
 
 		// launch
 		dsptch.start(); //Dispatcher launches in separate thread
@@ -242,10 +241,7 @@ public class SSLConnectionTest
 		if (listeners != null) {
 			org.junit.Assert.assertEquals(1, listeners.configured());
 			org.junit.Assert.assertEquals(0, listeners.count());
-			boolean done = listeners.stop();
-			org.junit.Assert.assertTrue(done);
-		} else {
-			boolean done = lstnr.stop(true);
+			boolean done = listeners.stop(true);
 			org.junit.Assert.assertTrue(done);
 		}
 
@@ -299,7 +295,7 @@ public class SSLConnectionTest
 
 	@Override
 	public void timerIndication(TimerNAF tmr, Dispatcher d) throws java.io.IOException {
-		boolean done = ctask.stop();
+		boolean done = ctask.stopDispatcherRunnable();
 		org.junit.Assert.assertTrue(done);
 	}
 
@@ -320,17 +316,11 @@ public class SSLConnectionTest
 	private static class SSLTask
 		extends com.grey.naf.Naflet
 	{
-		public boolean started;
 		public boolean stopped;
 
 		public SSLTask(String name, Dispatcher dsptch)
 				throws java.io.IOException {
 			super(name, dsptch, null);
-		}
-
-		@Override
-		protected void startNaflet() throws java.io.IOException {
-			started = true;
 		}
 
 		@Override

@@ -274,7 +274,7 @@ public abstract class ChannelMonitor
 				sb.setLength(prevlen);
 				return sb;
 			}
-			sb.append("Producer/").append(((Producer.AlertsPipe<?>)this).getProducer().consumerType);
+			sb.append("Producer/").append(((Producer.AlertsPipe<?>)this).getProducer().getName());
 		} else {
 			if (this instanceof CM_UDP) {
 				sb.append("UDP/");

@@ -85,7 +85,7 @@ class NafManResource
 			xslproc.transform(istrm, ostrm);
 		} catch (Throwable ex) {
 			//have observed XSL processor getting stuck on next call after out-of-mem errors
-			String errmsg = "XSLT transform failed for resource="+def.name+"- "+ex;
+			String errmsg = "XSLT transform failed for resource="+def.name+" - "+new String(indata)+" - "+ex;
 			try {
 				createXSL();
 			} catch (Throwable ex2) {

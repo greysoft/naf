@@ -23,8 +23,10 @@ public class Task
 	private final java.util.ArrayList<Relay> active = new java.util.ArrayList<>();
 	private final ListenerSet listeners;
 
-	public Task(String name, Dispatcher dsptch, XmlConfig cfg) throws java.io.IOException
-	{
+	@Override
+	public CharSequence nafmanHandlerID() {return getName();}
+
+	public Task(String name, Dispatcher dsptch, XmlConfig cfg) throws java.io.IOException {
 		super(name, dsptch, cfg);
 		String lname = "Task="+getName();
 		NAFConfig nafcfg = dsptch.getApplicationContext().getConfig();
@@ -37,28 +39,24 @@ public class Task
 	}
 
 	@Override
-	protected void startNaflet() throws java.io.IOException
-	{
+	protected void startNaflet() throws java.io.IOException {
 		getDispatcher().getLogger().info("Loaded JARs: "+com.grey.base.utils.PkgInfo.getLoadedJARs());
-		listeners.start();
+		listeners.start(true);
 	}
 
 	@Override
-	protected boolean stopNaflet()
-	{
-		return listeners.stop();
+	protected boolean stopNaflet() {
+		return listeners.stop(true);
 	}
 
 	@Override
-	public void entityStopped(Object obj)
-	{
+	public void entityStopped(Object obj) {
 		ListenerSet.class.cast(obj); //can only be our ListenerSet, but do a cast to assert that
 		nafletStopped();
 	}
 
 	@Override
-	public CharSequence handleNAFManCommand(NafManCommand cmd)
-	{
+	public CharSequence handleNAFManCommand(NafManCommand cmd) {
 		StringBuilder sb = new StringBuilder(512);
 
 		if (cmd.getCommandDef().code.equals(CMD_SHOWCONNS)) {
@@ -77,17 +75,12 @@ public class Task
 		}
 		return sb;
 	}
-	
-	@Override
-	public CharSequence nafmanHandlerID() {return getName();}
 
-	public void connectionStarted(Relay relay)
-	{
+	public void connectionStarted(Relay relay) {
 		active.add(relay);
 	}
 
-	public void connectionEnded(Relay relay)
-	{
+	public void connectionEnded(Relay relay) {
 		active.remove(relay);
 	}
 }

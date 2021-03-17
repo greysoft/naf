@@ -50,7 +50,7 @@ public class IterativeListenerTest
 		TestServer srvr = (TestServer)lstnr.getConnectionHandler();
 		org.junit.Assert.assertEquals(TestServer.class, srvr.getClass());
 		org.junit.Assert.assertEquals(TestServer.class, lstnr.getServerType());
-		lstnr.start();
+		dsptch.loadRunnable(lstnr);
 
 		for (int idx = 0; idx != clients.length; idx++) {
 			clients[idx] = new java.net.Socket("127.0.0.1", lstnr.getPort());
@@ -76,9 +76,8 @@ public class IterativeListenerTest
 		org.junit.Assert.assertTrue(dsptch.completedOK());
 		org.junit.Assert.assertTrue(srvr.completed);
 		org.junit.Assert.assertEquals(clients.length, srvr.conncount);
+		org.junit.Assert.assertEquals(0, srvr.opencount);
 		org.junit.Assert.assertEquals(1, reapcnt);
-		boolean done = lstnr.stop();
-		org.junit.Assert.assertTrue(done);
 	}
 
 	@Override

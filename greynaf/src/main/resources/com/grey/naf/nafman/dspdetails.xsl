@@ -115,9 +115,9 @@
 				<xsl:when test="$nodename='Disposition'">
 					<xsl:copy-of select="* | text()"/>
 				</xsl:when>
-				<xsl:when test="$nodename='NAFlets'">
+				<xsl:when test="$nodename='NAFlets' or $nodename='Runnables' or $nodename='Named Items'">
 					<ul>
-						<xsl:apply-templates select="item" mode="infonode-naflets"/>
+						<xsl:apply-templates select="item" mode="infonode-namedlist"/>
 					</ul>
 				</xsl:when>
 				<xsl:otherwise>
@@ -134,7 +134,7 @@
 	</tr>
 </xsl:template>
 
-<xsl:template match="item" mode="infonode-naflets">
+<xsl:template match="item" mode="infonode-namedlist">
 	<li>
 		Name: <xsl:value-of select="@id"/>
 		<br/>

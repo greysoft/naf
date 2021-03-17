@@ -16,6 +16,7 @@ public class NafManClient
 {
 	public static String submitCommand(String cmd, String host, int port, com.grey.logging.Logger logger) throws java.io.IOException
 	{
+		if (cmd == null || cmd.trim().isEmpty() || cmd.trim().equals("-")) cmd = "";
 		if (host == null) host = "127.0.0.1";
 		String httpreq = "GET /"+cmd+" HTTP/1.1\n\n";
 		ByteArrayOutputStream response = new ByteArrayOutputStream();

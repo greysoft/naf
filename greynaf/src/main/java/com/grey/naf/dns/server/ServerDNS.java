@@ -66,7 +66,7 @@ public class ServerDNS
 
 	public void start() throws java.io.IOException
 	{
-		listener_tcp.start();
+		listener_tcp.startDispatcherRunnable();
 		transport_udp.start();
 		dsptch.registerReaper(handlers);
 		dsptch.start();
@@ -80,7 +80,7 @@ public class ServerDNS
 	void dispatcherStopped()
 	{
 		transport_udp.stop();
-		listener_tcp.stop();
+		listener_tcp.stopDispatcherRunnable();
 	}
 
 	// NB: No need to defend against buffer overflow during query decoding, as Dispatcher will simply catch and log the

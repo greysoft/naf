@@ -14,12 +14,13 @@ import com.grey.naf.dns.resolver.distributed.DistributedResolver;
 import com.grey.naf.dns.resolver.embedded.EmbeddedResolver;
 import com.grey.naf.errors.NAFConfigException;
 import com.grey.naf.reactor.Dispatcher;
+import com.grey.naf.reactor.DispatcherRunnable;
 
 /**
  * This class represents a DNS-Resolver API for NAF applications, ie. applications running in the context of a Dispatcher.
  * External clients should use DNSClient as their resolver API.
  */
-public abstract class ResolverDNS
+public abstract class ResolverDNS implements DispatcherRunnable
 {
 	// This interface should be implemented by all users of the DNS-Resolver API and allows them to receive responses
 	public interface Client
@@ -59,14 +60,15 @@ public abstract class ResolverDNS
 	public static String getQTYPE(int qtype) {return qtype_txt[qtype & 0xff];}
 
 	abstract public Dispatcher getMasterDispatcher();
-	abstract public void start() throws java.io.IOException;
-	abstract public void stop();
 	abstract public int cancel(Client caller) throws java.io.IOException;
 	abstract protected ResolverAnswer resolve(byte qtype, ByteChars qname, Client caller,
 			Object cbdata, int flags) throws java.io.IOException;
 	abstract protected ResolverAnswer resolve(byte qtype, int qip, Client caller, Object cbdata, int flags) throws java.io.IOException;
 
 	private final Dispatcher dsptch;
+	@Override
+	public String getName() {return "DNS-Resolver";}
+	@Override
 	public Dispatcher getDispatcher() {return dsptch;}
 
 	// these are just temporary work areas, pre-allocated for efficiency
@@ -79,7 +81,7 @@ public abstract class ResolverDNS
 			ResolverDNS r = null;
 			try {
 				r = (config.isDistributed() ? new DistributedResolver(d, config) : new EmbeddedResolver(d, config));
-				r.start();
+				d.loadRunnable(r);
 			} catch (Exception ex) {
 				throw new NAFConfigException("Failed to start DNS-Resolver="+r+" for Dispatcher="+d.getName()+" with distributed="+config.isDistributed(), ex);
 			}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2019 Yusef Badri - All rights reserved.
+ * Copyright 2011-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -21,13 +21,13 @@ import com.grey.logging.Logger.LEVEL;
  * Dispatcher (which acts as its consumer) rather than a mechanism by which the Dispatcher acts as a
  * producer.
  */
-public class Producer<T>
+public class Producer<T> implements DispatcherRunnable
 {
 	public interface Consumer<T> {
 		void producerIndication(Producer<T> p) throws java.io.IOException;
 	}
 
-	public final String consumerType; //this is purely descriptive
+	private final String name;
 	private final Consumer<T> consumer;
 	private final Circulist<T> exchgq;  //MT queue, on which Dispatcher receives items from producer
 	private final Circulist<T> availq;  //non-MT staging queue, only accessed by the Dispatcher
@@ -35,19 +35,24 @@ public class Producer<T>
 	private final com.grey.logging.Logger logger;
 	private boolean in_shutdown;
 
+	@Override
+	public String getName() {return name;}
+	@Override
 	public Dispatcher getDispatcher() {return alertspipe.getDispatcher();}
-	public void shutdown() {shutdown(false);}
+	@Override
+	public boolean stopDispatcherRunnable() {shutdown(false); return true;}
 
-	public Producer(Class<T> clss, Dispatcher dsptch, Consumer<T> cons) throws java.io.IOException {
-		consumer = cons;
-		consumerType = consumer.getClass().getName()+"/"+clss.getName();
-		exchgq = new Circulist<T>(clss);
-		availq = new Circulist<T>(clss);
+	public Producer(String producerName, Class<T> itemClass, Dispatcher dsptch, Consumer<T> itemConsumer) throws java.io.IOException {
+		name = producerName+"/"+itemClass.getName();
+		consumer = itemConsumer;
+		exchgq = new Circulist<T>(itemClass);
+		availq = new Circulist<T>(itemClass);
 		alertspipe = new AlertsPipe<T>(dsptch, this);
 		logger = dsptch.getLogger();
 	}
-	
-	public void start() throws java.io.IOException {
+
+	@Override
+	public void startDispatcherRunnable() throws java.io.IOException {
 		logger.info("Dispatcher="+getDispatcher().getName()+" starting Producer="+this);
 		alertspipe.start();
 	}
@@ -125,7 +130,7 @@ public class Producer<T>
 	// If exchgq already had unconsumed items on it, then we assume the owner Dispatcher has already been signalled,
 	// so we can skip the I/O cost of sending it a redundant signal.
 	private void produce(int exchq_prevsize) throws java.io.IOException {
-		if (getDispatcher().inThread()) {
+		if (getDispatcher().inDispatcherThread()) {
 			producerEvent(); //we can synchronously call the Consumer
 		} else {
 			if (exchq_prevsize == 0) alertspipe.signalConsumer();  //one signal is enough
@@ -154,10 +159,10 @@ public class Producer<T>
 		takePendingItems();
 		notifyConsumer();
 	}
-	
+
 	@Override
 	public String toString() {
-		return super.toString()+" Consumer="+consumerType+"/"+consumer+" - alertspipe="+alertspipe.getCMID();
+		return super.toString()+" Name="+getName()+" with consumer="+consumer.getClass().getName()+"/"+consumer+" - alertspipe="+alertspipe.getCMID();
 	}
 
 
@@ -167,9 +172,7 @@ public class Producer<T>
 	 * This ChannelMonitor receives I/O indications from the Producer thread(s).
 	 * This class is non-private only because Dispatcher.dumpState() needs to be able to see it.
 	 */
-	static final class AlertsPipe<T>
-		extends CM_Stream
-	{
+	static final class AlertsPipe<T> extends CM_Stream {
 		private final Producer<T> producer;
 		private final java.nio.channels.Pipe.SinkChannel wep;   //Write end-point of pipe
 		private final java.nio.channels.Pipe.SourceChannel rep; //Read end-point of pipe

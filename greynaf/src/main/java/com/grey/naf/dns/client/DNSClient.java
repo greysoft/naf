@@ -25,13 +25,13 @@ public class DNSClient
 		dsptch = resolver.getMasterDispatcher();
 		asyncCallback = cb;
 		RequestHandler reqHandler = new RequestHandler(resolver);
-		reqSubmitter = new Producer<RequestBlock>(RequestBlock.class, dsptch, reqHandler);
-		dsptch.loadProducer(reqSubmitter);
+		reqSubmitter = new Producer<RequestBlock>("DNS-Client-reqs", RequestBlock.class, dsptch, reqHandler);
+		dsptch.loadRunnable(reqSubmitter);
 	}
 
 	// Can be called from any thread and is safe to call multiple times.
 	public void shutdown() throws java.io.IOException {
-		dsptch.unloadProducer(reqSubmitter);
+		dsptch.unloadRunnable(reqSubmitter);
 	}
 
 	public ResolverAnswer resolveHostname(CharSequence hostname) throws java.io.IOException {

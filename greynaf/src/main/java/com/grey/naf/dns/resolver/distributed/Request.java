@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2018 Yusef Badri - All rights reserved.
+ * Copyright 2012-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.resolver.distributed;
@@ -8,8 +8,8 @@ package com.grey.naf.dns.resolver.distributed;
 // is in-situ with the ResolverService object) and the secondaries.
 class Request
 {
-	// this is the reply channel to the Proxy client
-	public final com.grey.naf.reactor.Producer<Request> client;
+	// this is the resolver which issued this request
+	public final DistributedResolver issuer;
 
 	// the DNS request-response block
 	public final com.grey.naf.dns.resolver.ResolverAnswer answer = new com.grey.naf.dns.resolver.ResolverAnswer();
@@ -22,9 +22,9 @@ class Request
 	// we need this to preserve fields that can be reused while this object travels through Producer
 	private final com.grey.base.utils.ByteChars qnamebuf = new com.grey.base.utils.ByteChars();
 
-	public Request(com.grey.naf.reactor.Producer<Request> p)
+	public Request(DistributedResolver r)
 	{
-		client = p;
+		issuer = r;
 	}
 
 	public void setQuery(com.grey.naf.dns.resolver.ResolverDNS.Client caller, byte qtype,

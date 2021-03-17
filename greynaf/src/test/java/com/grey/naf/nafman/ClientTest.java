@@ -99,7 +99,6 @@ public class ClientTest
 		org.junit.Assert.assertFalse(ds2.getNafManAgent().isPrimary());
 		NafManClient.submitCommand(stopcmd.code+"?"+NafManCommand.ATTR_DISPATCHER+"="+ds2.getName(), null, ds1.getNafManAgent().getPort(), logger);
 		waitStopped(ds2);
-		org.junit.Assert.assertFalse(ds2.isRunning());
 		com.grey.naf.reactor.TimerNAF.sleep(100);
 		org.junit.Assert.assertTrue(dp.isRunning());
 		org.junit.Assert.assertTrue(ds1.isRunning());
@@ -108,7 +107,7 @@ public class ClientTest
 		waitStopped(ds1);
 	}
 
-	// Just exercise the code for various commands. All we're looking for is that it doesn't crash ...
+	// Just exercise the code for various commands. All we're looking for is rough evidence of responsiveness.
 	@org.junit.Test
 	public void testCommands() throws java.io.IOException
 	{
@@ -122,20 +121,39 @@ public class ClientTest
 		Dispatcher dsptch = Dispatcher.create(appctx, def, logger);
 		dsptch.start();
 		int port = dsptch.getNafManAgent().getPort();
-		NafManClient.submitCommand(reg.getCommand(NafManRegistry.CMD_DLIST).code, null, port, dsptch.getLogger());
-		NafManClient.submitCommand(reg.getCommand(NafManRegistry.CMD_DSHOW).code, null, port, dsptch.getLogger());
-		NafManClient.submitCommand(reg.getCommand(NafManRegistry.CMD_FLUSH).code, null, port, dsptch.getLogger());
-		NafManClient.submitCommand(reg.getCommand(NafManRegistry.CMD_SHOWCMDS).code, null, port, dsptch.getLogger());
-		NafManClient.submitCommand(reg.getCommand(NafManRegistry.CMD_APPSTOP).code, null, port, dsptch.getLogger()); //missing args
+
+		String rsp = NafManClient.submitCommand(null, null, port, dsptch.getLogger()); //home page
+		org.junit.Assert.assertTrue(rsp, rsp.startsWith("HTTP/1.1 200 OK"));
+		rsp = NafManClient.submitCommand(reg.getCommand(NafManRegistry.CMD_DLIST).code, null, port, dsptch.getLogger());
+		org.junit.Assert.assertTrue(rsp, rsp.startsWith("HTTP/1.1 200 OK"));
+		rsp = NafManClient.submitCommand(reg.getCommand(NafManRegistry.CMD_DSHOW).code, null, port, dsptch.getLogger());
+		org.junit.Assert.assertTrue(rsp, rsp.startsWith("HTTP/1.1 200 OK"));
+		rsp = NafManClient.submitCommand(reg.getCommand(NafManRegistry.CMD_FLUSH).code, null, port, dsptch.getLogger());
+		org.junit.Assert.assertTrue(rsp, rsp.startsWith("HTTP/1.1 200 OK"));
+		rsp = NafManClient.submitCommand(reg.getCommand(NafManRegistry.CMD_SHOWCMDS).code, null, port, dsptch.getLogger());
+		org.junit.Assert.assertTrue(rsp, rsp.startsWith("HTTP/1.1 200 OK"));
+		rsp = NafManClient.submitCommand(reg.getCommand(NafManRegistry.CMD_APPSTOP).code, null, port, dsptch.getLogger()); //missing args
+		org.junit.Assert.assertTrue(rsp, rsp.startsWith("HTTP/1.1 200 OK"));
+
 		String cmd = NafManRegistry.CMD_APPSTOP+"?"+NafManCommand.ATTR_DISPATCHER+"=no-such-disp&"+NafManCommand.ATTR_NAFLET+"=no-such-app";
-		NafManClient.submitCommand(cmd, null, port, dsptch.getLogger()); //missing args
+		rsp = NafManClient.submitCommand(cmd, null, port, dsptch.getLogger()); //missing args
+		org.junit.Assert.assertTrue(rsp, rsp.startsWith("HTTP/1.1 200 OK"));
+
 		cmd = reg.getCommand(NafManRegistry.CMD_LOGLVL).code+"?"+NafManCommand.ATTR_LOGLVL+"=";
+		rsp = NafManClient.submitCommand(cmd+"info", null, port, dsptch.getLogger());
+		org.junit.Assert.assertTrue(rsp, rsp.startsWith("HTTP/1.1 200 OK"));
+
 		Logger.LEVEL lvl = dsptch.getLogger().getLevel();
-		NafManClient.submitCommand(cmd+"info", null, port, dsptch.getLogger());
-		if (lvl != Logger.LEVEL.INFO) NafManClient.submitCommand(cmd+lvl.toString(), null, port, dsptch.getLogger());
-		NafManClient.submitCommand(cmd+"badlevel", null, port, dsptch.getLogger());
+		if (lvl != Logger.LEVEL.INFO) {
+			rsp = NafManClient.submitCommand(cmd+lvl.toString(), null, port, dsptch.getLogger());
+			org.junit.Assert.assertTrue(rsp, rsp.startsWith("HTTP/1.1 200 OK"));
+		}
+		rsp = NafManClient.submitCommand(cmd+"badlevel", null, port, dsptch.getLogger());
+		org.junit.Assert.assertTrue(rsp, rsp.startsWith("HTTP/1.1 200 OK"));
 		org.junit.Assert.assertTrue(dsptch.isRunning());
-		NafManClient.submitCommand(stopcmd.code, null, port, dsptch.getLogger());
+
+		rsp = NafManClient.submitCommand(stopcmd.code, null, port, dsptch.getLogger());
+		org.junit.Assert.assertTrue(rsp, rsp.startsWith("HTTP/1.1 200 OK"));
 		waitStopped(dsptch);
 		org.junit.Assert.assertFalse(dsptch.isRunning());
 	}
@@ -143,6 +161,7 @@ public class ClientTest
 	private static void waitStopped(Dispatcher dsptch) {
 		Dispatcher.STOPSTATUS stopsts = dsptch.waitStopped(TimeOps.MSECS_PER_SECOND * 10, true);
 		org.junit.Assert.assertEquals(Dispatcher.STOPSTATUS.STOPPED, stopsts);
+		org.junit.Assert.assertFalse(dsptch.isRunning());
 		org.junit.Assert.assertTrue(dsptch.completedOK());
 	}
 }

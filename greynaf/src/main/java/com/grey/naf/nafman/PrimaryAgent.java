@@ -39,7 +39,7 @@ public class PrimaryAgent
 	{
 		super(dsptch, reg);
 		this.surviveDownstream = cfg.isSurviveDownstream();
-		events = new Producer<Object>(Object.class, dsptch, this);
+		events = new Producer<Object>("NAFMAN-Agent-events", Object.class, dsptch, this);
 		lstnr = ConcurrentListener.create(dsptch, this, null, cfg.getListenerConfig());
 		dsptch.getLogger().info("NAFMAN-Primary="+dsptch.getName()+": survive_downstream="+surviveDownstream+", lstnr="+lstnr);
 
@@ -56,8 +56,8 @@ public class PrimaryAgent
 			getDispatcher().getLogger().trace(getRegistry().dumpState(null, false));
 		}
 		super.start();
-		events.start();
-		lstnr.start();
+		events.startDispatcherRunnable();
+		lstnr.startDispatcherRunnable();
 	}
 
 	@Override
@@ -66,7 +66,7 @@ public class PrimaryAgent
 		Dispatcher dsptch = getDispatcher();
 		dsptch.getLogger().info("NAFMAN Primary="+dsptch.getName()+" shutdown with Secondaries="+secondaries.size()+", Commands="+activecmds.size());
 		setShutdown();
-		lstnr.stop();
+		lstnr.stopDispatcherRunnable();
 
 		// Loop on a copy of the secondaries list, as the Dispatcher stop() command may reentrantly call
 		// back into our producerIndication() method below and modify the list while we're looping on it.

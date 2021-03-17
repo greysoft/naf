@@ -323,21 +323,6 @@ public class ResolverTester
 		validateObjectWell(rs, "rrwstore", true);
 	}
 
-	protected static void validatePendingRequests(ResolverDNS r, int exp_reqs, int exp_callers)
-	{
-		Object rs = getResolverService(r);
-		HashedMapIntKey<?> pendingreqs = (HashedMapIntKey<?>)DynLoader.getField(rs, "pendingreqs");
-		int num_callers = 0;
-		java.util.Iterator<?> it = pendingreqs.valuesIterator();
-		while (it.hasNext()) {
-			Object qh = it.next();
-			java.util.ArrayList<?> callers = (java.util.ArrayList<?>)DynLoader.getField(qh, "callers");
-			num_callers += callers.size();
-		}
-		org.junit.Assert.assertEquals(exp_reqs, pendingreqs.size());
-		org.junit.Assert.assertEquals(exp_callers, num_callers);
-	}
-
 	protected static void validateObjectWell(Object rs, String fldnam, boolean allow)
 	{
 		com.grey.base.collections.ObjectWell<?> ow = (com.grey.base.collections.ObjectWell<?>)DynLoader.getField(rs, fldnam);

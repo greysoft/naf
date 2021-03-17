@@ -4,6 +4,9 @@
  */
 package com.grey.naf.reactor;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
+import com.grey.naf.errors.NAFConfigException;
 import com.grey.naf.reactor.config.ConcurrentListenerConfig;
 
 public class ListenerSet
@@ -13,14 +16,13 @@ public class ListenerSet
 	private final Dispatcher dsptch;
 	private final com.grey.naf.EntityReaper reaper;
 	private final CM_Listener[] listeners;
-	private int listen_cnt;
+	private final AtomicInteger listenerCount = new AtomicInteger();
 
 	public int configured() {return listeners == null ? 0 : listeners.length;}
-	public int count() {return listen_cnt;}
+	public int count() {return listenerCount.get();}
 	public CM_Listener getListener(int idx) {return listeners[idx];}
 
-	public ListenerSet(String grpname, Dispatcher d, Object controller, com.grey.naf.EntityReaper rpr, ConcurrentListenerConfig[] config) throws java.io.IOException
-	{
+	public ListenerSet(String grpname, Dispatcher d, Object controller, com.grey.naf.EntityReaper rpr, ConcurrentListenerConfig[] config) throws java.io.IOException {
 		dsptch = d;
 		reaper = rpr;
 		name = "Listeners-"+d.getName()+"-"+grpname;
@@ -41,56 +43,65 @@ public class ListenerSet
 		}
 	}
 
-	public void start() throws java.io.IOException
-	{
+	// Can set foreground true if already running within Dispatcher thread, else must be false
+	public void start(boolean foreground) throws java.io.IOException {
 		if (listeners == null) return;
-		dsptch.getLogger().info(name+": Launching Listeners="+listeners.length);
+		dsptch.getLogger().info(name+": Launching Listeners="+listeners.length+" with foreground="+foreground);
 
-		for (int idx = 0; idx != listeners.length; idx++) {
-			listen_cnt++;
-			listeners[idx].start();
+		for (CM_Listener l : listeners) {
+			if (foreground) {
+				l.startDispatcherRunnable();
+			} else {
+				dsptch.loadRunnable(l);
+			}
+			listenerCount.incrementAndGet();
 		}
 	}
 
-	public boolean stop()
-	{
-		if (listeners == null) return true;
-		dsptch.getLogger().info(name+": Stopping Listeners="+listen_cnt+"/"+listeners.length);
-		boolean stopped = true;
+	// The foreground param should match what was used in start()
+	public boolean stop(boolean foreground) {
+		if (listeners == null || listenerCount.get() == 0) return true;
+		dsptch.getLogger().info(name+": Stopping Listeners="+listenerCount.get()+"/"+listeners.length);
 
 		for (int idx = 0; idx != listeners.length; idx++) {
-			if (listeners[idx] != null) {
-				if (listeners[idx].stop()) {
-					listeners[idx] = null;
-					listen_cnt--;
+			CM_Listener l = listeners[idx];
+			if (l != null) {
+				try {
+					if (foreground) {
+						if (l.stopDispatcherRunnable()) {
+							listeners[idx] = null;
+							listenerCount.decrementAndGet();
+						}
+					} else {
+						dsptch.unloadRunnable(l);
+					}
+				} catch (Exception ex) {
+					throw new NAFConfigException("Dispatcher="+dsptch.getName()+" failed to unload listener="+l.getName());
 				}
 			}
-			if (listeners[idx] != null) stopped = false;
 		}
-		return stopped;
+		return false;
 	}
 
 	@Override
-	public void entityStopped(Object obj)
-	{
+	public void entityStopped(Object obj) {
 		CM_Listener lstnr = CM_Listener.class.cast(obj);
 
 		for (int idx = 0; idx != listeners.length; idx++) {
 			if (listeners[idx] == lstnr) {
 				listeners[idx] = null;
-				listen_cnt--;
+				listenerCount.decrementAndGet();
 				break;
 			}
 		}
-		String extra = (listen_cnt==0 ? " - reaper="+reaper : "");
-		dsptch.getLogger().info(name+": Listener="+lstnr.getName()+" has terminated - remaining="+listen_cnt+extra);
-		if (listen_cnt == 0 && reaper != null) reaper.entityStopped(this);
+		int cnt = listenerCount.get();
+		dsptch.getLogger().info(name+": Listener="+lstnr.getName()+" has terminated - remaining="+cnt+" - reaper="+reaper);
+		if (cnt == 0 && reaper != null) reaper.entityStopped(this);
 	}
 
-	public void setReporter(CM_Listener.Reporter r)
-	{
-		for (int idx = 0; idx != listeners.length; idx++) {
-			if (listeners[idx] != null) listeners[idx].setReporter(r);
+	public void setReporter(CM_Listener.Reporter r) {
+		for (CM_Listener l : listeners) {
+			if (l != null) l.setReporter(r);
 		}
 	}
 }

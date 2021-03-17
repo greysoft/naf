@@ -149,12 +149,10 @@ public class ResolverTest
 		resolver.resolveHostname(bc, this, null, 0);
 		bc = new ByteChars("another-badname.cancel");
 		resolver.resolveHostname(bc, this, null, 0);
-		validatePendingRequests(resolver, 2, 3); //2 distinct requests, one of which was repeated
 		int cnt = resolver.cancel(this);
 		org.junit.Assert.assertEquals(3, cnt);
 		cnt = resolver.cancel(this);
 		org.junit.Assert.assertEquals(0, cnt);
-		validatePendingRequests(resolver, 2, 0); //the requests themselves aren't cancelled, just the callback
 		dsptch.stop();
 		Dispatcher.STOPSTATUS stopsts = dsptch.waitStopped(TimeOps.MSECS_PER_SECOND * 10, true);
 		org.junit.Assert.assertEquals(Dispatcher.STOPSTATUS.STOPPED, stopsts);
@@ -184,7 +182,6 @@ public class ResolverTest
 		resolver2.resolveHostname(bc, this, null, 0);
 		bc = new ByteChars("another-badname.canceldist");
 		resolver2.resolveHostname(bc, this, null, 0);
-		validatePendingRequests(resolver1, 2, 3);
 		// Run master Dispatcher briefly, but long enough to allow any DNS responses to be received (should be none)
 		d1.start();
 		TimerNAF.sleep(4 * 1000);

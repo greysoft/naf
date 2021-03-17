@@ -53,8 +53,8 @@ public class TCPConnectionTest
 				.withPort(0)
 				.build();
 		CM_Listener lstnr = ConcurrentListener.create(dsptch, this, this, lcfg);
-		lstnr.start();
 		lstnr.setReporter(this);
+		dsptch.loadRunnable(lstnr);
 
 		// set up the clients
 		for (int loop = 0; loop != NUM_CLIENTS / 2; loop++) {
@@ -81,8 +81,6 @@ public class TCPConnectionTest
 		org.junit.Assert.assertEquals(NUM_CLIENTS / 2, reapcnt_servers); //only half the clients connected
 		org.junit.Assert.assertEquals(reapcnt_servers, startcnt_servers);
 		org.junit.Assert.assertEquals(reapcnt_servers, servercnt_good);
-		boolean done = lstnr.stop();
-		org.junit.Assert.assertTrue(done);
 	}
 
 	@Override

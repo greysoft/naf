@@ -10,7 +10,7 @@ import com.grey.naf.reactor.config.ListenerConfig;
 
 public abstract class CM_Listener
 	extends ChannelMonitor
-	implements EntityReaper
+	implements DispatcherRunnable, EntityReaper
 {
 	public interface Reporter
 	{
@@ -30,6 +30,7 @@ public abstract class CM_Listener
 
 	public abstract Class<?> getServerType();
 
+	@Override
 	public String getName() {return name;}
 	public int getPort() {return srvport;}
 	public java.net.InetAddress getIP() {return srvip;}
@@ -43,20 +44,19 @@ public abstract class CM_Listener
 
 	SSLConfig getSSLConfig() {return sslconfig;}
 
-	protected CM_Listener(Dispatcher d, Object controller, EntityReaper rpr, ListenerConfig config) throws java.io.IOException
-	{
+	protected CM_Listener(Dispatcher d, Object controller, EntityReaper rpr, ListenerConfig config) throws java.io.IOException {
 		super(d);
 		this.controller = controller;
 		setReaper(rpr);
 		sslconfig = config.getConfigSSL();
-		String lname = config.getName();
 		String iface = config.getInterface();
 		int port = config.getPort();
 		int srvbacklog = config.getBacklog();
+		String lname = config.getName();
 		if (lname == null) lname = getDispatcher().getName()+":"+port;
 		name = lname;
 		getLogger().info("Listener="+name+" in Dispatcher="+getDispatcher().getName()+" initialising on interface="+iface+", port="+port
-				+" with controller="+controller+", reaper="+getReaper());
+				+" with controller="+controller+", reaper="+getReaper()+" - ssl="+sslconfig);
 
 		// set up our listening socket
 		java.net.InetAddress ipaddr = (iface == null ? null : com.grey.base.utils.IP.getHostByName(iface));
@@ -71,23 +71,21 @@ public abstract class CM_Listener
 
 		getLogger().info("Listener="+name+" bound to "+srvsock.getInetAddress()+":"+srvport+(port==0?"/dynamic":"")
 				         +(iface==null ? "" : " on interface="+iface)+"; Backlog="+srvbacklog);
-		if (sslconfig != null) getLogger().info("Listener="+name+": "+sslconfig);
 	}
 
-	public void start() throws java.io.IOException
-	{
+	@Override
+	public void startDispatcherRunnable() throws java.io.IOException {
 		getLogger().info("Listener="+getName()+": Starting up");
 		enableListen();
 	}
 
-	public boolean stop()
-	{
+	@Override
+	public boolean stopDispatcherRunnable() {
 		return stop(false);
 	}
 
-	protected boolean stop(boolean notify)
-	{
-		getLogger().info("Listener="+getName()+": Received Stop request - in-shutdown="+inShutdown+", stopped="+has_stopped);
+	protected boolean stop(boolean notify) {
+		getLogger().info("Listener="+getName()+": Received Stop request with notify="+notify+" - in-shutdown="+inShutdown+", stopped="+has_stopped);
 		if (inShutdown || has_stopped) return has_stopped; //break up possible mutually recursive calling chains
 		inShutdown = true;
 		disconnect(false, true); //don't want to notify our reaper till stopped()
@@ -96,8 +94,7 @@ public abstract class CM_Listener
 		return done;
 	}
 
-	protected void stopped(boolean notify)
-	{
+	protected void stopped(boolean notify) {
 		if (has_stopped) return;
 		has_stopped = true;
 		EntityReaper rpr = getReaper();

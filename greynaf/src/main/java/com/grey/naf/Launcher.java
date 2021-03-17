@@ -5,15 +5,18 @@
 package com.grey.naf;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 import com.grey.base.config.SysProps;
 import com.grey.base.config.XmlConfig;
 import com.grey.base.utils.FileOps;
 import com.grey.base.utils.CommandParser;
+import com.grey.naf.reactor.CM_Listener;
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.nafman.NafManClient;
 import com.grey.naf.nafman.NafManConfig;
+import com.grey.naf.nafman.PrimaryAgent;
 import com.grey.naf.errors.NAFConfigException;
 import com.grey.logging.Factory;
 import com.grey.logging.Parameters;
@@ -211,9 +214,7 @@ public class Launcher
 		FileOps.flush(bootlog);
 	}
 
-	public static List<Dispatcher> launchConfiguredDispatchers(ApplicationContextNAF appctx, Logger log)
-		throws java.io.IOException
-	{
+	public static List<Dispatcher> launchConfiguredDispatchers(ApplicationContextNAF appctx, Logger log) throws java.io.IOException {
 		NAFConfig nafcfg = appctx.getConfig();
 		XmlConfig[] cfgdispatchers = nafcfg.getDispatchers();
 		if (cfgdispatchers == null) return null;
@@ -234,22 +235,23 @@ public class Launcher
 			 */
 			XmlConfig[] nafletsConfig = dcfg.getSections("naflets/naflet"+XmlConfig.XPATH_ENABLED);
 			if (nafletsConfig != null) {
-				dsptch.getLogger().info("Dispatcher="+dsptch.getName()+": Creating Naflets="+nafletsConfig.length);
+				dsptch.getLogger().info("Creating Naflets="+nafletsConfig.length+" for Dispatcher="+dsptch.getName());
 				for (XmlConfig appcfg : nafletsConfig) {
 					Object obj = NAFConfig.createEntity(appcfg, null, Naflet.class, true,
 							new Class<?>[]{String.class, dsptch.getClass(), appcfg.getClass()},
 							new Object[]{null, dsptch, appcfg});
 					Naflet app = Naflet.class.cast(obj);
+					dsptch.getLogger().info("Created Naflet="+app.getName()+" for Dispatcher="+dsptch.getName());
 					if (app.getName().charAt(0) == '_') {
 						throw new NAFConfigException("Dispatcher="+dsptch.getName()+" has invalid Naflet name (starts with underscore) - "+app.getName());
 					}
-					dsptch.loadNaflet(app);
+					dsptch.loadRunnable(app);
 				}
 			}
 		}
 
 		// log the initial config
-		String txt = Dispatcher.dumpConfig(appctx);
+		String txt = dumpConfig(appctx);
 		log.info("Initialisation of the configured NAF Dispatchers is now complete\n"+txt);
 
 		// Now starts the multi-threaded phase
@@ -283,6 +285,21 @@ public class Launcher
 				.withLogLevel(lvl)
 				.build();
 		return Factory.getLogger(params, "NAF-bootlog");
+	}
+
+	private static String dumpConfig(ApplicationContextNAF appctx) {
+		String txt = "Dumping Laucher setup:\n";
+		Collection<Dispatcher> dispatchers = appctx.getDispatchers();
+		PrimaryAgent nafmanPrimary = appctx.getNamedItem(PrimaryAgent.class.getName(), null);
+		txt += "ApplicationContext="+appctx.getName()+", Dispatchers="+dispatchers.size()+":";
+		if (nafmanPrimary != null) txt += ", NAFMAN-Primary="+nafmanPrimary.getDispatcher().getName();
+
+		Collection<CM_Listener> listeners = appctx.getListeners();
+		txt += "\nListeners="+listeners.size();
+		for (CM_Listener l : listeners) {
+			txt += "\n- "+l.getName()+": Port="+l.getPort()+", Server="+l.getServerType().getName()+" (Dispatcher="+l.getDispatcher().getName()+")";
+		}
+		return txt;
 	}
 
 	// This may not look MT-safe, but it only gets called early on during startup, when still single-threaded

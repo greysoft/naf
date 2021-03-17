@@ -26,11 +26,11 @@ public class SecondaryAgent
 		if (primary == null) {
 			throw new IllegalStateException("Dispatcher="+dsptch.getName()+": Cannot create Secondary NAFMAN before Primary");
 		}
-		requests = new Producer<NafManCommand>(NafManCommand.class, dsptch, this);
+		requests = new Producer<NafManCommand>("NAFMAN-Agent-cmds", NafManCommand.class, dsptch, this);
 
 		// we have to subscribe to the Primary in our constructor due to unit-test timings, but 'requests' producer could be started in our start()
 		primary.secondarySubscribed(this);
-		requests.start();
+		requests.startDispatcherRunnable();
 	}
 
 	@Override
@@ -40,7 +40,7 @@ public class SecondaryAgent
 		PrimaryAgent activePrimary = dsptch.getApplicationContext().getNamedItem(PrimaryAgent.class.getName(), null);
 		dsptch.getLogger().info("NAFMAN Secondary="+dsptch.getName()+" shutdown with primary="+primary.getDispatcher().getName()+" - active="+activePrimary);
 		setShutdown();
-		requests.shutdown();
+		requests.stopDispatcherRunnable();
 		if (activePrimary == null) return; //Primary has already exited, so don't signal it
 
 		try {

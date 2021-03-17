@@ -200,7 +200,7 @@ public class App
 								.withServerFactory(ServerTCP.Factory.class, null)
 								.build();
 						ConcurrentListener lstnr = ConcurrentListener.create(dsptch, this, null, lcfg);
-						lstnr.start();
+						dsptch.loadRunnable(lstnr);
 					}
 					if (options.server_solo) continue;
 				}
@@ -212,7 +212,6 @@ public class App
 			}
 		}
 		cgrpcnt = options.cgrpcnt;
-		Logger.info("EchoBot initialisation complete\n"+Dispatcher.dumpConfig(appctx));
 
 		// start the Dispatchers
 		for (int idx = 0; idx != dcnt; idx++) {

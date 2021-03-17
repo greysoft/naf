@@ -6,6 +6,7 @@ package com.grey.naf;
 
 import com.grey.base.config.XmlConfig;
 import com.grey.naf.reactor.Dispatcher;
+import com.grey.naf.reactor.DispatcherRunnable;
 
 /**
  * This class defines a NAF application, aka a NAF task. It aggregates one or more fragments of callback code
@@ -16,25 +17,26 @@ import com.grey.naf.reactor.Dispatcher;
  * <code>classname(String naflet_name, com.grey.naf.reactor.Dispatcher, com.grey.base.config.XmlConfig)</code><br>
  * That subclass constructor must in turn call the Naflet constructor of the same signature (see below).
  */
-abstract public class Naflet
+abstract public class Naflet implements DispatcherRunnable
 {
 	private final String naflet_name;
 	private final Dispatcher dsptch;
 	private final XmlConfig taskcfg;
 	private final String cfgfile;
 
-	private EntityReaper reaper;
-	private boolean aborted_startup;
+	private volatile boolean aborted_startup;
 
 	// applications can override these
-	abstract protected void startNaflet() throws java.io.IOException;
+	protected void startNaflet() throws java.io.IOException {}
 	protected boolean stopNaflet() {return true;}
 	protected void abortOnStartup() {aborted_startup = true;}
 
-	public String getName() {return naflet_name;}
-	public Dispatcher getDispatcher() {return dsptch;}
 	public XmlConfig taskConfig() {return taskcfg;}
 	public String taskConfigFile() {return cfgfile;}
+	@Override
+	public String getName() {return naflet_name;}
+	@Override
+	public Dispatcher getDispatcher() {return dsptch;}
 
 	/**
 	 * Applications that are not based on naf.xml style config would pass a null XmlConfig arg in here
@@ -58,29 +60,30 @@ abstract public class Naflet
 		}
 	}
 
-	public final void start(EntityReaper rpr) throws java.io.IOException {
-		reaper = rpr;
-		if (aborted_startup) {
-			getDispatcher().getLogger().info("Naflet="+naflet_name+": Aborting startup");
+	@Override
+	public void startDispatcherRunnable() throws java.io.IOException {
+		boolean abort = aborted_startup;
+		getDispatcher().getLogger().info("Naflet="+naflet_name+" in Dispatcher="+dsptch.getName()+": Starting - abort="+abort);
+		if (abort) {
 			nafletStopped();
 			return;
 		}
-		getDispatcher().getLogger().info("Naflet="+naflet_name+": Starting - reaper="+reaper);
 		startNaflet();
 	}
 
-	public final boolean stop() {
-		getDispatcher().getLogger().info("Naflet="+naflet_name+": Received Stop request");
+	@Override
+	public boolean stopDispatcherRunnable() {
+		getDispatcher().getLogger().info("Naflet="+naflet_name+" in Dispatcher="+dsptch.getName()+": Stopping");
 		boolean done = stopNaflet();
 		if (done) nafletStopped();
 		return done;
 	}
-	
-	protected final void nafletStopped() {
-		getDispatcher().getLogger().info("Naflet="+naflet_name+" has terminated - reaper="+reaper);
-		if (reaper != null) reaper.entityStopped(this);
+
+	protected void nafletStopped() {
+		getDispatcher().getLogger().info("Naflet="+naflet_name+" in Dispatcher="+dsptch.getName()+" has terminated");
+		dsptch.entityStopped(this);
 	}
-	
+
 	@Override
 	public String toString() {
 		return super.toString()+"/Naflet="+getName()+" in Dispatcher="+getDispatcher().getName();

@@ -51,7 +51,6 @@
 			<tr>
 				<th>Name</th>
 				<th>Disposition</th>
-				<th>NAFlets</th>
 				<th/>
 			</tr>
 			<xsl:apply-templates select="$dspnodes"/>
@@ -115,15 +114,7 @@
 	<td>
 		<span class="propname">NAFMAN</span>:&#160;<xsl:value-of select="$nafmantype"/>
 		<br/>
-		<span class="propname">DNS</span>:&#160;<xsl:value-of select="@dns"/>
-		<br/>
 		<span class="propname">Log-Level</span>:&#160;<xsl:value-of select="@log"/>
-	</td>
-	<td>
-		Total:&#160;<xsl:value-of select="count($nafletnodes)"/>
-		<xsl:apply-templates select="$nafletnodes">
-			<xsl:sort select="@name"/>
-		</xsl:apply-templates>
 	</td>
 	<td>
 		<xsl:if test="$nafmantype!='No'">
