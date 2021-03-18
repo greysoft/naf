@@ -91,13 +91,23 @@ public abstract class ChannelMonitor
 	}
 
 	//Note that setReaper() can be called before this
-	void registerChannel(java.nio.channels.SelectableChannel chan, boolean takeOwnership) throws java.io.IOException
+	void initChannel(java.nio.channels.SelectableChannel chan, boolean takeOwnership) throws java.io.IOException
 	{
 		if (!isFlagSetCM(S_INIT)) initChannelMonitor();
 		iochan = chan;
 		if (takeOwnership) setFlagCM(S_WECLOSE);
 		iochan.configureBlocking(false);
+	}
+
+	void registerChannel()
+	{
 		getDispatcher().registerIO(this);
+	}
+
+	void registerChannel(java.nio.channels.SelectableChannel chan, boolean takeOwnership) throws java.io.IOException
+	{
+		initChannel(chan, takeOwnership);
+		registerChannel();
 	}
 
 	boolean disconnect(boolean linger, boolean no_reap)
@@ -364,6 +374,6 @@ public abstract class ChannelMonitor
 
 	@Override
 	public String toString() {
-		return getClass().getName()+"/E"+cm_id+" - iochan="+iochan;
+		return super.toString()+"/E"+getCMID()+" with iochan="+getChannel();
 	}
 }

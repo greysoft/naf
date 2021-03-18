@@ -190,7 +190,7 @@ public class App
 					dserver = dsptch;
 					if (options.udpmode) {
 						ServerUDP srvr = new ServerUDP(this, dsptch, tsap, sbufspec, options.sockbufsiz);
-						srvr.start();
+						dsptch.loadRunnable(srvr);
 					} else {
 						ConcurrentListenerConfig lcfg = new ConcurrentListenerConfig.Builder<>()
 								.withName("EchoBot-"+dsptch.getName())

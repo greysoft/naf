@@ -1,16 +1,18 @@
 /*
- * Copyright 2012-2018 Yusef Badri - All rights reserved.
+ * Copyright 2012-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.echobot;
 
 import com.grey.base.utils.ByteArrayRef;
 import com.grey.logging.Logger;
+import com.grey.naf.reactor.DispatcherRunnable;
 
 public class ClientTCP
 	extends com.grey.naf.reactor.CM_Client
-	implements com.grey.naf.reactor.TimerNAF.Handler
+	implements DispatcherRunnable
 {
+	private final String name;
 	private final ClientGroup grp;
 	private final byte[] echobuf;
 	private final String logpfx;
@@ -20,16 +22,29 @@ public class ClientTCP
 	private int msgbytes; //number of bytes of current message echoed back so far
 	private long time_xmit; //time at which current message was sent
 
-	public ClientTCP(int id, ClientGroup g, com.grey.naf.BufferSpec bufspec, byte[] msgbuf)
+	@Override
+	public String getName() {return name;}
+
+	public ClientTCP(String name, int id, ClientGroup g, com.grey.naf.BufferSpec bufspec, byte[] msgbuf)
 	{
 		super(g.dsptch, bufspec, bufspec);
+		this.name = name;
 		grp = g;
 		echobuf = java.util.Arrays.copyOf(msgbuf, msgbuf.length);
+		initChannelMonitor();
 		logpfx = "Client "+getDispatcher().getName()+"/"+id+": ";
 	}
 
-	public void start() {
-		getDispatcher().setTimer(0, 0, this); //connect once Dispatcher starts up
+	// This is called in the Dispatcher thread
+	@Override
+	public void startDispatcherRunnable() {
+		try {
+			connect(grp.tsap.sockaddr);
+		} catch (Throwable ex) {
+			Logger.LEVEL lvl = (ex instanceof java.io.IOException ? Logger.LEVEL.INFO : Logger.LEVEL.ERR);
+			getLogger().log(lvl, ex, lvl == Logger.LEVEL.ERR, logpfx+" Failed to connect to "+grp.tsap);
+			completed(false);
+		}
 	}
 
 	@Override
@@ -98,21 +113,4 @@ public class ClientTCP
 		disconnect();
 		grp.terminated(success, System.nanoTime() - time_start);
 	}
-
-	@Override
-	public void timerIndication(com.grey.naf.reactor.TimerNAF tmr, com.grey.naf.reactor.Dispatcher d)
-			throws java.io.IOException
-	{
-		initChannelMonitor();
-		try {
-			connect(grp.tsap.sockaddr);
-		} catch (Throwable ex) {
-			Logger.LEVEL lvl = (ex instanceof java.io.IOException ? Logger.LEVEL.INFO : Logger.LEVEL.ERR);
-			getLogger().log(lvl, ex, lvl == Logger.LEVEL.ERR, logpfx+" Failed to connect to "+grp.tsap);
-			completed(false);
-		}
-	}
-
-	@Override
-	public void eventError(com.grey.naf.reactor.TimerNAF tmr, com.grey.naf.reactor.Dispatcher d, Throwable ex) {}
 }

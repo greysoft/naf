@@ -18,6 +18,8 @@ public class ClientGroup
 	public final int echosize;
 	public final boolean verify;
 
+	// These need not be synchronised, since they are set before Dispatcher thread starts, and then read back by App class
+	// after joining the terminated Dispatcher thread, which is a synchronising event.
 	public final java.util.ArrayList<Long> durations = new java.util.ArrayList<Long>();  //session times, in nano-seconds
 	public final java.util.ArrayList<Long> latencies = new java.util.ArrayList<Long>();  //echo times, in nano-seconds
 	public int failcnt;
@@ -38,11 +40,11 @@ public class ClientGroup
 		for (int idx = 0; idx != size; idx++) {
 			clientcnt++;
 			if (udpmode) {
-				ClientUDP c = new ClientUDP(clientcnt, this, bufspec, msgbuf, sockbufsiz);
-				c.start();
+				ClientUDP c = new ClientUDP("EchoBot-Client-UDP-"+(idx+1), clientcnt, this, bufspec, msgbuf, sockbufsiz);
+				dsptch.loadRunnable(c);
 			} else {
-				ClientTCP c = new ClientTCP(clientcnt, this, bufspec, msgbuf);
-				c.start();
+				ClientTCP c = new ClientTCP("EchoBot-Client-TCP-"+(idx+1), clientcnt, this, bufspec, msgbuf);
+				dsptch.loadRunnable(c);
 			}
 		}
 	}

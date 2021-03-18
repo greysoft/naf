@@ -8,7 +8,7 @@ import java.util.function.Supplier;
 
 import com.grey.base.utils.ByteChars;
 import com.grey.base.collections.HashedSet;
-import com.grey.base.collections.ObjectWell;
+import com.grey.base.collections.ObjectPool;
 import com.grey.naf.dns.resolver.ResolverAnswer;
 import com.grey.naf.dns.resolver.ResolverConfig;
 import com.grey.naf.dns.resolver.ResolverDNS;
@@ -27,7 +27,7 @@ public class DistributedResolver
 {
 	private final Producer<Request> proxyReceiver; //receives responses from Proxy, is null if we're the master Dispatcher
 	private final HashedSet<ResolverDNS.Client> cancelledCallers;
-	private final ObjectWell<Request> reqPool;
+	private final ObjectPool<Request> reqPool;
 	private final ProxyReference proxyRef;
 
 	private Proxy getProxy() {return proxyRef.get();}
@@ -44,8 +44,8 @@ public class DistributedResolver
 			// the resolver engine is not running in this thread, so we will access it via the Producer's message-passing API
 			cancelledCallers = new HashedSet<>();
 			proxyReceiver = new Producer<>("DNS-distrib-proxyrsp", Request.class, dsptch, this);
-			RequestFactory factory = new RequestFactory(this);
-			reqPool = new ObjectWell<>(Request.class, factory, "DNS_Client_"+dsptch.getName(), 0, 0, 1);
+			Supplier<Request> reqFactory = () -> new Request(this);
+			reqPool = new ObjectPool<>(reqFactory);
 		} else {
 			// the resolver engine is running in this thread, so we will invoke it directly
 			proxyReceiver = null;
@@ -79,12 +79,12 @@ public class DistributedResolver
 
 	@Override
 	protected ResolverAnswer resolve(byte qtype, ByteChars qname, ResolverDNS.Client caller, Object cbdata, int flags) throws java.io.IOException {
-		return getProxy().resolve(this, qtype, qname, caller, cbdata, flags);
+		return getProxy().resolve(this, qtype, qname, caller, cbdata, flags, () -> allocateRequestBlock());
 	}
 
 	@Override
 	protected ResolverAnswer resolve(byte qtype, int qip, ResolverDNS.Client caller, Object cbdata, int flags) throws java.io.IOException {
-		return getProxy().resolve(this, qtype, qip, caller, cbdata, flags);
+		return getProxy().resolve(this, qtype, qip, caller, cbdata, flags, () -> allocateRequestBlock());
 	}
 
 	// NB: This behaves differently for callers outside the Resolver thread. Cancel normally cancels
@@ -106,9 +106,7 @@ public class DistributedResolver
 			if (req.caller != null && !cancelledCallers.contains(req.caller)) {
 				req.caller.dnsResolved(getDispatcher(), req.answer, req.cbdata);
 			}
-			synchronized (reqPool) {
-				reqPool.store(req);
-			}
+			reqPool.store(req);
 		}
 	}
 
@@ -116,32 +114,15 @@ public class DistributedResolver
 		proxyReceiver.produce(req);
 	}
 
-	Request allocateRequestBlock() {
-		synchronized (reqPool) {
-			return reqPool.extract();
-		}
+	private Request allocateRequestBlock() {
+		return reqPool.extract();
 	}
 
 	@Override
 	public String toString() {
-		return getClass().getName()+"/Dispatcher="+getDispatcher().getName()+"/Master="+(getMasterDispatcher()==getDispatcher());
+		return super.toString()+"/Dispatcher="+getDispatcher().getName()+"/Master="+(getMasterDispatcher()==getDispatcher());
 	}
 
-
-	public static final class RequestFactory
-		implements ObjectWell.ObjectFactory
-	{
-		private final DistributedResolver resolver;
-
-		public RequestFactory(DistributedResolver resolver) {
-			this.resolver = resolver;
-		}
-
-		@Override
-		public Request factory_create() {
-			return new Request(resolver);
-		}
-	}
 
 	private static class ProxyReference
 	{

@@ -85,24 +85,24 @@ class Proxy
 	}
 
 	protected ResolverAnswer resolve(DistributedResolver clnt, byte qtype, ByteChars qname, ResolverDNS.Client caller,
-			Object cbdata, int flags) throws java.io.IOException
+			Object cbdata, int flags, Supplier<Request> reqSupplier) throws java.io.IOException
 	{
 		if (clnt.getDispatcher() == rslvr.getDispatcher()) {
 			return rslvr.resolve(qtype, qname, caller, cbdata, flags);
 		}
-		Request req = clnt.allocateRequestBlock();
+		Request req = reqSupplier.get();
 		req.setQuery(caller, qtype, qname, 0, cbdata, flags);
 		distributedReceiver.produce(req);
 		return null;
 	}
 
 	protected ResolverAnswer resolve(DistributedResolver clnt, byte qtype, int qip, ResolverDNS.Client caller,
-			Object cbdata, int flags) throws java.io.IOException
+			Object cbdata, int flags, Supplier<Request> reqSupplier) throws java.io.IOException
 	{
 		if (clnt.getDispatcher() == rslvr.getDispatcher()) {
 			return rslvr.resolve(qtype, qip, caller, cbdata, flags);
 		}
-		Request req = clnt.allocateRequestBlock();
+		Request req = reqSupplier.get();
 		req.setQuery(caller, qtype, null, qip, cbdata, flags);
 		distributedReceiver.produce(req);
 		return null;

@@ -32,6 +32,7 @@ public class Producer<T> implements DispatcherRunnable
 	private final Circulist<T> exchgq;  //MT queue, on which Dispatcher receives items from producer
 	private final Circulist<T> availq;  //non-MT staging queue, only accessed by the Dispatcher
 	private final AlertsPipe<T> alertspipe;
+	private final Class<T> itemClass;
 	private final com.grey.logging.Logger logger;
 	private boolean in_shutdown;
 
@@ -44,6 +45,7 @@ public class Producer<T> implements DispatcherRunnable
 
 	public Producer(String producerName, Class<T> itemClass, Dispatcher dsptch, Consumer<T> itemConsumer) throws java.io.IOException {
 		name = producerName+"/"+itemClass.getName();
+		this.itemClass = itemClass;
 		consumer = itemConsumer;
 		exchgq = new Circulist<T>(itemClass);
 		availq = new Circulist<T>(itemClass);
@@ -162,7 +164,7 @@ public class Producer<T> implements DispatcherRunnable
 
 	@Override
 	public String toString() {
-		return super.toString()+" Name="+getName()+" with consumer="+consumer.getClass().getName()+"/"+consumer+" - alertspipe="+alertspipe.getCMID();
+		return super.toString()+" Name="+getName()+"/"+itemClass.getName()+" with consumer="+consumer.getClass().getName()+"/"+consumer+" - alertspipe="+alertspipe.getCMID();
 	}
 
 

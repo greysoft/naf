@@ -38,7 +38,7 @@ class CommsManager
 		} else {
 			udpLocal = new EndPointUDP[cfg.getSenderSocketsUDP()];
 			for (int idx = 0; idx != cfg.getSenderSocketsUDP(); idx++) {
-				udpLocal[idx] = new EndPointUDP(rslvr, bufspec_udp, ResolverConfig.UDPSOCKBUFSIZ);
+				udpLocal[idx] = new EndPointUDP("DNS-resolver-udp-"+(idx+1), rslvr, bufspec_udp, ResolverConfig.UDPSOCKBUFSIZ);
 			}
 		}
 		EndPointTCP.Factory fact = new EndPointTCP.Factory(rslvr.getDispatcher(), bufspec_tcp);
@@ -49,7 +49,7 @@ class CommsManager
 	{
 		int cnt = (udpLocal == null ? 0 : udpLocal.length);
 		for (int idx = 0; idx != cnt; idx++) {
-			udpLocal[idx].start();
+			udpLocal[idx].startDispatcherRunnable();
 		}
 	}
 
@@ -57,7 +57,7 @@ class CommsManager
 	{
 		int cnt = (udpLocal == null ? 0 : udpLocal.length);
 		for (int idx = 0; idx != cnt; idx++) {
-			udpLocal[idx].stop();
+			udpLocal[idx].stopDispatcherRunnable();
 		}
 	}
 

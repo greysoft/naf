@@ -67,7 +67,7 @@ public class ServerDNS
 	public void start() throws java.io.IOException
 	{
 		listener_tcp.startDispatcherRunnable();
-		transport_udp.start();
+		transport_udp.startDispatcherRunnable();
 		dsptch.registerReaper(handlers);
 		dsptch.start();
 	}
@@ -77,9 +77,9 @@ public class ServerDNS
 		return dsptch.stop();
 	}
 
-	void dispatcherStopped()
+	private void dispatcherStopped()
 	{
-		transport_udp.stop();
+		transport_udp.stopDispatcherRunnable();
 		listener_tcp.stopDispatcherRunnable();
 	}
 

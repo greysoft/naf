@@ -124,7 +124,7 @@ public class TimerNAF
 	@Override
 	public String toString()
 	{
-		String txt = "Timer-"+System.identityHashCode(this)+"/"+id+":"+type+"/"+interval;
+		String txt = getClass().getName()+"-"+System.identityHashCode(this)+"/"+getID()+":"+getType()+"/"+getInterval();
 		if (handler != null) txt += "/"+handler.getClass().getName();
 		if (attachment != null) txt += "/"+attachment.getClass().getName();
 		return txt;

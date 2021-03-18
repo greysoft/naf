@@ -19,36 +19,24 @@ public class ServerUDP
 	private static final org.slf4j.Logger Logger = LoggerFactory.getLogger(ServerUDP.class);
 
 	private final App app;
-	private final java.nio.channels.DatagramChannel udpchan;
 	private java.nio.ByteBuffer niobuf;
 
-	public ServerUDP(App app, com.grey.naf.reactor.Dispatcher d, com.grey.base.utils.TSAP tsap, com.grey.naf.BufferSpec bufspec,
-			int sockbufsiz) throws java.io.IOException
-	{
-		super(d, bufspec);
+	@Override
+	public String getName() {return "EchoBot-Server-UDP";}
+
+	public ServerUDP(App app, com.grey.naf.reactor.Dispatcher d, com.grey.base.utils.TSAP tsap, com.grey.naf.BufferSpec bufspec, int sockbufsiz)
+			throws java.io.IOException {
+		super(d, tsap.sockaddr, bufspec, sockbufsiz);
 		this.app = app;
-
-		udpchan = java.nio.channels.DatagramChannel.open();
-		java.net.DatagramSocket sock = udpchan.socket();
-		sock.setReceiveBufferSize(sockbufsiz);
-		sock.setSendBufferSize(sockbufsiz);
-		sock.bind(tsap.sockaddr);
-
-		registerConnectionlessChannel(udpchan, true);
 		Logger.info("Created UDP server="+this);
-	}
-	
-	public void start() throws java.io.IOException {
-		getReader().receive();
 	}
 
 	@Override
-	public void ioReceived(ByteArrayRef data, java.net.InetSocketAddress remaddr) throws java.io.IOException
-	{
+	public void ioReceived(ByteArrayRef data, java.net.InetSocketAddress remaddr) throws java.io.IOException {
 		Logger.info("Received data="+data.size()+" from remote="+remaddr);
 		niobuf = com.grey.base.utils.NIOBuffers.encode(data.buffer(), data.offset(), data.size(), niobuf, app.sbufspec.directbufs);
-		int nbytes = udpchan.send(niobuf, remaddr);
-		if (nbytes != data.size()) {
+		int nbytes = transmit(niobuf, remaddr);
+		if (nbytes != data.size()) {//belt and braces - transmit() has already verified nbytes vs the ByteBuffer encoding of data
 			getLogger().error("Server send failed - nbytes="+nbytes+"/"+data.size());
 		}
 	}

@@ -52,25 +52,25 @@ public class Dispatcher
 	private final Flusher flusher;
 	private final Logger logger;
 	private final Clock clock;
-	private final Thread thrd_main;
-	private final Thread thrd_init;
+	private final Thread threadMain;
+	private final Thread threadInitial;
 	private final boolean surviveHandlers; //survive error in event handlers
 	private final boolean zeroNafletsOK;  //true means ok if no Naflets running, else exit when count falls to zero
-	private final long timeboot;
+	private final long timeBoot;
 
 	private final Map<String, Object> namedItems = new ConcurrentHashMap<>();
 	private final ArrayList<DispatcherRunnable> dynamicRunnables = new ArrayList<>();
 	private final ArrayList<EntityReaper> reapers = new ArrayList<>();
-	private final HashedMapIntKey<ChannelMonitor> activechannels = new HashedMapIntKey<>(); //keyed on cm_id
-	private final Circulist<TimerNAF> activetimers = new Circulist<>(TimerNAF.class);
-	private final ObjectQueue<TimerNAF> pendingtimers = new ObjectQueue<>(TimerNAF.class);  //timers which have expired and are ready to fire
-	private final ObjectWell<TimerNAF> sparetimers;
-	private final ObjectWell<IOExecWriter.FileWrite> filewritepool;
+	private final HashedMapIntKey<ChannelMonitor> activeChannels = new HashedMapIntKey<>(); //keyed on cm_id
+	private final Circulist<TimerNAF> activeTimers = new Circulist<>(TimerNAF.class);
+	private final ObjectQueue<TimerNAF> pendingTimers = new ObjectQueue<>(TimerNAF.class);  //timers which have expired and are ready to fire
+	private final ObjectWell<TimerNAF> timerPool;
+	private final ObjectWell<IOExecWriter.FileWrite> fileWritePool;
 	private final java.nio.channels.Selector slct;
 	private final Producer<Object> dynamicLoader;
 
-	private int uniqid_timer;
-	private int uniqid_chan;
+	private final AtomicInteger nextChannelId = new AtomicInteger(1);
+	private int nextTimerId = 1; //only used within Disoatcher thread, so not synchronised
 	private boolean launched;
 	private boolean shutdownRequested;
 	private boolean shutdownPerformed;
@@ -83,22 +83,22 @@ public class Dispatcher
 	private byte[] tmpmembuf;
 
 	// assume that a Dispatcher which hasn't yet been started is being called by the thread setting it up
-	public boolean inDispatcherThread() {return Thread.currentThread() == thrd_main;}
+	public boolean inDispatcherThread() {return Thread.currentThread() == threadMain;}
 	private boolean inThread() {return inDispatcherThread() ||
-									(Thread.currentThread() == thrd_init && thrd_main.getState() == Thread.State.NEW);}
-	public boolean isRunning() {return thrd_main.isAlive();}
+									(Thread.currentThread() == threadInitial && threadMain.getState() == Thread.State.NEW);}
+	public boolean isRunning() {return threadMain.isAlive();}
 	public boolean isActive() {return isRunning() && !shutdownRequested;}
 	public void waitStopped() {waitStopped(0, false);}
 
 	public String getName() {return dname;}
-	public long getTimeBoot() {return timeboot;}
+	public long getTimeBoot() {return timeBoot;}
 	public ApplicationContextNAF getApplicationContext() {return appctx;}
 	public Flusher getFlusher() {return flusher;}
 	public Logger getLogger() {return logger;}
 
-	IOExecWriter.FileWrite allocFileWrite() {return filewritepool.extract();}
-	void releaseFileWrite(IOExecWriter.FileWrite fw) {filewritepool.store(fw);}
-	int allocateChannelId() {return ++uniqid_chan;}
+	IOExecWriter.FileWrite allocFileWrite() {return fileWritePool.extract();}
+	void releaseFileWrite(IOExecWriter.FileWrite fw) {fileWritePool.store(fw);}
+	int allocateChannelId() {return nextChannelId.getAndIncrement();}
 	java.util.Calendar getCalendar() {return dtcal;}
 
 	//this is mainly for the benefit of test code - should be tested after Thread join
@@ -145,8 +145,8 @@ public class Dispatcher
 		zeroNafletsOK = def.isZeroNafletsOK();
 
 		clock = def.getClock();
-		timeboot = clock.millis();
-		systime_msecs = timeboot;
+		timeBoot = clock.millis();
+		systime_msecs = timeBoot;
 
 		String logname = def.getLogName();
 		Logger dlog = initlog;
@@ -154,11 +154,11 @@ public class Dispatcher
 		logger = dlog;
 		if (initlog != null) initlog.info("Initialising Dispatcher="+dname+" in AppCtx="+appctx.getName()+" - Logger="+logname+" => "+dlog);
 
-		thrd_main = new Thread(this, "Dispatcher-"+dname);
-		thrd_init = Thread.currentThread();
+		threadMain = new Thread(this, "Dispatcher-"+dname);
+		threadInitial = Thread.currentThread();
 
-		sparetimers = new ObjectWell<>(TimerNAF.class, "Dispatcher-"+dname);
-		filewritepool = new ObjectWell<>(new IOExecWriter.FileWrite.Factory(), "Dispatcher-"+dname);
+		timerPool = new ObjectWell<>(TimerNAF.class, "Dispatcher-"+dname);
+		fileWritePool = new ObjectWell<>(new IOExecWriter.FileWrite.Factory(), "Dispatcher-"+dname);
 		slct = java.nio.channels.Selector.open();
 
 		dynamicLoader = new Producer<>("DispatcherRunnables", Object.class, this, this);
@@ -180,9 +180,9 @@ public class Dispatcher
 	{
 		getLogger().info("Dispatcher="+getName()+": Loaded JARs "+com.grey.base.utils.PkgInfo.getLoadedJARs());
 		launched = true;
-		thrd_main.start();
-		Logger.setThreadLogger(getLogger(), thrd_main.getId());
-		return thrd_main;
+		threadMain.start();
+		Logger.setThreadLogger(getLogger(), threadMain.getId());
+		return threadMain;
 	}
 
 	@Override
@@ -231,7 +231,7 @@ public class Dispatcher
 	private boolean stopSynchronously()
 	{
 		if (shutdownPerformed) return true;
-		getLogger().info("Dispatcher="+getName()+": Received Stop request - naflets="+getNafletCount()+"/"+dynamicRunnables.size()+", Channels="+activechannels.size()
+		getLogger().info("Dispatcher="+getName()+": Received Stop request - naflets="+getNafletCount()+"/"+dynamicRunnables.size()+", Channels="+activeChannels.size()
 				+", shutdownreq="+shutdownRequested+", Thread="+threadInfo());
 		shutdownRequested = true; //must set this before notifying the runnables
 
@@ -247,9 +247,9 @@ public class Dispatcher
 	{
 		if (shutdownPerformed) return;
 		getLogger().info("Dispatcher="+getName()+" in shutdown with endOfLife="+endOfLife+" - Thread="+threadInfo()
-				+"Naflets="+getNafletCount()+"/"+dynamicRunnables.size()+", Channels="+activechannels.size()
-				+", Timers="+activetimers.size()+":"+pendingtimers.size()
-				+" (well="+sparetimers.size()+"/"+sparetimers.population()+")");
+				+"Naflets="+getNafletCount()+"/"+dynamicRunnables.size()+", Channels="+activeChannels.size()
+				+", Timers="+activeTimers.size()+":"+pendingTimers.size()
+				+" (well="+timerPool.size()+"/"+timerPool.population()+")");
 		try {
 			if (slct.isOpen()) slct.close();
 		} catch (Throwable ex) {
@@ -266,13 +266,16 @@ public class Dispatcher
 		}
 		if (getNafManAgent() != null) getNafManAgent().stop();
 
-		if (activechannels.size() != 0) {
-			getLogger().trace("Channels: "+activechannels);
+		if (activeChannels.size() != 0) {
+			getLogger().trace("Channels: "+activeChannels);
 			closeAllChannels();
-			getLogger().info("Issued Disconnects - remaining channels="+(activechannels.size()==0?Integer.valueOf(0):activechannels));
+			getLogger().info("Issued Disconnects - remaining channels="+(activeChannels.size()==0?Integer.valueOf(0):activeChannels));
 		}
-		// NB: this loop might repeat some runnables that were also in activeChannels (eg. listeners)
 		for (DispatcherRunnable r : dynamicRunnables) {
+			if (r instanceof ChannelMonitor) { //activeChannels should now be empty, but skip any entries that might remain
+				ChannelMonitor cm = (ChannelMonitor)r;
+				if (activeChannels.get(cm.getCMID()) == r) continue;
+			}
 			r.stopDispatcherRunnable();
 		}
 		try {getLogger().flush(); } catch (Exception ex) {getLogger().trace("Dispatcher="+getName()+": shutdown() flush failed - "+ex);}
@@ -280,21 +283,19 @@ public class Dispatcher
 		dynamicLoader.stopDispatcherRunnable();
 		getApplicationContext().deregister(this);
 
-		getLogger().info("Dispatcher="+getName()+": Shutdown completed - Naflets="+getNafletCount()+"/"+dynamicRunnables.size()+", Channels="+activechannels.size()
-				+", Timers="+activetimers.size()+":"+pendingtimers.size()
+		getLogger().info("Dispatcher="+getName()+": Shutdown completed - Naflets="+getNafletCount()+"/"+dynamicRunnables.size()+", Channels="+activeChannels.size()
+				+", Timers="+activeTimers.size()+":"+pendingTimers.size()
 				+", reapers="+reaper_cnt);
 		if (dynamicRunnables.size() != 0) getLogger().trace("Dynamic Runnables: "+dynamicRunnables);
-		if (activetimers.size()+pendingtimers.size() != 0) getLogger().trace("Timers: Active="+activetimers+" - Pending="+pendingtimers);
+		if (activeTimers.size()+pendingTimers.size() != 0) getLogger().trace("Timers: Active="+activeTimers+" - Pending="+pendingTimers);
 		shutdownPerformed = true;
 	}
 
 	private void closeAllChannels() {
-		List<ChannelMonitor> lst = activechannels.getValues();
 		List<CM_Listener> lstnrs = new ArrayList<>();
 
-		for (int idx = 0; idx != lst.size(); idx++) {
-			ChannelMonitor cm = lst.get(idx);
-			if (!activechannels.containsValue(cm)) continue; //must have been removed as side-effect of another close
+		for (ChannelMonitor cm : activeChannels.getValues()) {
+			if (!activeChannels.containsValue(cm)) continue; //must have been removed as side-effect of another close
 			if (cm instanceof CM_Listener) {
 				//needs to be stopped in a top-down manner below, rather than bubbling up from socket closure
 				lstnrs.add((CM_Listener)cm);
@@ -303,8 +304,8 @@ public class Dispatcher
 			}
 		}
 
-		for (int idx = 0; idx != lstnrs.size(); idx++) {
-			lstnrs.get(idx).stop(true);
+		for (CM_Listener l : lstnrs) {
+			l.stop(true);
 		}
 	}
 
@@ -315,14 +316,14 @@ public class Dispatcher
 		boolean done = false;
 		do {
 			try {
-				thrd_main.join(timeout);
+				threadMain.join(timeout);
 				done = true;
 			} catch (InterruptedException ex) {}
 		} while (!done);
-		if (!thrd_main.isAlive()) return STOPSTATUS.STOPPED;
+		if (!threadMain.isAlive()) return STOPSTATUS.STOPPED;
 		if (!force) return STOPSTATUS.ALIVE;
 		getLogger().warn("Dispatcher="+getName()+": Forced stop after timeout="+timeout+" - Interrupt="+INTERRUPT_FRIENDLY);
-		if (INTERRUPT_FRIENDLY) thrd_main.interrupt(); //maximise the chances of waking up a blocked thread
+		if (INTERRUPT_FRIENDLY) threadMain.interrupt(); //maximise the chances of waking up a blocked thread
 		stop();
 		if (waitStopped(TMT_FORCEDSTOP, false) == STOPSTATUS.STOPPED) return STOPSTATUS.FORCED;
 		return STOPSTATUS.ALIVE; //failed to stop it - could only happen if blocked in an application callback
@@ -333,17 +334,17 @@ public class Dispatcher
 	private void activate() throws java.io.IOException
 	{
 		getLogger().info("Dispatcher="+getName()+": Entering Reactor event loop with Naflets="+getNafletCount()+"/"+dynamicRunnables.size()
-				+", Channels="+activechannels.size()+", Timers="+activetimers.size()+", shutdown="+shutdownRequested+"/zeroNaflets="+zeroNafletsOK);
+				+", Channels="+activeChannels.size()+", Timers="+activeTimers.size()+", shutdown="+shutdownRequested+"/zeroNaflets="+zeroNafletsOK);
 
-		while (!shutdownRequested && (activechannels.size() + activetimers.size() != 0))
+		while (!shutdownRequested && (activeChannels.size() + activeTimers.size() != 0))
 		{
 			if (INTERRUPT_FRIENDLY) Thread.interrupted();//clear any pending interrupt status
 			systime_msecs = 0;
 
-			if (activetimers.size() == 0) {
+			if (activeTimers.size() == 0) {
 				if (slct.select() != 0) fireIO();
 			} else {
-				long iotmt = activetimers.get(0).getExpiryTime() - getSystemTime();
+				long iotmt = activeTimers.get(0).getExpiryTime() - getSystemTime();
 				if (iotmt <= 0) {
 					//next timer already due, but we still need to check for I/O as well
 					if (slct.selectNow() != 0) fireIO();
@@ -366,8 +367,8 @@ public class Dispatcher
 			finalkeys = slct.selectNow();
 		}
 		getLogger().info("Dispatcher="+getName()+": Reactor event loop terminated - Naflets="+getNafletCount()+"/"+dynamicRunnables.size()
-				+", Channels="+activechannels.size()+"/"+finalkeys
-				+", Timers="+activetimers.size()+" (pending="+pendingtimers.size()+")");
+				+", Channels="+activeChannels.size()+"/"+finalkeys
+				+", Timers="+activeTimers.size()+" (pending="+pendingTimers.size()+")");
 	}
 
 	private void fireTimers()
@@ -378,17 +379,17 @@ public class Dispatcher
 		// It would also not be safe to take the obvious option of storing pending timers as an ArrayList
 		// and looping over it, as pending timers can be withdrawn by the action of preceding ones, and
 		// that would throw the loop iteration out.
-		while (activetimers.size() != 0) {
+		while (activeTimers.size() != 0) {
 			// Fire within milliseconds of maturity, as jitter in the system clock means the NIO
 			// Selector can trigger a fraction early.
-			TimerNAF tmr = activetimers.get(0);
+			TimerNAF tmr = activeTimers.get(0);
 			if (tmr.getExpiryTime() - getSystemTime() >= TimerNAF.JITTER_THRESHOLD) break; //no expired timers left
-			activetimers.remove(0);
-			pendingtimers.add(tmr);
+			activeTimers.remove(0);
+			pendingTimers.add(tmr);
 		}
 		TimerNAF tmr;
 
-		while ((tmr = pendingtimers.remove()) != null) {
+		while ((tmr = pendingTimers.remove()) != null) {
 			try {
 				tmr.fire(this);
 			} catch (Throwable ex) {
@@ -398,7 +399,7 @@ public class Dispatcher
 					getLogger().log(LEVEL.ERR, ex2, true, "Dispatcher="+getName()+": Error handler failed on timer - "+tmr);
 				}
 			}
-			sparetimers.store(tmr.clear());
+			timerPool.store(tmr.clear());
 		}
 	}
 
@@ -477,14 +478,14 @@ public class Dispatcher
 	// to deregisterlIO().
 	// In between, they can can call monitorIO() multiple times to stop and start listening for specific I/O events.
 	void registerIO(ChannelMonitor cm) {
-		if (activechannels.put(cm.getCMID(), cm) != null) {
+		if (activeChannels.put(cm.getCMID(), cm) != null) {
 			throw new IllegalStateException("Dispatcher="+getName()+": Illegal registerIO on CM="+cm.getClass().getName()+"/E"+cm.getCMID()
 					+" - Ops="+showInterestOps(cm.getRegistrationKey())+" - "+cm);
 		}
 	}
 
 	void deregisterIO(ChannelMonitor cm) {
-		if (activechannels.remove(cm.getCMID()) == null) {
+		if (activeChannels.remove(cm.getCMID()) == null) {
 			throw new IllegalStateException("Dispatcher="+getName()+": Illegal deregisterIO on CM="+cm.getClass().getName()+"/E"+cm.getCMID()
 					+" - Ops="+showInterestOps(cm.getRegistrationKey())+" - "+cm);
 		}
@@ -495,7 +496,7 @@ public class Dispatcher
 	}
 
 	void conditionalDeregisterIO(ChannelMonitor cm) {
-		if (activechannels.containsKey(cm.getCMID())) deregisterIO(cm);
+		if (activeChannels.containsKey(cm.getCMID())) deregisterIO(cm);
 	}
 
 	void monitorIO(ChannelMonitor cm, int ops) throws java.nio.channels.ClosedChannelException {
@@ -513,7 +514,7 @@ public class Dispatcher
 	}
 
 	public TimerNAF setTimer(long interval, int type, TimerNAF.Handler handler, Object attachment) {
-		TimerNAF tmr = sparetimers.extract().init(this, handler, interval, type, ++uniqid_timer, attachment);
+		TimerNAF tmr = timerPool.extract().init(this, handler, interval, type, nextTimerId++, attachment);
 		if (shutdownRequested && interval < shutdown_timer_advance) {
 			//This timer will never get fired, so if it was intended as a zero-second (or similiar)
 			//action, do it now.
@@ -525,7 +526,7 @@ public class Dispatcher
 			} catch (Throwable ex) {
 				getLogger().log(LEVEL.ERR, ex, true, "Dispatcher="+getName()+": Shutdown error on Timer handler - "+tmr);
 			}
-			sparetimers.store(tmr.clear());
+			timerPool.store(tmr.clear());
 			return null; //callers need to handle null return as meaning timer already executed
 		}
 		activateTimer(tmr);
@@ -534,30 +535,30 @@ public class Dispatcher
 
 	void cancelTimer(TimerNAF tmr) {
 		//remove from scheduled queue
-		if (!activetimers.remove(tmr)) {
+		if (!activeTimers.remove(tmr)) {
 			//remove from ready-to-fire queue
-			if (!pendingtimers.withdraw(tmr)) {
+			if (!pendingTimers.withdraw(tmr)) {
 				//unknown timer - it is safe to repeat a cancel-timer op, but this could be a bug - worth logging
-				getLogger().info("Dispatcher="+getName()+": Cancel on unknown Timer="+tmr+" - "+activetimers+" - pend="+pendingtimers);
+				getLogger().info("Dispatcher="+getName()+": Cancel on unknown Timer="+tmr+" - "+activeTimers+" - pend="+pendingTimers);
 				return;
 			}
 		}
 		//NB: This is safe against duplicate store() calls because it's illegal to cancel a timer after it's fired
-		sparetimers.store(tmr.clear());
+		timerPool.store(tmr.clear());
 	}
 
 	void resetTimer(TimerNAF tmr) {
 		tmr.resetExpiry();
-		int idx = activetimers.indexOf(tmr);
+		int idx = activeTimers.indexOf(tmr);
 
 		if (idx == -1) {
 			// Timer either no longer exists, or has been expired but not yet fired. If the latter, we
 			// need to remove it from the about-to-fire expired list
 			// Either way, it is not currently on active list, and so needs to be inserted into it.
-			pendingtimers.withdraw(tmr);
+			pendingTimers.withdraw(tmr);
 		} else {
 			// The timer is already scheduled - remove from active list, before re-inserting in new position
-			activetimers.remove(idx);
+			activeTimers.remove(idx);
 		}
 		activateTimer(tmr);
 	}
@@ -566,15 +567,15 @@ public class Dispatcher
 		int pos = 0; // will insert new timer at head of list, if we don't find any earlier timers
 		if (tmr.getInterval() != 0) {
 			//zero-sec timers go straight to front of queue, even ahead of other zero-sec ones
-			for (int idx = activetimers.size() - 1; idx != -1; idx--) {
-				if (tmr.getExpiryTime() >= activetimers.get(idx).getExpiryTime()) {
+			for (int idx = activeTimers.size() - 1; idx != -1; idx--) {
+				if (tmr.getExpiryTime() >= activeTimers.get(idx).getExpiryTime()) {
 					// insert tmr AFTER this node
 					pos = idx + 1;
 					break;
 				}
 			}
 		}
-		activetimers.insert(pos, tmr);
+		activeTimers.insert(pos, tmr);
 	}
 
 	@Override
@@ -729,7 +730,7 @@ public class Dispatcher
 	// start-time check anyway for robustness.
 	public boolean killConnection(int id, long stime, String diag) throws java.io.IOException
 	{
-		ChannelMonitor cm = activechannels.get(id);
+		ChannelMonitor cm = activeChannels.get(id);
 		if (cm == null) return false;
 		if (stime != 0 && stime != cm.getStartTime()) return false;
 		cm.ioDisconnected(diag);
@@ -746,7 +747,7 @@ public class Dispatcher
 			sb.setLength(0);
 		}
 		NafManAgent agent  = getNafManAgent();
-		dtcal.setTimeInMillis(timeboot);
+		dtcal.setTimeInMillis(timeBoot);
 		sb.append("<infonodes>");
 		sb.append("<infonode name=\"Disposition\" dispatcher=\"").append(getName()).append("\">");
 		sb.append("Application-Context = ").append(getApplicationContext().getName());
@@ -786,10 +787,10 @@ public class Dispatcher
 
 		// NB: 'total' attribute will be different to 'item' count, as the former is the actual number of
 		// registered channels, while the latter is only the "interesting" ones.
-		sb.append("<infonode name=\"IO Channels\" total=\"").append(activechannels.size()).append("\">");
-		IteratorInt itcm = activechannels.keysIterator();
+		sb.append("<infonode name=\"IO Channels\" total=\"").append(activeChannels.size()).append("\">");
+		IteratorInt itcm = activeChannels.keysIterator();
 		while (itcm.hasNext()) {
-			ChannelMonitor cm = activechannels.get(itcm.next());
+			ChannelMonitor cm = activeChannels.get(itcm.next());
 			int prevlen1 = sb.length();
 			sb.append("<item id=\"").append(cm.getCMID()).append("\"");
 			sb.append(" cankill=\"y\"").append(" time=\"").append(cm.getStartTime()).append("\"");
@@ -810,10 +811,10 @@ public class Dispatcher
 		sb.append("</infonode>");
 
 		// As above, the 'total' attribute will be different to the 'item' count, as the latter depends on various options
-		sb.append("<infonode name=\"Timers\" total=\"").append(activetimers.size()).append("\">");
-		int cnt = (verbose ? activetimers.size() : 0);
+		sb.append("<infonode name=\"Timers\" total=\"").append(activeTimers.size()).append("\">");
+		int cnt = (verbose ? activeTimers.size() : 0);
 		for (int idx = 0; idx != cnt; idx++) {
-			TimerNAF tmr = activetimers.get(idx);
+			TimerNAF tmr = activeTimers.get(idx);
 			sb.append("<item>ID=").append(tmr.getID()).append(':').append(tmr.getType()).append(" - Expires ");
 			TimeOps.makeTimeLogger(tmr.getExpiryTime(), sb, true, true).append(" (");
 			TimeOps.expandMilliTime(tmr.getInterval(), sb, false).append(")<br/>Handler=");
@@ -863,7 +864,7 @@ public class Dispatcher
 	}
 
 	private String threadInfo() {
-		return (launched?(isRunning()?"live":"dead"):"init")+"/"+thrd_main.getState();
+		return (launched?(isRunning()?"live":"dead"):"init")+"/"+threadMain.getState();
 	}
 
 	@Override

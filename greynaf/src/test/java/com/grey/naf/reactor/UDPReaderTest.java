@@ -9,6 +9,7 @@ import com.grey.base.utils.FileOps;
 import com.grey.base.utils.IP;
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
+import com.grey.naf.BufferSpec;
 import com.grey.naf.TestUtils;
 
 // This tests the UDP mode of IOExecReader
@@ -19,13 +20,13 @@ public class UDPReaderTest
 	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext("UDPReaderTest", true);
 
 	@org.junit.Test
-	public void testDirect() throws java.io.IOException
+	public void testDirectBuffers() throws java.io.IOException
 	{
 		runtest(true);
 	}
 
 	@org.junit.Test
-	public void testHeap() throws java.io.IOException
+	public void testHeapBuffers() throws java.io.IOException
 	{
 		runtest(false);
 	}
@@ -42,6 +43,7 @@ public class UDPReaderTest
 
 		// set up UDP reader
 		Reader rdr = new Reader(dsptch, directbufs);
+		dsptch.loadRunnable(rdr);
 
 		// queue up incoming messages on the UDP reader
 		java.net.DatagramSocket wsock = new java.net.DatagramSocket();
@@ -67,30 +69,20 @@ public class UDPReaderTest
 	private static class Reader
 		extends CM_UDP
 	{
-		private final java.nio.channels.DatagramChannel udpchan;
 		private int msgcnt;
 		public boolean completed;
 		public boolean disc_flag;
 		public int senderPort;
 
-		public Reader(Dispatcher d, boolean directbufs) throws java.io.IOException
-		{
-			super(d, new com.grey.naf.BufferSpec(1024, 0, directbufs, null));
-	        byte[] ipbytes = IP.ip2net(IP.IP_LOCALHOST, null, 0);
-	        java.net.InetAddress ipaddr_localhost = java.net.InetAddress.getByAddress(ipbytes);
+		@Override
+		public String getName() {return "UTEST-Reader-UDP";}
 
-			udpchan = java.nio.channels.DatagramChannel.open();
-			java.net.DatagramSocket sock = udpchan.socket();
-	        java.net.InetSocketAddress saddr = new java.net.InetSocketAddress(ipaddr_localhost, 0);
-			sock.bind(saddr);
-
-			registerConnectionlessChannel(udpchan, true);
-			getReader().receive();
+		public Reader(Dispatcher d, boolean directbufs) throws java.io.IOException {
+			super(d, makeAddress(), new BufferSpec(1024, 0, directbufs, null), 0);
 		}
 
 		@Override
-		public void ioReceived(ByteArrayRef data, java.net.InetSocketAddress remaddr) throws java.io.IOException
-		{
+		public void ioReceived(ByteArrayRef data, java.net.InetSocketAddress remaddr) throws java.io.IOException {
 			String msg = iomessages[msgcnt++];
 			org.junit.Assert.assertEquals(msg.length(), data.size());
 			org.junit.Assert.assertEquals(msg, new String(data.buffer(), data.offset(), data.size()));
@@ -108,6 +100,12 @@ public class UDPReaderTest
 		@Override
 		protected void ioDisconnected(CharSequence diagnostic) {
 			disc_flag = true;
+		}
+
+		private static java.net.SocketAddress makeAddress() throws java.io.IOException {
+			byte[] ipbytes = IP.ip2net(IP.IP_LOCALHOST, null, 0);
+			java.net.InetAddress ipaddr_localhost = java.net.InetAddress.getByAddress(ipbytes);
+			return new java.net.InetSocketAddress(ipaddr_localhost, 0);
 		}
 	}
 }

@@ -107,7 +107,8 @@ public abstract class CM_Listener
 
 	@Override
 	public String toString() {
-		return getClass().getName()+"="+getName()+" for "+getServerType()+" with controller="+getController()
+		Class<?> srvclass = getServerType();
+		return super.toString()+" - name="+getName()+" with server="+(srvclass==null?null:srvclass.getName())+", controller="+getController()
 				+" on "+getIP()+":"+getPort()+" - ssl="+getSSLConfig();
 	}
 }
