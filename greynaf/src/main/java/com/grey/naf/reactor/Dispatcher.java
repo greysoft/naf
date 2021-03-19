@@ -55,7 +55,6 @@ public class Dispatcher
 	private final Thread threadMain;
 	private final Thread threadInitial;
 	private final boolean surviveHandlers; //survive error in event handlers
-	private final boolean zeroNafletsOK;  //true means ok if no Naflets running, else exit when count falls to zero
 	private final long timeBoot;
 
 	private final Map<String, Object> namedItems = new ConcurrentHashMap<>();
@@ -142,7 +141,6 @@ public class Dispatcher
 		this.appctx = appctx;
 		dname = def.getName();
 		surviveHandlers = def.isSurviveHandlers();
-		zeroNafletsOK = def.isZeroNafletsOK();
 
 		clock = def.getClock();
 		timeBoot = clock.millis();
@@ -167,8 +165,7 @@ public class Dispatcher
 		if (getLogger() != initlog) flusher.register(getLogger());
 
 		getLogger().info("Dispatcher="+dname+": Initialised with baseport="+appctx.getConfig().getBasePort()
-				+", NAFMan="+(appctx.getNafManConfig()!=null)+", Naflets="+getNafletCount()
-				+", survive_handlers="+surviveHandlers+", zero_naflets="+zeroNafletsOK
+				+", NAFMan="+(appctx.getNafManConfig()!=null)+", survive_handlers="+surviveHandlers
 				+", flush="+TimeOps.expandMilliTime(def.getFlushInterval()));
 		getLogger().info("Dispatcher="+dname+": Selector="+slct.getClass().getCanonicalName()
 				+", Provider="+slct.provider().getClass().getCanonicalName()
@@ -231,8 +228,8 @@ public class Dispatcher
 	private boolean stopSynchronously()
 	{
 		if (shutdownPerformed) return true;
-		getLogger().info("Dispatcher="+getName()+": Received Stop request - naflets="+getNafletCount()+"/"+dynamicRunnables.size()+", Channels="+activeChannels.size()
-				+", shutdownreq="+shutdownRequested+", Thread="+threadInfo());
+		getLogger().info("Dispatcher="+getName()+": Received Stop request with shutdown="+shutdownRequested+"/"+launched+", Thread="+threadInfo()
+				+" - Runnables="+dynamicRunnables.size()+"/"+getNafletCount()+", Channels="+activeChannels.size());
 		shutdownRequested = true; //must set this before notifying the runnables
 
 		if (launched) {
@@ -246,8 +243,8 @@ public class Dispatcher
 	private void shutdown(boolean endOfLife)
 	{
 		if (shutdownPerformed) return;
-		getLogger().info("Dispatcher="+getName()+" in shutdown with endOfLife="+endOfLife+" - Thread="+threadInfo()
-				+"Naflets="+getNafletCount()+"/"+dynamicRunnables.size()+", Channels="+activeChannels.size()
+		getLogger().info("Dispatcher="+getName()+" in shutdown with endOfLife="+endOfLife+", Thread="+threadInfo()
+				+" - Runnables="+dynamicRunnables.size()+"/"+getNafletCount()+", Channels="+activeChannels.size()
 				+", Timers="+activeTimers.size()+":"+pendingTimers.size()
 				+" (well="+timerPool.size()+"/"+timerPool.population()+")");
 		try {
@@ -271,7 +268,9 @@ public class Dispatcher
 			closeAllChannels();
 			getLogger().info("Issued Disconnects - remaining channels="+(activeChannels.size()==0?Integer.valueOf(0):activeChannels));
 		}
-		for (DispatcherRunnable r : dynamicRunnables) {
+
+		List<DispatcherRunnable> lst = new ArrayList<>(dynamicRunnables);// take copy of list to prevent concurrent modification
+		for (DispatcherRunnable r : lst) {
 			if (r instanceof ChannelMonitor) { //activeChannels should now be empty, but skip any entries that might remain
 				ChannelMonitor cm = (ChannelMonitor)r;
 				if (activeChannels.get(cm.getCMID()) == r) continue;
@@ -283,7 +282,7 @@ public class Dispatcher
 		dynamicLoader.stopDispatcherRunnable();
 		getApplicationContext().deregister(this);
 
-		getLogger().info("Dispatcher="+getName()+": Shutdown completed - Naflets="+getNafletCount()+"/"+dynamicRunnables.size()+", Channels="+activeChannels.size()
+		getLogger().info("Dispatcher="+getName()+": Shutdown completed - Runnables="+dynamicRunnables.size()+"/"+getNafletCount()+", Channels="+activeChannels.size()
 				+", Timers="+activeTimers.size()+":"+pendingTimers.size()
 				+", reapers="+reaper_cnt);
 		if (dynamicRunnables.size() != 0) getLogger().trace("Dynamic Runnables: "+dynamicRunnables);
@@ -293,8 +292,9 @@ public class Dispatcher
 
 	private void closeAllChannels() {
 		List<CM_Listener> lstnrs = new ArrayList<>();
+		List<ChannelMonitor> lst = new ArrayList<>(activeChannels.getValues()); // take copy of list to prevent concurrent modification
 
-		for (ChannelMonitor cm : activeChannels.getValues()) {
+		for (ChannelMonitor cm : lst) {
 			if (!activeChannels.containsValue(cm)) continue; //must have been removed as side-effect of another close
 			if (cm instanceof CM_Listener) {
 				//needs to be stopped in a top-down manner below, rather than bubbling up from socket closure
@@ -333,8 +333,8 @@ public class Dispatcher
 	// It will execute in here for the entirety of its lifetime, until all the events it is monitoring cease to be.
 	private void activate() throws java.io.IOException
 	{
-		getLogger().info("Dispatcher="+getName()+": Entering Reactor event loop with Naflets="+getNafletCount()+"/"+dynamicRunnables.size()
-				+", Channels="+activeChannels.size()+", Timers="+activeTimers.size()+", shutdown="+shutdownRequested+"/zeroNaflets="+zeroNafletsOK);
+		getLogger().info("Dispatcher="+getName()+": Entering Reactor event loop with Runnables="+dynamicRunnables.size()+"/"+getNafletCount()
+				+", Channels="+activeChannels.size()+", Timers="+activeTimers.size()+", shutdown="+shutdownRequested);
 
 		while (!shutdownRequested && (activeChannels.size() + activeTimers.size() != 0))
 		{
@@ -357,8 +357,6 @@ public class Dispatcher
 					}
 				}
 			}
-			// we do this check after loop, as Naflets are not loaded until this method handles pending I/O
-			if (!zeroNafletsOK && getNafletCount() == 0) break;
 		}
 
 		int finalkeys = -1;
@@ -366,7 +364,7 @@ public class Dispatcher
 			//do a final Select to flush the SelectionKeys, as they're always one interval in arrears
 			finalkeys = slct.selectNow();
 		}
-		getLogger().info("Dispatcher="+getName()+": Reactor event loop terminated - Naflets="+getNafletCount()+"/"+dynamicRunnables.size()
+		getLogger().info("Dispatcher="+getName()+": Reactor event loop terminated - Runnables="+dynamicRunnables.size()+"/"+getNafletCount()
 				+", Channels="+activeChannels.size()+"/"+finalkeys
 				+", Timers="+activeTimers.size()+" (pending="+pendingTimers.size()+")");
 	}
@@ -581,7 +579,7 @@ public class Dispatcher
 	@Override
 	public void entityStopped(Object entity) {
 		boolean exists = (entity instanceof DispatcherRunnable ? dynamicRunnables.remove(entity) : false);
-		getLogger().info("Dispatcher="+getName()+" has received entity termination with exists="+exists+", naflets="+getNafletCount()+"/"+dynamicRunnables.size()+" - "+entity);
+		getLogger().info("Dispatcher="+getName()+" has received entity termination with exists="+exists+", runnables="+dynamicRunnables.size()+"/"+getNafletCount()+" - "+entity);
 	}
 
 	@Override

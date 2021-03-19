@@ -309,7 +309,10 @@ public class BatchResolver
         }
         ostrm.println("Cache hits = "+(cache_hits-stats[ResolverAnswer.STATUS.BADNAME.ordinal()]));
 		ostrm.close();
-		logger.log(LEVEL.INFO, LOGLBL+"Terminated");
+		logger.log(LEVEL.INFO, LOGLBL+"Stopping Natflet");
 		nafletStopped();
+		logger.log(LEVEL.INFO, LOGLBL+"Stopping Dispatcher");
+		getDispatcher().stop();
+		logger.log(LEVEL.INFO, LOGLBL+"Naflet terminated");
 	}
 }

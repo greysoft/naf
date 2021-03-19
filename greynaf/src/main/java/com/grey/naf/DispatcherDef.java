@@ -16,7 +16,6 @@ public class DispatcherDef
 	private final String name;
 	private final String logName;
 	private final boolean surviveHandlers;
-	private final boolean zeroNafletsOK;
 	private final long flushInterval;
 	private final Clock clock;
 
@@ -24,7 +23,6 @@ public class DispatcherDef
 		name = bldr.name;
 		logName = bldr.logName;
 		surviveHandlers = bldr.surviveHandlers;
-		zeroNafletsOK = bldr.zeroNafletsOK;
 		flushInterval = bldr.flushInterval;
 		clock = bldr.clock;
 	}
@@ -41,10 +39,6 @@ public class DispatcherDef
 		return surviveHandlers;
 	}
 
-	public boolean isZeroNafletsOK() {
-		return zeroNafletsOK;
-	}
-
 	public long getFlushInterval() {
 		return flushInterval;
 	}
@@ -58,7 +52,6 @@ public class DispatcherDef
 		private String name;
 		private String logName = SysProps.get(SYSPROP_LOGNAME, name);
 		private boolean surviveHandlers = true;
-		private boolean zeroNafletsOK = true;
 		private long flushInterval;
 		private Clock clock = Clock.systemUTC();
 
@@ -68,7 +61,6 @@ public class DispatcherDef
 			name = defs.name;
 			logName = defs.logName;
 			surviveHandlers = defs.surviveHandlers;
-			zeroNafletsOK = defs.zeroNafletsOK;
 			flushInterval = defs.flushInterval;
 			clock = defs.clock;
 		}
@@ -77,7 +69,6 @@ public class DispatcherDef
 			name = cfg.getValue("@name", true, name);
 			logName = cfg.getValue("@logname", true, logName == null ? name : logName);
 			surviveHandlers = cfg.getBool("@survive_handlers", surviveHandlers);
-			zeroNafletsOK = cfg.getBool("@zero_naflets", zeroNafletsOK);
 			flushInterval = cfg.getTime("@flush", flushInterval);
 			return this;
 		}
@@ -94,11 +85,6 @@ public class DispatcherDef
 
 		public Builder withSurviveHandlers(boolean v) {
 			surviveHandlers = v;
-			return this;
-		}
-
-		public Builder withZeroNafletsOK(boolean v) {
-			zeroNafletsOK = v;
 			return this;
 		}
 

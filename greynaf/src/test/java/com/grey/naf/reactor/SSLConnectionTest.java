@@ -150,7 +150,6 @@ public class SSLConnectionTest
 		// create the Dispatcher
 		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
 				.withSurviveHandlers(false)
-				.withZeroNafletsOK(false)
 				.build();
 		dsptch = Dispatcher.create(appctx, def, com.grey.logging.Factory.getLogger("no-such-logger"));
 
@@ -295,8 +294,8 @@ public class SSLConnectionTest
 
 	@Override
 	public void timerIndication(TimerNAF tmr, Dispatcher d) throws java.io.IOException {
-		boolean done = ctask.stopDispatcherRunnable();
-		org.junit.Assert.assertTrue(done);
+		boolean done = d.stop();
+		org.junit.Assert.assertFalse(done);
 	}
 
 	@Override

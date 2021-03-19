@@ -22,7 +22,6 @@ abstract public class Naflet implements DispatcherRunnable
 	private final String naflet_name;
 	private final Dispatcher dsptch;
 	private final XmlConfig taskcfg;
-	private final String cfgfile;
 
 	private volatile boolean aborted_startup;
 
@@ -32,7 +31,6 @@ abstract public class Naflet implements DispatcherRunnable
 	protected void abortOnStartup() {aborted_startup = true;}
 
 	public XmlConfig taskConfig() {return taskcfg;}
-	public String taskConfigFile() {return cfgfile;}
 	@Override
 	public String getName() {return naflet_name;}
 	@Override
@@ -44,20 +42,8 @@ abstract public class Naflet implements DispatcherRunnable
 	protected Naflet(String name, Dispatcher d, XmlConfig cfg) throws java.io.IOException {
 		naflet_name = name;
 		dsptch = d;
-		NAFConfig nafcfg = dsptch.getApplicationContext().getConfig();
-		cfgfile = nafcfg.getPath(cfg, "configfile", null, false, null, null);
-		getDispatcher().getLogger().info("Naflet="+naflet_name+": Initialising "+getClass().getName()+" in Dispatcher="+d.getName()+" - config="+cfgfile);
-
-		if (cfgfile != null) {
-			if (cfgfile.endsWith(".xml")) {
-				String cfgroot = nafcfg.get(cfg, "configfile/@root", null, true, null);
-				taskcfg = XmlConfig.getSection(cfgfile, cfgroot);
-			} else {
-				taskcfg = null; //application will have to use taskConfigFile() instead
-			}
-		} else {
-			taskcfg = cfg;
-		}
+		taskcfg = cfg;
+		getDispatcher().getLogger().info("Naflet="+naflet_name+": Initialising "+getClass().getName()+" in Dispatcher="+d.getName());
 	}
 
 	@Override
