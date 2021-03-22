@@ -208,9 +208,6 @@ public class RegistryTest
 		org.junit.Assert.assertFalse(mod);
 		org.junit.Assert.assertEquals(2, reg_handlers.size());
 		org.junit.Assert.assertNull(reg_handlers.get(cmdcode));
-
-		dsptch1.stop();
-		dsptch2.stop();
 	}
 
 	private static class DummyHandler implements NafManCommand.Handler

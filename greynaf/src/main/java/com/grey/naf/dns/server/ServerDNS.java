@@ -8,6 +8,7 @@ import com.grey.base.config.SysProps;
 import com.grey.base.utils.ByteArrayRef;
 import com.grey.base.utils.ByteChars;
 import com.grey.naf.reactor.Dispatcher;
+import com.grey.naf.reactor.DispatcherRunnable;
 import com.grey.naf.dns.resolver.PacketDNS;
 import com.grey.naf.dns.resolver.ResolverDNS;
 import com.grey.naf.dns.resolver.ResourceData;
@@ -19,7 +20,7 @@ import com.grey.logging.Logger;
  * application-specific sub-classes.
  * It was conceived mainly as a test harness for the NAF DNS-Resolver.
  */
-public class ServerDNS
+public class ServerDNS implements DispatcherRunnable
 {
 	public interface DNSQuestionResolver
 	{
@@ -49,10 +50,12 @@ public class ServerDNS
 
 	public java.net.InetAddress getLocalIP() {return transport_udp.getLocalIP();}
 	public int getLocalPort() {return transport_udp.getLocalPort();}
+	@Override
+	public String getName() {return "DNS-Server";}
+	@Override
 	public Dispatcher getDispatcher() {return dsptch;}
 
-	public ServerDNS(Dispatcher d, DNSQuestionResolver r, DnsServerConfig cfg) throws java.io.IOException
-	{
+	public ServerDNS(Dispatcher d, DNSQuestionResolver r, DnsServerConfig cfg) throws java.io.IOException {
 		dsptch = d;
 		responder = r;
 		handlers = new Handlers(this);
@@ -64,30 +67,16 @@ public class ServerDNS
 		if (IGNORE_QTRAIL) dsptch.getLogger().info("DNS-Server: Will ignore trailing bytes in incoming queries");
 	}
 
-	public void start() throws java.io.IOException
-	{
+	@Override
+	public void startDispatcherRunnable() throws java.io.IOException {
 		listener_tcp.startDispatcherRunnable();
 		transport_udp.startDispatcherRunnable();
-		dsptch.registerReaper(handlers);
-		dsptch.start();
-	}
-
-	public boolean stop()
-	{
-		return dsptch.stop();
-	}
-
-	private void dispatcherStopped()
-	{
-		transport_udp.stopDispatcherRunnable();
-		listener_tcp.stopDispatcherRunnable();
 	}
 
 	// NB: No need to defend against buffer overflow during query decoding, as Dispatcher will simply catch and log the
 	// ArrayIndexOutOfBoundsException for us. No need to send an error response in that situation either, as the sender
 	// was obviously just being rude.
-	void queryReceived(ByteArrayRef rcvdata, java.net.InetSocketAddress remote_addr, TransportTCP tcp) throws java.io.IOException
-	{
+	void queryReceived(ByteArrayRef rcvdata, java.net.InetSocketAddress remote_addr, TransportTCP tcp) throws java.io.IOException {
 		handlers.qry_qtype = 0;
 		handlers.qry_qname = null;
 		boolean is_auth = false; //this method only sends a response on failure, so don't claim to be authoritative.
@@ -205,7 +194,7 @@ public class ServerDNS
 	
 	// Move the override methods into an inner class, purely so as not to be externally visible
 	private static final class Handlers
-		implements PacketDNS.MessageCallback, com.grey.naf.EntityReaper
+		implements PacketDNS.MessageCallback
 	{
 		private final ServerDNS srvr;
 		private final Dispatcher dsptch;
@@ -218,13 +207,6 @@ public class ServerDNS
 
 		@Override
 		public long getSystemTime() {return dsptch.getSystemTime();}
-
-		@Override
-		public void entityStopped(Object obj)
-		{
-			if (obj != dsptch) return;
-			srvr.dispatcherStopped();
-		}
 
 		@Override
 		public boolean handleMessageQuestion(int qid, int qnum, int qcnt, byte qt, byte qclass, ByteChars qn, java.net.InetSocketAddress remote_addr) {

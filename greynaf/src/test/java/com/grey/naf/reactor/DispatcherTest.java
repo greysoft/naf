@@ -32,7 +32,8 @@ public class DispatcherTest
 		org.junit.Assert.assertNotNull(dsptch);
 		org.junit.Assert.assertEquals(dname, dsptch.getName());
 		org.junit.Assert.assertTrue(dsptch.isRunning());
-		dsptch.stop();
+		boolean done = dsptch.stop();
+		org.junit.Assert.assertFalse(done);
 		waitStopped(dsptch);
 		org.junit.Assert.assertEquals(appctx.getDispatchers().toString(), 0, appctx.getDispatchers().size());
 		org.junit.Assert.assertNull(appctx.getDispatcher(dname));
@@ -56,9 +57,11 @@ public class DispatcherTest
 			org.junit.Assert.fail("Failed to trap duplicate Dispatcher name");
 		} catch (NAFConfigException ex) {}
 		org.junit.Assert.assertFalse(dsptch.isRunning());
-		boolean sts = dsptch.stop();
-		org.junit.Assert.assertTrue(sts);
-		org.junit.Assert.assertFalse(dsptch.isRunning());
+		dsptch.start();
+		org.junit.Assert.assertTrue(dsptch.isRunning());
+		boolean done = dsptch.stop();
+		org.junit.Assert.assertFalse(done);
+		waitStopped(dsptch);
 
 		dcfg = appctx.getConfig().getDispatcher("x"+dname);
 		org.junit.Assert.assertNull(dcfg);
@@ -79,7 +82,8 @@ public class DispatcherTest
 		org.junit.Assert.assertTrue(dsptch.getApplicationContext().getConfig().isAnonymousBasePort());
 		dsptch.start();
 		org.junit.Assert.assertTrue(dsptch.isRunning());
-		dsptch.stop();
+		boolean done = dsptch.stop();
+		org.junit.Assert.assertFalse(done);
 		waitStopped(dsptch);
 
 		//make sure it can be run again

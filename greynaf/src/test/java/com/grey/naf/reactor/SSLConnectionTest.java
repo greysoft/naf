@@ -10,6 +10,7 @@ import com.grey.base.utils.FileOps;
 import com.grey.base.utils.IP;
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
+import com.grey.naf.EntityReaper;
 import com.grey.naf.SSLConfig;
 import com.grey.naf.reactor.config.ConcurrentListenerConfig;
 import com.grey.naf.TestUtils;
@@ -18,7 +19,7 @@ import com.grey.naf.TestUtils;
  * Note that this test class also exercises ListenerSet, ConcurrentListener and the Naflet class.
  */
 public class SSLConnectionTest
-	implements com.grey.naf.EntityReaper, CM_Listener.Reporter, TimerNAF.Handler
+	implements EntityReaper, CM_Listener.Reporter, TimerNAF.Handler
 {
 	private enum FAILTYPE {NONE, NOCONNECT, BADCERT_PURE, BADCERT_SWITCH};
 	private static final String rootdir = TestUtils.initPaths(SSLConnectionTest.class);
@@ -184,8 +185,8 @@ public class SSLConnectionTest
 			cport = srvport + 1000; //hopefully no such port exists
 			if (cport > (Short.MAX_VALUE & 0xffff)) cport = Short.MAX_VALUE - 10;
 		}
-		SSLC clnt = new SSLC(dsptch, clntcfg, cport);
-		clnt.start(this);
+		SSLC clnt = new SSLC(dsptch, clntcfg, cport, this);
+		dsptch.loadRunnable(clnt);
 
 		// set up a no-op Naflet which simply goes through the motions
 		ctask = new SSLTask("utest_sslc", dsptch);
@@ -298,9 +299,6 @@ public class SSLConnectionTest
 		org.junit.Assert.assertFalse(done);
 	}
 
-	@Override
-	public void eventError(TimerNAF tmr, Dispatcher d, Throwable ex) {}
-
 	private static String resourcePath(String cp)
 	{
 		try {
@@ -331,24 +329,27 @@ public class SSLConnectionTest
 
 
 	private static class SSLC
-		extends CM_Client
+		extends CM_Client implements DispatcherRunnable
 	{
 		public final EntityState state = new EntityState();
 		private final com.grey.naf.SSLConfig sslconfig;
+		private final EntityReaper rpr;
+		private final int srvport;
 		private java.nio.channels.SelectableChannel chan;
 		public boolean completed;
 		public int was_connected;
 		public boolean was_disconnected;
-		private final int srvport;
 		public int recvstep;
 		public int sendstep;
 
 		@Override
 		protected com.grey.naf.SSLConfig getSSLConfig() {return sslconfig;}
+		@Override
+		public String getName() {return "SSLConnectionTest.SSLC";}
 
-		public SSLC(Dispatcher d, XmlConfig cfg, int port) throws java.io.IOException
-		{
+		public SSLC(Dispatcher d, XmlConfig cfg, int port, EntityReaper rpr) throws java.io.IOException {
 			super(d, new com.grey.naf.BufferSpec(cfg, "niobuffers", 256, 128), new com.grey.naf.BufferSpec(cfg, "niobuffers", 256, 128));
+			this.rpr = rpr;
 			srvport = port;
 			XmlConfig sslcfg = (cfg == null ? XmlConfig.NULLCFG : cfg.getSection("ssl"));
 			if (sslcfg == null || !sslcfg.exists()) {
@@ -362,8 +363,8 @@ public class SSLConnectionTest
 			}
 		}
 
-		public void start(com.grey.naf.EntityReaper rpr) throws java.io.IOException, java.net.UnknownHostException
-		{
+		@Override
+		public void startDispatcherRunnable() throws java.io.IOException {
 			com.grey.base.utils.TSAP srvr = com.grey.base.utils.TSAP.build(null, srvport);
 			initChannelMonitor();
 			setReaper(rpr);
@@ -371,8 +372,7 @@ public class SSLConnectionTest
 		}
 
 		@Override
-		protected void connected(boolean success, CharSequence diagnostic, Throwable ex) throws java.io.IOException
-		{
+		protected void connected(boolean success, CharSequence diagnostic, Throwable ex) throws java.io.IOException {
 			was_connected = (success ? 1 : -1);
 			chan = getChannel();
 			if (!success) {
@@ -399,8 +399,7 @@ public class SSLConnectionTest
 		}
 
 		@Override
-		public void ioReceived(ByteArrayRef rcvdata) throws java.io.IOException
-		{
+		public void ioReceived(ByteArrayRef rcvdata) throws java.io.IOException {
 			getReader().endReceive();
 			int srvstep = (recvstep / 2) + 1;
 			recvstep++;
@@ -425,14 +424,12 @@ public class SSLConnectionTest
 		}
 
 		@Override
-		protected void startedSSL() throws java.io.IOException
-		{
+		protected void startedSSL() throws java.io.IOException {
 			org.junit.Assert.assertTrue(usingSSL());
 			sendRequest();
 		}
 
-		private boolean sendRequest() throws java.io.IOException
-		{
+		private boolean sendRequest() throws java.io.IOException {
 			boolean finished = false;
 			if (sendstep == iomessages.length+1) {
 				disconnect();
@@ -447,8 +444,7 @@ public class SSLConnectionTest
 			return finished;
 		}
 
-		private void sendfile() throws java.io.IOException
-		{
+		private void sendfile() throws java.io.IOException {
 			java.io.File fh = new java.io.File(pthnam_sendfile);
 			com.grey.base.utils.FileOps.ensureDirExists(fh.getParentFile());
 			org.junit.Assert.assertFalse(fh.exists());
@@ -468,8 +464,7 @@ public class SSLConnectionTest
 
 		// We don't have to override ioDisconnected(), but if we do, we must call disconnect() ourselves
 		@Override
-		public void ioDisconnected(CharSequence diagnostic) throws java.io.IOException
-		{
+		public void ioDisconnected(CharSequence diagnostic) throws java.io.IOException {
 			super.ioDisconnected(diagnostic);
 			was_disconnected = true;
 		}
@@ -486,15 +481,13 @@ public class SSLConnectionTest
 		public int step;
 		public boolean file_error;
 
-		SSLS(TestServerFactory fact)
-		{
+		SSLS(TestServerFactory fact) {
 			super(fact.lstnr, fact.bufspec, fact.bufspec);
 			org.junit.Assert.assertNotNull(getSSLConfig());
 		}
 
 		@Override
-		protected void connected() throws java.io.IOException
-		{
+		protected void connected() throws java.io.IOException {
 			boolean ok = false;
 			try {
 				chan = getChannel();
@@ -521,8 +514,7 @@ public class SSLConnectionTest
 		}
 
 		@Override
-		public void ioReceived(ByteArrayRef rcvdata) throws java.io.IOException
-		{
+		public void ioReceived(ByteArrayRef rcvdata) throws java.io.IOException {
 			boolean sendack = true;
 			getReader().endReceive();
 
@@ -559,8 +551,7 @@ public class SSLConnectionTest
 		}
 
 		@Override
-		public void ioDisconnected(CharSequence diagnostic) throws java.io.IOException
-		{
+		public void ioDisconnected(CharSequence diagnostic) throws java.io.IOException {
 			super.ioDisconnected(diagnostic);
 			org.junit.Assert.assertFalse(isConnected());
 			org.junit.Assert.assertNull(getChannel());
@@ -570,8 +561,7 @@ public class SSLConnectionTest
 		}
 
 		@Override
-		protected void startedSSL() throws java.io.IOException
-		{
+		protected void startedSSL() throws java.io.IOException {
 			org.junit.Assert.assertTrue(usingSSL());
 			getReader().receiveDelimited((byte)'\n');
 		}
@@ -591,8 +581,7 @@ public class SSLConnectionTest
 		@Override
 		public void shutdown() {}
 
-		public TestServerFactory(com.grey.naf.reactor.CM_Listener l, Object cfg)
-		{
+		public TestServerFactory(com.grey.naf.reactor.CM_Listener l, Object cfg) {
 			lstnr = l;
 			com.grey.base.config.XmlConfig xmlcfg = (com.grey.base.config.XmlConfig)cfg;
 			bufspec = new com.grey.naf.BufferSpec(xmlcfg, "niobuffers", 8 * 1024, 128);
@@ -606,17 +595,14 @@ public class SSLConnectionTest
 		public boolean usedSSL;
 		EntityState() {} //make explicit with non-private access, to eliminate synthetic accessor
 
-		void verifyReceivedMessage(String expected, ByteArrayRef actual)
-		{
+		void verifyReceivedMessage(String expected, ByteArrayRef actual) {
 			org.junit.Assert.assertEquals('\n', actual.buffer()[actual.offset(actual.size()-1)]);
 			actual.incrementSize(-1);
 			org.junit.Assert.assertEquals(expected.length(), actual.size());
 			org.junit.Assert.assertEquals(expected, new String(actual.buffer(), actual.offset(), actual.size()));
 		}
 
-		boolean verifySSL(CM_Stream cm, boolean havePeer, String expectedPeer, boolean switchssl)
-				throws java.io.IOException
-		{
+		boolean verifySSL(CM_Stream cm, boolean havePeer, String expectedPeer, boolean switchssl) throws java.io.IOException {
 			boolean switched = false;
 			java.security.cert.X509Certificate peercert = cm.getPeerCertificate();
 			java.security.cert.Certificate[] peerchain = cm.getPeerChain();

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Yusef Badri - All rights reserved.
+ * Copyright 2014-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -47,9 +47,10 @@ public abstract class CM_Stream extends ChannelMonitor
 	void registerChannel(java.nio.channels.SelectableChannel chan, boolean takeOwnership, boolean isconn, boolean app_knows)
 		throws java.io.IOException
 	{
-		registerChannel(chan, takeOwnership);
+		initChannel(chan, takeOwnership);
 		if (isconn) setFlagCM(S_ISCONN);
 		if (app_knows) setFlagCM(S_APPCONN);
+		registerChannel();
 		if (chanreader != null) chanreader.initChannel(this);
 		if (chanwriter != null) chanwriter.initChannel(this);
 	}

@@ -67,7 +67,7 @@ public abstract class CM_Listener
 		srvport = srvsock.getLocalPort();
 
 		getDispatcher().getApplicationContext().register(this);
-		registerChannel(srvchan, true);
+		initChannel(srvchan, true);
 
 		getLogger().info("Listener="+name+" bound to "+srvsock.getInetAddress()+":"+srvport+(port==0?"/dynamic":"")
 				         +(iface==null ? "" : " on interface="+iface)+"; Backlog="+srvbacklog);
@@ -76,6 +76,7 @@ public abstract class CM_Listener
 	@Override
 	public void startDispatcherRunnable() throws java.io.IOException {
 		getLogger().info("Listener="+getName()+": Starting up");
+		registerChannel();
 		enableListen();
 	}
 

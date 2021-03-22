@@ -132,7 +132,7 @@ public class Producer<T> implements DispatcherRunnable
 	// If exchgq already had unconsumed items on it, then we assume the owner Dispatcher has already been signalled,
 	// so we can skip the I/O cost of sending it a redundant signal.
 	private void produce(int exchq_prevsize) throws java.io.IOException {
-		if (getDispatcher().inDispatcherThread()) {
+		if (getDispatcher().isDispatcherThread()) {
 			producerEvent(); //we can synchronously call the Consumer
 		} else {
 			if (exchq_prevsize == 0) alertspipe.signalConsumer();  //one signal is enough
@@ -164,7 +164,8 @@ public class Producer<T> implements DispatcherRunnable
 
 	@Override
 	public String toString() {
-		return super.toString()+" Name="+getName()+"/"+itemClass.getName()+" with consumer="+consumer.getClass().getName()+"/"+consumer+" - alertspipe="+alertspipe.getCMID();
+		return super.toString()+" Name="+getName()+"/"+itemClass.getName()+" with consumer="+consumer.getClass().getName()+"/"+consumer
+				+" - Dispatcher="+alertspipe.getDispatcher().getName()+", alertspipe="+alertspipe.getCMID();
 	}
 
 

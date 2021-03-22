@@ -27,10 +27,14 @@ public class SecondaryAgent
 			throw new IllegalStateException("Dispatcher="+dsptch.getName()+": Cannot create Secondary NAFMAN before Primary");
 		}
 		requests = new Producer<NafManCommand>("NAFMAN-Agent-cmds", NafManCommand.class, dsptch, this);
+	}
 
-		// we have to subscribe to the Primary in our constructor due to unit-test timings, but 'requests' producer could be started in our start()
-		primary.secondarySubscribed(this);
+	@Override
+	public void start() throws java.io.IOException
+	{
+		super.start();
 		requests.startDispatcherRunnable();
+		primary.secondarySubscribed(this);
 	}
 
 	@Override

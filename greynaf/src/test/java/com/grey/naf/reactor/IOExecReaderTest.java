@@ -20,11 +20,59 @@ public class IOExecReaderTest
 	private static final String rootdir = TestUtils.initPaths(IOExecReaderTest.class);
 	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext("IORtest", true);
 
+	@org.junit.Test
+	public void testDirectBuffer() throws java.io.IOException
+	{
+		launch(new com.grey.naf.BufferSpec(25, 0, true, null));
+	}
+
+	@org.junit.Test
+	public void testHeapBuffer() throws java.io.IOException
+	{
+		launch(new com.grey.naf.BufferSpec(25, 0, false, null));
+	}
+
+	@org.junit.Test
+	public void testOffsetBuffer() throws java.io.IOException
+	{
+		int offset = 5;
+		com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(25, 0, false, null);
+		bufspec = Mockito.spy(bufspec);
+		Mockito.when(bufspec.createReadBuffer()).thenReturn(((ByteBuffer)NIOBuffers.create(bufspec.rcvbufsiz+offset, bufspec.directbufs).position(offset)).slice());
+		launch(bufspec);
+	}
+
+	private void launch(com.grey.naf.BufferSpec bufspec) throws java.io.IOException
+	{
+		FileOps.deleteDirectory(rootdir);
+		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
+				.withSurviveHandlers(false)
+				.build();
+		Dispatcher dsptch = Dispatcher.create(appctx, def, com.grey.logging.Factory.getLogger("no-such-logger"));
+		java.nio.channels.Pipe pipe = java.nio.channels.Pipe.open();
+		java.nio.channels.Pipe.SourceChannel rep = pipe.source();
+		java.nio.channels.Pipe.SinkChannel wep = pipe.sink();
+		CMR cm = new CMR(dsptch, rep, wep, bufspec);
+		dsptch.loadRunnable(cm);
+		dsptch.start();
+		// make sure the Dispatcher didn't bomb out on an error
+		Dispatcher.STOPSTATUS stopsts = dsptch.waitStopped(TimeOps.MSECS_PER_SECOND * 10, true);
+		org.junit.Assert.assertEquals(Dispatcher.STOPSTATUS.STOPPED, stopsts);
+		org.junit.Assert.assertTrue(dsptch.completedOK());
+		synchronized (cm) {
+			org.junit.Assert.assertTrue(cm.completed);
+		}
+		wep.close();
+		org.junit.Assert.assertFalse(cm.isConnected());
+	}
+
+
 	private static class CMR
-		extends CM_Stream
+		extends CM_Stream implements DispatcherRunnable
 	{
 		private final com.grey.naf.BufferSpec bufspec;
 		private final java.nio.channels.WritableByteChannel wchan;
+		private final java.nio.channels.SelectableChannel rchan;
 		private final com.grey.base.utils.ByteChars bc = new com.grey.base.utils.ByteChars();
 		private final StringBuilder sb = new StringBuilder();
 		private int phase;
@@ -32,14 +80,22 @@ public class IOExecReaderTest
 		private String expect;
 		private String writedata;
 
-		public CMR(Dispatcher d, java.nio.channels.SelectableChannel r, java.nio.channels.WritableByteChannel w,
-					com.grey.naf.BufferSpec bufspec)
-				throws java.io.IOException {
+		@Override
+		public String getName() {return "IOExecReaderTest.CMR";}
+
+		public CMR(Dispatcher d, java.nio.channels.SelectableChannel r, java.nio.channels.WritableByteChannel w, com.grey.naf.BufferSpec bufspec) throws java.io.IOException {
 			super(d, bufspec, null);
+			rchan = r;
 			wchan = w;
 			this.bufspec = bufspec;
-			registerConnectedChannel(r, true);
+		}
+
+		@Override
+		public void startDispatcherRunnable() throws java.io.IOException {
+			registerConnectedChannel(rchan, true);
 			getReader().receive(0);
+			org.junit.Assert.assertTrue(isConnected());
+			write("abcdexyz1234567890");  //has to be shorter than CMR.rcvcap
 		}
 
 		public void write(CharSequence data) throws java.io.IOException {
@@ -50,8 +106,7 @@ public class IOExecReaderTest
 		}
 
 		@Override
-		public void ioReceived(ByteArrayRef rcvdata) throws java.io.IOException
-		{
+		public void ioReceived(ByteArrayRef rcvdata) throws java.io.IOException {
 			bc.populate(rcvdata.buffer(), rcvdata.offset(), rcvdata.size());
 			org.junit.Assert.assertTrue("expect="+expect+" vs "+bc, com.grey.base.utils.StringOps.sameSeq(expect, bc));
 			char[] carr;
@@ -139,52 +194,5 @@ public class IOExecReaderTest
 				throw new RuntimeException("Missing case for phase="+phase);
 			}
 		}
-	}
-
-	@org.junit.Test
-	public void testDirectBuffer() throws java.io.IOException
-	{
-		launch(new com.grey.naf.BufferSpec(25, 0, true, null));
-	}
-
-	@org.junit.Test
-	public void testHeapBuffer() throws java.io.IOException
-	{
-		launch(new com.grey.naf.BufferSpec(25, 0, false, null));
-	}
-
-	@org.junit.Test
-	public void testOffsetBuffer() throws java.io.IOException
-	{
-		int offset = 5;
-		com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(25, 0, false, null);
-		bufspec = Mockito.spy(bufspec);
-		Mockito.when(bufspec.createReadBuffer()).thenReturn(((ByteBuffer)NIOBuffers.create(bufspec.rcvbufsiz+offset, bufspec.directbufs).position(offset)).slice());
-		launch(bufspec);
-	}
-
-	private void launch(com.grey.naf.BufferSpec bufspec) throws java.io.IOException
-	{
-		FileOps.deleteDirectory(rootdir);
-		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
-				.withSurviveHandlers(false)
-				.build();
-		Dispatcher dsptch = Dispatcher.create(appctx, def, com.grey.logging.Factory.getLogger("no-such-logger"));
-		java.nio.channels.Pipe pipe = java.nio.channels.Pipe.open();
-		java.nio.channels.Pipe.SourceChannel rep = pipe.source();
-		java.nio.channels.Pipe.SinkChannel wep = pipe.sink();
-		CMR cm = new CMR(dsptch, rep, wep, bufspec);
-		org.junit.Assert.assertTrue(cm.isConnected());
-		cm.write("abcdexyz1234567890");  //has to be shorter than CMR.rcvcap
-		dsptch.start();
-		// make sure the Dispatcher didn't bomb out on an error
-		Dispatcher.STOPSTATUS stopsts = dsptch.waitStopped(TimeOps.MSECS_PER_SECOND * 10, true);
-		org.junit.Assert.assertEquals(Dispatcher.STOPSTATUS.STOPPED, stopsts);
-		org.junit.Assert.assertTrue(dsptch.completedOK());
-		synchronized (cm) {
-			org.junit.Assert.assertTrue(cm.completed);
-		}
-		wep.close();
-		org.junit.Assert.assertFalse(cm.isConnected());
 	}
 }

@@ -41,7 +41,6 @@ public class Dispatcher
 
 	private static final boolean INTERRUPT_FRIENDLY = SysProps.get("greynaf.dispatchers.interrupts", false);
 	private static final long TMT_FORCEDSTOP = SysProps.getTime("greynaf.dispatchers.forcestoptmt", "1s");
-	private static final long shutdown_timer_advance = SysProps.getTime("greynaf.dispatchers.shutdown_advance", "1s");
 	private static final boolean HEAPWAIT = SysProps.get("greynaf.dispatchers.heapwait", false);
 	private static final String STOPCMD = "_STOP_";
 
@@ -67,6 +66,7 @@ public class Dispatcher
 	private final ObjectWell<IOExecWriter.FileWrite> fileWritePool;
 	private final java.nio.channels.Selector slct;
 	private final Producer<Object> dynamicLoader;
+	private final boolean threadTolerant = SysProps.get("greynaf.dispatchers.tolerant_threadchecks", false); //for benefit of some unit tests
 
 	private final AtomicInteger nextChannelId = new AtomicInteger(1);
 	private int nextTimerId = 1; //only used within Disoatcher thread, so not synchronised
@@ -81,10 +81,7 @@ public class Dispatcher
 	private java.nio.ByteBuffer tmpniobuf;
 	private byte[] tmpmembuf;
 
-	// assume that a Dispatcher which hasn't yet been started is being called by the thread setting it up
-	public boolean inDispatcherThread() {return Thread.currentThread() == threadMain;}
-	private boolean inThread() {return inDispatcherThread() ||
-									(Thread.currentThread() == threadInitial && threadMain.getState() == Thread.State.NEW);}
+	public boolean isDispatcherThread() {return Thread.currentThread() == threadMain;}
 	public boolean isRunning() {return threadMain.isAlive();}
 	public boolean isActive() {return isRunning() && !shutdownRequested;}
 	public void waitStopped() {waitStopped(0, false);}
@@ -169,7 +166,7 @@ public class Dispatcher
 				+", flush="+TimeOps.expandMilliTime(def.getFlushInterval()));
 		getLogger().info("Dispatcher="+dname+": Selector="+slct.getClass().getCanonicalName()
 				+", Provider="+slct.provider().getClass().getCanonicalName()
-				+" - half-duplex="+ChannelMonitor.halfduplex+", jitter="+TimerNAF.JITTER_THRESHOLD
+				+" - half-duplex="+ChannelMonitor.halfduplex+", timer-jitter="+TimerNAF.JITTER_THRESHOLD
 				+", wbufs="+IOExecWriter.MAXBUFSIZ+"/"+IOExecWriter.FILEBUFSIZ);
 	}
 
@@ -214,12 +211,15 @@ public class Dispatcher
 	// This method can be called by other threads
 	public boolean stop()
 	{
-		if (inThread()) return stopSynchronously();
+		if (isDispatcherThread() || threadMain.getState() == Thread.State.NEW) {
+			return stopSynchronously();
+		}
+
 		try {
 			dynamicLoader.produce(STOPCMD);
 		} catch (java.io.IOException ex) {
 			//probably a harmless error caused by Dispatcher already being shut down
-			getLogger().trace("Dispatcher="+getName()+": Failed to send cmd="+STOPCMD+" to Dispatcher="+getName()+", Thread="+threadInfo()+" - "+ex);
+			getLogger().info("Dispatcher="+getName()+": Failed to send cmd="+STOPCMD+" to Dispatcher="+getName()+", Thread="+threadInfo()+" - "+ex);
 		}
 		return false;
 	}
@@ -476,6 +476,7 @@ public class Dispatcher
 	// to deregisterlIO().
 	// In between, they can can call monitorIO() multiple times to stop and start listening for specific I/O events.
 	void registerIO(ChannelMonitor cm) {
+		verifyIsDispatcherThread();
 		if (activeChannels.put(cm.getCMID(), cm) != null) {
 			throw new IllegalStateException("Dispatcher="+getName()+": Illegal registerIO on CM="+cm.getClass().getName()+"/E"+cm.getCMID()
 					+" - Ops="+showInterestOps(cm.getRegistrationKey())+" - "+cm);
@@ -483,6 +484,7 @@ public class Dispatcher
 	}
 
 	void deregisterIO(ChannelMonitor cm) {
+		verifyIsDispatcherThread();
 		if (activeChannels.remove(cm.getCMID()) == null) {
 			throw new IllegalStateException("Dispatcher="+getName()+": Illegal deregisterIO on CM="+cm.getClass().getName()+"/E"+cm.getCMID()
 					+" - Ops="+showInterestOps(cm.getRegistrationKey())+" - "+cm);
@@ -498,6 +500,7 @@ public class Dispatcher
 	}
 
 	void monitorIO(ChannelMonitor cm, int ops) throws java.nio.channels.ClosedChannelException {
+		verifyIsDispatcherThread();
 		if (shutdownPerformed) return;
 		if (cm.getRegistrationKey() == null) { //equivalent to !cm.iochan.isRegistered(), but obviously cheaper
 			//3rd arg has same effect as calling attach(handler) on returned SelectionKey
@@ -512,26 +515,14 @@ public class Dispatcher
 	}
 
 	public TimerNAF setTimer(long interval, int type, TimerNAF.Handler handler, Object attachment) {
+		verifyIsSyncThread(false);
 		TimerNAF tmr = timerPool.extract().init(this, handler, interval, type, nextTimerId++, attachment);
-		if (shutdownRequested && interval < shutdown_timer_advance) {
-			//This timer will never get fired, so if it was intended as a zero-second (or similiar)
-			//action, do it now.
-			//Some apps set a short delay on their ChannelMonitor.disconnect() call to avoid
-			//reentrancy issues, so without this they would never disconnect. That's obviously
-			//a worse outcome than risking any reentrancy issues during the final shutdown.
-			try {
-				tmr.fire(this);
-			} catch (Throwable ex) {
-				getLogger().log(LEVEL.ERR, ex, true, "Dispatcher="+getName()+": Shutdown error on Timer handler - "+tmr);
-			}
-			timerPool.store(tmr.clear());
-			return null; //callers need to handle null return as meaning timer already executed
-		}
 		activateTimer(tmr);
 		return tmr;
 	}
 
 	void cancelTimer(TimerNAF tmr) {
+		verifyIsDispatcherThread();
 		//remove from scheduled queue
 		if (!activeTimers.remove(tmr)) {
 			//remove from ready-to-fire queue
@@ -546,6 +537,7 @@ public class Dispatcher
 	}
 
 	void resetTimer(TimerNAF tmr) {
+		verifyIsDispatcherThread();
 		tmr.resetExpiry();
 		int idx = activeTimers.indexOf(tmr);
 
@@ -578,12 +570,14 @@ public class Dispatcher
 
 	@Override
 	public void entityStopped(Object entity) {
+		verifyIsDispatcherThread();
 		boolean exists = (entity instanceof DispatcherRunnable ? dynamicRunnables.remove(entity) : false);
 		getLogger().info("Dispatcher="+getName()+" has received entity termination with exists="+exists+", runnables="+dynamicRunnables.size()+"/"+getNafletCount()+" - "+entity);
 	}
 
 	@Override
 	public void producerIndication(Producer<Object> producer) {
+		verifyIsDispatcherThread();
 		Object event;
 		while ((event = producer.consume()) != null) {
 			getLogger().info("Dispatcher="+getName()+": Received dynamic event - "+event);
@@ -638,9 +632,12 @@ public class Dispatcher
 		}
 	}
 
-	// These load/unload methods can be (and are meant to be) called by other threads.
-	// The DispatcherRunnable is expected to have merely been constructed, and we will call its start() method from
-	// within the Dispatcher thread.
+	/**
+	 * These load/unload methods can be called by other threads, and this load is suitable for objects that either:
+	 * a) Have been created and initialised in same thread as Dispatcher, which then calls this method before Dispatcher starts
+	 * b) Are immutable, or else defer all their initialisation till startDispatcherRunnable()
+	 * Their startDispatcherRunnable() method will be called within the Dispatcher thread.
+	 */
 	public void loadRunnable(DispatcherRunnable r) throws java.io.IOException {
 		if (r.getName().charAt(0) == '_') {
 			throw new IllegalArgumentException("Dispatcher="+getName()+" rejecting invalid Runnable name (starts with underscore) - "+r.getName()+"="+r);
@@ -712,6 +709,7 @@ public class Dispatcher
 	 */
 	@Override
 	public long getSystemTime() {
+		verifyIsSyncThread(true);
 		if (systime_msecs == 0) systime_msecs = getRealTime();
 		return systime_msecs;
 	}
@@ -728,6 +726,7 @@ public class Dispatcher
 	// start-time check anyway for robustness.
 	public boolean killConnection(int id, long stime, String diag) throws java.io.IOException
 	{
+		verifyIsDispatcherThread();
 		ChannelMonitor cm = activeChannels.get(id);
 		if (cm == null) return false;
 		if (stime != 0 && stime != cm.getStartTime()) return false;
@@ -739,7 +738,7 @@ public class Dispatcher
 	// The markup is XML, and if some of it happens to look like XHTML, that's a happy coincidence ...
 	public CharSequence dumpState(StringBuilder sb, boolean verbose)
 	{
-		if (!inDispatcherThread()) throw new IllegalStateException("Dispatcher called by external thread="+Thread.currentThread());
+		verifyIsDispatcherThread();
 		if (sb == null) {
 			sb = tmpsb;
 			sb.setLength(0);
@@ -832,6 +831,7 @@ public class Dispatcher
 	// convenience method which leverages a single pre-allocated transfer buffer for this thread
 	public int transfer(java.nio.ByteBuffer src, java.nio.ByteBuffer dst)
 	{
+		verifyIsSyncThread(false);
 		int nbytes = com.grey.base.utils.NIOBuffers.transfer(src, dst, tmpmembuf);
 		if (nbytes < 0) {
 			allocMemBuffer(-nbytes);
@@ -844,6 +844,7 @@ public class Dispatcher
 	// this method will probably return the same buffer.
 	public java.nio.ByteBuffer allocNIOBuffer(int cap)
 	{
+		verifyIsSyncThread(false);
 		if (tmpniobuf == null || tmpniobuf.capacity() < cap) {
 			tmpniobuf = com.grey.base.utils.NIOBuffers.create(cap, false);
 		}
@@ -855,6 +856,7 @@ public class Dispatcher
 	// this method will probably return the same buffer.
 	public byte[] allocMemBuffer(int cap)
 	{
+		verifyIsSyncThread(false);
 		if (tmpmembuf == null || tmpmembuf.length < cap) {
 			tmpmembuf = new byte[cap];
 		}
@@ -863,6 +865,25 @@ public class Dispatcher
 
 	private String threadInfo() {
 		return (launched?(isRunning()?"live":"dead"):"init")+"/"+threadMain.getState();
+	}
+
+	private void verifyIsDispatcherThread() {
+		Thread thrd = Thread.currentThread();
+		if (!isDispatcherThread()) throw new IllegalStateException("Dispatcher="+getName()
+				+" in thread="+threadMain.getId()+"/"+threadMain.getName()+"/"+threadMain.getState()
+				+" called by other thread="+thrd.getId()+"/"+thrd.getName()+"/"+thrd.getState());
+	}
+
+	private void verifyIsSyncThread(boolean lenient) {
+		Thread thrd = Thread.currentThread();
+		if (isDispatcherThread()
+				|| (thrd == threadInitial && threadMain.getState() == Thread.State.NEW)) return;
+		if (threadTolerant) {
+			if (lenient
+					&& (threadMain.getState() == Thread.State.NEW || threadMain.getState() == Thread.State.TERMINATED)) return;
+		}
+		throw new IllegalStateException("Dispatcher="+getName()+" in thread="+threadMain.getId()+"/"+threadMain.getName()+"/"+threadMain.getState()
+				+" called by non-sync thread="+thrd.getId()+"/"+thrd.getName()+"/"+thrd.getState());
 	}
 
 	@Override

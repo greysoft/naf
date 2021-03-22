@@ -77,8 +77,8 @@ public abstract class ChannelMonitor
 		cm_id = d.allocateChannelId();
 	}
 
-	// This can optionally be called before registerChannel() and some subclasses might choose to insist on it.
-	// A typical user would be a subclass that does some preparatory work before calling registerChannel() and can fail
+	// This can optionally be called before initChannel() and some subclasses might choose to insist on it.
+	// A typical user would be a subclass that does some preparatory work before calling initChannel() and can fail
 	// before ever making that call, such that it ends up calling disconnect() without ever having attempted to connect.
 	// Calling this method first ensures that it at least arrives in disconnect() in a properly initialised state.
 	protected void initChannelMonitor()
@@ -104,12 +104,6 @@ public abstract class ChannelMonitor
 		getDispatcher().registerIO(this);
 	}
 
-	void registerChannel(java.nio.channels.SelectableChannel chan, boolean takeOwnership) throws java.io.IOException
-	{
-		initChannel(chan, takeOwnership);
-		registerChannel();
-	}
-
 	boolean disconnect(boolean linger, boolean no_reap)
 	{
 		clearFlagCM(S_INIT); //in case we never got as far as calling CM_Client.connect()
@@ -123,8 +117,8 @@ public abstract class ChannelMonitor
 				return false;
 			}
 			clearFlagCM(S_CLOSELINGER);
+			getDispatcher().deregisterIO(this);
 			try {
-				getDispatcher().deregisterIO(this);
 				if (isFlagSetCM(S_WECLOSE)) {
 					iochan.close();
 					clearFlagCM(S_ISCONN);

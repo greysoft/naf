@@ -125,8 +125,4 @@ public class ClientSession
 		if (getLogger().isActive(LEVEL.TRC)) getLogger().trace("Closing idle connection: "+getChannel()+" => "+relay.server.getServerAddress().sockaddr);
 		ioDisconnected("Timeout");
 	}
-
-	// already logged by Dispatcher, no need to do anything else
-	@Override
-	public void eventError(com.grey.naf.reactor.TimerNAF t, com.grey.naf.reactor.Dispatcher d, Throwable ex) {}
 }

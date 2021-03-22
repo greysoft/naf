@@ -12,6 +12,7 @@ import com.grey.base.collections.HashedMap;
 import com.grey.base.collections.HashedMapIntKey;
 import com.grey.base.utils.IP;
 import com.grey.naf.ApplicationContextNAF;
+import com.grey.naf.DispatcherDef;
 import com.grey.naf.dns.integration.ResolverTester;
 import com.grey.naf.dns.resolver.CacheManager;
 import com.grey.naf.dns.resolver.PacketDNS;
@@ -28,7 +29,8 @@ public class CacheManagerTest
 	private static final com.grey.logging.Logger logger = com.grey.logging.Factory.getLoggerNoEx("no-such-logger");
 	private static final java.io.File CFGFILE_ROOTS = new java.io.File(rootdir+"/rootservers");
 
-	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, true);
+	// disable NAFMAN to prevent any deregisterIO ops in dsptch.stop, since we never actually start it
+	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, false);
 	private Dispatcher dsptch;
 	private CacheManager cmgr;
 
@@ -452,7 +454,9 @@ public class CacheManagerTest
 		throws java.io.IOException, javax.naming.NamingException
 	{
 		if (dnscfg == null) dnscfg = XmlConfig.NULLCFG;
-		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder().withName("CacheManagerTest").build();
+		DispatcherDef def = new DispatcherDef.Builder()
+				.withName("CacheManagerTest")
+				.build();
 		dsptch = Dispatcher.create(appctx, def, logger);
 		ResolverConfig config = new ResolverConfig.Builder()
 				.withXmlConfig(dnscfg)

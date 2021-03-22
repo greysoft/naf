@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2018 Yusef Badri - All rights reserved.
+ * Copyright 2010-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -11,7 +11,7 @@ public class TimerNAF
 	public interface Handler
 	{
 		public void timerIndication(TimerNAF tmr, Dispatcher d) throws java.io.IOException;
-		public void eventError(TimerNAF tmr, Dispatcher d, Throwable ex) throws java.io.IOException;
+		default void eventError(TimerNAF tmr, Dispatcher d, Throwable ex) throws java.io.IOException {}
 	}
 
 	public interface TimeProvider
@@ -125,8 +125,8 @@ public class TimerNAF
 	public String toString()
 	{
 		String txt = getClass().getName()+"-"+System.identityHashCode(this)+"/"+getID()+":"+getType()+"/"+getInterval();
-		if (handler != null) txt += "/"+handler.getClass().getName();
-		if (attachment != null) txt += "/"+attachment.getClass().getName();
+		if (handler != null) txt += "/handler="+handler.getClass().getName();
+		if (attachment != null) txt += "/attach="+attachment.getClass().getName();
 		return txt;
 	}
 }

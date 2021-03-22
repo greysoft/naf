@@ -10,11 +10,12 @@ import com.grey.base.utils.FileOps;
 import com.grey.base.utils.IP;
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
+import com.grey.naf.EntityReaper;
 import com.grey.naf.reactor.config.ConcurrentListenerConfig;
 import com.grey.naf.TestUtils;
 
 public class TCPConnectionTest
-	implements com.grey.naf.EntityReaper, CM_Listener.Reporter
+	implements EntityReaper, CM_Listener.Reporter
 {
 	private static final String rootdir = TestUtils.initPaths(TCPConnectionTest.class);
 	private static final int NUM_CLIENTS = 10; //must be even and greater than 2
@@ -59,12 +60,12 @@ public class TCPConnectionTest
 		// set up the clients
 		for (int loop = 0; loop != NUM_CLIENTS / 2; loop++) {
 			ClientTCP clnt_good = new ClientTCP(dsptch, lstnr.getIP(), lstnr.getPort(), true, this);
-			clnt_good.start(this);
+			dsptch.loadRunnable(clnt_good);
 			//this is hopefully an invalid port - a bad port will fail immediately, whereas bad IP takes 75 secs
 			int cport = lstnr.getPort()+1000;
 			if (cport > (Short.MAX_VALUE & 0xffff)) cport = Short.MAX_VALUE - 10;
 			ClientTCP clnt_bad1 = new ClientTCP(dsptch, lstnr.getIP(), cport, false, this);
-			clnt_bad1.start(this);
+			dsptch.loadRunnable(clnt_bad1);
 		}
 
 		// launch
@@ -119,8 +120,7 @@ public class TCPConnectionTest
 	}
 
 
-	private static class ClientTCP
-		extends CM_Client
+	private static class ClientTCP extends CM_Client implements DispatcherRunnable
 	{
 		private final TCPConnectionTest harness;
 		private static final com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(32, 64);
@@ -128,8 +128,10 @@ public class TCPConnectionTest
 		private final java.net.InetSocketAddress srvaddr;
 		private final boolean expect_ok;
 
-		public ClientTCP(Dispatcher d, java.net.InetAddress ipaddr, int port, boolean ok, TCPConnectionTest h)
-		{
+		@Override
+		public String getName() {return "TCPConnectionTest.ClientTCP";}
+
+		public ClientTCP(Dispatcher d, java.net.InetAddress ipaddr, int port, boolean ok, TCPConnectionTest h) {
 			super(d, bufspec, bufspec);
 			harness = h;
 			expect_ok = ok;
@@ -137,18 +139,16 @@ public class TCPConnectionTest
 			org.junit.Assert.assertNull(getSSLConfig());
 		}
 
-		public void start(com.grey.naf.EntityReaper rpr) throws java.io.IOException
-		{
+		@Override
+		public void startDispatcherRunnable() throws java.io.IOException {
 			org.junit.Assert.assertFalse(isConnected());
 			initChannelMonitor();
-			setReaper(rpr);
+			setReaper(harness);
 			connect(srvaddr);
 		}
 
 		@Override
-		protected void connected(boolean success, CharSequence diagnostic, Throwable ex)
-			throws java.io.IOException
-		{
+		protected void connected(boolean success, CharSequence diagnostic, Throwable ex) throws java.io.IOException {
 			org.junit.Assert.assertTrue(expect_ok == success);
 
 			if (!success) {
@@ -181,8 +181,7 @@ public class TCPConnectionTest
 		}
 
 		@Override
-		public void ioReceived(ByteArrayRef rcvdata) throws java.io.IOException
-		{
+		public void ioReceived(ByteArrayRef rcvdata) throws java.io.IOException {
 			org.junit.Assert.assertEquals(INTSIZE*2, rcvdata.size());
 			int rsp = ByteOps.decodeInt(rcvdata.buffer(), rcvdata.offset(), INTSIZE);
 			org.junit.Assert.assertEquals(req+RSP_INCR, rsp);
@@ -201,24 +200,21 @@ public class TCPConnectionTest
 	}
 
 
-	private static class ServerTCP
-		extends CM_Server
+	private static class ServerTCP extends CM_Server
 	{
 		private static final com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(32, 64);
 		private java.nio.channels.SelectableChannel chan;
 		private boolean sent_response;
 		public int rcvbytes;
 
-		public ServerTCP(CM_Listener l, com.grey.base.config.XmlConfig cfg)
-		{
+		public ServerTCP(CM_Listener l, com.grey.base.config.XmlConfig cfg) {
 			super(l, bufspec, bufspec);
 			org.junit.Assert.assertNull(getSSLConfig());
 			org.junit.Assert.assertFalse(isConnected());
 		}
 
 		@Override
-		protected void connected() throws java.io.IOException
-		{
+		protected void connected() throws java.io.IOException {
 			boolean ok = false;
 			try {
 				org.junit.Assert.assertTrue(isConnected());
@@ -233,8 +229,7 @@ public class TCPConnectionTest
 		}
 
 		@Override
-		public void ioReceived(ByteArrayRef rcvdata) throws java.io.IOException
-		{
+		public void ioReceived(ByteArrayRef rcvdata) throws java.io.IOException {
 			org.junit.Assert.assertEquals(INTSIZE, rcvdata.size());
 			rcvbytes += rcvdata.size();
 			byte[] buf = new byte[INTSIZE];
@@ -245,8 +240,7 @@ public class TCPConnectionTest
 		}
 
 		@Override
-		public void ioDisconnected(CharSequence diagnostic) throws java.io.IOException
-		{
+		public void ioDisconnected(CharSequence diagnostic) throws java.io.IOException {
 			super.ioDisconnected(diagnostic);
 			org.junit.Assert.assertFalse(isConnected());
 			org.junit.Assert.assertNull(getChannel());

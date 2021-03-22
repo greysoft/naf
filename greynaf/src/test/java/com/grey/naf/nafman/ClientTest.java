@@ -77,7 +77,7 @@ public class ClientTest
 	}
 
 	@org.junit.Test
-	public void testStopMulti() throws java.io.IOException
+	public void testStopMulti() throws Exception
 	{
 		ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, true);
 		NafManRegistry nafreg = NafManRegistry.get(appctx);
@@ -97,6 +97,7 @@ public class ClientTest
 		org.junit.Assert.assertTrue(dp.getNafManAgent().isPrimary());
 		org.junit.Assert.assertFalse(ds1.getNafManAgent().isPrimary());
 		org.junit.Assert.assertFalse(ds2.getNafManAgent().isPrimary());
+		Thread.sleep(1_000); //give secondaruies time to register
 		NafManClient.submitCommand(stopcmd.code+"?"+NafManCommand.ATTR_DISPATCHER+"="+ds2.getName(), null, ds1.getNafManAgent().getPort(), logger);
 		waitStopped(ds2);
 		com.grey.naf.reactor.TimerNAF.sleep(100);
@@ -109,7 +110,7 @@ public class ClientTest
 
 	// Just exercise the code for various commands. All we're looking for is rough evidence of responsiveness.
 	@org.junit.Test
-	public void testCommands() throws java.io.IOException
+	public void testCommands() throws Exception
 	{
 		ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, true);
 		NafManRegistry reg = NafManRegistry.get(appctx);

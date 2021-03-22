@@ -27,7 +27,7 @@ import com.grey.naf.TestUtils;
 
 public class ResolverTest
 	extends ResolverTester
-	implements com.grey.naf.dns.resolver.ResolverDNS.Client
+	implements ResolverDNS.Client
 {
 	private static final String rootdir = TestUtils.initPaths(ResolverTest.class);
 	private static final java.io.File CFGFILE_ROOTS = new java.io.File(rootdir+"/rootservers");
@@ -153,9 +153,6 @@ public class ResolverTest
 		org.junit.Assert.assertEquals(3, cnt);
 		cnt = resolver.cancel(this);
 		org.junit.Assert.assertEquals(0, cnt);
-		dsptch.stop();
-		Dispatcher.STOPSTATUS stopsts = dsptch.waitStopped(TimeOps.MSECS_PER_SECOND * 10, true);
-		org.junit.Assert.assertEquals(Dispatcher.STOPSTATUS.STOPPED, stopsts);
 		org.junit.Assert.assertEquals(0, cnt_dnscallbacks.get()); //no responses because we never started Dispatcher
 		org.junit.Assert.assertFalse(callback_error);
 		//can't call validateFinalState() because two QueryHandles still pending
@@ -206,19 +203,26 @@ public class ResolverTest
 		cnt_dnsrequests.set(4);
 		Dispatcher dsptch = createResolver(cfgflags);
 		ResolverDNS resolver = dsptch.getNamedItem(ResolverDNS.class.getName(), null);
+		ResolverDNS.Client client = this;
 
-		ByteChars bc = new ByteChars(queryTargetA);
-		ResolverAnswer answer = resolver.resolveHostname(bc, this, cbflags, 0);
-		org.junit.Assert.assertNull(answer);
-		int ip = IP.convertDottedIP(queryTargetPTR);
-		answer = resolver.resolveIP(ip, this, cbflags, 0);
-		org.junit.Assert.assertNull(answer);
-		bc = new ByteChars(queryTargetMX);
-		answer = resolver.resolveMailDomain(bc, this, cbflags, 0);
-		org.junit.Assert.assertNull(answer);
-		bc = new ByteChars(queryTargetNS);
-		answer = resolver.resolveNameServer(bc, this, cbflags, 0);
-		org.junit.Assert.assertNull(answer);
+		TimerNAF.Handler runner = new TimerNAF.Handler() {
+			@Override
+			public void timerIndication(TimerNAF tmr, Dispatcher d) throws IOException {
+				ByteChars bc = new ByteChars(queryTargetA);
+				ResolverAnswer answer = resolver.resolveHostname(bc, client, cbflags, 0);
+				org.junit.Assert.assertNull(answer);
+				int ip = IP.convertDottedIP(queryTargetPTR);
+				answer = resolver.resolveIP(ip, client, cbflags, 0);
+				org.junit.Assert.assertNull(answer);
+				bc = new ByteChars(queryTargetMX);
+				answer = resolver.resolveMailDomain(bc, client, cbflags, 0);
+				org.junit.Assert.assertNull(answer);
+				bc = new ByteChars(queryTargetNS);
+				answer = resolver.resolveNameServer(bc, client, cbflags, 0);
+				org.junit.Assert.assertNull(answer);
+			}
+		};
+		dsptch.setTimer(0, 0, runner);
 
 		dsptch.start();
 		Dispatcher.STOPSTATUS stopsts = dsptch.waitStopped(TimeOps.MSECS_PER_MINUTE * 2, true);
@@ -301,14 +305,14 @@ public class ResolverTest
 		TimerNAF.Handler issuer = new ResolverQueryIssuer(this, remote_resolver, cnt_dnsrequests);
 		dsptch.setTimer(0, 0, issuer);
 
+		long stoptmt = TimeOps.MSECS_PER_MINUTE * 2;
 		dsptch.start();
 		if (d2 != null) d2.start();
-		long maxtime = dsptch.getSystemTime() + (TimeOps.MSECS_PER_MINUTE * 2);
-		Dispatcher.STOPSTATUS stopsts = dsptch.waitStopped(maxtime - dsptch.getSystemTime(), true);
+		Dispatcher.STOPSTATUS stopsts = dsptch.waitStopped(stoptmt, true);
 		org.junit.Assert.assertEquals(Dispatcher.STOPSTATUS.STOPPED, stopsts);
 		org.junit.Assert.assertTrue(dsptch.completedOK());
 		if (d2 != null) {
-			stopsts = d2.waitStopped(maxtime - dsptch.getSystemTime(), true);
+			stopsts = d2.waitStopped(stoptmt, true);
 			org.junit.Assert.assertEquals(Dispatcher.STOPSTATUS.STOPPED, stopsts);
 			org.junit.Assert.assertTrue(d2.completedOK());
 		}

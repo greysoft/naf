@@ -5,7 +5,7 @@
 	<dispatchers>
 		<dispatcher name="dnsbatch">
 			<naflets>
-				<naflet name="batchdns" class="com.grey.dnsbatchresolver.BatchResolver">
+				<naflet name="batchdns" class="com.grey.dnsbatchresolver.BatchTask">
 					<dnstype>MX</dnstype>
 					<infile>${HOME}/infile.txt</infile>
 					<outfile>${HOME}/outfile.txt</outfile>

@@ -82,8 +82,4 @@ public class Flusher
 		if (tmr != null || interval == 0) return;
 		tmr = dsptch.setTimer(interval, 1, this);
 	}
-
-	//error already logged by Dispatcher so nothing more to do
-	@Override
-	public void eventError(TimerNAF t, Dispatcher d, Throwable ex) {}
 }

@@ -115,8 +115,6 @@ public class ResolverService
 	int nextRandomInt(int bound) {return rndgen.nextInt(bound);}
 	@Override
 	public CharSequence nafmanHandlerID() {return "Resolver";}
-	@Override
-	public void eventError(TimerNAF tmr, Dispatcher d, Throwable ex) {}
 
 	public ResolverService(Dispatcher dsptch, ResolverConfig config)
 		throws java.io.IOException, javax.naming.NamingException

@@ -257,10 +257,6 @@ public class NafManServer
 		endConnection();
 	}
 
-	// already logged by Dispatcher, we have nothing more to add
-	@Override
-	public void eventError(TimerNAF tmr, Dispatcher d, Throwable ex) {}
-
 	@Override
 	public StringBuilder dumpAppState(StringBuilder sb)
 	{

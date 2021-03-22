@@ -57,9 +57,6 @@ public class TimerTest
 				throw new RuntimeException("Unrecognised timer="+tmr.getType());
 			}
 		}
-
-		@Override
-		public void eventError(TimerNAF tmr, Dispatcher d, Throwable ex) {}
 	}
 
 	@org.junit.Test

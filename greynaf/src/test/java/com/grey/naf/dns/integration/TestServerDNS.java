@@ -26,10 +26,11 @@ class TestServerDNS
 	private static final String TMTDOMAIN = "simulate-timeout.net";
 	private static final String TRUNCDOMAIN = "forced-truncation.net";
 
+	private final Dispatcher dsptch;
+	private final com.grey.naf.dns.server.ServerDNS srvr;
 	private final HashedMapIntKey<HashedMap<String,ResourceData[][]>> answers= new HashedMapIntKey<>();
 	private final HashSet<String> unused_answers = new HashSet<String>();
 	private final int total_answers;
-	private final com.grey.naf.dns.server.ServerDNS srvr;
 	private final java.net.DatagramSocket rawsock; //used for sending custom responses that bypass our DNS API
 	private int tmtdomain_qrycnt;
 
@@ -44,11 +45,12 @@ class TestServerDNS
 				.withSurviveHandlers(false)
 				.build();
 		Logger log = com.grey.logging.Factory.getLoggerNoEx("no-such-initlogger");
-		Dispatcher dsptch = Dispatcher.create(appctx, def, log);
+		dsptch = Dispatcher.create(appctx, def, log);
 
 		DnsServerConfig.Builder bldr = new DnsServerConfig.Builder();
 		bldr.getListenerConfig().withPort(0).withInterface("127.0.0.1");
 		srvr = new com.grey.naf.dns.server.ServerDNS(dsptch, this, bldr.build());
+		dsptch.loadRunnable(srvr);
 
 		if (srvr.getLocalPort() == PacketDNS.INETPORT) throw new IllegalStateException("DNS server not on ephemeral port");
 		if (IP.convertIP(srvr.getLocalIP()) != IP.IP_LOCALHOST) throw new IllegalStateException("DNS server not on localhost");
@@ -56,12 +58,12 @@ class TestServerDNS
 	}
 
 	public void start() throws java.io.IOException {
-		srvr.start(); //launches server in another thread
+		dsptch.start(); //launches server in another thread
 	}
 
 	public void stop() {
-		srvr.stop();
-		Dispatcher.STOPSTATUS stopsts = srvr.getDispatcher().waitStopped(TimeOps.MSECS_PER_SECOND*10L, true);
+		dsptch.stop();
+		Dispatcher.STOPSTATUS stopsts = dsptch.waitStopped(TimeOps.MSECS_PER_SECOND*10L, true);
 		if (stopsts != Dispatcher.STOPSTATUS.STOPPED) throw new IllegalStateException("Failed to stop Server thread - "+stopsts);
 
 		if (unused_answers.size() != 0) {
