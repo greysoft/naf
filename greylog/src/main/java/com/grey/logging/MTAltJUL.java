@@ -1,9 +1,10 @@
 /*
- * Copyright 2011-2012 Yusef Badri - All rights reserved.
+ * Copyright 2011-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.logging;
 
+import java.time.Clock;
 import java.util.logging.Level;
 
 public class MTAltJUL
@@ -11,8 +12,8 @@ public class MTAltJUL
 {
 	private volatile int minlvl;
 
-	public MTAltJUL(String pthnam) throws java.io.FileNotFoundException {super(pthnam);}
-	public MTAltJUL(java.io.PrintStream strm) {super(strm);}
+	public MTAltJUL(String pthnam, Clock clock) throws java.io.FileNotFoundException {super(pthnam, clock);}
+	public MTAltJUL(java.io.PrintStream strm, Clock clock) {super(strm, clock);}
 
 	@Override
     public boolean isLoggable(Level lvl)

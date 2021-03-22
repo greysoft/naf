@@ -46,7 +46,7 @@ public class ServerDNS implements DispatcherRunnable
 	private final boolean recursion_offered;
 
 	// this is just a temporary work area, pre-allocated for efficiency
-	private final PacketDNS dnspkt = new PacketDNS(Math.max(PKTSIZ_TCP, PKTSIZ_UDP), DIRECTNIOBUFS, 0);
+	private final PacketDNS dnspkt;
 
 	public java.net.InetAddress getLocalIP() {return transport_udp.getLocalIP();}
 	public int getLocalPort() {return transport_udp.getLocalPort();}
@@ -60,6 +60,7 @@ public class ServerDNS implements DispatcherRunnable
 		responder = r;
 		handlers = new Handlers(this);
 		recursion_offered = responder.dnsRecursionAvailable();
+		dnspkt = new PacketDNS(Math.max(PKTSIZ_TCP, PKTSIZ_UDP), DIRECTNIOBUFS, 0, dsptch);
 
 		listener_tcp = ConcurrentListener.create(dsptch, this, null, cfg.getListenerConfig());
 		transport_udp = new TransportUDP(d, this, listener_tcp.getIP(),listener_tcp.getPort());
@@ -161,9 +162,9 @@ public class ServerDNS implements DispatcherRunnable
 		int off = dnspkt.encodeHeader();
 		off = dnspkt.encodeQuestion(off, qtype, qname);
 		int off_ans = off;
-		if (ans != null) off = dnspkt.encodeSection(off, PacketDNS.SECT_ANSWERS, ans, null);
-		if (auth != null) off = dnspkt.encodeSection(off, PacketDNS.SECT_AUTH, auth, null);
-		if (info != null) off = dnspkt.encodeSection(off, PacketDNS.SECT_INFO, info, null);
+		if (ans != null) off = dnspkt.encodeSection(off, PacketDNS.SECT_ANSWERS, ans);
+		if (auth != null) off = dnspkt.encodeSection(off, PacketDNS.SECT_AUTH, auth);
+		if (info != null) off = dnspkt.encodeSection(off, PacketDNS.SECT_INFO, info);
 		java.nio.ByteBuffer niobuf = dnspkt.completeEncoding(off);
 		int rsplen = niobuf.limit();
 
@@ -204,9 +205,6 @@ public class ServerDNS implements DispatcherRunnable
 		ByteChars qry_qname;
 
 		Handlers(ServerDNS s) {srvr=s; dsptch=srvr.getDispatcher();}
-
-		@Override
-		public long getSystemTime() {return dsptch.getSystemTime();}
 
 		@Override
 		public boolean handleMessageQuestion(int qid, int qnum, int qcnt, byte qt, byte qclass, ByteChars qn, java.net.InetSocketAddress remote_addr) {

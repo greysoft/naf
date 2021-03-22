@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2018 Yusef Badri - All rights reserved.
+ * Copyright 2010-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.logging;
@@ -46,7 +46,7 @@ public class LatinLogger
 	protected void openStream(String pthnam) throws java.io.IOException
 	{
 		java.io.FileOutputStream fstrm = new java.io.FileOutputStream(pthnam, true);
-		logstrm = new java.io.BufferedOutputStream(fstrm, bufsiz);
+		logstrm = new java.io.BufferedOutputStream(fstrm, getBufferSize());
 	}
 
 	@Override
@@ -76,7 +76,7 @@ public class LatinLogger
 			logmsg_buf.populate(tmpstrbuf).append(msg).append(eolbytes, 0, eolbytes.length);
 			logstrm.write(logmsg_buf.buffer(), logmsg_buf.offset(), logmsg_buf.size());
 		} catch (Throwable ex) {
-	        System.out.println(new java.util.Date(System.currentTimeMillis())+" FATAL ERROR: Failed to write LatinLogger - "
+	        System.out.println(new java.util.Date(getClock().millis())+" FATAL ERROR: Failed to write LatinLogger - "
 	        		+com.grey.base.ExceptionUtils.summary(ex, true));
 			System.exit(1);
 		}

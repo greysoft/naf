@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2018 Yusef Badri - All rights reserved.
+ * Copyright 2010-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.logging;
@@ -32,14 +32,14 @@ public class CharLogger
 	@Override
 	protected void openStream(java.io.OutputStream strm)
 	{
-		logstrm = new java.io.BufferedWriter(new java.io.OutputStreamWriter(strm), bufsiz);
+		logstrm = new java.io.BufferedWriter(new java.io.OutputStreamWriter(strm), getBufferSize());
 	}
 
 	@Override
 	protected void openStream(String pthnam) throws java.io.IOException
 	{
 		java.io.FileOutputStream fstrm = new java.io.FileOutputStream(pthnam, true);
-		logstrm = new java.io.BufferedWriter(new java.io.OutputStreamWriter(fstrm), bufsiz);
+		logstrm = new java.io.BufferedWriter(new java.io.OutputStreamWriter(fstrm), getBufferSize());
 	}
 
 	@Override
@@ -74,7 +74,7 @@ public class CharLogger
 
 			logstrm.write(logmsg_chars, 0, logmsg_buf.length());
 		} catch (Throwable ex) {
-	        System.out.println(new java.util.Date(System.currentTimeMillis())+" FATAL ERROR: Failed to write CharLogger - "
+	        System.out.println(new java.util.Date(getClock().millis())+" FATAL ERROR: Failed to write CharLogger - "
 	        		+com.grey.base.ExceptionUtils.summary(ex, true));
 			System.exit(1);
 		}

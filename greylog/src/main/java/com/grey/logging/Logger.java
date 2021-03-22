@@ -4,6 +4,7 @@
  */
 package com.grey.logging;
 
+import java.time.Clock;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -51,7 +52,8 @@ abstract public class Logger
 	private final boolean withLevel;
 	private final boolean withInitMark;
 	private final long flushInterval;  // interval between logfile flushes, in milliseconds
-	protected final int bufsiz;
+	private final int bufsiz;
+	private final Clock clock;
 	private final java.util.Calendar dtcal = TimeOps.getCalendar(null); //merely pre-allocated for efficiency
 
 	private LEVEL maxLevel; //active log level
@@ -77,6 +79,8 @@ abstract public class Logger
 	public void flush() throws java.io.IOException {}
 
 	boolean isOwner() {return isOwner;}
+	Clock getClock() {return clock;}
+	int getBufferSize() {return bufsiz;}
 	public boolean isActive(LEVEL lvl) {return  Interop.isActive(getLevel(), lvl);}
 	public String getName() {return name;}
 	public String getPathTemplate() {return pthnam_tmpl;}
@@ -90,6 +94,7 @@ abstract public class Logger
 		isMT = is_mt;
 		pthnam_tmpl = params.getPathname();
 		strm_base = params.getStream();
+		clock = params.getClock();
 		maxsize = params.getMaxSize();
 		rotsched = (params.getRotFreq() == ScheduledTime.FREQ.NEVER ? null : new ScheduledTime(params.getRotFreq(), dtcal, null));
 
@@ -127,7 +132,7 @@ abstract public class Logger
 	// access qualifiers, to prevent direct invocation.
 	protected void init() throws java.io.IOException
 	{
-		open(System.currentTimeMillis(), null);
+		open(getClock().millis(), null);
 	}
 
 	public LEVEL getLevel()
@@ -232,7 +237,7 @@ abstract public class Logger
 			flush();  //bizarrely, close() doesn't flush in all circumstances
 			closeStream(isOwner);
 		} catch (Exception ex) {
-	        System.out.println(new java.util.Date(System.currentTimeMillis())+" Logger failed to close logfile - "+this_string+" - "
+	        System.out.println(new java.util.Date(getClock().millis())+" Logger failed to close logfile - "+this_string+" - "
 	        		+com.grey.base.ExceptionUtils.summary(ex, false));
 		}
 		isOwner = false;
@@ -272,7 +277,7 @@ abstract public class Logger
 	// This is a very low-level routine where synchronisation would be a significant and unnecessary burden on non-MT loggers.
 	protected StringBuilder setLogEntry(LEVEL lvl, StringBuilder pfxbuf) throws java.io.IOException
 	{
-		long systime = System.currentTimeMillis();
+		long systime = getClock().millis();
 		if (withMillisecs || systime - dtcal.getTimeInMillis() > 500) dtcal.setTimeInMillis(systime);
 		boolean withdate = (rotsched == null || rotsched.compare(ScheduledTime.FREQ.DAILY) < 0);
 

@@ -1,9 +1,10 @@
 /*
- * Copyright 2011-2012 Yusef Badri - All rights reserved.
+ * Copyright 2011-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.logging;
 
+import java.time.Clock;
 import java.util.logging.Level;
 
 // This class provides much the same functionality as the JUL logger combined with the JUL's FileHandler and ConsoleHandler.
@@ -24,11 +25,12 @@ import java.util.logging.Level;
 public class AltJUL
 	extends java.util.logging.Logger
 {
+	private final Clock clock;
+	private final java.io.PrintStream strm;
+	private final java.util.Calendar dtcal;
+	private final StringBuilder logbuf;
+	private final StringBuilder msgbuf;
 	private int minlvl;  // JUL logger uses volatile levelValue, so cache our own
-	private java.io.PrintStream strm;
-	private java.util.Calendar dtcal;
-	private StringBuilder logbuf;
-	private StringBuilder msgbuf;
 
 	@Override
 	public void log(Level lvl, String msg) {log(lvl, (CharSequence)msg);}
@@ -37,15 +39,16 @@ public class AltJUL
 	@Override
     public boolean isLoggable(Level lvl) {return lvl.intValue() >= minlvl;}
 
-	public AltJUL(String pthnam) throws java.io.FileNotFoundException
+	public AltJUL(String pthnam, Clock clock) throws java.io.FileNotFoundException
 	{
-		this(new java.io.PrintStream(new java.io.FileOutputStream(pthnam, true)));  // because PrintStream(pthnam) doesn't append
+		this(new java.io.PrintStream(new java.io.FileOutputStream(pthnam, true)), clock);  // because PrintStream(pthnam) doesn't append
 	}
 
-	public AltJUL(java.io.PrintStream strm)
+	public AltJUL(java.io.PrintStream strm, Clock clock)
 	{
 		super("greybase.anon", (String)null);
 		this.strm = strm;
+		this.clock = clock;
 		dtcal = com.grey.base.utils.TimeOps.getCalendar(null);
 		logbuf = new StringBuilder();
 		msgbuf = new StringBuilder();
@@ -104,7 +107,7 @@ public class AltJUL
 	// Level has already been approved, and is only being passed in here so we can log it
 	private void log(CharSequence msg, Level lvl)
 	{
-		long systime = System.currentTimeMillis();
+		long systime = clock.millis();
 		dtcal.setTimeInMillis(systime);
 		logbuf.setLength(0);
 		com.grey.base.utils.TimeOps.makeTimeLogger(dtcal, logbuf, true, true);

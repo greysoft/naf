@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Yusef Badri - All rights reserved.
+ * Copyright 2015-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.resolver;
@@ -10,11 +10,21 @@ import com.grey.base.utils.DynLoader;
 import com.grey.naf.dns.resolver.PacketDNS;
 import com.grey.naf.dns.resolver.ResolverDNS;
 import com.grey.naf.dns.resolver.ResourceData;
+import com.grey.naf.reactor.TimerNAF;
 
 import java.net.InetSocketAddress;
+import java.time.Clock;
 
 public class PacketTest
 {
+	private static final TimerNAF.TimeProvider TimeProvider = new TimerNAF.TimeProvider() {
+		private final Clock clock = Clock.systemUTC();
+		@Override
+		public long getRealTime() {return clock.millis();}
+		@Override
+		public long getSystemTime() {return getRealTime();}
+	};
+
 	@org.junit.Test
 	public void testHeader() {
 		verifyHeader(false, false);
@@ -25,12 +35,12 @@ public class PacketTest
 
 	@org.junit.Test
 	public void testQuestion() {
-		PacketDNS pkt = new PacketDNS(200, false, 0);
+		PacketDNS pkt = new PacketDNS(200, false, 0, TimeProvider);
 		for (int loop = 0; loop != 2; loop++) {
 			verifyQuestion(false, pkt, pkt);
 			verifyQuestion(true, pkt, pkt);
 		}
-		pkt = new PacketDNS(200, true, 0);
+		pkt = new PacketDNS(200, true, 0, TimeProvider);
 		for (int loop = 0; loop != 2; loop++) {
 			verifyQuestion(false, pkt, pkt);
 			verifyQuestion(true, pkt, pkt);
@@ -120,7 +130,7 @@ public class PacketTest
 		String name_foo = label_foo+"."+name_f;
 		String name_arpa = "ARPA";
 		String name_last = "Final_Single-Label-Name";
-		PacketDNS pkt = new PacketDNS(200, directbufs, 0); //more than big enough
+		PacketDNS pkt = new PacketDNS(200, directbufs, 0, TimeProvider); //more than big enough
 		byte filler = 125;
 
 		// encode the names with compression enabled
@@ -221,7 +231,7 @@ public class PacketTest
 	private void verifyHeader(boolean is_tcp, boolean directbufs) {
 		int pktsiz = PacketDNS.PKTHDRSIZ;
 		if (is_tcp) pktsiz += PacketDNS.TCPMSGLENSIZ;
-		PacketDNS pkt = new PacketDNS(pktsiz+10, directbufs, 5);
+		PacketDNS pkt = new PacketDNS(pktsiz+10, directbufs, 5, TimeProvider);
 		verifyBlankHeader(pkt);
 		pkt.resetEncoder(is_tcp, false);
 		verifyBlankHeader(pkt);
@@ -318,7 +328,7 @@ public class PacketTest
 		niobuf.get(barr, boff, pktsiz);
 		if (is_tcp) org.junit.Assert.assertEquals(pktsiz - PacketDNS.TCPMSGLENSIZ, ByteOps.decodeInt(barr, boff, PacketDNS.TCPMSGLENSIZ));
 
-		PacketDNS pkt2 = new PacketDNS();
+		PacketDNS pkt2 = new PacketDNS(TimeProvider);
 		boff += tcp_incr;
 		pkt2.resetDecoder(barr, boff, pktsiz - tcp_incr);
 		off = pkt2.decodeHeader();
@@ -383,9 +393,6 @@ public class PacketTest
 		public Object cb_addr;
 
 		public ParseQuestionHandler() {}
-
-		@Override
-		public long getSystemTime() {return System.currentTimeMillis();}
 
 		@Override
 		public boolean handleMessageQuestion(int qid, int qnum, int qcnt, byte qtype, byte qclass, ByteChars qname, InetSocketAddress addr) {

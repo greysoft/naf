@@ -5,6 +5,7 @@
 package com.grey.logging;
 
 import java.lang.management.ManagementFactory;
+import java.time.Clock;
 
 import com.grey.base.config.SysProps;
 import com.grey.base.config.XmlConfig;
@@ -47,6 +48,7 @@ public class Parameters
 	private final int maxSize;
 	private final int bufSize;
 	private final long flushInterval;
+	private final Clock clock;
 	private final boolean withPID;
 	private final boolean withTID;
 	private final boolean withThreadName;
@@ -62,6 +64,7 @@ public class Parameters
 		maxSize = bldr.maxSize;
 		bufSize = bldr.bufSize;
 		flushInterval = bldr.flushInterval;
+		clock = bldr.clock;
 		withPID = bldr.withPID;
 		withTID = bldr.withTID;
 		withThreadName = bldr.withThreadName;
@@ -104,6 +107,10 @@ public class Parameters
 
 	public long getFlushInterval() {
 		return flushInterval;
+	}
+
+	public Clock getClock() {
+		return clock;
 	}
 
 	public boolean withPID() {
@@ -167,6 +174,7 @@ public class Parameters
 		private Logger.LEVEL logLevel = Logger.LEVEL.valueOf(SysProps.get(SYSPROP_LOGLEVEL, Logger.LEVEL.INFO.name()).toUpperCase());
 		private String pthnam = SysProps.get(SYSPROP_LOGFILE);
 		private java.io.OutputStream strm = DFLT_STRM;
+		private Clock clock = Clock.systemUTC();
 		private ScheduledTime.FREQ rotFreq = ScheduledTime.FREQ.valueOf(SysProps.get(SYSPROP_ROTFREQ, ScheduledTime.FREQ.NEVER.name()).toUpperCase());
 		private int maxSize = SysProps.get(SYSPROP_MAXSIZ, 0);
 		private int bufSize = SysProps.get(SYSPROP_BUFSIZ, 8 * 1024);
@@ -184,6 +192,7 @@ public class Parameters
 			logLevel = params.getLogLevel();
 			pthnam = params.getPathname();
 			strm = params.getStream();
+			clock = params.clock;
 			rotFreq = params.getRotFreq();
 			maxSize = params.getMaxSize();
 			bufSize = params.getBufSize();
@@ -216,6 +225,11 @@ public class Parameters
 
 		public Builder withStream(java.io.OutputStream v) {
 			strm = v;
+			return this;
+		}
+
+		public Builder withClock(Clock v) {
+			clock = v;
 			return this;
 		}
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2018 Yusef Badri - All rights reserved.
+ * Copyright 2010-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.resolver;
@@ -94,9 +94,6 @@ class QueryHandle
 	private final void clearFlag(int f) {flags &= ~f;}
 	private void setFlag(int f) {flags |= f;}
 	private void setFlag(int f, boolean b) {if(b) setFlag(f); else clearFlag(f);}
-
-	@Override
-	public long getSystemTime() {return rslvr.getDispatcher().getSystemTime();}
 
 	QueryHandle(ResolverService r)
 	{

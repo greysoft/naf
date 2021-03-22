@@ -1,18 +1,19 @@
 /*
- * Copyright 2010-2018 Yusef Badri - All rights reserved.
+ * Copyright 2010-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.resolver;
 
 import com.grey.base.utils.DynLoader;
 import com.grey.base.utils.IP;
+import com.grey.naf.reactor.TimerNAF;
 import com.grey.base.collections.HashedMapIntValue;
 
 // DNS protocol definitions and utility methods
 // RFC-1035 is the main authority - See also http://www.iana.org/assignments/dns-parameters
 public class PacketDNS
 {
-	public interface MessageCallback extends com.grey.naf.reactor.TimerNAF.TimeProvider
+	public interface MessageCallback
 	{
 		//Return=False means we are rejecting the question (and hence the packet)
 		public boolean handleMessageQuestion(int qid, int qnum, int qcnt, byte qtype, byte qclass,
@@ -75,18 +76,6 @@ public class PacketDNS
 	private static final String[] sect_txt = DynLoader.generateSymbolNames(PacketDNS.class, "SECT_", 5);
 	public static String getSectionType(int stype) {return sect_txt[stype];}
 
-	private byte[] pktbuf;
-	private int hdrflags;
-	private int msgbase; //offset of Packet header within pktbuf (excludes TCP length field)
-	private int msglmt; //marks boundary of received message - only used for decoding mode
-	private final long minttl_rr;
-
-	int hdr_qid;
-	int hdr_qcnt;
-	int hdr_anscnt;
-	int hdr_authcnt;
-	int hdr_infocnt;
-
 	//these fields are only used for the encoding mode
 	private final HashedMapIntValue<String> cmprseqs = new HashedMapIntValue<String>(); //maps compressed name sequences to offsets
 	private final java.nio.ByteBuffer xmtniobuf;
@@ -110,6 +99,19 @@ public class PacketDNS
 	// these are just temporary work areas, pre-allocated for efficiency
 	private final com.grey.base.utils.ByteChars bctmp = new com.grey.base.utils.ByteChars();
 	private final StringBuilder sbtmp = new StringBuilder();
+
+	private final TimerNAF.TimeProvider timeProvider;
+	private final long minttl_rr;
+	private byte[] pktbuf;
+	private int hdrflags;
+	private int msgbase; //offset of Packet header within pktbuf (excludes TCP length field)
+	private int msglmt; //marks boundary of received message - only used for decoding mode
+
+	int hdr_qid;
+	int hdr_qcnt;
+	int hdr_anscnt;
+	int hdr_authcnt;
+	int hdr_infocnt;
 
 	private static final int MASK_RCODE = 0xF;
 	private static final int MASK_OPCODE = 0xF << 11;
@@ -140,11 +142,12 @@ public class PacketDNS
 	private boolean isCompressedLabel(int off) {return ((pktbuf[off] & COMPRESSION_PTRPREFIX) != 0);}
 	private int compressedLabelPointer(int off) {return msgbase + (decodeInt(off, FLDSIZ_PTRCOMPRESS) & ~(COMPRESSION_PTRPREFIX << 8));}
 
-	public PacketDNS() {this(0);} //minttl=0 would suit users who never encode a Packet and don't parse non-Question sections
-	public PacketDNS(long minttl) {this(0, false, minttl);} //would suit users who never encode a Packet
+	public PacketDNS(TimerNAF.TimeProvider tp) {this(0, tp);} //minttl=0 would suit users who never encode a Packet and don't parse non-Question sections
+	public PacketDNS(long minttl, TimerNAF.TimeProvider tp) {this(0, false, minttl, tp);} //would suit users who never encode a Packet
 
-	public PacketDNS(int bsiz, boolean bdirect, long minttl)
+	public PacketDNS(int bsiz, boolean bdirect, long minttl, TimerNAF.TimeProvider tp)
 	{
+		timeProvider = tp;
 		minttl_rr = minttl;
 
 		if (bsiz == 0) {
@@ -318,7 +321,7 @@ public class PacketDNS
 		} else {
 			return null; //unsupported RR
 		}
-		long systime = (handler == null ? System.currentTimeMillis() : handler.getSystemTime());
+		long systime = timeProvider.getRealTime();
 		if (raw_ttl < minttl_rr) raw_ttl = (int)minttl_rr;
 		rrbuf.reset(clss);
 		rrbuf.setExpiry(raw_ttl, systime);
@@ -400,17 +403,17 @@ public class PacketDNS
 		return encodeInt(off, PacketDNS.QCLASS_INET, FLDSIZ_RRCLASS);
 	}
 
-	public int encodeSection(int off, int sectiontype, ResourceData[] rr, com.grey.naf.reactor.TimerNAF.TimeProvider time)
+	public int encodeSection(int off, int sectiontype, ResourceData[] rr)
 	{
 		for (int idx = 0; idx != rr.length; idx++) {
-			off = encodeRR(off, rr[idx], time);
+			off = encodeRR(off, rr[idx]);
 		}
 		return off;
 	}
 
-	private int encodeRR(int off, ResourceData rr, com.grey.naf.reactor.TimerNAF.TimeProvider time)
+	private int encodeRR(int off, ResourceData rr)
 	{
-		long systime = (time == null ? System.currentTimeMillis() : time.getSystemTime());
+		long systime = timeProvider.getRealTime();
 		int ttl = rr.getTTL(systime);
 		if (ttl < 0) ttl = 0;
 		if (rr.rrType() == ResolverDNS.QTYPE_PTR) {

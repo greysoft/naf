@@ -4,6 +4,7 @@
  */
 package com.grey.naf;
 
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -36,6 +37,8 @@ public class Launcher
 	static {
 		announceNAF();
 	}
+
+	private static final Clock clock = Clock.systemUTC();
 
 	protected final BaseOptsHandler baseOptions = new BaseOptsHandler();
 	protected final CommandParser cmdParser;
@@ -188,13 +191,13 @@ public class Launcher
 	}
 
 	private static void executeDispatchers(ApplicationContextNAF appctx, Logger bootlog) throws java.io.IOException {
-		long systime_boot = System.currentTimeMillis();
+		long systime_boot = clock.millis();
 		bootlog.info("NAF BOOTING in "+new java.io.File(".").getCanonicalPath());
 
 		java.util.List<Dispatcher> dispatchers = launchConfiguredDispatchers(appctx, bootlog);
 		if (dispatchers == null) throw new NAFConfigException("No Dispatchers are configured");
 
-		long systime2 = System.currentTimeMillis();
+		long systime2 = clock.millis();
 		bootlog.info("NAF BOOTED in time="+(systime2-systime_boot)+"ms - Dispatchers="+dispatchers.size());
 		FileOps.flush(bootlog);
 

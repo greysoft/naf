@@ -717,6 +717,7 @@ public class Dispatcher
 	/**
 	 * This returns the instantaneous system time, and is thread-safe.
 	 */
+	@Override
 	public long getRealTime() {
 		return clock.millis();
 	}

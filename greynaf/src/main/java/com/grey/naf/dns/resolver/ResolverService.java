@@ -162,7 +162,7 @@ public class ResolverService
 		bcstore = new ObjectWell<>(ByteChars.class, "DNS_"+dsptch.getName());
 		anstore = new ObjectWell<>(ResolverAnswer.class, "DNS_"+dsptch.getName());
 		rrwstore = new ObjectWell<>(QueryHandle.WrapperRR.class, "DNS_"+dsptch.getName());
-		pkt_tmp = new PacketDNS(Math.max(ResolverConfig.PKTSIZ_TCP, ResolverConfig.PKTSIZ_UDP), ResolverConfig.DIRECTNIOBUFS, config.getInitialMinTTL());
+		pkt_tmp = new PacketDNS(Math.max(ResolverConfig.PKTSIZ_TCP, ResolverConfig.PKTSIZ_UDP), ResolverConfig.DIRECTNIOBUFS, config.getInitialMinTTL(), dsptch);
 		fh_dump = new java.io.File(dsptch.getApplicationContext().getConfig().getPathVar()+"/DNSdump-"+dsptch.getName()+".txt");
 
 		QueryHandle.Factory qryfact = new QueryHandle.Factory(this);

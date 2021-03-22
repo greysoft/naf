@@ -17,6 +17,7 @@ public class TimerNAF
 	public interface TimeProvider
 	{
 		public long getSystemTime();
+		public long getRealTime();
 	}
 
 	// dampens jitter - see reset() and nextExpiry() comments below

@@ -42,7 +42,7 @@ public class MemLogger
 			setLogEntry(lvl, msgbuf);
 		} catch (Throwable ex) {
 			//This can't actually happen in our case, setLogEntry() won't do any I/O
-	        System.out.println(new java.util.Date(System.currentTimeMillis())+" FATAL ERROR: Failed to write MemLogger - "
+	        System.out.println(new java.util.Date(getClock().millis())+" FATAL ERROR: Failed to write MemLogger - "
 	        		+com.grey.base.ExceptionUtils.summary(ex, true));
 			System.exit(1);
 		}
