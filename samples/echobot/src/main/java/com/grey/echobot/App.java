@@ -9,10 +9,10 @@ import com.grey.base.utils.TSAP;
 import com.grey.base.utils.CommandParser;
 import com.grey.logging.Logger;
 import com.grey.naf.ApplicationContextNAF;
-import com.grey.naf.BufferSpec;
-import com.grey.naf.DispatcherDef;
+import com.grey.naf.BufferGenerator;
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.config.ConcurrentListenerConfig;
+import com.grey.naf.reactor.config.DispatcherConfig;
 import com.grey.naf.reactor.ConcurrentListener;
 
 import org.slf4j.LoggerFactory;
@@ -107,7 +107,7 @@ public class App
 	}
 
 	private final OptsHandler options = new OptsHandler();
-	public BufferSpec sbufspec;
+	public BufferGenerator sbufspec;
 	private Dispatcher dserver;
 	private int cgrpcnt;
 
@@ -145,11 +145,11 @@ public class App
 		int dcnt = (options.server_solo ? options.cgrpcnt + 1 : options.cgrpcnt);
 		if (dcnt == 0) dcnt++; //need at least one Dispatcher for the server
 
-		DispatcherDef.Builder dispatcherDefsBuilder = new DispatcherDef.Builder();
+		DispatcherConfig.Builder dispatcherDefsBuilder = new DispatcherConfig.Builder();
 		Dispatcher[] cdispatchers = new Dispatcher[dcnt];
 		ClientGroup[] cgroups = new ClientGroup[options.cgrpcnt];
 		TSAP tsap = TSAP.build(hostport, 0, true);
-		sbufspec = (options.server_enabled ? new BufferSpec(options.srcvbuf, options.sxmtbuf) : null);
+		sbufspec = (options.server_enabled ? new BufferGenerator(options.srcvbuf, options.sxmtbuf) : null);
 		byte[] msgbuf = null;
 
 		if (options.cgrpcnt != 0) {
@@ -172,7 +172,7 @@ public class App
 			System.out.println("Messages = "+options.msgcnt+"x "+options.msgsiz+" bytes"+(options.msgpath==null ? "" : " - "+options.msgpath));
 		}
 		System.out.println("Transport = "+(options.udpmode ? "UDP" : "TCP"));
-		System.out.println("Buffers: Direct="+BufferSpec.directniobufs+", Client="+options.crcvbuf+"/"+options.cxmtbuf
+		System.out.println("Buffers: Direct="+BufferGenerator.directniobufs+", Client="+options.crcvbuf+"/"+options.cxmtbuf
 				+", Server="+options.srcvbuf+"/"+options.sxmtbuf+", UDP-socket="+options.sockbufsiz);
 		int cgnum = 0;
 
@@ -181,7 +181,7 @@ public class App
 			boolean hasClients = (options.cgrpcnt != 0 && (!options.server_solo || idx != 0));
 			String dname = (options.server_enabled && idx == 0 ? "DS" : "");  //server resides in first Dispatcher
 			if (hasClients) dname += "DC"+(cgnum+1); //this Dispatcher hosts clients
-			DispatcherDef def = dispatcherDefsBuilder.withName(dname).build();
+			DispatcherConfig def = dispatcherDefsBuilder.withName(dname).build();
 			cdispatchers[idx] = Dispatcher.create(appctx, def, bootlog);
 			Dispatcher dsptch = cdispatchers[idx];
 
@@ -206,7 +206,7 @@ public class App
 				}
 			}
 			if (hasClients) {
-				BufferSpec bufspec = new BufferSpec(options.crcvbuf, options.cxmtbuf);
+				BufferGenerator bufspec = new BufferGenerator(options.crcvbuf, options.cxmtbuf);
 				cgroups[cgnum++] = new ClientGroup(this, dsptch, options.udpmode, tsap, options.cgrpsiz, bufspec, msgbuf, options.msgcnt,
 						options.sockbufsiz, options.verify);
 			}

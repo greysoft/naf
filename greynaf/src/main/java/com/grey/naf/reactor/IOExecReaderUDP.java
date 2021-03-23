@@ -10,7 +10,7 @@ import com.grey.naf.errors.NAFException;
 public class IOExecReaderUDP
 	extends IOExecReader
 {
-	IOExecReaderUDP(com.grey.naf.BufferSpec spec)
+	IOExecReaderUDP(com.grey.naf.BufferGenerator spec)
 	{
 		super(spec);
 	}

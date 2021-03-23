@@ -9,7 +9,7 @@ import java.net.SocketAddress;
 
 import com.grey.base.utils.ByteArrayRef;
 import com.grey.base.utils.IP;
-import com.grey.naf.BufferSpec;
+import com.grey.naf.BufferGenerator;
 
 public abstract class CM_UDP extends ChannelMonitor implements DispatcherRunnable
 {
@@ -21,7 +21,7 @@ public abstract class CM_UDP extends ChannelMonitor implements DispatcherRunnabl
 	public java.net.InetAddress getLocalIP() {return getDatagramChannel().socket().getLocalAddress();}
 	protected IOExecReaderUDP getReader() {return udpreader;}
 
-	public CM_UDP(Dispatcher d, SocketAddress addr, BufferSpec bufspec, int sockbufsiz) throws java.io.IOException {
+	public CM_UDP(Dispatcher d, SocketAddress addr, BufferGenerator bufspec, int sockbufsiz) throws java.io.IOException {
 		super(d);
 		udpreader = (bufspec == null ? null : new IOExecReaderUDP(bufspec));
 		if (udpreader != null) udpreader.initChannel(this);

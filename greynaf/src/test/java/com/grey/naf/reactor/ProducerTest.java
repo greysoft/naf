@@ -27,7 +27,7 @@ public class ProducerTest
 			throws java.io.IOException, InterruptedException
 	{
 		FileOps.deleteDirectory(rootdir);
-		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
+		com.grey.naf.reactor.config.DispatcherConfig def = new com.grey.naf.reactor.config.DispatcherConfig.Builder()
 				.withName("producertest-workflow")
 				.withSurviveHandlers(false)
 				.build();
@@ -60,7 +60,7 @@ public class ProducerTest
 		produced_cnt = 1_000_000;
 		benchmark_mode = true;
 		consumed_cnt = 0;
-		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
+		com.grey.naf.reactor.config.DispatcherConfig def = new com.grey.naf.reactor.config.DispatcherConfig.Builder()
 				.withName("producertest-bulk")
 				.withSurviveHandlers(false)
 				.build();

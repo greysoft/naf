@@ -6,7 +6,7 @@ package com.grey.naf.dns.server;
 
 import com.grey.base.config.XmlConfig;
 import com.grey.naf.NAFConfig;
-import com.grey.naf.dns.resolver.PacketDNS;
+import com.grey.naf.dns.resolver.engine.PacketDNS;
 import com.grey.naf.reactor.config.ConcurrentListenerConfig;
 
 public class DnsServerConfig

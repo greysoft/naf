@@ -7,10 +7,10 @@ package com.grey.naf.dns.resolver.distributed;
 import java.util.function.Supplier;
 
 import com.grey.base.utils.ByteChars;
-import com.grey.naf.dns.resolver.ResolverAnswer;
 import com.grey.naf.dns.resolver.ResolverConfig;
 import com.grey.naf.dns.resolver.ResolverDNS;
-import com.grey.naf.dns.resolver.ResolverService;
+import com.grey.naf.dns.resolver.engine.ResolverAnswer;
+import com.grey.naf.dns.resolver.engine.ResolverService;
 import com.grey.naf.errors.NAFConfigException;
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.Producer;

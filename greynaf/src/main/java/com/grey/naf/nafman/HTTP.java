@@ -37,7 +37,7 @@ class HTTP
 	private static final char DLM_METHOD = ' ';
 	private static final char DLM_HEADER = ':';
 
-	private final com.grey.naf.BufferSpec bufspec;
+	private final com.grey.naf.BufferGenerator bufspec;
 	final long permcache;
 
 	//pre-allocated purely for efficiency
@@ -45,7 +45,7 @@ class HTTP
 	private final ByteChars bctmp = new ByteChars();
 	private final ByteChars tmplightbc = new ByteChars(-1); //lightweight object without own storage
 
-	public HTTP(com.grey.naf.BufferSpec bufspec, long permcache)
+	public HTTP(com.grey.naf.BufferGenerator bufspec, long permcache)
 	{
 		this.bufspec = bufspec;
 		this.permcache = permcache;

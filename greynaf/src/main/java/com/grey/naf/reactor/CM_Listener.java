@@ -5,8 +5,8 @@
 package com.grey.naf.reactor;
 
 import com.grey.naf.EntityReaper;
-import com.grey.naf.SSLConfig;
 import com.grey.naf.reactor.config.ListenerConfig;
+import com.grey.naf.reactor.config.SSLConfig;
 
 public abstract class CM_Listener
 	extends ChannelMonitor

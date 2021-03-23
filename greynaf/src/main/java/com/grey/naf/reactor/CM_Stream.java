@@ -15,7 +15,7 @@ public abstract class CM_Stream extends ChannelMonitor
 
 	protected abstract void ioReceived(ByteArrayRef rcvdata) throws java.io.IOException;
 
-	protected com.grey.naf.SSLConfig getSSLConfig() {return null;}
+	protected com.grey.naf.reactor.config.SSLConfig getSSLConfig() {return null;}
 	protected void startedSSL() throws java.io.IOException {}
 	protected boolean usingSSL() {return sslconn != null;}
 	protected java.security.cert.Certificate[] getPeerChain() {return sslconn == null ? null : sslconn.getPeerChain();}
@@ -31,7 +31,7 @@ public abstract class CM_Stream extends ChannelMonitor
 	void indicateConnection() throws java.io.IOException {}
 	protected void disconnectLingerDone(boolean ok, CharSequence info, Throwable ex) {} //called later, if disconnect() returns False
 
-	public CM_Stream(Dispatcher d, com.grey.naf.BufferSpec rbufspec, com.grey.naf.BufferSpec wbufspec)
+	public CM_Stream(Dispatcher d, com.grey.naf.BufferGenerator rbufspec, com.grey.naf.BufferGenerator wbufspec)
 	{
 		super(d);
 		chanreader = (rbufspec == null ? null : new com.grey.naf.reactor.IOExecReaderStream(rbufspec));
@@ -141,7 +141,7 @@ public abstract class CM_Stream extends ChannelMonitor
 
 	boolean isPureSSL()
 	{
-		com.grey.naf.SSLConfig sslcfg = getSSLConfig();
+		com.grey.naf.reactor.config.SSLConfig sslcfg = getSSLConfig();
 		return (sslcfg != null && !sslcfg.isLatent());
 	}
 

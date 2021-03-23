@@ -7,8 +7,8 @@ package com.grey.dnsbatchresolver;
 import java.io.IOException;
 
 import com.grey.base.utils.ByteChars;
-import com.grey.naf.dns.resolver.ResolverAnswer;
 import com.grey.naf.dns.resolver.ResolverDNS;
+import com.grey.naf.dns.resolver.engine.ResolverAnswer;
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.logging.Logger.LEVEL;
 

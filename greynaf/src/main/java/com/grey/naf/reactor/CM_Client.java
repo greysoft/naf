@@ -9,7 +9,7 @@ public abstract class CM_Client extends CM_TCP
 	protected abstract void connected(boolean success, CharSequence diagnostic, Throwable error)
 			throws java.io.IOException;
 
-	public CM_Client(Dispatcher d, com.grey.naf.BufferSpec rbufspec, com.grey.naf.BufferSpec wbufspec)
+	public CM_Client(Dispatcher d, com.grey.naf.BufferGenerator rbufspec, com.grey.naf.BufferGenerator wbufspec)
 	{
 		super(d, rbufspec, wbufspec);
 	}

@@ -12,7 +12,7 @@ class Request
 	public final DistributedResolver issuer;
 
 	// the DNS request-response block
-	public final com.grey.naf.dns.resolver.ResolverAnswer answer = new com.grey.naf.dns.resolver.ResolverAnswer();
+	public final com.grey.naf.dns.resolver.engine.ResolverAnswer answer = new com.grey.naf.dns.resolver.engine.ResolverAnswer();
 
 	// additional params for the Proxy request
 	public com.grey.naf.dns.resolver.ResolverDNS.Client caller;
@@ -43,7 +43,7 @@ class Request
 		this.flags = flags;
 	}
 
-	public void setResponse(com.grey.naf.dns.resolver.ResolverAnswer ans2)
+	public void setResponse(com.grey.naf.dns.resolver.engine.ResolverAnswer ans2)
 	{
 		if (ans2.qname == null) {
             qnamebuf.clear();

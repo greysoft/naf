@@ -52,7 +52,7 @@ class SSLConnection
 		cm = chanmon;
 		int peerport = (cm.getChannel() instanceof java.nio.channels.SocketChannel ?
 				cm.getSocketChannel().socket().getPort() : 0);
-		com.grey.naf.SSLConfig sslcfg = cm.getSSLConfig();
+		com.grey.naf.reactor.config.SSLConfig sslcfg = cm.getSSLConfig();
 		isClient = sslcfg.isClient();
 		peerCertName = sslcfg.getPeerCertName();
 		sessionTimeout = sslcfg.getSessionTimeout();
@@ -65,9 +65,9 @@ class SSLConnection
 		javax.net.ssl.SSLSession sess = engine.getSession();
 		int netbufsiz = (BUFSIZ_SSL == 0 ? sess.getPacketBufferSize() : BUFSIZ_SSL);
 		int appbufsiz = (BUFSIZ_APP == 0 ? sess.getApplicationBufferSize() : BUFSIZ_APP);
-		sslprotoXmtBuf = com.grey.base.utils.NIOBuffers.create(netbufsiz, com.grey.naf.BufferSpec.directniobufs);
-		sslprotoRcvBuf = com.grey.base.utils.NIOBuffers.create(netbufsiz, com.grey.naf.BufferSpec.directniobufs);
-		appdataRcvBuf = com.grey.base.utils.NIOBuffers.create(appbufsiz, com.grey.naf.BufferSpec.directniobufs);
+		sslprotoXmtBuf = com.grey.base.utils.NIOBuffers.create(netbufsiz, com.grey.naf.BufferGenerator.directniobufs);
+		sslprotoRcvBuf = com.grey.base.utils.NIOBuffers.create(netbufsiz, com.grey.naf.BufferGenerator.directniobufs);
+		appdataRcvBuf = com.grey.base.utils.NIOBuffers.create(appbufsiz, com.grey.naf.BufferGenerator.directniobufs);
 		dummyShakeBuf = com.grey.base.utils.NIOBuffers.create(1, false); //could possibly be static?
 		engine.setUseClientMode(isClient); //must call this in both modes - even if getUseClientMode() already seems correct
 
@@ -431,7 +431,7 @@ class SSLConnection
 
 		public void enqueue(java.nio.ByteBuffer inbuf) {
 			int bufsiz = inbuf.remaining();
-			java.nio.ByteBuffer qbuf = com.grey.base.utils.NIOBuffers.create(bufsiz, com.grey.naf.BufferSpec.directniobufs);
+			java.nio.ByteBuffer qbuf = com.grey.base.utils.NIOBuffers.create(bufsiz, com.grey.naf.BufferGenerator.directniobufs);
 			cm.getDispatcher().transfer(inbuf, qbuf);
 			qbuf.flip();
 			bufq.add(qbuf);

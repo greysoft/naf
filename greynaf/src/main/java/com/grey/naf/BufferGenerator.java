@@ -8,7 +8,7 @@ import com.grey.base.config.SysProps;
 import com.grey.base.config.XmlConfig;
 import com.grey.base.utils.NIOBuffers;
 
-public class BufferSpec
+public class BufferGenerator
 {
 	//defaults to false as Direct buffers don't have backing array in standard JDK implementation
 	public static final boolean directniobufs = SysProps.get("greynaf.nio.directbufs", false);
@@ -21,23 +21,23 @@ public class BufferSpec
 
 	public String charsetName() {return (chenc == null ? "n/a" : chenc.charset().displayName());}
 
-	public BufferSpec(int rcvsiz, int xmtsiz) {
+	public BufferGenerator(int rcvsiz, int xmtsiz) {
 		this(null, null, rcvsiz, xmtsiz);
 	}
 
-	public BufferSpec(int rcvsiz, int xmtsiz, boolean direct, String charset) {
+	public BufferGenerator(int rcvsiz, int xmtsiz, boolean direct, String charset) {
 		this(null, null, rcvsiz, xmtsiz, direct, charset);
 	}
 
-	public BufferSpec(XmlConfig cfg, String xpath, int rcvsiz, int xmtsiz) {
+	public BufferGenerator(XmlConfig cfg, String xpath, int rcvsiz, int xmtsiz) {
 		this(cfg, xpath, rcvsiz, xmtsiz, DefaultConfig.directbufs, DefaultConfig.charset);
 	}
 
-	public BufferSpec(XmlConfig cfg, String xpath, int rcvsiz, int xmtsiz, boolean direct, String charset) {
+	public BufferGenerator(XmlConfig cfg, String xpath, int rcvsiz, int xmtsiz, boolean direct, String charset) {
 		this(BufferConfig.create(cfg, xpath, new BufferConfig(rcvsiz, xmtsiz==0?false:true, direct, charset)));
 	}
 	
-	public BufferSpec(BufferConfig cfg) {
+	public BufferGenerator(BufferConfig cfg) {
 		rcvbufsiz = cfg.rcvbufsiz;
 		directbufs = cfg.directbufs;
 

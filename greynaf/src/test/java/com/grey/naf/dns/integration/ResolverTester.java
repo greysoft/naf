@@ -12,10 +12,10 @@ import com.grey.base.utils.StringOps;
 import com.grey.base.utils.IP;
 import com.grey.base.utils.DynLoader;
 import com.grey.naf.ApplicationContextNAF;
-import com.grey.naf.dns.resolver.PacketDNS;
-import com.grey.naf.dns.resolver.ResolverAnswer;
 import com.grey.naf.dns.resolver.ResolverDNS;
-import com.grey.naf.dns.resolver.ResourceData;
+import com.grey.naf.dns.resolver.engine.PacketDNS;
+import com.grey.naf.dns.resolver.engine.ResolverAnswer;
+import com.grey.naf.dns.resolver.engine.ResourceData;
 import com.grey.naf.TestUtils;
 
 public class ResolverTester

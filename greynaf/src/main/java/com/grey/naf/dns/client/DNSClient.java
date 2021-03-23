@@ -4,8 +4,8 @@
  */
 package com.grey.naf.dns.client;
 
-import com.grey.naf.dns.resolver.ResolverAnswer;
 import com.grey.naf.dns.resolver.ResolverDNS;
+import com.grey.naf.dns.resolver.engine.ResolverAnswer;
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.Producer;
 import com.grey.naf.errors.NAFException;

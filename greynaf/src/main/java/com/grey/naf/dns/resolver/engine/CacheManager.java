@@ -2,7 +2,7 @@
  * Copyright 2014-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
-package com.grey.naf.dns.resolver;
+package com.grey.naf.dns.resolver.engine;
 
 import com.grey.base.config.SysProps;
 import com.grey.base.utils.ByteChars;
@@ -11,6 +11,8 @@ import com.grey.base.collections.HashedMapIntKey;
 import com.grey.base.collections.HashedSet;
 import com.grey.base.utils.IP;
 import com.grey.base.utils.TSAP;
+import com.grey.naf.dns.resolver.ResolverConfig;
+import com.grey.naf.dns.resolver.ResolverDNS;
 import com.grey.naf.errors.NAFConfigException;
 
 class CacheManager

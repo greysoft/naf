@@ -8,9 +8,9 @@ import com.grey.base.config.XmlConfig;
 import com.grey.base.utils.TimeOps;
 import com.grey.base.utils.FileOps;
 import com.grey.naf.ApplicationContextNAF;
-import com.grey.naf.DispatcherDef;
 import com.grey.naf.Launcher;
 import com.grey.naf.errors.NAFConfigException;
+import com.grey.naf.reactor.config.DispatcherConfig;
 import com.grey.naf.TestUtils;
 
 public class DispatcherTest
@@ -48,7 +48,7 @@ public class DispatcherTest
 
 		String dname = "testdispatcher1";
 		XmlConfig dcfg = appctx.getConfig().getDispatcher(dname);
-		DispatcherDef def = new DispatcherDef.Builder().withXmlConfig(dcfg).build();
+		DispatcherConfig def = new DispatcherConfig.Builder().withXmlConfig(dcfg).build();
 		Dispatcher dsptch = Dispatcher.create(appctx, def, bootlog);
 		org.junit.Assert.assertEquals(dname, dsptch.getName());
 		org.junit.Assert.assertFalse(dsptch.isRunning());
@@ -73,7 +73,7 @@ public class DispatcherTest
 		FileOps.deleteDirectory(rootdir);
 		ApplicationContextNAF appctx = TestUtils.createApplicationContext("DispatcherTest-Dynamic", true);
 		String dname = "utest_dynamic1";
-		DispatcherDef def = new DispatcherDef.Builder()
+		DispatcherConfig def = new DispatcherConfig.Builder()
 				.withName(dname)
 				.withSurviveHandlers(false)
 				.build();

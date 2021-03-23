@@ -13,7 +13,7 @@ import com.grey.base.utils.StringOps;
 import com.grey.base.utils.TimeOps;
 import com.grey.base.utils.NIOBuffers;
 import com.grey.base.collections.ObjectWell;
-import com.grey.naf.BufferSpec;
+import com.grey.naf.BufferGenerator;
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.CM_Listener;
 import com.grey.naf.reactor.TimerNAF;
@@ -63,7 +63,7 @@ public class NafManServer
 		final HTTP http;
 		final ResourceManager rsrcmgr;
 		final ObjectWell<NafManCommand> cmdstore;
-		final BufferSpec bufspec;
+		final BufferGenerator bufspec;
 		final java.nio.ByteBuffer httprsp400;
 		final java.nio.ByteBuffer httprsp404;
 		final java.nio.ByteBuffer httprsp405;
@@ -78,7 +78,7 @@ public class NafManServer
 			tmt_idle = cfg.getIdleConnectionTimeout();
 			long permcache = cfg.getDeclaredStaticTTL();
 			long dyncache = cfg.getDynamicResourceTTL();
-			bufspec = new BufferSpec(cfg.getBufferConfig());
+			bufspec = new BufferGenerator(cfg.getBufferConfig());
 			cmdstore = new ObjectWell<NafManCommand>(NafManCommand.class, "NAFMAN_"+dsptch.getName());
 			http = new HTTP(bufspec, permcache);
 			rsrcmgr = new ResourceManager(primary, http, dyncache);

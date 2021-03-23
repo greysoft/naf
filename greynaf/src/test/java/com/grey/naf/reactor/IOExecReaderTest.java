@@ -23,29 +23,29 @@ public class IOExecReaderTest
 	@org.junit.Test
 	public void testDirectBuffer() throws java.io.IOException
 	{
-		launch(new com.grey.naf.BufferSpec(25, 0, true, null));
+		launch(new com.grey.naf.BufferGenerator(25, 0, true, null));
 	}
 
 	@org.junit.Test
 	public void testHeapBuffer() throws java.io.IOException
 	{
-		launch(new com.grey.naf.BufferSpec(25, 0, false, null));
+		launch(new com.grey.naf.BufferGenerator(25, 0, false, null));
 	}
 
 	@org.junit.Test
 	public void testOffsetBuffer() throws java.io.IOException
 	{
 		int offset = 5;
-		com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(25, 0, false, null);
+		com.grey.naf.BufferGenerator bufspec = new com.grey.naf.BufferGenerator(25, 0, false, null);
 		bufspec = Mockito.spy(bufspec);
 		Mockito.when(bufspec.createReadBuffer()).thenReturn(((ByteBuffer)NIOBuffers.create(bufspec.rcvbufsiz+offset, bufspec.directbufs).position(offset)).slice());
 		launch(bufspec);
 	}
 
-	private void launch(com.grey.naf.BufferSpec bufspec) throws java.io.IOException
+	private void launch(com.grey.naf.BufferGenerator bufspec) throws java.io.IOException
 	{
 		FileOps.deleteDirectory(rootdir);
-		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
+		com.grey.naf.reactor.config.DispatcherConfig def = new com.grey.naf.reactor.config.DispatcherConfig.Builder()
 				.withSurviveHandlers(false)
 				.build();
 		Dispatcher dsptch = Dispatcher.create(appctx, def, com.grey.logging.Factory.getLogger("no-such-logger"));
@@ -70,7 +70,7 @@ public class IOExecReaderTest
 	private static class CMR
 		extends CM_Stream implements DispatcherRunnable
 	{
-		private final com.grey.naf.BufferSpec bufspec;
+		private final com.grey.naf.BufferGenerator bufspec;
 		private final java.nio.channels.WritableByteChannel wchan;
 		private final java.nio.channels.SelectableChannel rchan;
 		private final com.grey.base.utils.ByteChars bc = new com.grey.base.utils.ByteChars();
@@ -83,7 +83,7 @@ public class IOExecReaderTest
 		@Override
 		public String getName() {return "IOExecReaderTest.CMR";}
 
-		public CMR(Dispatcher d, java.nio.channels.SelectableChannel r, java.nio.channels.WritableByteChannel w, com.grey.naf.BufferSpec bufspec) throws java.io.IOException {
+		public CMR(Dispatcher d, java.nio.channels.SelectableChannel r, java.nio.channels.WritableByteChannel w, com.grey.naf.BufferGenerator bufspec) throws java.io.IOException {
 			super(d, bufspec, null);
 			rchan = r;
 			wchan = w;

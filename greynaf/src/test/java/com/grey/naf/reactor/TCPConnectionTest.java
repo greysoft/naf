@@ -41,7 +41,7 @@ public class TCPConnectionTest
 		FileOps.deleteDirectory(rootdir);
 
 		// create the Dispatcher
-		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
+		com.grey.naf.reactor.config.DispatcherConfig def = new com.grey.naf.reactor.config.DispatcherConfig.Builder()
 				.withSurviveHandlers(false)
 				.build();
 		dsptch = Dispatcher.create(appctx, def, com.grey.logging.Factory.getLogger("no-such-logger"));
@@ -123,7 +123,7 @@ public class TCPConnectionTest
 	private static class ClientTCP extends CM_Client implements DispatcherRunnable
 	{
 		private final TCPConnectionTest harness;
-		private static final com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(32, 64);
+		private static final com.grey.naf.BufferGenerator bufspec = new com.grey.naf.BufferGenerator(32, 64);
 		private final int req = System.identityHashCode(this);
 		private final java.net.InetSocketAddress srvaddr;
 		private final boolean expect_ok;
@@ -202,7 +202,7 @@ public class TCPConnectionTest
 
 	private static class ServerTCP extends CM_Server
 	{
-		private static final com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(32, 64);
+		private static final com.grey.naf.BufferGenerator bufspec = new com.grey.naf.BufferGenerator(32, 64);
 		private java.nio.channels.SelectableChannel chan;
 		private boolean sent_response;
 		public int rcvbytes;

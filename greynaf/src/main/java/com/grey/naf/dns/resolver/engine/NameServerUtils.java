@@ -2,7 +2,7 @@
  * Copyright 2014-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
-package com.grey.naf.dns.resolver;
+package com.grey.naf.dns.resolver.engine;
 
 import java.util.List;
 import java.util.ArrayList;
@@ -13,6 +13,7 @@ import com.grey.base.utils.ByteChars;
 import com.grey.base.utils.FileOps;
 import com.grey.base.collections.HashedMap;
 import com.grey.base.utils.IP;
+import com.grey.naf.dns.resolver.ResolverDNS;
 import com.grey.naf.errors.NAFConfigException;
 
 class NameServerUtils

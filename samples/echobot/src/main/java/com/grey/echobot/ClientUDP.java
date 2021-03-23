@@ -22,7 +22,7 @@ public class ClientUDP
 	@Override
 	public String getName() {return name;}
 
-	public ClientUDP(String name, int id, ClientGroup g, com.grey.naf.BufferSpec bufspec, byte[] msgbuf, int sockbufsiz)
+	public ClientUDP(String name, int id, ClientGroup g, com.grey.naf.BufferGenerator bufspec, byte[] msgbuf, int sockbufsiz)
 			throws java.io.IOException
 	{
 		super(g.dsptch, null, bufspec, sockbufsiz);

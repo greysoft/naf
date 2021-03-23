@@ -12,6 +12,8 @@ import com.grey.base.utils.StringOps;
 import com.grey.base.utils.IP;
 import com.grey.naf.dns.resolver.distributed.DistributedResolver;
 import com.grey.naf.dns.resolver.embedded.EmbeddedResolver;
+import com.grey.naf.dns.resolver.engine.ResolverAnswer;
+import com.grey.naf.dns.resolver.engine.ResourceData;
 import com.grey.naf.errors.NAFConfigException;
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.DispatcherRunnable;

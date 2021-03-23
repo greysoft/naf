@@ -12,11 +12,11 @@ public abstract class CM_Server extends CM_TCP
 
 	protected boolean abortServer() {return false;} //returns True if termination completes before returning
 	@Override
-	protected com.grey.naf.SSLConfig getSSLConfig() {return lstnr.getSSLConfig();}
+	protected com.grey.naf.reactor.config.SSLConfig getSSLConfig() {return lstnr.getSSLConfig();}
 
 	public CM_Listener getListener() {return lstnr;}
 
-	public CM_Server(CM_Listener l, com.grey.naf.BufferSpec rbufspec, com.grey.naf.BufferSpec wbufspec) {
+	public CM_Server(CM_Listener l, com.grey.naf.BufferGenerator rbufspec, com.grey.naf.BufferGenerator wbufspec) {
 		super(l.getDispatcher(), rbufspec, wbufspec);
 		lstnr=l;
 	}

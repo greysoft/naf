@@ -5,7 +5,7 @@
 package com.grey.naf.dns.resolver.embedded;
 
 import com.grey.naf.dns.resolver.ResolverConfig;
-import com.grey.naf.dns.resolver.ResolverService;
+import com.grey.naf.dns.resolver.engine.ResolverService;
 import com.grey.naf.reactor.Dispatcher;
 
 /**
@@ -14,7 +14,7 @@ import com.grey.naf.reactor.Dispatcher;
 public class EmbeddedResolver
 	extends com.grey.naf.dns.resolver.ResolverDNS
 {
-	private final com.grey.naf.dns.resolver.ResolverService rslvr;
+	private final com.grey.naf.dns.resolver.engine.ResolverService rslvr;
 
 	@Override
 	public Dispatcher getMasterDispatcher() {return rslvr.getDispatcher();}
@@ -41,13 +41,13 @@ public class EmbeddedResolver
 	}
 
 	@Override
-	protected com.grey.naf.dns.resolver.ResolverAnswer resolve(byte qtype, com.grey.base.utils.ByteChars qname, com.grey.naf.dns.resolver.ResolverDNS.Client caller,
+	protected com.grey.naf.dns.resolver.engine.ResolverAnswer resolve(byte qtype, com.grey.base.utils.ByteChars qname, com.grey.naf.dns.resolver.ResolverDNS.Client caller,
 			Object cbdata, int flags) {
 		return rslvr.resolve(qtype, qname, caller, cbdata, flags);
 	}
 
 	@Override
-	protected com.grey.naf.dns.resolver.ResolverAnswer resolve(byte qtype, int qip, com.grey.naf.dns.resolver.ResolverDNS.Client caller,
+	protected com.grey.naf.dns.resolver.engine.ResolverAnswer resolve(byte qtype, int qip, com.grey.naf.dns.resolver.ResolverDNS.Client caller,
 			Object cbdata, int flags) {
 		return rslvr.resolve(qtype, qip, caller, cbdata, flags);
 	}

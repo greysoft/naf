@@ -2,9 +2,10 @@
  * Copyright 2014-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
-package com.grey.naf.dns.resolver;
+package com.grey.naf.dns.resolver.engine;
 
 import com.grey.base.utils.TSAP;
+import com.grey.naf.dns.resolver.ResolverConfig;
 
 class CommsManager
 	implements com.grey.naf.EntityReaper
@@ -19,8 +20,8 @@ class CommsManager
 	{
 		ResolverConfig cfg = rslvr.getConfig();
 		//we only transmit queries, so TCP BufferSpec transmit-size need not be expanded to the TCP limit
-		com.grey.naf.BufferSpec bufspec_udp = new com.grey.naf.BufferSpec(ResolverConfig.PKTSIZ_UDP, ResolverConfig.PKTSIZ_UDP, ResolverConfig.DIRECTNIOBUFS, null);
-		com.grey.naf.BufferSpec bufspec_tcp = new com.grey.naf.BufferSpec(ResolverConfig.PKTSIZ_TCP, ResolverConfig.PKTSIZ_UDP, ResolverConfig.DIRECTNIOBUFS, null);
+		com.grey.naf.BufferGenerator bufspec_udp = new com.grey.naf.BufferGenerator(ResolverConfig.PKTSIZ_UDP, ResolverConfig.PKTSIZ_UDP, ResolverConfig.DIRECTNIOBUFS, null);
+		com.grey.naf.BufferGenerator bufspec_tcp = new com.grey.naf.BufferGenerator(ResolverConfig.PKTSIZ_TCP, ResolverConfig.PKTSIZ_UDP, ResolverConfig.DIRECTNIOBUFS, null);
 
 		if (!cfg.isRecursive()) {
 			localNameServers = null;

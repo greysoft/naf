@@ -37,7 +37,7 @@ public class IterativeListenerTest
 		java.net.Socket clients[] = new java.net.Socket[NUMCONNS];
 
 		// set up Dispatcher
-		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
+		com.grey.naf.reactor.config.DispatcherConfig def = new com.grey.naf.reactor.config.DispatcherConfig.Builder()
 				.withSurviveHandlers(false)
 				.build();
 		Dispatcher dsptch = Dispatcher.create(appctx, def, com.grey.logging.Factory.getLogger("no-such-logger"));
@@ -90,7 +90,7 @@ public class IterativeListenerTest
 	private static class TestServer
 		extends CM_Server
 	{
-		private static final com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(32, 64);
+		private static final com.grey.naf.BufferGenerator bufspec = new com.grey.naf.BufferGenerator(32, 64);
 		public boolean completed;
 		public int conncount;
 		private int opencount;

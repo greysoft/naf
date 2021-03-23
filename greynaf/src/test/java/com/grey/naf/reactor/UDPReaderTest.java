@@ -9,7 +9,7 @@ import com.grey.base.utils.FileOps;
 import com.grey.base.utils.IP;
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
-import com.grey.naf.BufferSpec;
+import com.grey.naf.BufferGenerator;
 import com.grey.naf.TestUtils;
 
 // This tests the UDP mode of IOExecReader
@@ -36,7 +36,7 @@ public class UDPReaderTest
 		FileOps.deleteDirectory(rootdir);
 
 		// set up Dispatcher
-		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
+		com.grey.naf.reactor.config.DispatcherConfig def = new com.grey.naf.reactor.config.DispatcherConfig.Builder()
 				.withSurviveHandlers(false)
 				.build();
 		Dispatcher dsptch = Dispatcher.create(appctx, def, com.grey.logging.Factory.getLogger("no-such-logger"));
@@ -78,7 +78,7 @@ public class UDPReaderTest
 		public String getName() {return "UTEST-Reader-UDP";}
 
 		public Reader(Dispatcher d, boolean directbufs) throws java.io.IOException {
-			super(d, makeAddress(), new BufferSpec(1024, 0, directbufs, null), 0);
+			super(d, makeAddress(), new BufferGenerator(1024, 0, directbufs, null), 0);
 		}
 
 		@Override

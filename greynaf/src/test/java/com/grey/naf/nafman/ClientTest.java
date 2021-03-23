@@ -10,9 +10,9 @@ import com.grey.base.utils.FileOps;
 import com.grey.base.utils.TimeOps;
 import com.grey.logging.Logger;
 import com.grey.naf.ApplicationContextNAF;
-import com.grey.naf.DispatcherDef;
 import com.grey.naf.TestUtils;
 import com.grey.naf.reactor.Dispatcher;
+import com.grey.naf.reactor.config.DispatcherConfig;
 
 public class ClientTest
 {
@@ -37,7 +37,7 @@ public class ClientTest
 
 		String dname = "testdispatcher1";
 		XmlConfig dcfg = appctx.getConfig().getDispatcher(dname);
-		DispatcherDef def = new DispatcherDef.Builder().withXmlConfig(dcfg).build();
+		DispatcherConfig def = new DispatcherConfig.Builder().withXmlConfig(dcfg).build();
 
 		Dispatcher dsptch = Dispatcher.create(appctx, def, logger);
 		NafManAgent agent = dsptch.getNafManAgent();
@@ -82,14 +82,14 @@ public class ClientTest
 		ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, true);
 		NafManRegistry nafreg = NafManRegistry.get(appctx);
 		NafManRegistry.DefCommand stopcmd = nafreg.getCommand(NafManRegistry.CMD_STOP);
-		DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
+		DispatcherConfig def = new com.grey.naf.reactor.config.DispatcherConfig.Builder()
 				.withName("utest_d1")
 				.withSurviveHandlers(false)
 				.build();
 		Dispatcher dp = Dispatcher.create(appctx, def, logger);
-		def = new com.grey.naf.DispatcherDef.Builder(def).withName("utest_d2").build();
+		def = new com.grey.naf.reactor.config.DispatcherConfig.Builder(def).withName("utest_d2").build();
 		Dispatcher ds1 = Dispatcher.create(appctx, def, logger);
-		def = new com.grey.naf.DispatcherDef.Builder(def).withName("utest_d3").build();
+		def = new com.grey.naf.reactor.config.DispatcherConfig.Builder(def).withName("utest_d3").build();
 		Dispatcher ds2 = Dispatcher.create(appctx, def, logger);
 		dp.start();
 		ds1.start();
@@ -115,7 +115,7 @@ public class ClientTest
 		ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, true);
 		NafManRegistry reg = NafManRegistry.get(appctx);
 		NafManRegistry.DefCommand stopcmd = reg.getCommand(NafManRegistry.CMD_STOP);
-		DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
+		DispatcherConfig def = new com.grey.naf.reactor.config.DispatcherConfig.Builder()
 				.withName("utest_allcmds")
 				.withSurviveHandlers(false)
 				.build();

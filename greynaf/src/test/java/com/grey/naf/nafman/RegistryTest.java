@@ -7,9 +7,9 @@ package com.grey.naf.nafman;
 import com.grey.base.utils.DynLoader;
 import com.grey.base.utils.FileOps;
 import com.grey.naf.ApplicationContextNAF;
-import com.grey.naf.DispatcherDef;
 import com.grey.naf.errors.NAFConfigException;
 import com.grey.naf.reactor.Dispatcher;
+import com.grey.naf.reactor.config.DispatcherConfig;
 import com.grey.naf.TestUtils;
 
 public class RegistryTest
@@ -95,9 +95,9 @@ public class RegistryTest
 			= (java.util.HashMap<String, java.util.List<Object>>)DynLoader.getField(nafreg, "cmd_handlers");
 		com.grey.base.collections.HashedMap<String, java.util.ArrayList<NafManCommand.Handler>> dsptch_handlers
 			= new com.grey.base.collections.HashedMap<String, java.util.ArrayList<NafManCommand.Handler>>();
-		DispatcherDef def = new DispatcherDef.Builder().build();
+		DispatcherConfig def = new DispatcherConfig.Builder().build();
 		Dispatcher dsptch1 = Dispatcher.create(appctx, def, logger);
-		def = new com.grey.naf.DispatcherDef.Builder(def).withName(null).build();
+		def = new com.grey.naf.reactor.config.DispatcherConfig.Builder(def).withName(null).build();
 		Dispatcher dsptch2 = Dispatcher.create(appctx, def, logger);
 		nafreg.loadCommands(new NafManRegistry.DefCommand[]{fakecmd1});
 		nafreg.loadCommands(new NafManRegistry.DefCommand[]{fakecmd2});

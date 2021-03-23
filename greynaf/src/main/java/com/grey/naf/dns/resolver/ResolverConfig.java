@@ -14,6 +14,7 @@ import com.grey.base.utils.TimeOps;
 import com.grey.base.config.XmlConfig;
 import com.grey.naf.dns.resolver.distributed.DistributedResolver;
 import com.grey.naf.dns.resolver.embedded.EmbeddedResolver;
+import com.grey.naf.dns.resolver.engine.PacketDNS;
 import com.grey.naf.errors.NAFConfigException;
 
 public class ResolverConfig
@@ -24,7 +25,7 @@ public class ResolverConfig
 	public static final int PKTSIZ_TCP = SysProps.get("greynaf.dns.maxtcp", PacketDNS.UDPMAXMSG * 4);
 	// Linux limit is 128K, while Windows seems to accept just about anything
 	public static final int UDPSOCKBUFSIZ = SysProps.get("greynaf.dns.sockbuf", PacketDNS.UDPMAXMSG * 128);
-	public static final boolean DIRECTNIOBUFS = com.grey.naf.BufferSpec.directniobufs;
+	public static final boolean DIRECTNIOBUFS = com.grey.naf.BufferGenerator.directniobufs;
 	private static final int SVCPORT_DNS = SysProps.get("greynaf.dns.altport", PacketDNS.INETPORT);
 
 	public static final com.grey.logging.Logger.LEVEL DEBUGLVL = com.grey.logging.Logger.LEVEL.TRC2;

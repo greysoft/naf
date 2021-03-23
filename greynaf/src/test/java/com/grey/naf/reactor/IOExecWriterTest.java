@@ -12,7 +12,7 @@ import com.grey.base.utils.FileOps;
 import com.grey.base.utils.StringOps;
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
-import com.grey.naf.BufferSpec;
+import com.grey.naf.BufferGenerator;
 import com.grey.naf.TestUtils;
 
 public class IOExecWriterTest
@@ -30,10 +30,10 @@ public class IOExecWriterTest
 	public void testBlocking() throws Exception
 	{
 		FileOps.deleteDirectory(rootdir);
-		final BufferSpec bufspec = new BufferSpec(0, 10);
+		final BufferGenerator bufspec = new BufferGenerator(0, 10);
 		BlockingQueue<BlockingTestData> blockingQueue = new ArrayBlockingQueue<>(5);
 
-		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
+		com.grey.naf.reactor.config.DispatcherConfig def = new com.grey.naf.reactor.config.DispatcherConfig.Builder()
 				.withSurviveHandlers(false)
 				.build();
 		Dispatcher dsptch = Dispatcher.create(appctx, def, com.grey.logging.Factory.getLogger("no-such-logger"));
@@ -82,7 +82,7 @@ public class IOExecWriterTest
 	public void testFile() throws java.io.IOException
 	{
 		FileOps.deleteDirectory(rootdir);
-		final BufferSpec bufspec = new BufferSpec(0, 0);
+		final BufferGenerator bufspec = new BufferGenerator(0, 0);
 
 		// create the file
 		final char chval = 'A';
@@ -103,7 +103,7 @@ public class IOExecWriterTest
 		org.junit.Assert.assertEquals(filebody.length, fh.length());
 
 		// create the Dispatcher and write channel
-		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
+		com.grey.naf.reactor.config.DispatcherConfig def = new com.grey.naf.reactor.config.DispatcherConfig.Builder()
 				.withSurviveHandlers(false)
 				.build();
 		Dispatcher dsptch = Dispatcher.create(appctx, def, com.grey.logging.Factory.getLogger("no-such-logger"));
@@ -159,7 +159,7 @@ public class IOExecWriterTest
 		@Override //not used
 		public void ioReceived(ByteArrayRef rcvdata) throws java.io.IOException {}
 
-		public CMW(Dispatcher d, java.nio.channels.Pipe.SourceChannel r, java.nio.channels.SelectableChannel w, BufferSpec bufspec, java.io.File fh,
+		public CMW(Dispatcher d, java.nio.channels.Pipe.SourceChannel r, java.nio.channels.SelectableChannel w, BufferGenerator bufspec, java.io.File fh,
 				BlockingQueue<BlockingTestData> q) throws java.io.IOException {
 			super(d, null, bufspec);
 			blockingQueue = q;

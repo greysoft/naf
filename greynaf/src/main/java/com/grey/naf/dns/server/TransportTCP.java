@@ -5,7 +5,7 @@
 package com.grey.naf.dns.server;
 
 import com.grey.base.utils.ByteArrayRef;
-import com.grey.naf.dns.resolver.PacketDNS;
+import com.grey.naf.dns.resolver.engine.PacketDNS;
 
 class TransportTCP
 	extends com.grey.naf.reactor.CM_Server
@@ -14,7 +14,7 @@ class TransportTCP
 		implements com.grey.naf.reactor.ConcurrentListener.ServerFactory
 	{
 		private final com.grey.naf.reactor.CM_Listener lstnr;
-		private final com.grey.naf.BufferSpec bufspec;
+		private final com.grey.naf.BufferGenerator bufspec;
 
 		@Override
 		public TransportTCP factory_create() {return new TransportTCP(lstnr, bufspec);}
@@ -26,14 +26,14 @@ class TransportTCP
 		public ServerFactory(com.grey.naf.reactor.CM_Listener l, Object cfg) {
 			lstnr = l;
 			//we only receive queries, so TCP BufferSpec receive-size need not be expanded
-			bufspec = new com.grey.naf.BufferSpec(ServerDNS.PKTSIZ_UDP, ServerDNS.PKTSIZ_TCP, ServerDNS.DIRECTNIOBUFS, null);
+			bufspec = new com.grey.naf.BufferGenerator(ServerDNS.PKTSIZ_UDP, ServerDNS.PKTSIZ_TCP, ServerDNS.DIRECTNIOBUFS, null);
 		}
 	}
 	
 
 	private boolean have_rsplen;
 
-	TransportTCP(com.grey.naf.reactor.CM_Listener lstnr, com.grey.naf.BufferSpec bufspec) {
+	TransportTCP(com.grey.naf.reactor.CM_Listener lstnr, com.grey.naf.BufferGenerator bufspec) {
 		super(lstnr, bufspec, bufspec);
 	}
 

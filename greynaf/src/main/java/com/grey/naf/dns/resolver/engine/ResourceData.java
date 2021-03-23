@@ -2,10 +2,11 @@
  * Copyright 2010-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
-package com.grey.naf.dns.resolver;
+package com.grey.naf.dns.resolver.engine;
 
 import com.grey.base.utils.IP;
 import com.grey.base.utils.TimeOps;
+import com.grey.naf.dns.resolver.ResolverDNS;
 import com.grey.base.utils.ByteChars;
 
 abstract public class ResourceData
@@ -19,22 +20,22 @@ abstract public class ResourceData
 	private long ttl;
 
 	public abstract int rrType(); //Resolver.QTYPE_x values
-	public final int rrClass() {return rrclass;} //Packet.QCLASS_x values
+	public int rrClass() {return rrclass;} //Packet.QCLASS_x values
 
-	public final int getIP() {return ipaddr;}
-	final void setIP(int ip) {ipaddr = ip;}
+	public int getIP() {return ipaddr;}
+	public void setIP(int ip) {ipaddr = ip;}
 
 	//Obviously getName() returns an object which could be modified, but callers must use setName()
-	public final ByteChars getName() {return rrname;}
-	final ByteChars setName(ByteChars src) {return rrname.populate(src.buffer(), src.offset(), src.size());}
+	public ByteChars getName() {return rrname;}
+	public ByteChars setName(ByteChars src) {return rrname.populate(src.buffer(), src.offset(), src.size());}
 
-	public final long getExpiry() {return ttl;}
-	public final int getTTL(long systime) {return (int)((ttl - systime) / TimeOps.MSECS_PER_SECOND);}
-	final void setExpiry(long expiry) {ttl = expiry;}
-	final void setExpiry(int rawttl, long systime) {ttl = (rawttl * 1000L) + systime;}
+	public long getExpiry() {return ttl;}
+	public int getTTL(long systime) {return (int)((ttl - systime) / TimeOps.MSECS_PER_SECOND);}
+	void setExpiry(long expiry) {ttl = expiry;}
+	void setExpiry(int rawttl, long systime) {ttl = (rawttl * 1000L) + systime;}
 
-	final boolean isNegative() {return (rrname == null);}
-	final boolean isExpired(long cutoff) {return (ttl < cutoff);}
+	boolean isNegative() {return (rrname == null);}
+	boolean isExpired(long cutoff) {return (ttl < cutoff);}
 
 	ResourceData(ByteChars name, int ip, long expiry_time)
 	{

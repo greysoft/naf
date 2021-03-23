@@ -8,7 +8,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 
 import com.grey.base.utils.ByteArrayRef;
-import com.grey.naf.BufferSpec;
+import com.grey.naf.BufferGenerator;
 import com.grey.naf.reactor.Dispatcher;
 
 class TransportUDP
@@ -20,7 +20,7 @@ class TransportUDP
 	public String getName() {return "DNS-Server-UDP";}
 
 	public TransportUDP(Dispatcher d, ServerDNS qh, InetAddress iface, int port) throws java.io.IOException {
-		super(d, new InetSocketAddress(iface, port), new BufferSpec(ServerDNS.PKTSIZ_UDP, ServerDNS.PKTSIZ_UDP, ServerDNS.DIRECTNIOBUFS, null), ServerDNS.UDPSOCKBUFSIZ);
+		super(d, new InetSocketAddress(iface, port), new BufferGenerator(ServerDNS.PKTSIZ_UDP, ServerDNS.PKTSIZ_UDP, ServerDNS.DIRECTNIOBUFS, null), ServerDNS.UDPSOCKBUFSIZ);
 		qryh = qh;
 	}
 

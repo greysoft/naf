@@ -23,13 +23,13 @@ import com.grey.base.collections.IteratorInt;
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
 import com.grey.naf.Naflet;
-import com.grey.naf.DispatcherDef;
 import com.grey.naf.EntityReaper;
 import com.grey.naf.nafman.NafManAgent;
 import com.grey.naf.nafman.NafManConfig;
 import com.grey.naf.nafman.NafManRegistry;
 import com.grey.naf.nafman.PrimaryAgent;
 import com.grey.naf.nafman.SecondaryAgent;
+import com.grey.naf.reactor.config.DispatcherConfig;
 import com.grey.naf.errors.NAFConfigException;
 import com.grey.logging.Logger;
 import com.grey.logging.Logger.LEVEL;
@@ -102,13 +102,13 @@ public class Dispatcher
 	private boolean error_abort;
 	public boolean completedOK() {return thread_completed && !error_abort;}
 
-	public static Dispatcher create(ApplicationContextNAF appctx, DispatcherDef def, Logger log) throws java.io.IOException {
+	public static Dispatcher create(ApplicationContextNAF appctx, DispatcherConfig def, Logger log) throws java.io.IOException {
 		if (def == null) {
-			def = new DispatcherDef.Builder().build();
+			def = new DispatcherConfig.Builder().build();
 		}
 		if (def.getName() == null || def.getName().isEmpty()) {
 			String name = appctx.getName()+"-AnonDispatcher-"+anonDispatcherCount.incrementAndGet();
-			def = new DispatcherDef.Builder(def).withName(name).build();
+			def = new DispatcherConfig.Builder(def).withName(name).build();
 		}
 		Dispatcher dsptch = new Dispatcher(appctx, def, log);
 		appctx.register(dsptch);
@@ -134,7 +134,7 @@ public class Dispatcher
 		return dsptch;
 	}
 
-	private Dispatcher(ApplicationContextNAF appctx, DispatcherDef def, Logger initlog) throws java.io.IOException {
+	private Dispatcher(ApplicationContextNAF appctx, DispatcherConfig def, Logger initlog) throws java.io.IOException {
 		this.appctx = appctx;
 		dname = def.getName();
 		surviveHandlers = def.isSurviveHandlers();

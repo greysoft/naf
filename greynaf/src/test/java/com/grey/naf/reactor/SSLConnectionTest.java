@@ -11,8 +11,8 @@ import com.grey.base.utils.IP;
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
 import com.grey.naf.EntityReaper;
-import com.grey.naf.SSLConfig;
 import com.grey.naf.reactor.config.ConcurrentListenerConfig;
+import com.grey.naf.reactor.config.SSLConfig;
 import com.grey.naf.TestUtils;
 
 /*
@@ -149,7 +149,7 @@ public class SSLConnectionTest
 		FileOps.deleteDirectory(rootdir);
 
 		// create the Dispatcher
-		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
+		com.grey.naf.reactor.config.DispatcherConfig def = new com.grey.naf.reactor.config.DispatcherConfig.Builder()
 				.withSurviveHandlers(false)
 				.build();
 		dsptch = Dispatcher.create(appctx, def, com.grey.logging.Factory.getLogger("no-such-logger"));
@@ -332,7 +332,7 @@ public class SSLConnectionTest
 		extends CM_Client implements DispatcherRunnable
 	{
 		public final EntityState state = new EntityState();
-		private final com.grey.naf.SSLConfig sslconfig;
+		private final com.grey.naf.reactor.config.SSLConfig sslconfig;
 		private final EntityReaper rpr;
 		private final int srvport;
 		private java.nio.channels.SelectableChannel chan;
@@ -343,12 +343,12 @@ public class SSLConnectionTest
 		public int sendstep;
 
 		@Override
-		protected com.grey.naf.SSLConfig getSSLConfig() {return sslconfig;}
+		protected com.grey.naf.reactor.config.SSLConfig getSSLConfig() {return sslconfig;}
 		@Override
 		public String getName() {return "SSLConnectionTest.SSLC";}
 
 		public SSLC(Dispatcher d, XmlConfig cfg, int port, EntityReaper rpr) throws java.io.IOException {
-			super(d, new com.grey.naf.BufferSpec(cfg, "niobuffers", 256, 128), new com.grey.naf.BufferSpec(cfg, "niobuffers", 256, 128));
+			super(d, new com.grey.naf.BufferGenerator(cfg, "niobuffers", 256, 128), new com.grey.naf.BufferGenerator(cfg, "niobuffers", 256, 128));
 			this.rpr = rpr;
 			srvport = port;
 			XmlConfig sslcfg = (cfg == null ? XmlConfig.NULLCFG : cfg.getSection("ssl"));
@@ -572,7 +572,7 @@ public class SSLConnectionTest
 		implements com.grey.naf.reactor.ConcurrentListener.ServerFactory
 	{
 		final CM_Listener lstnr;
-		final com.grey.naf.BufferSpec bufspec;
+		final com.grey.naf.BufferGenerator bufspec;
 
 		@Override
 		public SSLS factory_create() {return new SSLS(this);}
@@ -584,7 +584,7 @@ public class SSLConnectionTest
 		public TestServerFactory(com.grey.naf.reactor.CM_Listener l, Object cfg) {
 			lstnr = l;
 			com.grey.base.config.XmlConfig xmlcfg = (com.grey.base.config.XmlConfig)cfg;
-			bufspec = new com.grey.naf.BufferSpec(xmlcfg, "niobuffers", 8 * 1024, 128);
+			bufspec = new com.grey.naf.BufferGenerator(xmlcfg, "niobuffers", 8 * 1024, 128);
 			org.junit.Assert.assertNotNull(lstnr.getSSLConfig());
 		}
 	}

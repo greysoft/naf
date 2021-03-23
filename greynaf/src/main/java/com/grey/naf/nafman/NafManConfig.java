@@ -8,7 +8,7 @@ import java.time.Duration;
 import java.util.function.Supplier;
 
 import com.grey.base.config.XmlConfig;
-import com.grey.naf.BufferSpec;
+import com.grey.naf.BufferGenerator;
 import com.grey.naf.NAFConfig;
 import com.grey.naf.reactor.config.ConcurrentListenerConfig;
 
@@ -17,7 +17,7 @@ public class NafManConfig
 	private final boolean surviveDownstream; //if false, Primary agent halts its Dispatcher if any secondary agents halt
 	private final long idleConnectionTimeout; //idle timeout the NAFMAN server applies to incoming connections
 	private final ConcurrentListenerConfig listenerConfig; //the NAFMAN server
-	private BufferSpec.BufferConfig bufferConfig;
+	private BufferGenerator.BufferConfig bufferConfig;
 
 	// these are TTLs for cached responses in NAFMAN server
 	private final long dynamicResourceTTL;
@@ -52,7 +52,7 @@ public class NafManConfig
 		return listenerConfig;
 	}
 
-	public BufferSpec.BufferConfig getBufferConfig() {
+	public BufferGenerator.BufferConfig getBufferConfig() {
 		return bufferConfig;
 	}
 
@@ -69,7 +69,7 @@ public class NafManConfig
 		private long dynamicResourceTTL = Duration.ofSeconds(5).toMillis();
 		private long declaredStaticTTL = Duration.ofDays(1).toMillis();
 		private long idleConnectionTimeout = Duration.ofSeconds(30).toMillis();
-		private BufferSpec.BufferConfig bufferConfig = new BufferSpec.BufferConfig(1024, true, BufferSpec.directniobufs, null);
+		private BufferGenerator.BufferConfig bufferConfig = new BufferGenerator.BufferConfig(1024, true, BufferGenerator.directniobufs, null);
 
 		public Builder(NAFConfig nafConfig) {
 			this.nafConfig = nafConfig;
@@ -85,7 +85,7 @@ public class NafManConfig
 			dynamicResourceTTL = cfg.getTime("@dyncache", dynamicResourceTTL);
 			declaredStaticTTL = cfg.getTime("@permcache", declaredStaticTTL);
 			idleConnectionTimeout = cfg.getTime("@timeout", idleConnectionTimeout);
-			bufferConfig = BufferSpec.BufferConfig.create(cfg, "niobuffers", bufferConfig);
+			bufferConfig = BufferGenerator.BufferConfig.create(cfg, "niobuffers", bufferConfig);
 
 			XmlConfig lxmlcfg = cfg.getSection("listener");
 			getListenerConfig().withXmlConfig(lxmlcfg, nafConfig);
@@ -112,7 +112,7 @@ public class NafManConfig
 			return this;
 		}
 
-		public Builder withBufferConfig(BufferSpec.BufferConfig v) {
+		public Builder withBufferConfig(BufferGenerator.BufferConfig v) {
 			bufferConfig = v;
 			return this;
 		}

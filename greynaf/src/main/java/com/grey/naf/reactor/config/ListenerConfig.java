@@ -5,7 +5,6 @@
 package com.grey.naf.reactor.config;
 
 import com.grey.base.config.XmlConfig;
-import com.grey.naf.SSLConfig;
 import com.grey.naf.NAFConfig;
 import com.grey.naf.errors.NAFConfigException;
 

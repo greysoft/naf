@@ -16,13 +16,13 @@ import com.grey.base.utils.FileOps;
 import com.grey.base.utils.TimeOps;
 import com.grey.base.utils.IP;
 import com.grey.naf.ApplicationContextNAF;
-import com.grey.naf.DispatcherDef;
 import com.grey.naf.NAFConfig;
-import com.grey.naf.dns.resolver.ResolverAnswer;
 import com.grey.naf.dns.resolver.ResolverConfig;
 import com.grey.naf.dns.resolver.ResolverDNS;
+import com.grey.naf.dns.resolver.engine.ResolverAnswer;
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.TimerNAF;
+import com.grey.naf.reactor.config.DispatcherConfig;
 import com.grey.naf.TestUtils;
 
 public class ResolverTest
@@ -416,7 +416,7 @@ public class ResolverTest
 		Class<?> clss_resolver = com.grey.naf.dns.resolver.embedded.EmbeddedResolver.class;
 		com.grey.naf.NAFConfig nafcfg = setConfig(null, clss_resolver, flags);
 		ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, nafcfg, true);
-		DispatcherDef def = new DispatcherDef.Builder()
+		DispatcherConfig def = new DispatcherConfig.Builder()
 				.withName(dispatcher_name)
 				.withSurviveHandlers(false)
 				.build();
@@ -447,7 +447,7 @@ public class ResolverTest
 		}
 		//we need NAFMAN (enabled by default) to propagate the dsptch.stop() in handleDnsResult() to the other Dispatcher
 		ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, nafcfg, true);
-		DispatcherDef def = new DispatcherDef.Builder()
+		DispatcherConfig def = new DispatcherConfig.Builder()
 				.withName(d1name)
 				.withSurviveHandlers(false)
 				.build();
@@ -455,7 +455,7 @@ public class ResolverTest
 				.withXmlConfig(nafcfg.getNode("dnsresolver"))
 				.build();
 		Dispatcher d1 = Dispatcher.create(appctx, def, logger);
-		def = new DispatcherDef.Builder(def).withName(d2name).build();
+		def = new DispatcherConfig.Builder(def).withName(d2name).build();
 		Dispatcher d2 = Dispatcher.create(appctx, def, logger);
 		if (local_master) { //first resolver to be created becomes the master
 			ResolverDNS.create(d1, rcfg);

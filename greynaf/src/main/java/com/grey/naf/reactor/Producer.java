@@ -9,7 +9,7 @@ import java.util.List;
 import com.grey.base.collections.Circulist;
 import com.grey.base.utils.ByteArrayRef;
 import com.grey.base.utils.NIOBuffers;
-import com.grey.naf.BufferSpec;
+import com.grey.naf.BufferGenerator;
 import com.grey.logging.Logger.LEVEL;
 
 /*
@@ -185,7 +185,7 @@ public class Producer<T> implements DispatcherRunnable
 
 		// Note that 'rep' and 'CM_Stream.iochan' are one and the same, but recording it as rep allows us to avoid casting iochan.
 		private AlertsPipe(Dispatcher d, Producer<T> p) throws java.io.IOException {
-			super(d, new BufferSpec(0, 0), null); //we will do our own reads
+			super(d, new BufferGenerator(0, 0), null); //we will do our own reads
 			producer = p;
 
 			java.nio.channels.Pipe pipe = java.nio.channels.Pipe.open();

@@ -15,6 +15,7 @@ import com.grey.base.utils.FileOps;
 import com.grey.base.utils.CommandParser;
 import com.grey.naf.reactor.CM_Listener;
 import com.grey.naf.reactor.Dispatcher;
+import com.grey.naf.reactor.config.DispatcherConfig;
 import com.grey.naf.nafman.NafManClient;
 import com.grey.naf.nafman.NafManConfig;
 import com.grey.naf.nafman.PrimaryAgent;
@@ -227,7 +228,7 @@ public class Launcher
 		// Do separate loops to create and start the Dispatchers, so that they're all guaranteed to be in single-threaded
 		// mode until all have initialised.
 		for (XmlConfig dcfg : cfgdispatchers) {
-			DispatcherDef def = new DispatcherDef.Builder().withXmlConfig(dcfg).build();
+			DispatcherConfig def = new DispatcherConfig.Builder().withXmlConfig(dcfg).build();
 			Dispatcher dsptch = Dispatcher.create(appctx, def, log);
 			dlst.add(dsptch);
 

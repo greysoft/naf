@@ -9,9 +9,9 @@ import com.grey.base.utils.ByteArrayRef;
 import com.grey.base.utils.ByteChars;
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.DispatcherRunnable;
-import com.grey.naf.dns.resolver.PacketDNS;
 import com.grey.naf.dns.resolver.ResolverDNS;
-import com.grey.naf.dns.resolver.ResourceData;
+import com.grey.naf.dns.resolver.engine.PacketDNS;
+import com.grey.naf.dns.resolver.engine.ResourceData;
 import com.grey.naf.reactor.ConcurrentListener;
 import com.grey.logging.Logger;
 
@@ -32,7 +32,7 @@ public class ServerDNS implements DispatcherRunnable
 	static final int PKTSIZ_UDP = SysProps.get("greynaf.dns.maxudp", PacketDNS.UDPMAXMSG);
 	static final int PKTSIZ_TCP = SysProps.get("greynaf.dns.maxtcp", 5*PKTSIZ_UDP);
 	static final int UDPSOCKBUFSIZ = SysProps.get("greynaf.dns.sockbuf", PacketDNS.UDPMAXMSG * 128);
-	static final boolean DIRECTNIOBUFS = com.grey.naf.BufferSpec.directniobufs;
+	static final boolean DIRECTNIOBUFS = com.grey.naf.BufferGenerator.directniobufs;
 	static final Logger.LEVEL DEBUGLVL = Logger.LEVEL.TRC2;
 
 	private static final boolean IGNORE_QTRAIL = SysProps.get("greynaf.dns.server.ignoretrailing", false);

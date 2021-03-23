@@ -9,15 +9,14 @@ import com.grey.base.utils.StringOps;
 import com.grey.base.utils.FileOps;
 import com.grey.base.utils.IP;
 import com.grey.naf.reactor.Dispatcher;
-
+import com.grey.naf.reactor.config.DispatcherConfig;
 import com.grey.naf.ApplicationContextNAF;
-import com.grey.naf.DispatcherDef;
 import com.grey.naf.NAFConfig;
 import com.grey.naf.TestUtils;
 import com.grey.naf.dns.client.DNSClient;
-import com.grey.naf.dns.resolver.ResolverAnswer;
 import com.grey.naf.dns.resolver.ResolverConfig;
 import com.grey.naf.dns.resolver.ResolverDNS;
+import com.grey.naf.dns.resolver.engine.ResolverAnswer;
 
 import org.junit.Assert;
 
@@ -186,7 +185,7 @@ public class SynchronousTest
 			d1name += "_slave";
 			d2name += "_master";
 		}
-		DispatcherDef def = new DispatcherDef.Builder()
+		DispatcherConfig def = new DispatcherConfig.Builder()
 				.withName(d1name)
 				.withSurviveHandlers(false)
 				.build();
@@ -194,7 +193,7 @@ public class SynchronousTest
 				.withXmlConfig(nafcfg.getNode("dnsresolver"))
 				.build();
 		dsptch = Dispatcher.create(appctx, def, logger);
-		def = new DispatcherDef.Builder(def).withName(d2name).build();
+		def = new DispatcherConfig.Builder(def).withName(d2name).build();
 		dsptchOther = Dispatcher.create(appctx, def, logger);
 		ResolverDNS r1;
 		if (master) {

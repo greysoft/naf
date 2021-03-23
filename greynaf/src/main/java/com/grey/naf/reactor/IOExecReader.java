@@ -27,7 +27,7 @@ public abstract class IOExecReader
 	protected void clearFlag(int f) {iostate &= ~f;}
 	protected boolean isFlagSet(int f) {return ((iostate & f) != 0);}
 
-	protected IOExecReader(com.grey.naf.BufferSpec spec)
+	protected IOExecReader(com.grey.naf.BufferGenerator spec)
 	{
 		if (spec == null || spec.rcvbufsiz == 0) {
 			//app wants to perform the reads for itself

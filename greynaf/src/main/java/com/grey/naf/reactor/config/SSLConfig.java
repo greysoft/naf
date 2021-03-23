@@ -2,12 +2,13 @@
  * Copyright 2012-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
-package com.grey.naf;
+package com.grey.naf.reactor.config;
 
 import com.grey.base.config.SysProps;
 import com.grey.base.config.XmlConfig;
 import com.grey.base.utils.FileOps;
 import com.grey.base.utils.TimeOps;
+import com.grey.naf.NAFConfig;
 import com.grey.naf.errors.NAFConfigException;
 
 public class SSLConfig

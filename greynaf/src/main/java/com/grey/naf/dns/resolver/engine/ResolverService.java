@@ -2,7 +2,7 @@
  * Copyright 2010-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
-package com.grey.naf.dns.resolver;
+package com.grey.naf.dns.resolver.engine;
 
 import com.grey.base.utils.StringOps;
 import com.grey.base.utils.TimeOps;
@@ -21,6 +21,8 @@ import com.grey.base.collections.HashedSet;
 import com.grey.base.collections.IteratorInt;
 import com.grey.base.collections.ObjectWell;
 import com.grey.naf.nafman.NafManRegistry;
+import com.grey.naf.dns.resolver.ResolverConfig;
+import com.grey.naf.dns.resolver.ResolverDNS;
 import com.grey.naf.nafman.NafManCommand;
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.TimerNAF;

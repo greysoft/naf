@@ -2,7 +2,9 @@
  * Copyright 2010-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
-package com.grey.naf.dns.resolver;
+package com.grey.naf.dns.resolver.engine;
+
+import com.grey.naf.dns.resolver.ResolverDNS;
 
 public class ResolverAnswer
 {
@@ -16,7 +18,7 @@ public class ResolverAnswer
 	// Query result
 	// rrdata is guaranteed non-empty if result=OK (unless FLAG_NOQRY or FLAG_SYNTAXONLY was set)
 	public STATUS result;
-	final java.util.ArrayList<ResourceData> rrdata = new java.util.ArrayList<ResourceData>();
+	public final java.util.ArrayList<ResourceData> rrdata = new java.util.ArrayList<ResourceData>();
 	int ip_responder;
 
 	public int size() {return rrdata.size();}

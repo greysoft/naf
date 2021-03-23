@@ -25,7 +25,7 @@ public class ClientTCP
 	@Override
 	public String getName() {return name;}
 
-	public ClientTCP(String name, int id, ClientGroup g, com.grey.naf.BufferSpec bufspec, byte[] msgbuf)
+	public ClientTCP(String name, int id, ClientGroup g, com.grey.naf.BufferGenerator bufspec, byte[] msgbuf)
 	{
 		super(g.dsptch, bufspec, bufspec);
 		this.name = name;

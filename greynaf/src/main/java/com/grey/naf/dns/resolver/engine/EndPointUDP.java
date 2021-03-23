@@ -2,7 +2,7 @@
  * Copyright 2014-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
-package com.grey.naf.dns.resolver;
+package com.grey.naf.dns.resolver.engine;
 
 import com.grey.base.utils.ByteArrayRef;
 
@@ -17,7 +17,7 @@ class EndPointUDP
 	@Override
 	public String getName() {return name;}
 
-	public EndPointUDP(String name, ResolverService r, com.grey.naf.BufferSpec bufspec, int sockbufsiz) throws java.io.IOException {
+	public EndPointUDP(String name, ResolverService r, com.grey.naf.BufferGenerator bufspec, int sockbufsiz) throws java.io.IOException {
 		super(r.getDispatcher(), null, bufspec, sockbufsiz);
 		this.name = name;
 		rslvr = r;

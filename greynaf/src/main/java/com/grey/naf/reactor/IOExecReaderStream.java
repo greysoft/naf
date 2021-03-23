@@ -16,7 +16,7 @@ public class IOExecReaderStream
 	private byte rcvdlm;  // the byte-value that demarcates delimited reads, eg. a line-oriented reader would specify LineFeed ('\n' = 0xA)
 	private final int rcvbuf0;
 
-	IOExecReaderStream(com.grey.naf.BufferSpec spec)
+	IOExecReaderStream(com.grey.naf.BufferGenerator spec)
 	{
 		super(spec);
 		rcvbuf0 = (getUserBuffer() == null ? 0 : getUserBuffer().offset());

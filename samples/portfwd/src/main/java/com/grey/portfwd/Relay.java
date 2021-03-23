@@ -16,7 +16,7 @@ public class Relay
 
 	private long start_time;
 
-	public Relay(ClientSession c, com.grey.portfwd.balance.Balancer b, com.grey.naf.BufferSpec bufspec)
+	public Relay(ClientSession c, com.grey.portfwd.balance.Balancer b, com.grey.naf.BufferGenerator bufspec)
 	{
 		task = Task.class.cast(c.getListener().getController());
 		loadbalancer = b;

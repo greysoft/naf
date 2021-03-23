@@ -12,9 +12,9 @@ import com.grey.logging.Logger;
 import com.grey.base.collections.HashedMap;
 import com.grey.base.collections.HashedMapIntKey;
 import com.grey.naf.ApplicationContextNAF;
-import com.grey.naf.dns.resolver.PacketDNS;
 import com.grey.naf.dns.resolver.ResolverDNS;
-import com.grey.naf.dns.resolver.ResourceData;
+import com.grey.naf.dns.resolver.engine.PacketDNS;
+import com.grey.naf.dns.resolver.engine.ResourceData;
 import com.grey.naf.dns.server.DnsServerConfig;
 import com.grey.naf.reactor.Dispatcher;
 
@@ -40,7 +40,7 @@ class TestServerDNS
 	public TestServerDNS(ApplicationContextNAF appctx) throws java.io.IOException {
 		populateAnswers();
 		total_answers = unused_answers.size();
-		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
+		com.grey.naf.reactor.config.DispatcherConfig def = new com.grey.naf.reactor.config.DispatcherConfig.Builder()
 				.withName("Mock-DNS-Server")
 				.withSurviveHandlers(false)
 				.build();

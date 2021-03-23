@@ -24,7 +24,7 @@ public class ServerUDP
 	@Override
 	public String getName() {return "EchoBot-Server-UDP";}
 
-	public ServerUDP(App app, com.grey.naf.reactor.Dispatcher d, com.grey.base.utils.TSAP tsap, com.grey.naf.BufferSpec bufspec, int sockbufsiz)
+	public ServerUDP(App app, com.grey.naf.reactor.Dispatcher d, com.grey.base.utils.TSAP tsap, com.grey.naf.BufferGenerator bufspec, int sockbufsiz)
 			throws java.io.IOException {
 		super(d, tsap.sockaddr, bufspec, sockbufsiz);
 		this.app = app;

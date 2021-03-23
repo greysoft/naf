@@ -19,7 +19,7 @@ public class IOExecWriter
 	static final int FILEBUFSIZ = SysProps.get("greynaf.io.filebufsiz", 8*1024*1024);
 	private static final LEVEL WRBLOCKTRC = LEVEL.valueOf(SysProps.get("greynaf.io.blocktrc", LEVEL.OFF.toString()));
 
-	private final com.grey.naf.BufferSpec bufspec; //NB: xmtbufsiz is ignored as a starting point
+	private final com.grey.naf.BufferGenerator bufspec; //NB: xmtbufsiz is ignored as a starting point
 	private final com.grey.base.collections.ObjectQueue<Object> xmtq;
 	private CM_Stream chanmon;
 	private int writemark; //current position in buffer at head of xmtq queue
@@ -34,7 +34,7 @@ public class IOExecWriter
 	//this is just a convenience which saves callers from having to cast ByteChars params
 	public void transmit(ByteChars data) throws java.io.IOException {transmit((ByteArrayRef)data);}
 
-	IOExecWriter(com.grey.naf.BufferSpec spec)
+	IOExecWriter(com.grey.naf.BufferGenerator spec)
 	{
 		bufspec = spec;
 		xmtq = new com.grey.base.collections.ObjectQueue<Object>(Object.class, 4, 4);

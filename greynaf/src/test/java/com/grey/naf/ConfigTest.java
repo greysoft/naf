@@ -5,6 +5,7 @@
 package com.grey.naf;
 
 import com.grey.base.config.XmlConfig;
+import com.grey.naf.reactor.config.DispatcherConfig;
 
 public class ConfigTest
 {
@@ -34,7 +35,7 @@ public class ConfigTest
 		XmlConfig dcfg = cfg.getDispatcher(dname);
 		XmlConfig[] nafletsConfig = dcfg.getSections("naflets/naflet"+XmlConfig.XPATH_ENABLED);
 		org.junit.Assert.assertNotNull(dcfg);
-		DispatcherDef def = new DispatcherDef.Builder().withXmlConfig(dcfg).build();
+		DispatcherConfig def = new DispatcherConfig.Builder().withXmlConfig(dcfg).build();
 		org.junit.Assert.assertEquals(dname, def.getName());
 		org.junit.Assert.assertTrue(def.isSurviveHandlers());
 		org.junit.Assert.assertEquals(2, nafletsConfig.length);
@@ -53,11 +54,11 @@ public class ConfigTest
 
 		dcfg = cfg.getDispatcher(dname);
 		org.junit.Assert.assertNotNull(dcfg);
-		DispatcherDef def = new DispatcherDef.Builder().withXmlConfig(dcfg).build();
+		DispatcherConfig def = new DispatcherConfig.Builder().withXmlConfig(dcfg).build();
 		verifyConfig(def, dname);
 	}
 
-	private static void verifyConfig(DispatcherDef def, String dname)
+	private static void verifyConfig(DispatcherConfig def, String dname)
 	{
 		org.junit.Assert.assertEquals(dname, def.getName());
 		org.junit.Assert.assertFalse(def.isSurviveHandlers());

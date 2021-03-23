@@ -2,14 +2,14 @@
  * Copyright 2012-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
-package com.grey.naf;
+package com.grey.naf.reactor.config;
 
 import java.time.Clock;
 
 import com.grey.base.config.SysProps;
 import com.grey.base.config.XmlConfig;
 
-public class DispatcherDef
+public class DispatcherConfig
 {
 	public static final String SYSPROP_LOGNAME = "greynaf.dispatchers.logname";
 
@@ -19,7 +19,7 @@ public class DispatcherDef
 	private final long flushInterval;
 	private final Clock clock;
 
-	private DispatcherDef(Builder bldr) {
+	private DispatcherConfig(Builder bldr) {
 		name = bldr.name;
 		logName = bldr.logName;
 		surviveHandlers = bldr.surviveHandlers;
@@ -57,7 +57,7 @@ public class DispatcherDef
 
 		public Builder() {}
 
-		public Builder(DispatcherDef defs) {
+		public Builder(DispatcherConfig defs) {
 			name = defs.name;
 			logName = defs.logName;
 			surviveHandlers = defs.surviveHandlers;
@@ -98,8 +98,8 @@ public class DispatcherDef
 			return this;
 		}
 
-		public DispatcherDef build() {
-			return new DispatcherDef(this);
+		public DispatcherConfig build() {
+			return new DispatcherConfig(this);
 		}
 	}
 }

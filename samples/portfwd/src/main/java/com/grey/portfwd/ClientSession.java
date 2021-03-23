@@ -26,7 +26,7 @@ public class ClientSession
 	{
 		final com.grey.naf.reactor.CM_Listener lstnr;
 		final Balancer loadbalancer;
-		final com.grey.naf.BufferSpec bufspec;
+		final com.grey.naf.BufferGenerator bufspec;
 		final long tmt_idle;
 
 		@Override
@@ -43,7 +43,7 @@ public class ClientSession
 			com.grey.base.config.XmlConfig cfg = (com.grey.base.config.XmlConfig)factoryConfig;
 			com.grey.base.config.XmlConfig[] servicecfg = cfg.getSections("services/service");
 			com.grey.base.config.XmlConfig balancercfg = cfg.getSection("loadbalancer");
-			bufspec = new com.grey.naf.BufferSpec(cfg, "niobuffers", 1024, 512);
+			bufspec = new com.grey.naf.BufferGenerator(cfg, "niobuffers", 1024, 512);
 			tmt_idle = cfg.getTime("services/@timeout", 0);
 
 			if (servicecfg == null) {

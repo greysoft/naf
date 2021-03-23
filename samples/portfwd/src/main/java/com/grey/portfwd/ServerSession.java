@@ -16,7 +16,7 @@ public class ServerSession
 
 	public com.grey.base.utils.TSAP getServerAddress() {return svcaddr;}
 
-	public ServerSession(com.grey.naf.reactor.Dispatcher d, Relay r, com.grey.naf.BufferSpec bufspec)
+	public ServerSession(com.grey.naf.reactor.Dispatcher d, Relay r, com.grey.naf.BufferGenerator bufspec)
 	{
 		super(d, bufspec, bufspec);
 		relay = r;

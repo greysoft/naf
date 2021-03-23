@@ -26,7 +26,7 @@ public class ClientGroup
 	private int clientcnt;
 
 	public ClientGroup(App app, com.grey.naf.reactor.Dispatcher d, boolean udpmode, com.grey.base.utils.TSAP remote_addr,
-			int size, com.grey.naf.BufferSpec bufspec, byte[] msgbuf, int mcnt, int sockbufsiz, boolean verify)
+			int size, com.grey.naf.BufferGenerator bufspec, byte[] msgbuf, int mcnt, int sockbufsiz, boolean verify)
 			throws java.io.IOException
 	{
 		Logger.info("Creating client-group with mode="+(udpmode?"UDP":"TCP")+" and size="+size);

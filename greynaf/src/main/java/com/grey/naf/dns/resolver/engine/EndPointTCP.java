@@ -2,7 +2,7 @@
  * Copyright 2014-2018 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
-package com.grey.naf.dns.resolver;
+package com.grey.naf.dns.resolver.engine;
 
 import com.grey.base.utils.ByteArrayRef;
 import com.grey.base.utils.IP;
@@ -14,9 +14,9 @@ class EndPointTCP
 		implements com.grey.base.collections.ObjectWell.ObjectFactory
 	{
 		private final com.grey.naf.reactor.Dispatcher dsptch;
-		private final com.grey.naf.BufferSpec bufspec;
+		private final com.grey.naf.BufferGenerator bufspec;
 
-		public Factory(com.grey.naf.reactor.Dispatcher d, com.grey.naf.BufferSpec spec)
+		public Factory(com.grey.naf.reactor.Dispatcher d, com.grey.naf.BufferGenerator spec)
 		{
 			dsptch = d;
 			bufspec = spec;
@@ -33,7 +33,7 @@ class EndPointTCP
 	private java.net.InetSocketAddress srvaddr;
 	private boolean have_rsplen;
 
-	EndPointTCP(com.grey.naf.reactor.Dispatcher d, com.grey.naf.BufferSpec spec) {
+	EndPointTCP(com.grey.naf.reactor.Dispatcher d, com.grey.naf.BufferGenerator spec) {
 		super(d, spec, spec);
 	}
 

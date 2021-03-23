@@ -17,7 +17,7 @@ public abstract class CM_TCP extends CM_Stream
 	public java.net.InetSocketAddress getLocalAddress() {return (java.net.InetSocketAddress)getSocketChannel().socket().getLocalSocketAddress();}
 	public java.net.InetSocketAddress getRemoteAddress() {return (java.net.InetSocketAddress)getSocketChannel().socket().getRemoteSocketAddress();}
 
-	public CM_TCP(Dispatcher d, com.grey.naf.BufferSpec rspec, com.grey.naf.BufferSpec wspec) {
+	public CM_TCP(Dispatcher d, com.grey.naf.BufferGenerator rspec, com.grey.naf.BufferGenerator wspec) {
 		super(d, rspec, wspec);
 	}
 }

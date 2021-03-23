@@ -39,10 +39,10 @@ public class ChannelMonitorTest
 		final int paircnt = 64;
 		final int numsends = 5;  //only the write() calls from CMR count towards this total, not the calls below
 		final CMR[] receivers = new CMR[paircnt];
-		final com.grey.naf.BufferSpec bufspec = new com.grey.naf.BufferSpec(xmtsiz - 1, xmtsiz, directbufs, null);
+		final com.grey.naf.BufferGenerator bufspec = new com.grey.naf.BufferGenerator(xmtsiz - 1, xmtsiz, directbufs, null);
 
 		ApplicationContextNAF appctx = TestUtils.createApplicationContext("CMTEST-"+directbufs, true);
-		com.grey.naf.DispatcherDef def = new com.grey.naf.DispatcherDef.Builder()
+		com.grey.naf.reactor.config.DispatcherConfig def = new com.grey.naf.reactor.config.DispatcherConfig.Builder()
 				.withSurviveHandlers(false)
 				.build();
 		Dispatcher dsptch = Dispatcher.create(appctx, def, com.grey.logging.Factory.getLogger("no-such-logger"));
@@ -114,7 +114,7 @@ public class ChannelMonitorTest
 		public boolean completed;
 
 		public TestMonitor(Dispatcher d, java.nio.channels.SelectableChannel c, boolean owner,
-				com.grey.naf.BufferSpec rbufspec, com.grey.naf.BufferSpec wbufspec,
+				com.grey.naf.BufferGenerator rbufspec, com.grey.naf.BufferGenerator wbufspec,
 				ChannelMonitorTest h) throws java.io.IOException {
 			super(d, rbufspec, wbufspec);
 			chan = c;
@@ -148,7 +148,7 @@ public class ChannelMonitorTest
 		@Override
 		public String getName() {return "ChannelMonitorTest.CMR";}
 
-		public CMR(Dispatcher d, java.nio.channels.SelectableChannel c, com.grey.naf.BufferSpec bufspec, int sends,
+		public CMR(Dispatcher d, java.nio.channels.SelectableChannel c, com.grey.naf.BufferGenerator bufspec, int sends,
 					CMW cmw, ChannelMonitorTest harness) throws java.io.IOException {
 			super(d, c, true, bufspec, null, harness);
 			numsends = sends;
@@ -208,7 +208,7 @@ public class ChannelMonitorTest
 		@Override
 		public String getName() {return "ChannelMonitorTest.CMW";}
 
-		public CMW(Dispatcher d, java.nio.channels.SelectableChannel w, com.grey.naf.BufferSpec bufspec, ChannelMonitorTest runner)
+		public CMW(Dispatcher d, java.nio.channels.SelectableChannel w, com.grey.naf.BufferGenerator bufspec, ChannelMonitorTest runner)
 				throws java.io.IOException {
 			super(d, w, false, null, bufspec, runner);
 			pipe = w;
