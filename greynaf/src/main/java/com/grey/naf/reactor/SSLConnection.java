@@ -415,7 +415,7 @@ class SSLConnection
 	/*
 	 * Holds queue of plaintext buffers to be transmitted.
 	 * We allocate and discard ByteBuffers as need be. There's enough memory churn in this class that
-	 * there's no point bothering with an ObjectWell to reuse them.
+	 * there's no point bothering with pool to reuse them.
 	 */
 	private static final class XmitQueue
 	{

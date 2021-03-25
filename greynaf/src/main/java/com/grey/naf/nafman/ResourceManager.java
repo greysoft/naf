@@ -39,11 +39,11 @@ class ResourceManager
 		}
 	}
 
-	public java.nio.ByteBuffer getContent(String rsrc_name) throws java.io.IOException
+	public java.nio.ByteBuffer getContent(String rsrc_name, NafManCommand cmd) throws java.io.IOException
 	{
 		NafManResource rsrc = getResource(rsrc_name);
 		if (rsrc == null) return null;
-		return rsrc.getContent(cachettl, primary);
+		return rsrc.getContent(cachettl, primary, cmd);
 	}
 
 	public byte[] formatData(String rsrc_name, byte[] data, com.grey.base.collections.HashedMap<String, String> params)

@@ -569,17 +569,12 @@ public class SSLConnectionTest
 
 
 	public static final class TestServerFactory
-		implements com.grey.naf.reactor.ConcurrentListener.ServerFactory
+		implements com.grey.naf.reactor.CM_Listener.ServerFactory
 	{
 		final CM_Listener lstnr;
 		final com.grey.naf.BufferGenerator bufspec;
-
 		@Override
-		public SSLS factory_create() {return new SSLS(this);}
-		@Override
-		public Class<SSLS> getServerClass() {return SSLS.class;}
-		@Override
-		public void shutdown() {}
+		public SSLS createServer() {return new SSLS(this);}
 
 		public TestServerFactory(com.grey.naf.reactor.CM_Listener l, Object cfg) {
 			lstnr = l;

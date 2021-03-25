@@ -255,18 +255,14 @@ public class TCPConnectionTest
 
 
 	public static final class TestServerFactory
-		implements com.grey.naf.reactor.ConcurrentListener.ServerFactory
+		implements com.grey.naf.reactor.CM_Listener.ServerFactory
 	{
 		private final CM_Listener lstnr;
+		@Override
+		public ServerTCP createServer() {return new ServerTCP(lstnr, null);}
 
 		public TestServerFactory(com.grey.naf.reactor.CM_Listener l, Object cfg) {
 			lstnr = l;
 		}
-		@Override
-		public ServerTCP factory_create() {return new ServerTCP(lstnr, null);}
-		@Override
-		public Class<ServerTCP> getServerClass() {return ServerTCP.class;}
-		@Override
-		public void shutdown() {}
 	}
 }

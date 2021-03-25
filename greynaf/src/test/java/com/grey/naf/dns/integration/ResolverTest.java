@@ -157,8 +157,6 @@ public class ResolverTest
 		org.junit.Assert.assertFalse(callback_error);
 		//can't call validateFinalState() because two QueryHandles still pending
 		Object rs = getResolverService(resolver);
-		validateObjectWell(rs, "bcstore", false);
-		validateObjectWell(rs, "anstore", false);
 		int caller_errors = ((Integer)DynLoader.getField(rs, "caller_errors")).intValue();
 		org.junit.Assert.assertEquals(0, caller_errors);
 	}

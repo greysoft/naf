@@ -5,7 +5,7 @@
 package com.grey.naf.reactor;
 
 import com.grey.base.collections.HashedSet;
-import com.grey.base.collections.ObjectWell;
+import com.grey.base.collections.ObjectPool;
 import com.grey.naf.EntityReaper;
 import com.grey.naf.reactor.config.ConcurrentListenerConfig;
 import com.grey.logging.Logger.LEVEL;
@@ -13,50 +13,26 @@ import com.grey.logging.Logger.LEVEL;
 public class ConcurrentListener
 	extends CM_Listener
 {
-	/**
-	 * In addition to providing the explicit interface methods, factory classes must also provide a constructor
-	 * with this signature:<br>
-	 * <code>classname(com.grey.naf.reactor.CM_Listener listener, Object config)</code>
-	 */
-	public interface ServerFactory
-		extends ObjectWell.ObjectFactory
-	{
-		public Class<? extends CM_Server> getServerClass();
-		public void shutdown();
-	}
-
-	private final ServerFactory serverFactory;
 	private final HashedSet<CM_Server> activeservers = new HashedSet<>();
-	private final ObjectWell<CM_Server> spareservers;
+	private final ObjectPool<CM_Server> spareservers;
 
 	private boolean in_sync_stop;
 
-	@Override
-	public Class<?> getServerType() {return serverFactory == null ? null : serverFactory.getServerClass();} //would only be null if toString() called in constructor
-
-	public static ConcurrentListener create (Dispatcher d, Object controller, EntityReaper rpr, ConcurrentListenerConfig config) throws java.io.IOException {
+	public static ConcurrentListener create(Dispatcher d, Object controller, EntityReaper rpr, ConcurrentListenerConfig config) throws java.io.IOException {
 		return new ConcurrentListener(d, controller, rpr, config);
 	}
 
-	private ConcurrentListener(Dispatcher d, Object controller, EntityReaper rpr, ConcurrentListenerConfig config) throws java.io.IOException
-	{
+	private ConcurrentListener(Dispatcher d, Object controller, EntityReaper rpr, ConcurrentListenerConfig config) throws java.io.IOException {
 		super(d, controller, rpr, config);
 		int srvmin = config.getMinServers();
 		int srvmax = config.getMaxServers();
 		int srvincr = config.getServersIncrement();
-		serverFactory = config.getServerFactoryGenerator().apply(this);
-
-		spareservers = new ObjectWell<>(serverFactory.getServerClass(), serverFactory,
-				"Listener_"+getName()+":"+getPort()+"_Servers", srvmin, srvmax, srvincr);
-
-		getLogger().info("Listener="+getName()+" created with Server="+serverFactory.getServerClass().getName()
-				+", Factory="+serverFactory.getClass().getName()
-				+" - init/max/incr="+spareservers.size()+"/"+srvmax+"/"+srvincr);
+		spareservers = new ObjectPool<>(() -> getServerFactory().createServer(), srvmin, srvmax, srvincr);
+		getLogger().info("Listener="+getName()+" created with init/max/incr="+srvmin+"/"+srvmax+"/"+srvincr);
 	}
 
 	@Override
-	protected boolean stopListener()
-	{
+	protected boolean stopListener() {
 		//cannot iterate on activeservers as it gets modified during the loop, so take a copy
 		in_sync_stop = true;
 		CM_Server[] arr = activeservers.toArray(new CM_Server[activeservers.size()]);
@@ -71,14 +47,7 @@ public class ConcurrentListener
 	}
 
 	@Override
-	protected void listenerStopped()
-	{
-		serverFactory.shutdown();
-	}
-
-	@Override
-	public void entityStopped(Object obj)
-	{
+	public void entityStopped(Object obj) {
 		CM_Server srvr = (CM_Server)obj;
 		if (getReporter() != null) getReporter().listenerNotification(Reporter.EVENT.STOPPED, srvr);
 		boolean not_dup = deallocateServer(srvr);
@@ -88,8 +57,7 @@ public class ConcurrentListener
 	// We know that the readyOps argument must indicate an Accept (that's all we registered for), so don't bother checking it.
 	// NB: Can't loop on SelectionKey.isAcceptable(), as it will remain True until we return to Dispatcher
 	@Override
-	void ioIndication(int readyOps) throws java.io.IOException
-	{
+	void ioIndication(int readyOps) throws java.io.IOException {
 		java.nio.channels.ServerSocketChannel srvsock = (java.nio.channels.ServerSocketChannel)getChannel();
 		java.nio.channels.SocketChannel connsock;
 
@@ -106,9 +74,7 @@ public class ConcurrentListener
 		}
 	}
 
-	private void handleConnection(java.nio.channels.SocketChannel connsock)
-		throws java.io.IOException
-	{
+	private void handleConnection(java.nio.channels.SocketChannel connsock) throws java.io.IOException {
 		CM_Server srvr = spareservers.extract();
 		if (srvr == null) {
 			// we're at max capacity - can't allocate any more server objects
@@ -132,8 +98,7 @@ public class ConcurrentListener
 		}
 	}
 
-	private boolean deallocateServer(CM_Server srvr)
-	{
+	private boolean deallocateServer(CM_Server srvr) {
 		//guard against duplicate entityStopped() notifications
 		if (!activeservers.remove(srvr)) {
 			return false;

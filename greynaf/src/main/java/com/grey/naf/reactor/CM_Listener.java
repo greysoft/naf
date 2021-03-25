@@ -12,49 +12,58 @@ public abstract class CM_Listener
 	extends ChannelMonitor
 	implements DispatcherRunnable, EntityReaper
 {
-	public interface Reporter
-	{
+	/**
+	 * In addition to providing the explicit interface methods, factory classes that are created via naf.xml config
+	 * must also provide a constructor with this signature:<br>
+	 * <code>classname(com.grey.naf.reactor.CM_Listener listener, Object config)</code>
+	 */
+	public interface ServerFactory {
+		CM_Server createServer();
+		default void shutdownServerFactory() {}
+	}
+
+	public interface Reporter {
 		enum EVENT {STARTED, STOPPED}
 		void listenerNotification(EVENT evt, CM_Server s);
 	}
 
 	private final String name;
-	private final Object controller;
+	private final Object controller; //provides context on the application behind the listener - for server-specific use
 	private final SSLConfig sslconfig;
 	private final java.net.InetAddress srvip;
 	private final int srvport;
+	private final ServerFactory serverFactory;
 
 	private Reporter reporter;
 	private boolean inShutdown;
 	private boolean has_stopped;
 
-	public abstract Class<?> getServerType();
-
 	@Override
 	public String getName() {return name;}
+
 	public int getPort() {return srvport;}
 	public java.net.InetAddress getIP() {return srvip;}
 	public Object getController() {return controller;}
+	public SSLConfig getSSLConfig() {return sslconfig;}
+	public ServerFactory getServerFactory() {return serverFactory;}
 	protected Reporter getReporter() {return reporter;}
 	protected void setReporter(Reporter r) {reporter = r;}
 
-	protected void listenerStopped() {}
 	protected boolean stopListener() {return true;}
 	protected boolean inShutdown() {return inShutdown;}
-
-	SSLConfig getSSLConfig() {return sslconfig;}
 
 	protected CM_Listener(Dispatcher d, Object controller, EntityReaper rpr, ListenerConfig config) throws java.io.IOException {
 		super(d);
 		this.controller = controller;
-		setReaper(rpr);
 		sslconfig = config.getConfigSSL();
 		String iface = config.getInterface();
 		int port = config.getPort();
 		int srvbacklog = config.getBacklog();
+
 		String lname = config.getName();
 		if (lname == null) lname = getDispatcher().getName()+":"+port;
 		name = lname;
+
 		getLogger().info("Listener="+name+" in Dispatcher="+getDispatcher().getName()+" initialising on interface="+iface+", port="+port
 				+" with controller="+controller+", reaper="+getReaper()+" - ssl="+sslconfig);
 
@@ -66,11 +75,14 @@ public abstract class CM_Listener
 		srvip = srvsock.getInetAddress();
 		srvport = srvsock.getLocalPort();
 
+		serverFactory = config.getServerFactoryGenerator().apply(this);
+
+		setReaper(rpr);
 		getDispatcher().getApplicationContext().register(this);
 		initChannel(srvchan, true);
 
 		getLogger().info("Listener="+name+" bound to "+srvsock.getInetAddress()+":"+srvport+(port==0?"/dynamic":"")
-				         +(iface==null ? "" : " on interface="+iface)+"; Backlog="+srvbacklog);
+				         +(iface==null ? "" : " on interface="+iface)+" with backlog="+srvbacklog+" - factory="+getServerFactory());
 	}
 
 	@Override
@@ -100,7 +112,7 @@ public abstract class CM_Listener
 		has_stopped = true;
 		EntityReaper rpr = getReaper();
 		getLogger().info("Listener="+getName()+" has stopped with notify="+notify+" - reaper="+rpr);
-		listenerStopped();
+		serverFactory.shutdownServerFactory();
 		getDispatcher().getApplicationContext().deregister(this);
 		if (notify && rpr != null) rpr.entityStopped(this);
 		setReaper(null);
@@ -108,8 +120,7 @@ public abstract class CM_Listener
 
 	@Override
 	public String toString() {
-		Class<?> srvclass = getServerType();
-		return super.toString()+" - name="+getName()+" with server="+(srvclass==null?null:srvclass.getName())+", controller="+getController()
+		return super.toString()+" - name="+getName()+" with server-factory="+getServerFactory()+", controller="+getController()
 				+" on "+getIP()+":"+getPort()+" - ssl="+getSSLConfig();
 	}
 }

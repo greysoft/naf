@@ -19,7 +19,7 @@ import com.grey.base.collections.HashedMap;
 import com.grey.base.collections.HashedMapIntKey;
 import com.grey.base.collections.HashedSet;
 import com.grey.base.collections.IteratorInt;
-import com.grey.base.collections.ObjectWell;
+import com.grey.base.collections.ObjectPool;
 import com.grey.naf.nafman.NafManRegistry;
 import com.grey.naf.dns.resolver.ResolverConfig;
 import com.grey.naf.dns.resolver.ResolverDNS;
@@ -85,14 +85,14 @@ public class ResolverService
 	int caller_errors;
 
 	// We pre-allocate spare instances of these objects, for efficiency
-	private final ObjectWell<QueryHandle> qrystore;
-	private final ObjectWell<QueryHandle.WrapperRR> rrwstore;
-	private final ObjectWell<ByteChars> bcstore;
+	private final ObjectPool<QueryHandle> qrystore;
+	private final ObjectPool<QueryHandle.WrapperRR> rrwstore;
+	private final ObjectPool<ByteChars> bcstore;
 
 	// We can't use dnsAnswer indiscriminately, as it would be corruped by callback chains between nested QueryHandles, so
 	// it is purely for the use of top-level callers to whom we have to synchronously return an Answer block. Internal
 	// DNS-Resolver code must allocate temp intances from anstore;
-	private final ObjectWell<ResolverAnswer> anstore;
+	private final ObjectPool<ResolverAnswer> anstore;
 	private final ResolverAnswer dnsAnswer = new ResolverAnswer();
 
 	// these are just temporary work areas, pre-allocated for efficiency
@@ -161,14 +161,13 @@ public class ResolverService
 		cachemgr = new CacheManager(dsptch, config, localNameServers); // NB: This can reorder the localNameServers array
 		xmtmgr = new CommsManager(this);
 
-		bcstore = new ObjectWell<>(ByteChars.class, "DNS_"+dsptch.getName());
-		anstore = new ObjectWell<>(ResolverAnswer.class, "DNS_"+dsptch.getName());
-		rrwstore = new ObjectWell<>(QueryHandle.WrapperRR.class, "DNS_"+dsptch.getName());
 		pkt_tmp = new PacketDNS(Math.max(ResolverConfig.PKTSIZ_TCP, ResolverConfig.PKTSIZ_UDP), ResolverConfig.DIRECTNIOBUFS, config.getInitialMinTTL(), dsptch);
 		fh_dump = new java.io.File(dsptch.getApplicationContext().getConfig().getPathVar()+"/DNSdump-"+dsptch.getName()+".txt");
 
-		QueryHandle.Factory qryfact = new QueryHandle.Factory(this);
-		qrystore = new ObjectWell<>(qryfact, "DNS_"+dsptch.getName());
+		bcstore = new ObjectPool<>(() -> new ByteChars());
+		anstore = new ObjectPool<>(() -> new ResolverAnswer());
+		rrwstore = new ObjectPool<>(() -> new QueryHandle.WrapperRR());
+		qrystore = new ObjectPool<>(() -> new QueryHandle(this));
 
 		if (dsptch.getNafManAgent() != null) {
 			NafManRegistry reg = dsptch.getNafManAgent().getRegistry();
@@ -209,6 +208,13 @@ public class ResolverService
 		for (int idx = 0; idx != reqs.size(); idx++) {
 			int callers = reqs.get(idx).cancelExternalCallers(ResolverAnswer.STATUS.SHUTDOWN);
 			if (callers == 0) requestCompleted(reqs.get(idx));
+		}
+
+		if (ObjectPool.DEBUG) {
+			if (qrystore.getActiveCount() != 0) throw new IllegalStateException("DNS-Resolver has active timers on exit - count="+qrystore.getActiveCount());
+			if (anstore.getActiveCount() != 0) throw new IllegalStateException("DNS-Resolver has active FileWrites on exit - count="+anstore.getActiveCount());
+			if (rrwstore.getActiveCount() != 0) throw new IllegalStateException("DNS-Resolver has active FileWrites on exit - count="+rrwstore.getActiveCount());
+			if (bcstore.getActiveCount() != 0) throw new IllegalStateException("DNS-Resolver has active FileWrites on exit - count="+bcstore.getActiveCount());
 		}
 	}
 

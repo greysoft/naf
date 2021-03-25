@@ -18,8 +18,8 @@ import com.grey.base.config.SysProps;
 import com.grey.base.collections.HashedMapIntKey;
 import com.grey.base.collections.Circulist;
 import com.grey.base.collections.ObjectQueue;
-import com.grey.base.collections.ObjectWell;
 import com.grey.base.collections.IteratorInt;
+import com.grey.base.collections.ObjectPool;
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
 import com.grey.naf.Naflet;
@@ -29,6 +29,7 @@ import com.grey.naf.nafman.NafManConfig;
 import com.grey.naf.nafman.NafManRegistry;
 import com.grey.naf.nafman.PrimaryAgent;
 import com.grey.naf.nafman.SecondaryAgent;
+import com.grey.naf.reactor.IOExecWriter.FileWrite;
 import com.grey.naf.reactor.config.DispatcherConfig;
 import com.grey.naf.errors.NAFConfigException;
 import com.grey.logging.Logger;
@@ -62,8 +63,8 @@ public class Dispatcher
 	private final HashedMapIntKey<ChannelMonitor> activeChannels = new HashedMapIntKey<>(); //keyed on cm_id
 	private final Circulist<TimerNAF> activeTimers = new Circulist<>(TimerNAF.class);
 	private final ObjectQueue<TimerNAF> pendingTimers = new ObjectQueue<>(TimerNAF.class);  //timers which have expired and are ready to fire
-	private final ObjectWell<TimerNAF> timerPool;
-	private final ObjectWell<IOExecWriter.FileWrite> fileWritePool;
+	private final ObjectPool<TimerNAF> timerPool;
+	private final ObjectPool<IOExecWriter.FileWrite> fileWritePool;
 	private final java.nio.channels.Selector slct;
 	private final Producer<Object> dynamicLoader;
 	private final boolean threadTolerant = SysProps.get("greynaf.dispatchers.tolerant_threadchecks", false); //for benefit of some unit tests
@@ -152,8 +153,8 @@ public class Dispatcher
 		threadMain = new Thread(this, "Dispatcher-"+dname);
 		threadInitial = Thread.currentThread();
 
-		timerPool = new ObjectWell<>(TimerNAF.class, "Dispatcher-"+dname);
-		fileWritePool = new ObjectWell<>(new IOExecWriter.FileWrite.Factory(), "Dispatcher-"+dname);
+		timerPool = new ObjectPool<>(() -> new TimerNAF());
+		fileWritePool = new ObjectPool<>(() -> new FileWrite());
 		slct = java.nio.channels.Selector.open();
 
 		dynamicLoader = new Producer<>("DispatcherRunnables", Object.class, this, this);
@@ -198,14 +199,19 @@ public class Dispatcher
 			ok = false;
 		}
 		shutdown(true);
-		getLogger().info("Dispatcher="+getName()+" thread has terminated with abort="+error_abort+" - heapwait="+HEAPWAIT);
 		try {getLogger().flush(); } catch (Exception ex) {getLogger().trace("Dispatcher="+getName()+": Final thread flush failed - "+ex);}
-		thread_completed = ok;
+		getLogger().info("Dispatcher="+getName()+" thread has terminated with abort="+error_abort+" - heapwait="+HEAPWAIT);
+		
+		if (ObjectPool.DEBUG) {
+			if (timerPool.getActiveCount() != 0) throw new IllegalStateException("Dispatcher="+getName()+" has active timers on exit - count="+timerPool.getActiveCount());
+			if (fileWritePool.getActiveCount() != 0) throw new IllegalStateException("Dispatcher="+getName()+" has active FileWrites on exit - count="+fileWritePool.getActiveCount());
+		}
 
 		if (HEAPWAIT) {
 			//this is purely to support interactive troubleshooting - hold process alive so debug tools can attach
 			for (;;) TimerNAF.sleep(5000);
 		}
+		thread_completed = ok;
 	}
 
 	// This method can be called by other threads
@@ -245,8 +251,7 @@ public class Dispatcher
 		if (shutdownPerformed) return;
 		getLogger().info("Dispatcher="+getName()+" in shutdown with endOfLife="+endOfLife+", Thread="+threadInfo()
 				+" - Runnables="+dynamicRunnables.size()+"/"+getNafletCount()+", Channels="+activeChannels.size()
-				+", Timers="+activeTimers.size()+":"+pendingTimers.size()
-				+" (well="+timerPool.size()+"/"+timerPool.population()+")");
+				+", Timers="+activeTimers.size()+":"+pendingTimers.size());
 		try {
 			if (slct.isOpen()) slct.close();
 		} catch (Throwable ex) {

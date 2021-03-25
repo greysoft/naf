@@ -12,7 +12,7 @@ import com.grey.base.utils.ByteArrayRef;
 import com.grey.base.utils.StringOps;
 import com.grey.base.utils.TimeOps;
 import com.grey.base.utils.NIOBuffers;
-import com.grey.base.collections.ObjectWell;
+import com.grey.base.collections.ObjectPool;
 import com.grey.naf.BufferGenerator;
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.CM_Listener;
@@ -35,10 +35,12 @@ public class NafManServer
 	private static final int S_PROC = 4; //command has been accepted and is being processed
 
 	static final class Factory
-		implements com.grey.naf.reactor.ConcurrentListener.ServerFactory
+		implements com.grey.naf.reactor.CM_Listener.ServerFactory
 	{
 		private final CM_Listener lstnr;
 		private final SharedFields shared;
+		@Override
+		public NafManServer createServer() {return new NafManServer(lstnr, shared);}
 
 		public Factory(CM_Listener l, Object cfg)
 			throws java.io.IOException, javax.xml.transform.TransformerConfigurationException
@@ -48,13 +50,6 @@ public class NafManServer
 			PrimaryAgent agent = PrimaryAgent.class.cast(l.getController());
 			shared = new SharedFields(agent, srvcfg.get());
 		}
-
-		@Override
-		public NafManServer factory_create() {return new NafManServer(lstnr, shared);}
-		@Override
-		public Class<NafManServer> getServerClass() {return NafManServer.class;}
-		@Override
-		public void shutdown() {}
 	}
 
 	private static final class SharedFields
@@ -62,7 +57,7 @@ public class NafManServer
 		final PrimaryAgent primary;
 		final HTTP http;
 		final ResourceManager rsrcmgr;
-		final ObjectWell<NafManCommand> cmdstore;
+		final ObjectPool<NafManCommand> cmdstore;
 		final BufferGenerator bufspec;
 		final java.nio.ByteBuffer httprsp400;
 		final java.nio.ByteBuffer httprsp404;
@@ -79,7 +74,7 @@ public class NafManServer
 			long permcache = cfg.getDeclaredStaticTTL();
 			long dyncache = cfg.getDynamicResourceTTL();
 			bufspec = new BufferGenerator(cfg.getBufferConfig());
-			cmdstore = new ObjectWell<NafManCommand>(NafManCommand.class, "NAFMAN_"+dsptch.getName());
+			cmdstore = new ObjectPool<>(() -> new NafManCommand());
 			http = new HTTP(bufspec, permcache);
 			rsrcmgr = new ResourceManager(primary, http, dyncache);
 			httprsp400 = http.buildErrorResponse("400 Bad request");
@@ -203,7 +198,7 @@ public class NafManServer
 	private void commandReceived() throws java.io.IOException
 	{
 		if (cmd.getCommandDef() == null) {
-			java.nio.ByteBuffer httprsp = shared.rsrcmgr.getContent(cmdcode);
+			java.nio.ByteBuffer httprsp = shared.rsrcmgr.getContent(cmdcode, cmd);
 			if (httprsp == null) httprsp = shared.httprsp404;
 			LEVEL lvl = LEVEL.TRC2;
 			if (getLogger().isActive(lvl)) {
@@ -228,7 +223,7 @@ public class NafManServer
 		if (!omit_body) {
 			finaldata = rspbody.toArray();
 			String xsl = cmd.getArg(NafManCommand.ATTR_XSL);
-			if (xsl != null) {
+			if (xsl != null && !StringOps.stringAsBool(cmd.getArg(NafManCommand.ATTR_NOXSL))) {
 				byte[] fmtdata = shared.rsrcmgr.formatData(xsl, finaldata, cmd.getArgs());
 				if (fmtdata != null) finaldata = fmtdata;
 			}

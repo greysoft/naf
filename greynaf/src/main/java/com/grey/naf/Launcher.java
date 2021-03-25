@@ -301,7 +301,7 @@ public class Launcher
 		Collection<CM_Listener> listeners = appctx.getListeners();
 		txt += "\nListeners="+listeners.size();
 		for (CM_Listener l : listeners) {
-			txt += "\n- "+l.getName()+": Port="+l.getPort()+", Server="+l.getServerType().getName()+" (Dispatcher="+l.getDispatcher().getName()+")";
+			txt += "\n- "+l.getName()+": Port="+l.getPort()+", Server="+l.getServerFactory()+" - Dispatcher="+l.getDispatcher().getName();
 		}
 		return txt;
 	}

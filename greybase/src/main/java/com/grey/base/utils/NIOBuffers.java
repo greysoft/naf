@@ -1,31 +1,11 @@
 /*
- * Copyright 2010-2013 Yusef Badri - All rights reserved.
+ * Copyright 2010-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
 
 public class NIOBuffers
 {
-	public static final class BufferFactory
-		implements com.grey.base.collections.ObjectWell.ObjectFactory
-	{
-		private final int bufsiz;
-		private final boolean directbuf;
-
-		public BufferFactory(int siz, boolean direct)
-		{
-			bufsiz = siz;
-			directbuf = direct;
-		}
-
-		@Override
-		public java.nio.ByteBuffer factory_create()
-		{
-			return NIOBuffers.create(bufsiz, directbuf);
-		}
-	}
-
-
 	public static java.nio.ByteBuffer create(int bufsiz, boolean directbuf)
 	{
 		java.nio.ByteBuffer buf;

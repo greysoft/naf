@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.collections;
@@ -12,17 +12,15 @@ import com.grey.base.utils.ByteChars;
 public final class CanonByteChars
 {
 	public final String name;
-	private final int hiwater; //soft limit for ObjectWell - it can get temporarily larger, but we prune it back
 	private final HashedSet<ByteChars> canonset = new HashedSet<ByteChars>(0, 10f); //start small (might not be needed)
-	private final ObjectWell<ByteChars> bufpool;
+	private final ObjectPool<ByteChars> bufpool;
 
 	public int size() {return canonset.size();}
 
-	public CanonByteChars(String name, int hiwater)
+	public CanonByteChars(String name)
 	{
 		this.name = name;
-		this.hiwater = hiwater;
-		bufpool = new ObjectWell<ByteChars>(ByteChars.class, "CanonBC_"+name);
+		bufpool = new ObjectPool<>(() -> new ByteChars());
 	}
 
 	public ByteChars intern(ByteChars inpval)
@@ -53,12 +51,10 @@ public final class CanonByteChars
 	public void clear()
 	{
 		java.util.Iterator<ByteChars> it = canonset.iterator();
-
 		while (it.hasNext()) {
 			ByteChars bc = it.next();
 			bufpool.store(bc);
 		}
 		canonset.clear();
-		if (hiwater != 0) bufpool.clear(hiwater);
 	}
 }

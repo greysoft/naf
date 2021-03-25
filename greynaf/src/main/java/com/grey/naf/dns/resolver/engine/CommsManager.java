@@ -4,6 +4,7 @@
  */
 package com.grey.naf.dns.resolver.engine;
 
+import com.grey.base.collections.ObjectPool;
 import com.grey.base.utils.TSAP;
 import com.grey.naf.dns.resolver.ResolverConfig;
 
@@ -12,7 +13,7 @@ class CommsManager
 {
 	private final java.net.InetSocketAddress[] localNameServers; //local name servers to which we can issue queries
 	private final EndPointUDP[] udpLocal; //the UDP sockets on which we issue our outgoing queries
-	private final com.grey.base.collections.ObjectWell<EndPointTCP> tcpstore;
+	private final ObjectPool<EndPointTCP> tcpstore;
 	private int nextServer; //allows us to round-robin through localNameServers
 	private int nextUDP; //allows us to round-robin through udpLocal
 
@@ -42,8 +43,7 @@ class CommsManager
 				udpLocal[idx] = new EndPointUDP("DNS-resolver-udp-"+(idx+1), rslvr, bufspec_udp, ResolverConfig.UDPSOCKBUFSIZ);
 			}
 		}
-		EndPointTCP.Factory fact = new EndPointTCP.Factory(rslvr.getDispatcher(), bufspec_tcp);
-		tcpstore = new com.grey.base.collections.ObjectWell<>(fact, "DNS_"+rslvr.getDispatcher().getName());
+		tcpstore = new ObjectPool<>(() -> new EndPointTCP(rslvr.getDispatcher(), bufspec_tcp));
 	}
 
 	public void start() throws java.io.IOException

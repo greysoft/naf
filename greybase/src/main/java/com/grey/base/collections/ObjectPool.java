@@ -8,17 +8,23 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.function.Supplier;
 
+import com.grey.base.config.SysProps;
+
 /**
  * A more modern and less cumbersome replacement for ObjectWell.
  */
 public final class ObjectPool<T>
 {
+	public static final boolean DEBUG = SysProps.get("grey.objectpool.debug", false);
+
 	private final Supplier<T> factory;
 	private final List<T> cache = new ArrayList<>();
 	private final int maxItems;  //zero means no limit
 	private final int increment; //number of new objects to create when pool is empty
 
-	private int extant; //the number of items that are currently allocated
+	private int active; //the number of items that are currently allocated
+
+	public int getActiveCount() {return active;}
 
 	public ObjectPool(Supplier<T> factory, int initial, int max, int incr) {
 		if (initial < 0) throw new IllegalArgumentException("Initial ObjectPool cannot be negative");
@@ -36,25 +42,27 @@ public final class ObjectPool<T>
 
 	/**
 	 * Obtain an item from the pool
+	 * @return An instance of the the objects stored on this pool.
 	 */
 	public T extract() {
 		if (cache.isEmpty()) {
-			int newTotal = extant + increment;
+			int newTotal = active + increment;
 			if (maxItems != 0 && newTotal > maxItems) newTotal = maxItems;
-			int delta = newTotal - extant;
-			if (delta <= 0) throw new IllegalStateException("Object-Pool-"+factory+" cannot allocate any more objects - extant="+extant+" vs max="+maxItems);
+			int delta = newTotal - active;
+			if (delta <= 0) throw new IllegalStateException("Object-Pool-"+factory+" cannot allocate any more objects - extant="+active+" vs max="+maxItems);
 			allocate(delta);
 		}
-		extant++;
+		active++;
 		return pop();
 	}
 
 	/**
 	 * Return an item to the pool, that was previously obtained with extract()
+	 * @param obj The object to restore to the pool.
 	 */
 	public void store(T obj) {
 		cache.add(obj);
-		extant--;
+		active--;
 	}
 
 	public void prune(int maxSpares) {

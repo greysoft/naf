@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2018 Yusef Badri - All rights reserved.
+ * Copyright 2010-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.nafman;
@@ -9,7 +9,7 @@ import com.grey.base.utils.StringOps;
 /*
  * This is the only class which is passed around between different threads, so here is how synchronisation
  * works:
- * - Each newly connected Server grabs a Command from an ObjectWell and initialises it, before passing it to
+ * - Each newly connected Server grabs a Command from an ObjectPool and initialises it, before passing it to
  *   the Primary Agent. This all happens in the primary agent's Dispatcher thread.
  * - Before passing this object to other threads, the Primary synchronises by calling its getAttachedAgents()
  *   method
@@ -33,6 +33,7 @@ public class NafManCommand
 	public static final String ATTR_DISPATCHER = "d";
 	public static final String ATTR_NAFLET = "n";
 	public static final String ATTR_XSL = "st";
+	public static final String ATTR_NOXSL = "noxsl";
 	public static final String ATTR_KEY = "key";
 	public static final String ATTR_LOGLVL = "log";
 	public static final String ATTR_VERBOSE = "v";

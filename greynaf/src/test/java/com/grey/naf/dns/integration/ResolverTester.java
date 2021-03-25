@@ -301,9 +301,6 @@ public class ResolverTester
 	protected static void validateFinalState(ResolverDNS r)
 	{
 		Object rs = getResolverService(r);
-		Object xmtmgr = DynLoader.getField(rs, "xmtmgr");
-		validateObjectWell(rs, "anstore", false);
-		validateObjectWell(rs, "bcstore", false);
 		verifyEmptyMap(rs, "pendingdoms_mx", false);
 		verifyEmptyMap(rs, "pendingdoms_soa", false);
 		verifyEmptyMap(rs, "pendingdoms_srv", false);
@@ -311,7 +308,6 @@ public class ResolverTester
 		verifyEmptyMap(rs, "pendingdoms_aaaa", false);
 		verifyEmptyIntMap(rs, "pendingdoms_ptr", false);
 		verifyEmptySet(rs, "wrapblocked", false);
-		validateObjectWell(xmtmgr, "tcpstore", false);
 		int caller_errors = ((Integer)DynLoader.getField(rs, "caller_errors")).intValue();
 		org.junit.Assert.assertEquals(0, caller_errors);
 		// these can be intermittently non-empty, due to the parents completing after partial-notify
@@ -319,19 +315,6 @@ public class ResolverTester
 		verifyEmptyIntMap(rs, "pendingreqs", true);
 		verifyEmptyMap(rs, "pendingdoms_a", true);
 		verifyEmptyMap(rs, "pendingdoms_ns", true);
-		validateObjectWell(rs, "qrystore", true);
-		validateObjectWell(rs, "rrwstore", true);
-	}
-
-	protected static void validateObjectWell(Object rs, String fldnam, boolean allow)
-	{
-		com.grey.base.collections.ObjectWell<?> ow = (com.grey.base.collections.ObjectWell<?>)DynLoader.getField(rs, fldnam);
-		String txt = "ObjectWell="+ow.name;
-		if (allow) {
-			if (ow.size() != ow.population()) System.out.println("REMNANT COLLECTION: "+txt+" - Size="+ow.size()+" vs pop="+ow.population());
-		} else {
-			org.junit.Assert.assertEquals(txt, ow.size(), ow.population());
-		}
 	}
 
 	private static void verifyEmptySet(Object rs, String fldnam, boolean allow)

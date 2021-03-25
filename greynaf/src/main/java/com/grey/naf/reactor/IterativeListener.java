@@ -6,35 +6,28 @@ package com.grey.naf.reactor;
 
 import com.grey.logging.Logger.LEVEL;
 import com.grey.naf.reactor.config.ListenerConfig;
+import com.grey.naf.EntityReaper;
 import com.grey.naf.errors.NAFException;
 
 public class IterativeListener
 	extends CM_Listener
 {
-	public interface ServerFactory
-	{
-		public CM_Server createServer(CM_Listener l);
-	}
-
 	private final CM_Server cnxhandler;
 
 	public CM_Server getConnectionHandler() {return cnxhandler;}
-	@Override
-	public Class<?> getServerType() {return cnxhandler.getClass();}
 
-	public static IterativeListener create (Dispatcher d,  ServerFactory factory, com.grey.naf.EntityReaper rpr, ListenerConfig config) throws java.io.IOException {
-		return new IterativeListener(d, factory, rpr, config);
+	public static IterativeListener create(Dispatcher d, EntityReaper rpr, ListenerConfig config) throws java.io.IOException {
+		return new IterativeListener(d, rpr, config);
 	}
 
-	private IterativeListener(Dispatcher d,  ServerFactory factory, com.grey.naf.EntityReaper rpr, ListenerConfig config) throws java.io.IOException {
-		super(d, factory, rpr, config);
-		cnxhandler = factory.createServer(this);
+	private IterativeListener(Dispatcher d, EntityReaper rpr, ListenerConfig config) throws java.io.IOException {
+		super(d, null, rpr, config);
+		cnxhandler = getServerFactory().createServer();
 		getLogger().info("Listener="+getName()+": Iterative handler is "+cnxhandler.getClass().getName());
 	}
 
 	@Override
-	public void entityStopped(Object obj)
-	{
+	public void entityStopped(Object obj) {
 		if (getReporter() != null) getReporter().listenerNotification(Reporter.EVENT.STOPPED, cnxhandler);
 		try {
 			enableListen();
@@ -46,8 +39,7 @@ public class IterativeListener
 
 	// We know that the readyOps argument must indicate an Accept (that's all we registered for), so don't bother checking it.
 	@Override
-	void ioIndication(int readyOps) throws java.io.IOException
-	{
+	void ioIndication(int readyOps) throws java.io.IOException {
 		java.nio.channels.ServerSocketChannel srvsock = (java.nio.channels.ServerSocketChannel)getChannel();
 		java.nio.channels.SocketChannel connsock = srvsock.accept();
 

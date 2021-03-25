@@ -18,43 +18,6 @@ import com.grey.logging.Logger;
 class QueryHandle
 	implements ResolverDNS.Client, PacketDNS.MessageCallback, TimerNAF.Handler
 {
-	public static final class WrapperRR
-	{
-		ResourceData rr;
-		boolean qrysent;
-		boolean deadlocked;
-
-		WrapperRR set(ResourceData rr) {
-			this.rr = rr;
-			return this;
-		}
-
-		WrapperRR clear() {
-			rr = null;
-			qrysent = false;
-			deadlocked = false;
-			return this;
-		}
-
-		@Override
-		public String toString() {return rr.toString();}
-	}
-
-	public static final class Factory
-		implements com.grey.base.collections.ObjectWell.ObjectFactory
-	{
-		private final ResolverService rslvr;
-
-		public Factory(ResolverService r) {
-			rslvr = r;
-		}
-
-		@Override
-		public QueryHandle factory_create() {
-			return new QueryHandle(rslvr);
-		}
-	}
-
 	private static final int F_TCP = 1 << 0; //can't rely on non-null tcpconn, as it gets nulled before handleReponse()
 	private static final int F_IPSTICKY = 1 << 1;
 	private static final int F_HAVERSP = 1 << 2;
@@ -967,5 +930,27 @@ class QueryHandle
 			return rslvr.getConfig().getMxMaxRR();
 		}
 		return 0;
+	}
+
+
+	public static final class WrapperRR {
+		ResourceData rr;
+		boolean qrysent;
+		boolean deadlocked;
+
+		WrapperRR set(ResourceData rr) {
+			this.rr = rr;
+			return this;
+		}
+
+		WrapperRR clear() {
+			rr = null;
+			qrysent = false;
+			deadlocked = false;
+			return this;
+		}
+
+		@Override
+		public String toString() {return rr.toString();}
 	}
 }

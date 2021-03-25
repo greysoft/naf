@@ -380,21 +380,12 @@ public class IOExecWriter
 	}
 
 
-	static final class FileWrite
-	{
-		public static final class Factory
-			implements com.grey.base.collections.ObjectWell.ObjectFactory
-		{
-			@Override
-			public FileWrite factory_create() {return new FileWrite();}
-		}
-
+	static final class FileWrite {
 		java.nio.channels.FileChannel chan;
 		long offset;
 		long limit;
 
-		public FileWrite set(java.nio.channels.FileChannel c, long pos, long lmt)
-		{
+		public FileWrite set(java.nio.channels.FileChannel c, long pos, long lmt) {
 			chan = c;
 			offset = pos;
 			limit = lmt;

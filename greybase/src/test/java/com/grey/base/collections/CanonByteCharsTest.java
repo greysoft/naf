@@ -12,7 +12,7 @@ public class CanonByteCharsTest
 	@org.junit.Test
 	public void testBC()
 	{
-		CanonByteChars canon = new CanonByteChars("utest_bc", 1);
+		CanonByteChars canon = new CanonByteChars("utest_bc");
 		org.junit.Assert.assertEquals(0, canon.size());
 		canon.clear();
 		org.junit.Assert.assertEquals(0, canon.size());
@@ -56,7 +56,7 @@ public class CanonByteCharsTest
 	@org.junit.Test
 	public void testCharSeq()
 	{
-		CanonByteChars canon = new CanonByteChars("utest_charseq", 0);
+		CanonByteChars canon = new CanonByteChars("utest_charseq");
 		ByteChars bc_out = canon.intern(null);
 		org.junit.Assert.assertNull(bc_out);
 		org.junit.Assert.assertEquals(0, canon.size());

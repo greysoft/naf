@@ -269,9 +269,11 @@ public abstract class ChannelMonitor
 		int prevlen = sb.length();
 		sb.append("ID=").append(cm_id).append(": ");
 		if (this instanceof CM_Listener) {
-			sb.append(clss.getSimpleName())
-				.append('/').append(((CM_Listener)this).getServerType().getName())
-				.append('/').append(((CM_Listener)this).getName());
+			CM_Listener l = (CM_Listener)this;
+			CM_Listener.ServerFactory fact = l.getServerFactory();
+			sb.append(l.getName())
+				.append('/').append(clss.getSimpleName())
+				.append('/').append(fact == null ? "no-factory" : fact.getClass().getName());
 		} else if (clss == Producer.AlertsPipe.class) {
 			if (!verbose) {
 				//omit this object altogether

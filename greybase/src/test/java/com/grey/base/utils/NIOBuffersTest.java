@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2013 Yusef Badri - All rights reserved.
+ * Copyright 2012-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -8,26 +8,6 @@ public class NIOBuffersTest
 {
 	private static final String ORIGTXT1 = "  Hello NIO  ";
 	private static final String ORIGTXT2 = "  And Again  ";
-
-	@org.junit.Test
-	public void factory()
-	{
-		int cap = 1024;
-		NIOBuffers.BufferFactory fact = new NIOBuffers.BufferFactory(cap, false);
-		java.nio.ByteBuffer buf1 = fact.factory_create();
-		org.junit.Assert.assertFalse(buf1.isDirect());
-		NIOBuffers.BufferFactory fact2 = new NIOBuffers.BufferFactory(cap, true);
-		java.nio.ByteBuffer buf2 = fact2.factory_create();
-		org.junit.Assert.assertTrue(buf2.isDirect());
-
-		java.nio.ByteBuffer[] arr = new java.nio.ByteBuffer[]{buf1, buf2};
-		for (int idx = 0; idx != arr.length; idx++) {
-			org.junit.Assert.assertEquals(cap, arr[idx].capacity());
-			org.junit.Assert.assertEquals(cap, arr[idx].limit());
-			org.junit.Assert.assertEquals(0, arr[idx].position());
-			org.junit.Assert.assertFalse(arr[idx].isReadOnly());
-		}
-	}
 
 	@org.junit.Test
 	public void encode8()

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2018 Yusef Badri - All rights reserved.
+ * Copyright 2014-2021 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.resolver.engine;
@@ -10,25 +10,6 @@ import com.grey.base.utils.IP;
 class EndPointTCP
 	extends com.grey.naf.reactor.CM_Client
 {
-	public static final class Factory
-		implements com.grey.base.collections.ObjectWell.ObjectFactory
-	{
-		private final com.grey.naf.reactor.Dispatcher dsptch;
-		private final com.grey.naf.BufferGenerator bufspec;
-
-		public Factory(com.grey.naf.reactor.Dispatcher d, com.grey.naf.BufferGenerator spec)
-		{
-			dsptch = d;
-			bufspec = spec;
-		}
-
-		@Override
-		public EndPointTCP factory_create()
-		{
-			return new EndPointTCP(dsptch, bufspec);
-		}
-	}
-
 	private QueryHandle qryh;
 	private java.net.InetSocketAddress srvaddr;
 	private boolean have_rsplen;

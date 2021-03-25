@@ -39,7 +39,7 @@ class NafManResource
 		if (xslfact != null) createXSL();
 	}
 
-	public java.nio.ByteBuffer getContent(long cachetime, PrimaryAgent primary) throws java.io.IOException
+	public java.nio.ByteBuffer getContent(long cachetime, PrimaryAgent primary, NafManCommand cmd) throws java.io.IOException
 	{
 		Dispatcher dsptch = primary.getDispatcher();
 		if (httprsp != null) {
@@ -53,7 +53,8 @@ class NafManResource
 		if (java.util.Arrays.equals(newdata, srcdata)) return httprsp; //source-data unchanged
 
 		// we need to generate the resource data anew - unless 'newdata' is already the finished article
-		byte[] rspdata = (xslproc == null ? newdata : formatData(newdata, null));
+		byte[] rspdata = newdata;
+		if (xslproc != null && !StringOps.stringAsBool(cmd.getArg(NafManCommand.ATTR_NOXSL))) rspdata = formatData(newdata, null);
 
 		// create the NIO response buffer
 		httprsp = http.buildDynamicResponse(rspdata, httprsp);
@@ -136,5 +137,10 @@ class NafManResource
 		java.io.ByteArrayInputStream bstrm = new java.io.ByteArrayInputStream(rsrcdata);
 		javax.xml.transform.stream.StreamSource src = new javax.xml.transform.stream.StreamSource(bstrm);
 		xslproc = xslfact.newTransformer(src);
+	}
+
+	@Override
+	public String toString() {
+		return super.toString()+" - def="+def+" - xsl="+xslfact;
 	}
 }

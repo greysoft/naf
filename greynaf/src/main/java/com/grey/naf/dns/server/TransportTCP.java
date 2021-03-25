@@ -11,17 +11,12 @@ class TransportTCP
 	extends com.grey.naf.reactor.CM_Server
 {
 	public static final class ServerFactory
-		implements com.grey.naf.reactor.ConcurrentListener.ServerFactory
+		implements com.grey.naf.reactor.CM_Listener.ServerFactory
 	{
 		private final com.grey.naf.reactor.CM_Listener lstnr;
 		private final com.grey.naf.BufferGenerator bufspec;
-
 		@Override
-		public TransportTCP factory_create() {return new TransportTCP(lstnr, bufspec);}
-		@Override
-		public Class<TransportTCP> getServerClass() {return TransportTCP.class;}
-		@Override
-		public void shutdown() {}
+		public TransportTCP createServer() {return new TransportTCP(lstnr, bufspec);}
 
 		public ServerFactory(com.grey.naf.reactor.CM_Listener l, Object cfg) {
 			lstnr = l;

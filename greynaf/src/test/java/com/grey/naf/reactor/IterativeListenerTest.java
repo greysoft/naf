@@ -17,10 +17,11 @@ public class IterativeListenerTest
 {
 	private static class Factory implements IterativeListener.ServerFactory
 	{
+		private final CM_Listener lstnr;
 		private final java.net.Socket[] clients;
-		public Factory(java.net.Socket[] c) {clients = c;}
+		public Factory(CM_Listener l, java.net.Socket[] c) {lstnr=l; clients=c;}
 		@Override
-		public CM_Server createServer(CM_Listener l) {return new TestServer(l, clients);}
+		public CM_Server createServer() {return new TestServer(lstnr, clients);}
 	}
 
 	private static final String rootdir = TestUtils.initPaths(IterativeListenerTest.class);
@@ -42,14 +43,14 @@ public class IterativeListenerTest
 				.build();
 		Dispatcher dsptch = Dispatcher.create(appctx, def, com.grey.logging.Factory.getLogger("no-such-logger"));
 
-		Factory fact = new Factory(clients);
 		ListenerConfig lcfg = new ListenerConfig.Builder<>()
 				.withName("utest_IterativeListener")
+				.withServerFactoryGenerator((l) -> new Factory(l, clients))
 				.build();
-		IterativeListener lstnr = IterativeListener.create(dsptch, fact, this, lcfg);
+		IterativeListener lstnr = IterativeListener.create(dsptch, this, lcfg);
 		TestServer srvr = (TestServer)lstnr.getConnectionHandler();
 		org.junit.Assert.assertEquals(TestServer.class, srvr.getClass());
-		org.junit.Assert.assertEquals(TestServer.class, lstnr.getServerType());
+		org.junit.Assert.assertEquals(Factory.class, lstnr.getServerFactory().getClass());
 		dsptch.loadRunnable(lstnr);
 
 		for (int idx = 0; idx != clients.length; idx++) {

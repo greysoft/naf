@@ -23,15 +23,14 @@ public class TimerNAF
 	// dampens jitter - see reset() and nextExpiry() comments below
 	static final long JITTER_THRESHOLD = SysProps.getTime("greynaf.timers.jitter", 10L); //deliberately package-private
 
+	private Dispatcher dsptch;
 	private int id;   //unique ID for every timer activation event (within each Dispatcher)
 	private int type; //caller-specific ID to identify the purpose of this timer
 	private long interval; //requested timer interval, in milliseconds
 	private long expiry;  //absolute system time of expiry (milliseconds since epoch)
+	private long activated;  // absolute system time at which this timer was set (milliseconds since epoch)
 	private Handler handler;
 	private Object attachment;
-
-	private Dispatcher dsptch;
-	private long activated;  // absolute system time at which this timer was set (milliseconds since epoch)
 
 	public int getID() {return id;}
 	public int getType() {return type;}
@@ -58,6 +57,7 @@ public class TimerNAF
 
 	TimerNAF clear()
 	{
+		dsptch = null;
 		handler = null;
 		attachment = null;
 		return this;

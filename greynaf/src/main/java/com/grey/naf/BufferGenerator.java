@@ -7,6 +7,7 @@ package com.grey.naf;
 import com.grey.base.config.SysProps;
 import com.grey.base.config.XmlConfig;
 import com.grey.base.utils.NIOBuffers;
+import com.grey.base.collections.ObjectPool;
 
 public class BufferGenerator
 {
@@ -16,7 +17,7 @@ public class BufferGenerator
 
 	public final int rcvbufsiz;
 	public final boolean directbufs;
-	private final com.grey.base.collections.ObjectWell<java.nio.ByteBuffer> xmtpool;
+	private final ObjectPool<java.nio.ByteBuffer> xmtpool;
 	private final java.nio.charset.CharsetEncoder chenc;
 
 	public String charsetName() {return (chenc == null ? "n/a" : chenc.charset().displayName());}
@@ -51,9 +52,7 @@ public class BufferGenerator
 
 		if (cfg.withXmitPool) {
 			// ByteBuffers are initially allocated with size of 1 bytes, since users (only IOEXecWriter?) will expand them on demand
-			String name = "BufferSpecPool_"+rcvbufsiz+":"+directbufs;
-			NIOBuffers.BufferFactory factory = new NIOBuffers.BufferFactory(1, directbufs);
-			xmtpool = new com.grey.base.collections.ObjectWell<java.nio.ByteBuffer>(java.nio.ByteBuffer.class, factory, name, 0, 0, 1);
+			xmtpool = new ObjectPool<>(() -> NIOBuffers.create(1, directbufs));
 		} else {
 			xmtpool = null;
 		}

@@ -23,6 +23,10 @@ public class ListenerSet
 	public CM_Listener getListener(int idx) {return listeners[idx];}
 
 	public ListenerSet(String grpname, Dispatcher d, Object controller, com.grey.naf.EntityReaper rpr, ConcurrentListenerConfig[] config) throws java.io.IOException {
+		this(grpname, d, controller, rpr, config, false);
+	}
+
+	public ListenerSet(String grpname, Dispatcher d, Object controller, com.grey.naf.EntityReaper rpr, ConcurrentListenerConfig[] config, boolean iterative) throws java.io.IOException {
 		dsptch = d;
 		reaper = rpr;
 		name = "Listeners-"+d.getName()+"-"+grpname;
@@ -35,8 +39,8 @@ public class ListenerSet
 		listeners = new CM_Listener[config.length];
 
 		for (int idx = 0; idx != config.length; idx++) {
-			if (controller instanceof IterativeListener.ServerFactory) {
-				listeners[idx] = IterativeListener.create(d, (IterativeListener.ServerFactory)controller, reaper, config[idx]);
+			if (iterative) {
+				listeners[idx] = IterativeListener.create(d, reaper, config[idx]);
 			} else {
 				listeners[idx] = ConcurrentListener.create(d, controller, this, config[idx]);
 			}

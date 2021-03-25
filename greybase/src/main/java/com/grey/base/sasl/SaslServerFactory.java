@@ -4,14 +4,14 @@
  */
 package com.grey.base.sasl;
 
-public class ServerFactory
+public class SaslServerFactory
 	implements com.grey.base.collections.ObjectWell.ObjectFactory
 {
 	private final SaslEntity.MECH mech;
 	private final SaslServer.Authenticator auth;
 	private final boolean base64;
 
-	public ServerFactory(SaslEntity.MECH mech, SaslServer.Authenticator auth, boolean base64) {
+	public SaslServerFactory(SaslEntity.MECH mech, SaslServer.Authenticator auth, boolean base64) {
 		this.mech = mech;
 		this.auth = auth;
 		this.base64 = base64;

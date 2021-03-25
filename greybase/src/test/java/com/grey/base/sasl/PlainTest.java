@@ -46,7 +46,7 @@ public class PlainTest
 
 	private void runtests(boolean base64, boolean role_ok)
 	{
-		ServerFactory fact = new ServerFactory(SaslEntity.MECH.PLAIN, saslauth, base64);
+		SaslServerFactory fact = new SaslServerFactory(SaslEntity.MECH.PLAIN, saslauth, base64);
 		ObjectWell<PlainServer> servers = new ObjectWell<PlainServer>(null, fact, "utest_SaslPlain", 0, 0, 1);
 		PlainServer server = servers.extract().init();
 		PlainClient client = new PlainClient(base64);

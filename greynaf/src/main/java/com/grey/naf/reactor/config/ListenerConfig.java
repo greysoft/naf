@@ -4,9 +4,12 @@
  */
 package com.grey.naf.reactor.config;
 
+import java.util.function.Function;
+
 import com.grey.base.config.XmlConfig;
 import com.grey.naf.NAFConfig;
 import com.grey.naf.errors.NAFConfigException;
+import com.grey.naf.reactor.CM_Listener;
 
 public class ListenerConfig
 {
@@ -15,6 +18,7 @@ public class ListenerConfig
 	private final int port;
 	private final int backlog;
 	private final SSLConfig configSSL;
+	private final Function<CM_Listener,CM_Listener.ServerFactory> serverFactoryGenerator; //server factory creates server instance to handle incoming connection
 
 	protected ListenerConfig(Builder<?> bldr) {
 		name = bldr.name;
@@ -22,6 +26,7 @@ public class ListenerConfig
 		port = bldr.port;
 		backlog = bldr.backlog;
 		configSSL = bldr.configSSL;
+		serverFactoryGenerator = bldr.serverFactoryGenerator;
 	}
 
 	public String getName() {
@@ -44,6 +49,10 @@ public class ListenerConfig
 		return configSSL;
 	}
 
+	public Function<CM_Listener,CM_Listener.ServerFactory> getServerFactoryGenerator() {
+		return serverFactoryGenerator;
+	}
+
 
 	public static class Builder<T extends Builder<T>> {
 		private String name;
@@ -52,10 +61,18 @@ public class ListenerConfig
 		private int portSSL;
 		private SSLConfig configSSL;
 		private int backlog = 5000;
+		private Function<CM_Listener,CM_Listener.ServerFactory> serverFactoryGenerator;
+		private Class<? extends CM_Listener.ServerFactory> serverFactoryClass;
+		private Object serverFactoryParam;
 
 		// Call the other setter methods before this to set any defaults for name, iface, port, backlog
 		public T withXmlConfig(XmlConfig cfg, NAFConfig nafConfig) {
 			cfg = getLinkConfig(cfg);
+
+			XmlConfig servercfg = cfg.getSection("server");
+			serverFactoryClass = getServerFactoryClass(servercfg, serverFactoryClass);
+			if (serverFactoryParam == null) serverFactoryParam = servercfg;
+			withServerFactory(serverFactoryClass, serverFactoryParam);
 
 			XmlConfig xmlSSL = cfg.getSection("ssl");
 			try {
@@ -106,6 +123,26 @@ public class ListenerConfig
 			return self();
 		}
 
+		// This specifies the server-factory class traditionally used in the XML config. The factory's constructor takes the
+		// Listener as one arg and a factory-specific object as another. If the factory constructor requires more parameters than
+		// that, you must supply them as an array in the second arg.
+		// This server-factory type is not limited to XML config, can be called instead of withXmlConfig() if we're not using XML config,
+		// else it should be called before it to set the default. If the factory param is null, future calls to withXmlConfig() will set it
+		// to the server XmlConfig block
+		public T withServerFactory(Class<? extends CM_Listener.ServerFactory> clss, Object param) {
+			serverFactoryClass = clss;
+			serverFactoryParam = param;
+			serverFactoryGenerator = createServerFactoryGenerator(serverFactoryClass, serverFactoryParam);
+			return self();
+		}
+
+		// This is an alternative to withServerFactory() which specifies a server-factory method with fewer restrictions on its constructor signature.
+		// All server factory constructors still require at least one arg, which ius the Listener.
+		public T withServerFactoryGenerator(Function<CM_Listener,CM_Listener.ServerFactory> v) {
+			serverFactoryGenerator = v;
+			return self();
+		}
+
 		protected XmlConfig getLinkConfig(XmlConfig cfg) {
 			String linkname = cfg.getValue("@configlink", false, null);
 			if (linkname != null) cfg = cfg.getSection("../listener[@name='"+linkname+"']");
@@ -119,6 +156,22 @@ public class ListenerConfig
 
 		public ListenerConfig build()  {
 			return new ListenerConfig(this);
+		}
+
+		@SuppressWarnings("unchecked")
+		private static Class<? extends CM_Listener.ServerFactory> getServerFactoryClass(XmlConfig cfg, Class<? extends CM_Listener.ServerFactory> dflt) {
+			return (Class<? extends CM_Listener.ServerFactory>) NAFConfig.getEntityClass(cfg, dflt, CM_Listener.ServerFactory.class);
+		}
+
+		private static Function<CM_Listener,CM_Listener.ServerFactory> createServerFactoryGenerator(Class<? extends CM_Listener.ServerFactory> factoryClass,
+				                                                                                    Object factoryParam) {
+			Function<CM_Listener,CM_Listener.ServerFactory> func = (lstnr) -> {
+				Class<?>[] ctorSig = new Class<?>[]{CM_Listener.class, Object.class};
+				Object[] ctorArgs = new Object[]{lstnr, factoryParam};
+				Object factory = NAFConfig.createEntity(factoryClass, ctorSig, ctorArgs);
+				return CM_Listener.ServerFactory.class.cast(factory);
+			};
+			return func;
 		}
 	}
 }

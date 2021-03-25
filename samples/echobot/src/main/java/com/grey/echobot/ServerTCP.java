@@ -14,18 +14,12 @@ public class ServerTCP
 	private static final org.slf4j.Logger Logger = LoggerFactory.getLogger(ServerTCP.class);
 
 	public static final class Factory
-		implements com.grey.naf.reactor.ConcurrentListener.ServerFactory
+		implements com.grey.naf.reactor.CM_Listener.ServerFactory
 	{
 		private final com.grey.naf.reactor.CM_Listener lstnr;
-
-		@Override
-		public ServerTCP factory_create() {return new ServerTCP(lstnr);}
-		@Override
-		public Class<ServerTCP> getServerClass() {return ServerTCP.class;}
-		@Override
-		public void shutdown() {}
-
 		public Factory(com.grey.naf.reactor.CM_Listener l, Object cfg) {lstnr = l;}
+		@Override
+		public ServerTCP createServer() {return new ServerTCP(lstnr);}
 	}
 
 

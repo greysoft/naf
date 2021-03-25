@@ -1491,9 +1491,11 @@ DNS domain name in FQDN form - resolved to the domain's SRV data string
 The remaining
 <span class="pathname">batchresolver.xml</span>
 config items are absent and therefore default to appropriate values.
-All the config items can be inspected in the source code in the constructor of the
-<span class="softname">BatchResolver</span>
-class, but the most interesting ones are:
+All the config items can be inspected in the source code of the
+<span class="softname">BatchConfig</span>
+class (which is constructed by the
+<span class="softname">BatchTask</span>
+class, nominated in the XML config as the driving NAFlet) but the most interesting config settings are:
 <br/> <br/>
 &bull; <span class="cfgtitle">fullanswer</span>:<br/>
 A Y/N field determining whether we merely report the status (OK, NODOMAIN, etc) of each query in the output file, or the full set of Answer RRs (DNS Resource Records)

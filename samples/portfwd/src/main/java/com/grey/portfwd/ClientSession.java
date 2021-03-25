@@ -22,7 +22,7 @@ public class ClientSession
 	implements com.grey.naf.reactor.TimerNAF.Handler
 {
 	public static final class Factory
-		implements com.grey.naf.reactor.ConcurrentListener.ServerFactory
+		implements com.grey.naf.reactor.CM_Listener.ServerFactory
 	{
 		final com.grey.naf.reactor.CM_Listener lstnr;
 		final Balancer loadbalancer;
@@ -30,11 +30,7 @@ public class ClientSession
 		final long tmt_idle;
 
 		@Override
-		public ClientSession factory_create() {return new ClientSession(this);}
-		@Override
-		public Class<ClientSession> getServerClass() {return ClientSession.class;}
-		@Override
-		public void shutdown() {}
+		public ClientSession createServer() {return new ClientSession(this);}
 
 		public Factory(com.grey.naf.reactor.CM_Listener l, Object factoryConfig)
 				throws java.net.UnknownHostException
@@ -60,8 +56,7 @@ public class ClientSession
 					new Object[]{services, lstnr.getLogger()});
 			loadbalancer = Balancer.class.cast(obj);
 
-			l.getLogger().info("Server for "+lstnr.getName()+" has LoadBalancer="+loadbalancer
-					+", Controller="+lstnr.getController()+", Timeout="+TimeOps.expandMilliTime(tmt_idle));
+			l.getLogger().info("Server for "+lstnr.getName()+" has LoadBalancer="+loadbalancer+", Timeout="+TimeOps.expandMilliTime(tmt_idle));
 			l.getLogger().trace("NIO-Buffers: "+bufspec);
 		}
 	}
@@ -109,7 +104,7 @@ public class ClientSession
 			tmr.cancel();
 			tmr = null;
 		}
-		disconnect(); //returns this object to Listener's ObjectWell of inactive servers
+		disconnect(); //returns this object to Listener's pool of inactive servers
 	}
 
 	public void transmit(ByteArrayRef data) throws java.io.IOException
