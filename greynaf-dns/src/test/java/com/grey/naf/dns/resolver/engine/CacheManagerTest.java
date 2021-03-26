@@ -22,11 +22,11 @@ import com.grey.naf.dns.resolver.engine.ResolverService;
 import com.grey.naf.dns.resolver.engine.ResourceData;
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.config.DispatcherConfig;
-import com.grey.naf.TestUtils;
+import com.grey.naf.dns.TestUtils;
 
 public class CacheManagerTest
 {
-	private static final String rootdir = com.grey.naf.TestUtils.initPaths(CacheManagerTest.class);
+	private static final String rootdir = TestUtils.initPaths(CacheManagerTest.class);
 	private static final com.grey.logging.Logger logger = com.grey.logging.Factory.getLoggerNoEx("no-such-logger");
 	private static final java.io.File CFGFILE_ROOTS = new java.io.File(rootdir+"/rootservers");
 

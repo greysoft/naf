@@ -27,6 +27,7 @@
 		<module>greylog</module>
 		<module>greylog-slf4j</module>
 		<module>greynaf</module>
+		<module>greynaf-dns</module>
 		<module>samples</module>
 		<module>bom</module>
 		<module>pkg</module>

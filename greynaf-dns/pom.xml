@@ -1,5 +1,5 @@
 <!--
-  Copyright 2010-2021 Yusef Badri - All rights reserved.
+  Copyright 2021 Yusef Badri - All rights reserved.
   NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -7,14 +7,13 @@
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
 		<groupId>com.github.greysoft.naf</groupId>
-		<artifactId>ossnaf-samples</artifactId>
+		<artifactId>ossnaf</artifactId>
 		<version>${revision}</version>
 	</parent>
-	<artifactId>samples-echobot</artifactId>
-	<name>Echo Bot</name>
+	<artifactId>greynaf-dns</artifactId>
+	<name>NAF DNS API</name>
 	<properties>
-		<grey.manifest.name>com/grey/echobot/</grey.manifest.name>
-		<grey.manifest.mainclass>com.grey.echobot.App</grey.manifest.mainclass>
+		<grey.manifest.name>com/grey/naf/dns</grey.manifest.name>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -22,18 +21,5 @@
 			<artifactId>greynaf</artifactId>
 			<version>${project.version}</version>
 		</dependency>
-		<dependency>
-			<groupId>${project.groupId}</groupId>
-			<artifactId>greylog-slf4j</artifactId>
-			<version>${project.version}</version>
-		</dependency>
 	</dependencies>
-	<build>
-		<plugins>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-shade-plugin</artifactId>
-			</plugin>
-		</plugins>
-	</build>
 </project>

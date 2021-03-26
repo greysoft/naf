@@ -65,7 +65,7 @@ public abstract class CM_Listener
 		name = lname;
 
 		getLogger().info("Listener="+name+" in Dispatcher="+getDispatcher().getName()+" initialising on interface="+iface+", port="+port
-				+" with controller="+controller+", reaper="+getReaper()+" - ssl="+sslconfig);
+				+" with controller="+controller+", reaper="+rpr+" - ssl="+sslconfig);
 
 		// set up our listening socket
 		java.net.InetAddress ipaddr = (iface == null ? null : com.grey.base.utils.IP.getHostByName(iface));
@@ -82,7 +82,7 @@ public abstract class CM_Listener
 		initChannel(srvchan, true);
 
 		getLogger().info("Listener="+name+" bound to "+srvsock.getInetAddress()+":"+srvport+(port==0?"/dynamic":"")
-				         +(iface==null ? "" : " on interface="+iface)+" with backlog="+srvbacklog+" - factory="+getServerFactory());
+				         +(iface==null ? "" : " on interface="+iface)+" with backlog="+srvbacklog+" - factory="+serverFactory);
 	}
 
 	@Override

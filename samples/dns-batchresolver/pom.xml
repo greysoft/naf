@@ -18,6 +18,11 @@
 	</properties>
 	<dependencies>
 		<dependency>
+			<groupId>${project.groupId}</groupId>
+			<artifactId>greynaf-dns</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
 			<groupId>com.github.greysoft.loggers</groupId>
 			<artifactId>slf4j-logstdio</artifactId>
 			<version>1.0.0</version>

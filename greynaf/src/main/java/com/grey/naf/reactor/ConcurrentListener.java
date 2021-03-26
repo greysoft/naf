@@ -18,6 +18,10 @@ public class ConcurrentListener
 
 	private boolean in_sync_stop;
 
+	public static ConcurrentListener create(Dispatcher d, ConcurrentListenerConfig config) throws java.io.IOException {
+		return create(d, null, null, config);
+	}
+
 	public static ConcurrentListener create(Dispatcher d, Object controller, EntityReaper rpr, ConcurrentListenerConfig config) throws java.io.IOException {
 		return new ConcurrentListener(d, controller, rpr, config);
 	}

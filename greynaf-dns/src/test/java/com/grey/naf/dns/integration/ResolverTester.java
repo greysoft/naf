@@ -16,7 +16,7 @@ import com.grey.naf.dns.resolver.ResolverDNS;
 import com.grey.naf.dns.resolver.engine.PacketDNS;
 import com.grey.naf.dns.resolver.engine.ResolverAnswer;
 import com.grey.naf.dns.resolver.engine.ResourceData;
-import com.grey.naf.TestUtils;
+import com.grey.naf.dns.TestUtils;
 
 public class ResolverTester
 {

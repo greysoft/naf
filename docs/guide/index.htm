@@ -139,6 +139,8 @@ To dive straight in and pull the NAF libraries into your application so you can 
 </td></tr>
 </table>
 <br/>
+There is an additional dependency for the DNS resolver, with the same group and version but an artifactId of
+<span class="softname">greynaf-dns</span>.
 
 <hr class="pline"/>
 <h2>
@@ -262,9 +264,12 @@ If the <span class="cfgname">grey.paths.tmp</span> system property is set, then 
 It's up to the application which setting it wishes to abide by.
 <br/>
 If the 
-<span class="cfgname">grey.logger.dir</span> system property is not set, then NAF will set it to the resolved value of its
-<span class="cfgname">dirpaths/logs</span> config item, and this ought to propagate to the underlying
-<span class="softname">GreyLog</span> logger, so long as you loaded naf.xml before creating any loggers.
+<span class="cfgname">grey.logger.dir</span>
+system property is not set, then NAF will set it to the resolved value of its
+<span class="cfgname">dirpaths/logs</span>
+config item, and this ought to propagate to the underlying
+<span class="softname">GreyLog</span>
+logger, so long as you loaded naf.xml before creating any loggers.
 </p>
 
 <p>

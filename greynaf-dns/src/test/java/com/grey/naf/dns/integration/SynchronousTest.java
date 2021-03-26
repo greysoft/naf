@@ -12,11 +12,11 @@ import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.config.DispatcherConfig;
 import com.grey.naf.ApplicationContextNAF;
 import com.grey.naf.NAFConfig;
-import com.grey.naf.TestUtils;
 import com.grey.naf.dns.client.DNSClient;
 import com.grey.naf.dns.resolver.ResolverConfig;
 import com.grey.naf.dns.resolver.ResolverDNS;
 import com.grey.naf.dns.resolver.engine.ResolverAnswer;
+import com.grey.naf.dns.TestUtils;
 
 import org.junit.Assert;
 

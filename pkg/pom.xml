@@ -16,11 +16,6 @@
 	<dependencies>
 		<dependency>
 			<groupId>${project.groupId}</groupId>
-			<artifactId>greynaf</artifactId>
-			<version>${project.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>${project.groupId}</groupId>
 			<artifactId>greybase</artifactId>
 			<version>${project.version}</version>
 		</dependency>
@@ -32,6 +27,16 @@
 		<dependency>
 			<groupId>${project.groupId}</groupId>
 			<artifactId>greylog-slf4j</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>${project.groupId}</groupId>
+			<artifactId>greynaf</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>${project.groupId}</groupId>
+			<artifactId>greynaf-dns</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 	</dependencies>

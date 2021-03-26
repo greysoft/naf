@@ -23,7 +23,7 @@ public class IterativeListener
 	private IterativeListener(Dispatcher d, EntityReaper rpr, ListenerConfig config) throws java.io.IOException {
 		super(d, null, rpr, config);
 		cnxhandler = getServerFactory().createServer();
-		getLogger().info("Listener="+getName()+": Iterative handler is "+cnxhandler.getClass().getName());
+		getLogger().info("Iterative Listener="+getName()+" created with handler="+cnxhandler.getClass().getName());
 	}
 
 	@Override
