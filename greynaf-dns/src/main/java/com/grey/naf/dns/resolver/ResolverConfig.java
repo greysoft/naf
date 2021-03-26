@@ -31,13 +31,13 @@ public class ResolverConfig
 	public static final com.grey.logging.Logger.LEVEL DEBUGLVL = com.grey.logging.Logger.LEVEL.TRC2;
 
 	private final boolean recursive; //true means we issue recursive queries to localNameServers
-	private final String[] localNameServers; //local name servers to which we can issue queries (host:port)
+	private final String[] localNameServers; //local name servers to which we can issue queries - pipe-separated, each part is host[:port]
 	private final boolean autoRoots; //automatically discover the root servers (via localNameServers) - not relevant if in non-recursive mode
 	private final String pathnameRootServers; //file containing the root servers - contents are appended even if autoRoots true - not relevant if in non-recursive mode
 
 	private final boolean alwaysTCP; //start off in TCP mode to begin with, rather than falling back from UDP for large responses as usual
-	private final int udpSenderSockets; //UDP sockets on which to distribute our outgoing DNS queries
-	private final int dnsPort; //DNS port to send queries to
+	private final int udpSenderSockets; //no. UDP sockets on which to distribute our outgoing DNS queries
+	private final int dnsPort; //an alternative DNS port to send queries to - unlikely to ever make sense when talking to public nameservers
 
 	//overrides any nameserver we would otherwise send a request to - mainly useful for troubleshooting
 	private final java.net.InetSocketAddress dnsInterceptor;

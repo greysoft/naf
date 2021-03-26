@@ -35,7 +35,6 @@ class TestServerDNS
 	private int tmtdomain_qrycnt;
 
 	public int getPort() {return srvr.getLocalPort();}
-	@Override public boolean dnsRecursionAvailable() {return false;}
 
 	public TestServerDNS(ApplicationContextNAF appctx) throws java.io.IOException {
 		populateAnswers();

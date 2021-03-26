@@ -24,8 +24,7 @@ public class ServerDNS implements DispatcherRunnable
 {
 	public interface DNSQuestionResolver
 	{
-		public void dnsResolveQuestion(int qid, byte qtype, ByteChars qname, boolean recursion_desired, java.net.InetSocketAddress remote_addr, Object cbparam) throws java.io.IOException;
-		public boolean dnsRecursionAvailable();
+		public void dnsResolveQuestion(int qid, byte qtype, ByteChars qname, boolean recursion_desired, java.net.InetSocketAddress remote_addr, Object questionCallbackParam) throws java.io.IOException;
 	}
 
 	// use same NIO/socket property names as the Resolver API
@@ -40,16 +39,16 @@ public class ServerDNS implements DispatcherRunnable
 
 	private final Dispatcher dsptch;
 	private final ServerDNS.DNSQuestionResolver responder;
-	private final Handlers handlers;
-	private final ConcurrentListener listener_tcp;
-	private final TransportUDP transport_udp;
-	private final boolean recursion_offered;
+	private final QueryParser queryParser;
+	private final ConcurrentListener listenerTCP;
+	private final TransportUDP transportUDP;
+	private final boolean recursionOffered;
 
 	// this is just a temporary work area, pre-allocated for efficiency
 	private final PacketDNS dnspkt;
 
-	public java.net.InetAddress getLocalIP() {return transport_udp.getLocalIP();}
-	public int getLocalPort() {return transport_udp.getLocalPort();}
+	public java.net.InetAddress getLocalIP() {return transportUDP.getLocalIP();}
+	public int getLocalPort() {return transportUDP.getLocalPort();}
 	@Override
 	public String getName() {return "DNS-Server";}
 	@Override
@@ -58,50 +57,63 @@ public class ServerDNS implements DispatcherRunnable
 	public ServerDNS(Dispatcher d, DNSQuestionResolver r, DnsServerConfig cfg) throws java.io.IOException {
 		dsptch = d;
 		responder = r;
-		handlers = new Handlers(this);
-		recursion_offered = responder.dnsRecursionAvailable();
+		queryParser = new QueryParser(d.getLogger());
+		recursionOffered = cfg.getRecursionOffered();
 		dnspkt = new PacketDNS(Math.max(PKTSIZ_TCP, PKTSIZ_UDP), DIRECTNIOBUFS, 0, dsptch);
 
-		listener_tcp = ConcurrentListener.create(dsptch, this, null, cfg.getListenerConfig());
-		transport_udp = new TransportUDP(d, this, listener_tcp.getIP(),listener_tcp.getPort());
+		listenerTCP = ConcurrentListener.create(dsptch, this, null, cfg.getListenerConfig());
+		transportUDP = new TransportUDP(d, this, listenerTCP.getIP(),listenerTCP.getPort());
 		dsptch.getLogger().info("DNS-Server: Port="+cfg.getListenerConfig().getPort()+", directbufs="+DIRECTNIOBUFS+"; udpmax="+PKTSIZ_UDP+"; tcpmax="+PKTSIZ_TCP);
+
 		if (IGNORE_QTRAIL) dsptch.getLogger().info("DNS-Server: Will ignore trailing bytes in incoming queries");
 	}
 
 	@Override
 	public void startDispatcherRunnable() throws java.io.IOException {
-		listener_tcp.startDispatcherRunnable();
-		transport_udp.startDispatcherRunnable();
+		listenerTCP.startDispatcherRunnable();
+		transportUDP.startDispatcherRunnable();
+	}
+
+	@Override
+	public boolean stopDispatcherRunnable() {
+		boolean done = listenerTCP.stopDispatcherRunnable();
+		done = done && transportUDP.stopDispatcherRunnable();
+		return done;
 	}
 
 	// NB: No need to defend against buffer overflow during query decoding, as Dispatcher will simply catch and log the
 	// ArrayIndexOutOfBoundsException for us. No need to send an error response in that situation either, as the sender
 	// was obviously just being rude.
 	void queryReceived(ByteArrayRef rcvdata, java.net.InetSocketAddress remote_addr, TransportTCP tcp) throws java.io.IOException {
-		handlers.qry_qtype = 0;
-		handlers.qry_qname = null;
 		boolean is_auth = false; //this method only sends a response on failure, so don't claim to be authoritative.
+
+		// parse the DNS query
+		queryParser.reset();
 		dnspkt.resetDecoder(rcvdata.buffer(), rcvdata.offset(), rcvdata.size());
 		int off = dnspkt.decodeHeader();
-		if (off != -1) off = dnspkt.parseQuestion(off, dnspkt.getQuestionCount(), remote_addr, handlers);
+		if (off != -1) off = dnspkt.parseQuestion(off, dnspkt.getQuestionCount(), remote_addr, queryParser);
+		byte qtype = queryParser.getQueryType();
+		ByteChars qname = queryParser.getQueryName();
+
 		if (off == -1 || dnspkt.getQuestionCount() == 0) {
-			sendResponse(dnspkt.getQID(), handlers.qry_qtype, handlers.qry_qname, PacketDNS.RCODE_BADFMT, is_auth, dnspkt.recursionDesired(),
+			sendResponse(dnspkt.getQID(), qtype, qname, PacketDNS.RCODE_BADFMT, is_auth, dnspkt.recursionDesired(),
 					null, null, null, remote_addr, tcp);
 			return;
 		}
 		if (dsptch.getLogger().isActive(ServerDNS.DEBUGLVL)) {
 			dsptch.getLogger().log(ServerDNS.DEBUGLVL, "DNS-Server received "+(tcp==null?"UDP":"TCP")+" query="
-					+dnspkt.getQID()+"/"+ResolverDNS.getQTYPE(handlers.qry_qtype)+"/"+handlers.qry_qname
+					+dnspkt.getQID()+"/"+ResolverDNS.getQTYPE(qtype)+"/"+qname
 					+" from "+remote_addr+" - size="+rcvdata.size()+", recurse="+dnspkt.recursionDesired());
 		}
 		if (dnspkt.opcode() != PacketDNS.OPCODE_QRY) {
 			dsptch.getLogger().info("DNS-Server rejecting unsupported packet="+dnspkt.getQID()+" with opcode="+dnspkt.opcode()
 				+" - rcode="+dnspkt.rcode()+"/rsp="+dnspkt.isResponse()
-				+" - query="+ResolverDNS.getQTYPE(handlers.qry_qtype)+"/"+handlers.qry_qname+" from "+remote_addr);
-			sendResponse(dnspkt.getQID(), handlers.qry_qtype, handlers.qry_qname, PacketDNS.RCODE_NOTIMPL, is_auth, dnspkt.recursionDesired(),
+				+" - query="+ResolverDNS.getQTYPE(qtype)+"/"+qname+" from "+remote_addr);
+			sendResponse(dnspkt.getQID(), qtype,qname, PacketDNS.RCODE_NOTIMPL, is_auth, dnspkt.recursionDesired(),
 					null, null, null, remote_addr, tcp);
 			return;
 		}
+
 		//ignore AdditionalInfo RRs (a common occurrence is qtype=41, for EDNS OPT)
 		if (dnspkt.getAnswerCount() + dnspkt.getAuthorityCount() != 0
 				|| dnspkt.getQuestionCount() != 1
@@ -111,8 +123,8 @@ public class ServerDNS implements DispatcherRunnable
 				+"/"+dnspkt.getAnswerCount()+"/"+dnspkt.getAuthorityCount()+"/"+dnspkt.getInfoCount()
 				+" with rcode="+dnspkt.rcode()+"/opcode="+dnspkt.opcode()+"/rsp="+dnspkt.isResponse()
 				+"/trunc="+dnspkt.isTruncated()+"/auth="+dnspkt.isAuth()
-				+" - query="+ResolverDNS.getQTYPE(handlers.qry_qtype)+"/"+handlers.qry_qname+" from "+remote_addr);
-			sendResponse(dnspkt.getQID(), handlers.qry_qtype, handlers.qry_qname, PacketDNS.RCODE_BADFMT, is_auth, dnspkt.recursionDesired(),
+				+" - query="+ResolverDNS.getQTYPE(qtype)+"/"+qname+" from "+remote_addr);
+			sendResponse(dnspkt.getQID(), qtype, qname, PacketDNS.RCODE_BADFMT, is_auth, dnspkt.recursionDesired(),
 					null, null, null, remote_addr, tcp);
 			return;
 		}
@@ -122,8 +134,8 @@ public class ServerDNS implements DispatcherRunnable
 			int excess = rcvdata.limit() - off;
 			if (excess != 0) {
 				dsptch.getLogger().info("DNS-Server rejecting packet="+dnspkt.getQID()+" due to excess bytes="+excess
-					+" - query="+ResolverDNS.getQTYPE(handlers.qry_qtype)+"/"+handlers.qry_qname+" from "+remote_addr);
-				sendResponse(dnspkt.getQID(), handlers.qry_qtype, handlers.qry_qname, PacketDNS.RCODE_BADFMT, is_auth, dnspkt.recursionDesired(),
+					+" - query="+ResolverDNS.getQTYPE(qtype)+"/"+qname+" from "+remote_addr);
+				sendResponse(dnspkt.getQID(), qtype, qname, PacketDNS.RCODE_BADFMT, is_auth, dnspkt.recursionDesired(),
 						null, null, null, remote_addr, tcp);
 				return;
 			}
@@ -131,30 +143,30 @@ public class ServerDNS implements DispatcherRunnable
 
 		//the question appears valid, so answer it
 		try {
-			responder.dnsResolveQuestion(dnspkt.getQID(), handlers.qry_qtype, handlers.qry_qname, dnspkt.recursionDesired(), remote_addr, tcp);
+			responder.dnsResolveQuestion(dnspkt.getQID(), qtype, qname, dnspkt.recursionDesired(), remote_addr, tcp);
 		} catch (Throwable ex) {
 			dsptch.getLogger().log(Logger.LEVEL.ERR, ex, true, "DNS-Server failed to handle DNS query="+dnspkt.getQID()
-				+"/"+handlers.qry_qtype+"/"+handlers.qry_qname+" from "+remote_addr);
+				+"/"+qtype+"/"+qname+" from "+remote_addr);
 			if (dsptch.isActive()) {
-				sendResponse(dnspkt.getQID(), handlers.qry_qtype, handlers.qry_qname, PacketDNS.RCODE_SRVFAIL, is_auth, dnspkt.recursionDesired(),
+				sendResponse(dnspkt.getQID(), qtype, qname, PacketDNS.RCODE_SRVFAIL, is_auth, dnspkt.recursionDesired(),
 						null, null, null, remote_addr, tcp);
 			}
 		}
 	}
 
 	public boolean sendResponse(int qid, byte qtype, ByteChars qname, int rcode,
-			boolean isauth, boolean recursion_desired,
+			boolean isAuth, boolean recursionDesired,
 			ResourceData[] ans, ResourceData[] auth, ResourceData[] info,
-			java.net.InetSocketAddress remote_addr, Object tcpconn) throws java.io.IOException
+			java.net.InetSocketAddress remoteAddr, Object questionCallbackParam) throws java.io.IOException
 	{
-		boolean is_tcp = (tcpconn != null);
+		boolean is_tcp = (questionCallbackParam != null);
 		dnspkt.resetEncoder(is_tcp, COMPRESS_NAMES);
 		dnspkt.setResponse();
 		dnspkt.opcode(PacketDNS.OPCODE_QRY);
 		dnspkt.rcode(rcode);
-		if (recursion_offered) dnspkt.setRecursionAvailable();
-		if (isauth) dnspkt.setAuth();
-		if (recursion_desired) dnspkt.setRecursionDesired();
+		if (recursionOffered) dnspkt.setRecursionAvailable();
+		if (isAuth) dnspkt.setAuth();
+		if (recursionDesired) dnspkt.setRecursionDesired();
 		int anscnt = (ans==null?0:ans.length);
 		int authcnt = (auth==null?0:auth.length);
 		int infocnt = (info==null?0:info.length);
@@ -181,49 +193,57 @@ public class ServerDNS implements DispatcherRunnable
 		if (dsptch.getLogger().isActive(ServerDNS.DEBUGLVL)) {
 			dsptch.getLogger().log(ServerDNS.DEBUGLVL, "DNS-Server sending "+(is_tcp?"TCP":"UDP")+" response="
 					+dnspkt.getQID()+"/"+ResolverDNS.getQTYPE(qtype)+"/"+qname
-					+" with answer="+anscnt+"/"+authcnt+"/"+infocnt+"/rcode="+rcode+" to "+remote_addr
-					+" - size="+niobuf.limit()+", auth="+isauth+(dnspkt.isTruncated()?"/truncated":""));
+					+" with answer="+anscnt+"/"+authcnt+"/"+infocnt+"/rcode="+rcode+" to "+remoteAddr
+					+" - size="+niobuf.limit()+", auth="+isAuth+(dnspkt.isTruncated()?"/truncated":""));
 		}
 		if (is_tcp) {
-			((TransportTCP)tcpconn).sendResponse(niobuf);
+			((TransportTCP)questionCallbackParam).sendResponse(niobuf);
 		} else {
-			transport_udp.sendResponse(niobuf, remote_addr);
+			transportUDP.sendResponse(niobuf, remoteAddr);
 		}
 		return dnspkt.isTruncated();
 	}
 
-	
-	// Move the override methods into an inner class, purely so as not to be externally visible
-	private static final class Handlers
+
+	private static final class QueryParser
 		implements PacketDNS.MessageCallback
 	{
-		private final ServerDNS srvr;
-		private final Dispatcher dsptch;
+		private final Logger logger;
 
 		//current question - these are only valid within the scope of a single queryReceived() call
-		byte qry_qtype;
-		ByteChars qry_qname;
+		private byte qtype;
+		private ByteChars qname;
 
-		Handlers(ServerDNS s) {srvr=s; dsptch=srvr.getDispatcher();}
+		public byte getQueryType() {return qtype;}
+		public ByteChars getQueryName() {return qname;}
+
+		public QueryParser(Logger logger) {
+			this.logger = logger;
+		}
+
+		public void reset() {
+			qtype = 0;
+			qname = null;
+		}
 
 		@Override
 		public boolean handleMessageQuestion(int qid, int qnum, int qcnt, byte qt, byte qclass, ByteChars qn, java.net.InetSocketAddress remote_addr) {
 			if (qclass != PacketDNS.QCLASS_INET) {
-				dsptch.getLogger().info("DNS-Server rejecting class="+qclass+" for query="+qt+"/"+qn+" from "+remote_addr);
+				logger.info("DNS-Server rejecting class="+qclass+" for query="+qt+"/"+qn+" from "+remote_addr);
 				return false;
 			}
 			if (qnum != 0) {
-				dsptch.getLogger().info("DNS-Server rejecting excess question #"+qnum+"/"+qcnt+" = "+qt+"/"+qn+" from "+remote_addr);
+				logger.info("DNS-Server rejecting excess question #"+qnum+"/"+qcnt+" = "+qt+"/"+qn+" from "+remote_addr);
 				return false;
 			}
-			qry_qtype = qt;
-			qry_qname = new ByteChars(qn);
+			qtype = qt;
+			qname = new ByteChars(qn);
 			return true;
 		}
 
 		@Override
 		public boolean handleMessageRR(int qid, int sectiontype, int rrnum, int rrcnt, ByteChars rrname, ResourceData rr, java.net.InetSocketAddress remote_addr) {
-			throw new UnsupportedOperationException(getClass().getPackage().getName()+" package does not expect to receive DNS responses - "+rr);
+			throw new IllegalStateException("DNS server does not expect to receive sectiontype="+sectiontype+" - "+rr);
 		}
 	}
 }

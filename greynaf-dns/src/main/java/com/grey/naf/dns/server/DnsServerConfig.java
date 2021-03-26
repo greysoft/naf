@@ -12,18 +12,25 @@ import com.grey.naf.reactor.config.ConcurrentListenerConfig;
 public class DnsServerConfig
 {
 	private final ConcurrentListenerConfig listenerConfig;
+	private final boolean recursionOffered;
 
 	public DnsServerConfig(Builder bldr) {
 		listenerConfig = bldr.getListenerConfig().build();
+		recursionOffered = bldr.recursionOffered;
 	}
 
 	public ConcurrentListenerConfig getListenerConfig() {
 		return listenerConfig;
 	}
 
+	public boolean getRecursionOffered() {
+		return recursionOffered;
+	}
+
 
 	public static class Builder {
 		private ConcurrentListenerConfig.Builder<?> listenerConfig = defaultListener();
+		private boolean recursionOffered;
 
 		public ConcurrentListenerConfig.Builder<?> getListenerConfig() {
 			return listenerConfig;
@@ -32,6 +39,11 @@ public class DnsServerConfig
 		public Builder withXmlConfig(XmlConfig cfg, NAFConfig nafConfig) {
 			XmlConfig lxmlcfg = cfg.getSection("listener");
 			getListenerConfig().withXmlConfig(lxmlcfg, nafConfig);
+			return this;
+		}
+
+		public Builder withRecursionOffered(boolean v) {
+			recursionOffered = v;
 			return this;
 		}
 

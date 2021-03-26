@@ -17,7 +17,7 @@ class CommsManager
 	private int nextServer; //allows us to round-robin through localNameServers
 	private int nextUDP; //allows us to round-robin through udpLocal
 
-	public CommsManager(ResolverService rslvr) throws java.io.IOException
+	public CommsManager(ResolverService rslvr, String[] nameServers) throws java.io.IOException
 	{
 		ResolverConfig cfg = rslvr.getConfig();
 		//we only transmit queries, so TCP BufferSpec transmit-size need not be expanded to the TCP limit
@@ -27,10 +27,10 @@ class CommsManager
 		if (!cfg.isRecursive()) {
 			localNameServers = null;
 		} else {
-			localNameServers = new java.net.InetSocketAddress[rslvr.getLocalNameServers().length];
+			localNameServers = new java.net.InetSocketAddress[nameServers.length];
 			for (int idx = 0; idx != localNameServers.length; idx++) {
 				//if the server name include a port spec (ie. host:port) allow that to override the default config DNS port
-				TSAP tsap = TSAP.build(rslvr.getLocalNameServers()[idx], cfg.getDnsPort(), false);
+				TSAP tsap = TSAP.build(nameServers[idx], cfg.getDnsPort(), false);
 				localNameServers[idx] = rslvr.getCacheManager().createServerTSAP(tsap.ip, tsap.port);
 			}
 		}

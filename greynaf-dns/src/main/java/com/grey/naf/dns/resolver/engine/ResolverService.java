@@ -47,7 +47,6 @@ public class ResolverService
 	private final ResolverConfig config;
 	private final CacheManager cachemgr;
 	private final CommsManager xmtmgr;
-	private final String[] localNameServers; //local name servers to which we can issue queries (host:port)
 	private final java.io.File fh_dump;
 	private final java.util.Random rndgen = new java.util.Random(System.nanoTime());
 
@@ -105,7 +104,6 @@ public class ResolverService
 	ResolverConfig getConfig() {return config;}
 	CacheManager getCacheManager() {return cachemgr;}
 	CommsManager getCommsManager() {return xmtmgr;}
-	String[] getLocalNameServers() {return localNameServers;}
 	StringBuilder reusableStringBuilder() {return sbtmp;}
 	boolean isActive(QueryHandle qh) {return activereqs.contains(qh);}
 	QueryHandle.WrapperRR allocWrapperRR(ResourceData rr) {return rrwstore.extract().set(rr);}
@@ -148,6 +146,7 @@ public class ResolverService
 		logger.trace(LOGLBL+"Partial cache prune="+config.isPartialPrune()+", dump-on-exit="+config.isDumpOnExit());
 		logger.trace(LOGLBL+"directbufs="+ResolverConfig.DIRECTNIOBUFS+"; udpmax="+ResolverConfig.PKTSIZ_UDP+"; tcpmax="+ResolverConfig.PKTSIZ_TCP);
 
+		String[] localNameServers;
 		if (config.getLocalNameServers() == null || config.getLocalNameServers().length == 0) {
 			List<String> lst = NameServerUtils.getLocalServers(logger);
 			if (lst.isEmpty()) lst = Collections.singletonList("127.0.0.1");
@@ -159,7 +158,7 @@ public class ResolverService
 		}
 
 		cachemgr = new CacheManager(dsptch, config, localNameServers); // NB: This can reorder the localNameServers array
-		xmtmgr = new CommsManager(this);
+		xmtmgr = new CommsManager(this, localNameServers);
 
 		pkt_tmp = new PacketDNS(Math.max(ResolverConfig.PKTSIZ_TCP, ResolverConfig.PKTSIZ_UDP), ResolverConfig.DIRECTNIOBUFS, config.getInitialMinTTL(), dsptch);
 		fh_dump = new java.io.File(dsptch.getApplicationContext().getConfig().getPathVar()+"/DNSdump-"+dsptch.getName()+".txt");
@@ -233,17 +232,17 @@ public class ResolverService
 		return reqs;
 	}
 
-	public ResolverAnswer resolve(byte qtype, ByteChars qname, ResolverDNS.Client caller, Object callerparam, int flags)
+	public ResolverAnswer resolve(byte qtype, ByteChars qname, ResolverDNS.Client caller, Object callerParam, int flags)
 	{
-		return resolve(qtype, qname, caller, callerparam, flags, 0, dnsAnswer);
+		return resolve(qtype, qname, caller, callerParam, flags, 0, dnsAnswer);
 	}
 
-	public ResolverAnswer resolve(byte qtype, int qip, ResolverDNS.Client caller, Object callerparam, int flags)
+	public ResolverAnswer resolve(byte qtype, int qip, ResolverDNS.Client caller, Object callerParam, int flags)
 	{
-		return resolve(qtype, qip, caller, callerparam, flags, dnsAnswer);
+		return resolve(qtype, qip, caller, callerParam, flags, dnsAnswer);
 	}
 
-	ResolverAnswer resolve(byte qtype, ByteChars qname, ResolverDNS.Client caller, Object callerparam,
+	ResolverAnswer resolve(byte qtype, ByteChars qname, ResolverDNS.Client caller, Object callerParam,
 			int flags, int server_ip, ResolverAnswer answerbuf)
 	{
 		//update stats
@@ -334,7 +333,7 @@ public class ResolverService
 			}
 			// NB: There must be no steps in the synchronous resolve() call chain which can fail after this, as that
 			// means the caller would receive a failure callback as well as the synchronous error return code.
-			qryh.addCaller(caller, callerparam);
+			qryh.addCaller(caller, callerParam);
 		}
 		// the result is not yet available, so the caller will be notified later via callback.
 		return null;

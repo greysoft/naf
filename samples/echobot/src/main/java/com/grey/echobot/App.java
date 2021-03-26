@@ -22,8 +22,7 @@ public class App
 {
 	private static final org.slf4j.Logger Logger = LoggerFactory.getLogger(App.class);
 
-	static final String[] opts = new String[]{"udp", "server", "server-solo", "clients:", "msg:", "cbuf:", "sbuf:", "sockbuf:", "verify"};
-	static final int HDRSIZ = 0; //no message header is defined
+	private static final int HDRSIZ = 0; //no message header is defined
 
 	public static void main(String[] args) throws Exception
 	{
@@ -34,6 +33,8 @@ public class App
 
 	private static class OptsHandler extends CommandParser.OptionsHandler
 	{
+		private static final String[] opts = new String[]{"udp", "server", "server-solo", "clients:", "msg:", "cbuf:", "sbuf:", "sockbuf:", "verify"};
+
 		boolean udpmode;
 		boolean server_enabled;
 		boolean server_solo; //true means standalone server, ie. has own exclusive Dispatcher with no clients

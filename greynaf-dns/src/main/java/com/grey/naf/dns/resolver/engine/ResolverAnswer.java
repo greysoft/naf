@@ -105,4 +105,20 @@ public class ResolverAnswer
 		if (rrdata.size() != 0) sb.append('}');
 		return sb;
 	}
+
+	public int getRCODE() {
+		switch (result) {
+		case OK:
+			return PacketDNS.RCODE_OK;
+		case NODOMAIN:
+			return PacketDNS.RCODE_NXDOM;
+		case BADNAME:
+			return PacketDNS.RCODE_BADFMT;
+		case SHUTDOWN:
+			return PacketDNS.RCODE_REJ;
+		default:
+			break;
+		}
+		return PacketDNS.RCODE_SRVFAIL;
+	}
 }

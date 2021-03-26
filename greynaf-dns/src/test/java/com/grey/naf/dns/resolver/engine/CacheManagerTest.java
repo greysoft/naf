@@ -472,7 +472,7 @@ public class CacheManagerTest
 				.withLookupMinTTL(0)
 				.build();
 		ResolverService rslvr = new ResolverService(dsptch, config);
-		cmgr = new CacheManager(dsptch, config, rslvr.getLocalNameServers());
+		cmgr = rslvr.getCacheManager();
 		return config;
 	}
 

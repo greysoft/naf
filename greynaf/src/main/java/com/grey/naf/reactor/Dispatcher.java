@@ -164,9 +164,8 @@ public class Dispatcher
 
 		getLogger().info("Dispatcher="+dname+": Initialised with baseport="+appctx.getConfig().getBasePort()
 				+", NAFMan="+(appctx.getNafManConfig()!=null)+", survive_handlers="+surviveHandlers
-				+", flush="+TimeOps.expandMilliTime(def.getFlushInterval()));
-		getLogger().info("Dispatcher="+dname+": Selector="+slct.getClass().getCanonicalName()
-				+", Provider="+slct.provider().getClass().getCanonicalName()
+				+", flush="+TimeOps.expandMilliTime(def.getFlushInterval())
+				+"\n\tSelector="+slct.getClass().getCanonicalName()+", Provider="+slct.provider().getClass().getCanonicalName()
 				+" - half-duplex="+ChannelMonitor.halfduplex+", timer-jitter="+TimerNAF.JITTER_THRESHOLD
 				+", wbufs="+IOExecWriter.MAXBUFSIZ+"/"+IOExecWriter.FILEBUFSIZ);
 	}
