@@ -4,6 +4,8 @@
  */
 package com.grey.naf.nafman;
 
+import java.util.List;
+
 import com.grey.base.utils.StringOps;
 import com.grey.base.collections.HashedMap;
 import com.grey.naf.reactor.Dispatcher;
@@ -14,7 +16,7 @@ public abstract class NafManAgent
 {
 	private final Dispatcher dsptch;
 	private final NafManRegistry registry;
-	private final HashedMap<String, java.util.ArrayList<NafManCommand.Handler>> handlers = new HashedMap<>();
+	private final HashedMap<String, List<NafManCommand.Handler>> handlers = new HashedMap<>();
 	private boolean in_shutdown;
 
 	//temp objects pre-allocated merely for efficiency
@@ -70,7 +72,7 @@ public abstract class NafManAgent
 	protected void processCommand(NafManCommand cmd) throws java.io.IOException
 	{
 		NafManRegistry.DefCommand def = cmd.getCommandDef();
-		java.util.ArrayList<NafManCommand.Handler> lst = handlers.get(def.code);
+		List<NafManCommand.Handler> lst = handlers.get(def.code);
 		sbtmp.setLength(0);
 		sbtmp.append("NAFMAN=").append(dsptch.getName()).append(" received command=").append(def.code);
 		if (lst == null) {

@@ -18,7 +18,12 @@ public class Task
 	extends Naflet
 	implements NafManCommand.Handler, EntityReaper
 {
+	private static final String NAFMAN_FAMILY = "Port-Forwarder";
 	public static final String CMD_SHOWCONNS = "SHOWCONNS";
+
+	private static final NafManRegistry.DefCommand[] nafman_cmds = new NafManRegistry.DefCommand[] {
+			new NafManRegistry.DefCommand(CMD_SHOWCONNS, NAFMAN_FAMILY, "Show connection details", NafManRegistry.RSRC_CMDSTATUS, true)
+	};
 
 	private final java.util.ArrayList<Relay> active = new java.util.ArrayList<>();
 	private final ListenerSet listeners;
@@ -32,8 +37,10 @@ public class Task
 		NAFConfig nafcfg = dsptch.getApplicationContext().getConfig();
 		ConcurrentListenerConfig[] lcfg = ConcurrentListenerConfig.buildMultiConfig(lname, nafcfg, "listeners/listener", taskConfig(), 0, 0, null, null);
 		listeners = new ListenerSet(lname, dsptch, this, this, lcfg);
+
 		if (dsptch.getNafManAgent() != null) {
 			NafManRegistry reg = dsptch.getNafManAgent().getRegistry();
+			reg.registerCommandFamily(NAFMAN_FAMILY, nafman_cmds, null, null);
 			reg.registerHandler(CMD_SHOWCONNS, 0, this, dsptch);
 		}
 	}

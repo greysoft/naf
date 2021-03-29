@@ -20,10 +20,8 @@ import com.grey.base.collections.HashedMapIntKey;
 import com.grey.base.collections.HashedSet;
 import com.grey.base.collections.IteratorInt;
 import com.grey.base.collections.ObjectPool;
-import com.grey.naf.nafman.NafManRegistry;
 import com.grey.naf.dns.resolver.ResolverConfig;
 import com.grey.naf.dns.resolver.ResolverDNS;
-import com.grey.naf.nafman.NafManCommand;
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.TimerNAF;
 import com.grey.logging.Logger.LEVEL;
@@ -32,14 +30,8 @@ import com.grey.logging.Logger.LEVEL;
  * This class is the entry point to the resolver engine
  */
 public class ResolverService
-	implements NafManCommand.Handler, TimerNAF.Handler
+	implements TimerNAF.Handler
 {
-	//NAFMAN attributes
-	private static final String MATTR_QTYP = "qt";
-	private static final String MATTR_QVAL = "qv";
-	private static final String MATTR_DUMPFILE = "df";
-	private static final String MATTR_DUMPHTML = "dh";
-
 	private static final String LOGLBL = "DNS-Resolver: ";
 
 	final com.grey.logging.Logger logger;
@@ -95,7 +87,6 @@ public class ResolverService
 	private final ResolverAnswer dnsAnswer = new ResolverAnswer();
 
 	// these are just temporary work areas, pre-allocated for efficiency
-	private final ByteChars tmpbc_nafman = new ByteChars();
 	private final ByteChars tmplightbc = new ByteChars(-1); //lightweight object without own storage
 	private final StringBuilder sbtmp = new StringBuilder();
 	private final PacketDNS pkt_tmp;
@@ -113,8 +104,6 @@ public class ResolverService
 	ByteChars allocByteChars() {return bcstore.extract().clear();}
 	void freeByteChars(ByteChars bc) {bcstore.store(bc);}
 	int nextRandomInt(int bound) {return rndgen.nextInt(bound);}
-	@Override
-	public CharSequence nafmanHandlerID() {return "Resolver";}
 
 	public ResolverService(Dispatcher dsptch, ResolverConfig config)
 		throws java.io.IOException, javax.naming.NamingException
@@ -159,6 +148,7 @@ public class ResolverService
 
 		cachemgr = new CacheManager(dsptch, config, localNameServers); // NB: This can reorder the localNameServers array
 		xmtmgr = new CommsManager(this, localNameServers);
+		new ResolverNAFMAN(this, config);
 
 		pkt_tmp = new PacketDNS(Math.max(ResolverConfig.PKTSIZ_TCP, ResolverConfig.PKTSIZ_UDP), ResolverConfig.DIRECTNIOBUFS, config.getInitialMinTTL(), dsptch);
 		fh_dump = new java.io.File(dsptch.getApplicationContext().getConfig().getPathVar()+"/DNSdump-"+dsptch.getName()+".txt");
@@ -167,14 +157,6 @@ public class ResolverService
 		anstore = new ObjectPool<>(() -> new ResolverAnswer());
 		rrwstore = new ObjectPool<>(() -> new QueryHandle.WrapperRR());
 		qrystore = new ObjectPool<>(() -> new QueryHandle(this));
-
-		if (dsptch.getNafManAgent() != null) {
-			NafManRegistry reg = dsptch.getNafManAgent().getRegistry();
-			reg.registerHandler(NafManRegistry.CMD_DNSDUMP, 0, this, dsptch);
-			reg.registerHandler(NafManRegistry.CMD_DNSPRUNE, 0, this, dsptch);
-			reg.registerHandler(NafManRegistry.CMD_DNSQUERY, 0, this, dsptch);
-			if (!config.isRecursive()) reg.registerHandler(NafManRegistry.CMD_DNSLOADROOTS, 0, this, dsptch);
-		}
 	}
 
 	public void start() throws java.io.IOException
@@ -641,81 +623,7 @@ public class ResolverService
 		return allocByteChars().append(sbtmp);
 	}
 
-	@Override
-	public CharSequence handleNAFManCommand(NafManCommand cmd)
-	{
-		//use temp StringBuilder, so that we don't hold onto a potentially huge block of memory
-		StringBuilder sbrsp = new StringBuilder();
-		NafManRegistry.DefCommand def = cmd.getCommandDef();
-
-		if (def.code.equals(NafManRegistry.CMD_DNSDUMP)) {
-			String dh = cmd.getArg(MATTR_DUMPHTML);
-			String df = cmd.getArg(MATTR_DUMPFILE);
-			if (!"N".equalsIgnoreCase(dh)) dumpState("<br/>", sbrsp);
-			if (!"N".equalsIgnoreCase(df)) {
-				dumpState(fh_dump, "Dumping cache on NAFMAN="+def.code);
-				sbrsp.append("<br/><br/>Dumped cache to file "+fh_dump.getAbsolutePath());
-			}
-		} else if (def.code.equals(NafManRegistry.CMD_DNSPRUNE)) {
-			cachemgr.prune(sbrsp);
-		} else if (def.code.equals(NafManRegistry.CMD_DNSLOADROOTS)) {
-			try {
-				if (config.isRecursive()) {
-					sbrsp.append("DNS roots are not applicable, as Resolver is in recursive mode");
-				} else {
-					cachemgr.loadRootServers();
-				}
-			} catch (Exception ex) {
-				sbrsp.append("Failed to reload roots - "+ex);
-			}
-		} else if (def.code.equals(NafManRegistry.CMD_DNSQUERY)) {
-			String pqt = cmd.getArg(MATTR_QTYP);
-			String pqv = cmd.getArg(MATTR_QVAL);
-			if (pqv == null) return sbrsp.append("INVALID: Missing query attribute=").append(MATTR_QVAL);
-			ResolverAnswer ans = null;
-			byte qt = 0;
-			if ("A".equalsIgnoreCase(pqt)) {
-				qt = ResolverDNS.QTYPE_A;
-			} else if ("NS".equalsIgnoreCase(pqt)) {
-				qt = ResolverDNS.QTYPE_NS;
-			} else if ("MX".equalsIgnoreCase(pqt)) {
-				qt = ResolverDNS.QTYPE_MX;
-			} else if ("SOA".equalsIgnoreCase(pqt)) {
-				qt = ResolverDNS.QTYPE_SOA;
-			} else if ("SRV".equalsIgnoreCase(pqt)) {
-				qt = ResolverDNS.QTYPE_SRV;
-			} else if ("TXT".equalsIgnoreCase(pqt)) {
-				qt = ResolverDNS.QTYPE_TXT;
-			} else if ("AAAA".equalsIgnoreCase(pqt)) {
-				qt = ResolverDNS.QTYPE_AAAA;
-			} else if ("PTR".equalsIgnoreCase(pqt)) {
-				qt = ResolverDNS.QTYPE_PTR;
-			} else {
-				return sbrsp.append("INVALID: Unsupported query type - ").append(MATTR_QTYP).append('=').append(pqt);
-			}
-			if (qt == ResolverDNS.QTYPE_PTR) {
-				int ip = IP.convertDottedIP(pqv);
-				if (!IP.validDottedIP(pqv, ip)) return sbrsp.append("INVALID: Not a valid dotted IP - ").append(pqv);
-				ans = resolve(qt, ip, null, null, 0);
-			} else {
-				ans = resolve(qt, tmpbc_nafman.populate(pqv), null, null, 0);
-			}
-			if (ans == null) {
-				sbrsp.append("Answer not in cache - query has been issued");
-			} else {
-				sbrsp.append("Cached Answer: ");
-				ans.toString(sbrsp);
-			}
-		} else {
-			// we've obviously registered for this command, so we must be missing a clause - clearly a bug
-			logger.error(LOGLBL+"NAFMAN: Missing case for cmd="+def.code);
-			return null;
-		}
-		return sbrsp;
-	}
-
-	private void dumpState(java.io.File fh, CharSequence msg)
-	{
+	void dumpState(java.io.File fh, CharSequence msg) {
 		String eol = "\n";
 		StringBuilder sb = dumpState(eol, null);
 		java.io.OutputStream fout = null;
@@ -742,8 +650,7 @@ public class ResolverService
 		}
 	}
 
-	private StringBuilder dumpState(String eol, StringBuilder sb)
-	{
+	StringBuilder dumpState(String eol, StringBuilder sb) {
 		int reqcnt = 0;
 		int cachemiss = 0;
 		for (int idx = 0; idx != stats_reqcnt.length; idx++) {
@@ -799,9 +706,7 @@ public class ResolverService
 		return sb;
 	}
 
-	private static void dumpPending(HashedMap<ByteChars, QueryHandle> pending, String qtype,
-			String dlm1, String dlm2, String eol, StringBuilder sb)
-	{
+	private static void dumpPending(HashedMap<ByteChars, QueryHandle> pending, String qtype, String dlm1, String dlm2, String eol, StringBuilder sb) {
 		sb.append(eol).append(qtype).append('=').append(pending.size());
 		java.util.Iterator<ByteChars> it = pending.keysIterator();
 		String dlm = dlm1;

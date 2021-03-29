@@ -4,6 +4,9 @@
  */
 package com.grey.naf.nafman;
 
+import java.util.List;
+import java.util.Map;
+
 import com.grey.base.utils.DynLoader;
 import com.grey.base.utils.FileOps;
 import com.grey.naf.ApplicationContextNAF;
@@ -14,29 +17,19 @@ import com.grey.naf.TestUtils;
 
 public class RegistryTest
 {
-	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, true);
-	private static final NafManRegistry nafreg = NafManRegistry.get(appctx);
-	private static final String rootdir = com.grey.naf.TestUtils.initPaths(RegistryTest.class);
-	private static final NafManRegistry.DefCommand fakecmd1 = new NafManRegistry.DefCommand("fake-cmd-1", "utest", "fake1", null, false);
-	private static final NafManRegistry.DefCommand fakecmd2 = new NafManRegistry.DefCommand("fake-cmd-2", "utest", "fake2", null, false);
-	private static final NafManRegistry.DefCommand stopcmd = nafreg.getCommand(NafManRegistry.CMD_STOP);
 	private static final com.grey.logging.Logger logger = com.grey.logging.Factory.getLoggerNoEx("");
+
+	private final ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, true);
+	private final NafManRegistry nafreg = NafManRegistry.get(appctx);
+	private final String rootdir = com.grey.naf.TestUtils.initPaths(RegistryTest.class);
+	private final NafManRegistry.DefCommand fakecmd1 = new NafManRegistry.DefCommand("fake-cmd-1", "utest", "fake1", null, false);
+	private final NafManRegistry.DefCommand fakecmd2 = new NafManRegistry.DefCommand("fake-cmd-2", "utest", "fake2", null, false);
+	private final NafManRegistry.DefCommand stopcmd = nafreg.getCommand(NafManRegistry.CMD_STOP);
 
 	public RegistryTest()
 		throws InstantiationException, IllegalAccessException, NoSuchMethodException, SecurityException,
 			IllegalArgumentException, java.lang.reflect.InvocationTargetException, java.io.IOException
 	{
-		Class<?>[] nested = NafManRegistry.class.getDeclaredClasses();
-		int cnt = (nested == null ? 0 : nested.length);
-		for (int idx = 0; idx != cnt; idx++) {
-			if (nested[idx].getSimpleName().equals("SingletonHolder")) {
-				java.lang.reflect.Constructor<NafManRegistry> ctor = NafManRegistry.class.getDeclaredConstructor(new Class<?>[]{});
-				ctor.setAccessible(true);
-				NafManRegistry reg = ctor.newInstance();
-				DynLoader.setField(nested[idx], "instance", reg, null);
-				break;
-			}
-		}
 		FileOps.deleteDirectory(rootdir);
 	}
 
@@ -88,13 +81,10 @@ public class RegistryTest
 	@org.junit.Test
 	public void testHandlerDefs() throws java.io.IOException {
 		@SuppressWarnings("unchecked")
-		java.util.HashSet<Dispatcher> reg_inviolate
-			= (java.util.HashSet<Dispatcher>)DynLoader.getField(nafreg, "inviolate_handlers");
+		java.util.Set<Dispatcher> reg_inviolate = (java.util.Set<Dispatcher>)DynLoader.getField(nafreg, "inviolateHandlers");
 		@SuppressWarnings("unchecked")
-		java.util.HashMap<String, java.util.List<Object>> reg_handlers
-			= (java.util.HashMap<String, java.util.List<Object>>)DynLoader.getField(nafreg, "cmd_handlers");
-		com.grey.base.collections.HashedMap<String, java.util.ArrayList<NafManCommand.Handler>> dsptch_handlers
-			= new com.grey.base.collections.HashedMap<String, java.util.ArrayList<NafManCommand.Handler>>();
+		Map<String, List<?>> reg_handlers = (Map<String, List<?>>)DynLoader.getField(nafreg, "commandHandlers");
+		com.grey.base.collections.HashedMap<String, java.util.List<NafManCommand.Handler>> dsptch_handlers = new com.grey.base.collections.HashedMap<>();
 		DispatcherConfig def = new DispatcherConfig.Builder().build();
 		Dispatcher dsptch1 = Dispatcher.create(appctx, def, logger);
 		def = new com.grey.naf.reactor.config.DispatcherConfig.Builder(def).withName(null).build();
