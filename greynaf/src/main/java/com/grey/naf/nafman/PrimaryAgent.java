@@ -53,7 +53,8 @@ public class PrimaryAgent
 	public void start() throws java.io.IOException
 	{
 		if (getDispatcher().getLogger().isActive(LEVEL.TRC)) {
-			getDispatcher().getLogger().trace(getRegistry().dumpState(null, false));
+			CharSequence dump = getRegistry().dumpState(null, false);
+			getDispatcher().getLogger().trace(dump);
 		}
 		super.start();
 		events.startDispatcherRunnable();

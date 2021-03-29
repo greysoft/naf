@@ -130,18 +130,20 @@ public class NafManRegistry
 	}
 
 	private NafManRegistry(ApplicationContextNAF appctx) {
-		loadCommands(nafcmds);
-		loadResources(nafresources);
-		setHomePage(nafresources[0].name);
+		registerCommandFamily(FAMILY_NAFCORE, nafcmds, nafresources, nafresources[0].name);
 	}
 
 	public void registerCommandFamily(String family, DefCommand[] commands, DefResource[] resources, String home) {
 		commandFamilies.computeIfAbsent(family, (k) -> new CommandFamily(this, commands, resources, home));
 	}
 
-	void setHomePage(String rsrc_name) {
-		if (getResource(rsrc_name) == null) throw new NAFConfigException("NAFMAN: Unknown homepage="+rsrc_name);
-		homePage = rsrc_name;
+	// Supports commands whose name is not statically defined, and is only known at runtime
+	public boolean registerDynamicCommand(String cmdcode, NafManCommand.Handler handler, Dispatcher dsptch,
+				String family, String autopub, boolean rdonly, String descr) {
+		if (activeCommands.containsKey(cmdcode)) return false;
+		DefCommand def = new DefCommand(cmdcode, family, descr, autopub, rdonly);
+		loadCommand(def);
+		return registerHandler(cmdcode, 0, handler, dsptch);
 	}
 
 	void loadCommands(DefCommand[] defs) {
@@ -182,13 +184,9 @@ public class NafManRegistry
 		return false;
 	}
 
-	// Supports commands whose name is not statically defined, and is only known at runtime
-	public boolean registerDynamicCommand(String cmdcode, NafManCommand.Handler handler, Dispatcher dsptch,
-				String family, String autopub, boolean rdonly, String descr) {
-		if (activeCommands.containsKey(cmdcode)) return false;
-		DefCommand def = new DefCommand(cmdcode, family, descr, autopub, rdonly);
-		loadCommand(def);
-		return registerHandler(cmdcode, 0, handler, dsptch);
+	void setHomePage(String rsrc_name) {
+		if (getResource(rsrc_name) == null) throw new NAFConfigException("NAFMAN: Unknown homepage="+rsrc_name);
+		homePage = rsrc_name;
 	}
 
 	// Register handlers for various commands.
@@ -275,7 +273,7 @@ public class NafManRegistry
 		return lst;
 	}
 
-	CharSequence dumpState(StringBuilder sb, boolean xml) {
+	public CharSequence dumpState(StringBuilder sb, boolean xml) {
 		if (sb == null) sb = new StringBuilder();
 		Set<String> cmdCodes = new HashSet<>(commandHandlers.keySet());
 		List<String> activeCodes = new ArrayList<>(activeCommands.keySet());
