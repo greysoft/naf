@@ -1,8 +1,11 @@
 /*
- * Copyright 2018 Yusef Badri - All rights reserved.
+ * Copyright 2018-2022 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.errors;
+
+import java.io.IOException;
+import javax.net.ssl.SSLException;
 
 public class NAFException extends RuntimeException {
 	private static final long serialVersionUID = 1L;
@@ -39,8 +42,12 @@ public class NAFException extends RuntimeException {
 	}
 
 	public static boolean isError(Throwable ex) {
-		if (ex instanceof NAFException) return ((NAFException)ex).error();
-		return (ex instanceof Error
-				|| ex instanceof RuntimeException);
+		if (ex instanceof NAFException) {
+			return ((NAFException)ex).error();
+		}
+		if (ex instanceof IOException) {
+			return (ex instanceof SSLException);
+		}
+		return true;
 	}
 }

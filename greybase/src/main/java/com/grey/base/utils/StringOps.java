@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2016 Yusef Badri - All rights reserved.
+ * Copyright 2010-2022 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -261,15 +261,27 @@ public class StringOps
 		return leadingChars(str, maxlen);
 	}
 
+	// This is merely a best effort
 	public static boolean erase(String str)
 	{
-		char[] value = (char[])DynLoader.getField(str, "value");
-		if (value == null) return false; //this method is incompatible with this version of Java
-		Object raw_offset = DynLoader.getField(str, "offset");
+		Object raw_offset = DynLoader.getField(str, "offset"); //existed before Java 11
 		int offset = (raw_offset == null ? 0 : (int)raw_offset);
 		int lmt = offset + str.length();
-		for (int idx = offset; idx != lmt; idx++) {
-			value[idx] = 0;
+		Object raw = DynLoader.getField(str, "value");
+		if (raw instanceof byte[]) {
+			byte[] value = (byte[])raw;
+			for (int idx = offset; idx != lmt; idx++) {
+				value[idx] = 0;
+			}
+		} else if (raw instanceof char[]) {
+			//before Java 11
+			char[] value = (char[])raw;
+			for (int idx = offset; idx != lmt; idx++) {
+				value[idx] = 0;
+			}
+		} else {
+			//this method is incompatible with this version of Java
+			return false;
 		}
 		return true;
 	}

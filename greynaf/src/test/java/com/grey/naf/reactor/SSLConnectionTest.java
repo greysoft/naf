@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2021 Yusef Badri - All rights reserved.
+ * Copyright 2013-2022 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -21,7 +21,7 @@ import com.grey.naf.TestUtils;
 public class SSLConnectionTest
 	implements EntityReaper, CM_Listener.Reporter, TimerNAF.Handler
 {
-	private enum FAILTYPE {NONE, NOCONNECT, BADCERT_PURE, BADCERT_SWITCH};
+	private enum FAILTYPE {NONE, NOCONNECT, BADCERT_PURE, BADCERT_SWITCH}
 	private static final String rootdir = TestUtils.initPaths(SSLConnectionTest.class);
 	static final int filesize = (int)(IOExecWriter.MAXBUFSIZ * 1.5) + 1;
 	static final String pthnam_sendfile = rootdir+"/sendfile";
@@ -57,7 +57,7 @@ public class SSLConnectionTest
 	private static final String clntcfg_badcert_pure = clntcfg_puressl;
 	private static final String clntcfg_badcert_switch = clntcfg_switchssl;
 
-	static final String iomessages[] = {"Hello, I am the client and this is my first message",
+	static final String[] iomessages = {"Hello, I am the client and this is my first message",
 		"This is the second message from the client",
 		"The final message"};
 
@@ -157,7 +157,6 @@ public class SSLConnectionTest
 		// set up the server component
 		expected_tcpentities = (failtype == FAILTYPE.NOCONNECT ? 1 : 2);
 		ListenerSet listeners = null;
-		ConcurrentListener lstnr = null;
 		String lname = "utest_SSL";
 		if (lset) {
 			ConcurrentListenerConfig[] lcfg = ConcurrentListenerConfig.buildMultiConfig(lname, appctx.getConfig(), "listeners/listener", srvcfg, 0, 0, TestServerFactory.class, null);
@@ -173,7 +172,7 @@ public class SSLConnectionTest
 					.withServerFactory(TestServerFactory.class, null)
 					.withXmlConfig(srvcfg, appctx.getConfig())
 					.build();
-			lstnr = ConcurrentListener.create(dsptch, this, this, lcfg);
+			ConcurrentListener lstnr = ConcurrentListener.create(dsptch, this, this, lcfg);
 			srvport = lstnr.getPort();
 			lstnr.setReporter(this);
 			dsptch.loadRunnable(lstnr);
@@ -217,9 +216,7 @@ public class SSLConnectionTest
 			org.junit.Assert.assertNull(lastsrv);
 		} else {
 			org.junit.Assert.assertTrue(clnt.completed);
-			org.junit.Assert.assertEquals(1, clnt.was_connected);
 			org.junit.Assert.assertFalse(clnt.was_disconnected);
-			org.junit.Assert.assertTrue(lastsrv.completed);
 		}
 		org.junit.Assert.assertTrue(ctask.stopped);
 		org.junit.Assert.assertEquals(1, reapcnt_clients);
@@ -248,8 +245,8 @@ public class SSLConnectionTest
 		if (failtype == FAILTYPE.NOCONNECT) {
 			org.junit.Assert.assertFalse(clnt.state.usedSSL);
 		} else {
-			org.junit.Assert.assertTrue(sslmode == clnt.state.usedSSL);
-			if (lastsrv != null) org.junit.Assert.assertTrue(sslmode == lastsrv.state.usedSSL);
+			org.junit.Assert.assertEquals(sslmode, clnt.state.usedSSL);
+			if (lastsrv != null) org.junit.Assert.assertEquals(sslmode, lastsrv.state.usedSSL);
 		}
 		//delete the file just to make sure nothing is holding a stream open
 		final java.io.File fh = new java.io.File(pthnam_sendfile);
@@ -258,7 +255,7 @@ public class SSLConnectionTest
 	}
 
 	private void runtest(XmlConfig clntcfg, XmlConfig srvcfg, boolean sslmode, boolean lset, int fail_step)
-			throws java.io.IOException, java.security.GeneralSecurityException
+			throws java.io.IOException
 	{
 		runtest(clntcfg, srvcfg, sslmode, lset, fail_step, FAILTYPE.NONE);
 	}
@@ -294,7 +291,7 @@ public class SSLConnectionTest
 	}
 
 	@Override
-	public void timerIndication(TimerNAF tmr, Dispatcher d) throws java.io.IOException {
+	public void timerIndication(TimerNAF tmr, Dispatcher d) {
 		boolean done = d.stop();
 		org.junit.Assert.assertFalse(done);
 	}
@@ -376,10 +373,9 @@ public class SSLConnectionTest
 			was_connected = (success ? 1 : -1);
 			chan = getChannel();
 			if (!success) {
-				org.junit.Assert.assertFalse(isConnected());
+				org.junit.Assert.assertFalse(isFlagSetCM(S_APPCONN));
 				org.junit.Assert.assertFalse(isBrokenPipe());
 				org.junit.Assert.assertNotNull(getChannel());
-				org.junit.Assert.assertFalse(chan.isOpen());
 				disconnect();
 				org.junit.Assert.assertNull(getChannel());
 				org.junit.Assert.assertFalse(chan.isOpen());
@@ -392,7 +388,7 @@ public class SSLConnectionTest
 				org.junit.Assert.assertTrue(usingSSL());
 			}
 			org.junit.Assert.assertEquals(srvport, getRemotePort());
-			org.junit.Assert.assertFalse(srvport==getLocalPort());
+			org.junit.Assert.assertNotEquals(srvport, getLocalPort());
 			org.junit.Assert.assertEquals(IP.IP_LOCALHOST, IP.convertIP(getRemoteIP()));
 			org.junit.Assert.assertEquals(IP.IP_LOCALHOST, IP.convertIP(getLocalIP()));
 			sendRequest();
@@ -452,7 +448,7 @@ public class SSLConnectionTest
 			byte[] filebody = new byte[filesize];
 			for (int idx = 0; idx != filebody.length; idx++) {
 				filebody[idx] = (byte)idx;
-			};
+			}
 			java.io.FileOutputStream ostrm = new java.io.FileOutputStream(fh, false);
 			try {
 				ostrm.write(filebody);
@@ -502,13 +498,13 @@ public class SSLConnectionTest
 
 				//for want of anywhere better to test these
 				org.junit.Assert.assertEquals(harness.srvport, getLocalPort());
-				org.junit.Assert.assertFalse(harness.srvport == getRemotePort());
+				org.junit.Assert.assertNotEquals(harness.srvport, getRemotePort());
 				org.junit.Assert.assertEquals(IP.IP_LOCALHOST, IP.convertIP(getRemoteIP()));
 				org.junit.Assert.assertEquals(IP.IP_LOCALHOST, IP.convertIP(getLocalIP()));
 				ok = true;
 			} finally {
 				// Can't depend on Dispatcher's error handling here as connected() errors are trapped and discarded within the Listener,
-				// so we have to detect and act on any errors ourself.
+				// so we have to detect and act on any errors ourselves.
 				if (!ok) getDispatcher().stop();
 			}
 		}
