@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 Yusef Badri - All rights reserved.
+ * Copyright 2012-2022 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -17,7 +17,7 @@ class SSLConnection
 	private static final int BUFSIZ_SSL = SysProps.get("greynaf.ssl.bufsiz_ssl", 0);
 	private static final int BUFSIZ_APP = SysProps.get("greynaf.ssl.bufsiz_app", 0);
 
-	private static final int S_STARTED = 1 << 0;   //initial handshake completed
+	private static final int S_STARTED = 1 << 0; //initial handshake completed
 	private static final int S_HANDSHAKE = 1 << 1; //currently in a handshake
 	private static final int S_CLOSING = 1 << 2;
 	private static final int S_ABORTED = 1 << 3;
@@ -426,7 +426,7 @@ class SSLConnection
 		public XmitQueue(SSLConnection conn, CM_Stream cm) {
 			this.conn = conn;
 			this.cm = cm;
-			bufq = new com.grey.base.collections.ObjectQueue<java.nio.ByteBuffer>(java.nio.ByteBuffer.class, 1, 1);
+			bufq = new com.grey.base.collections.ObjectQueue<>(java.nio.ByteBuffer.class, 1, 1);
 		}
 
 		public void enqueue(java.nio.ByteBuffer inbuf) {

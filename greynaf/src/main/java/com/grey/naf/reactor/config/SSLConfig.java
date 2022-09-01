@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 Yusef Badri - All rights reserved.
+ * Copyright 2012-2022 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor.config;
@@ -35,13 +35,13 @@ public class SSLConfig
 	private final boolean isClient;
 	private final int clientAuth; //0=No, 1=Will-Accept, 2=Need
 	private final String localCertAlias; //keystore alias
-	private final String peerCertName;   //this is the cert's subject hostname
+	private final String peerCertName; //this is the cert's subject hostname
 	private final String trustFormat;
 	private final java.net.URL trustPath;
 	private final String storeFormat;
 	private final java.net.URL storePath;
 	private final int sessionCacheSize;
-	private final long sessionTimeout;  //maximum SSL session lifetime, before forcibly invalidated - zero means never
+	private final long sessionTimeout; //maximum SSL session lifetime, before forcibly invalidated - zero means never
 	private final long shakeFreq; //maximum time between partial handshakes - zero means never
 	public long shakeTimeout; //timeout on initial handshake - zero means none
 	private final boolean latent; //true means this is not initially an SSL connection - SSL may be activated later
@@ -70,7 +70,7 @@ public class SSLConfig
 
 		if (isClient) {
 			// Even a partial re-handshake fails in client mode with this error:
-			//      javax.net.ssl.SSLProtocolException - handshake alert:  no_negotiation
+			//      javax.net.ssl.SSLProtocolException - handshake alert: no_negotiation
 			if (!CLIENT_RESHAKE) sesstmt = 0;
 			if (bldr.clientAuth != 0) bldr.clientAuth = 0; //irrelevant for clients - adjust to only legal value
 		} else {
@@ -83,7 +83,7 @@ public class SSLConfig
 		sessionTimeout = sesstmt;
 
 		if (sessionTimeout <= bldr.shakeFreq) {
-			shakeFreq = 0;  //session expiry will force a full handshake anyway
+			shakeFreq = 0; //session expiry will force a full handshake anyway
 		} else {
 			shakeFreq = bldr.shakeFreq;
 		}
@@ -240,7 +240,7 @@ public class SSLConfig
 
 	public static class Builder
 	{
-		private String protocol = "TLSv1";
+		private String protocol = "TLSv1.2";
 		private boolean isClient;
 		private int clientAuth = 1; //accept client certs, if supplied
 		private String localCertAlias;
@@ -254,7 +254,7 @@ public class SSLConfig
 		private long shakeFreq = TimeOps.parseMilliTime("1h");
 		private long shakeTimeout = TimeOps.parseMilliTime("2m");
 		private boolean latent;
-		private boolean mdty;  //qualifies 'latent' by specifying whether it's mandatory to switch to SSL mode
+		private boolean mdty; //qualifies 'latent' by specifying whether it's mandatory to switch to SSL mode
 		private char[] trustPasswd = makeChars(SysProps.get("javax.net.ssl.trustStorePassword"));
 		private char[] storePasswd = makeChars(SysProps.get("javax.net.ssl.keyStorePassword"));
 		private char[] certPasswd;
