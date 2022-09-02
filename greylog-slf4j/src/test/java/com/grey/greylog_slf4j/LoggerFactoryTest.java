@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Yusef Badri - All rights reserved.
+ * Copyright 2018-2022 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.greylog_slf4j;
@@ -15,13 +15,19 @@ public class LoggerFactoryTest {
 	public void testBasic() {
 		Logger log = LoggerFactory.getLogger(LoggerFactoryTest.class);
 		Assert.assertNotNull(log);
+		Assert.assertTrue("log="+log.getClass().getName()+"/"+log, log instanceof LoggerAdapter);
 		Logger log2 = LoggerFactory.getLogger(LoggerFactoryTest.class);
 		verifySame(log, log2, true);
 		verifySame(((LoggerAdapter)log).getDelegate(), ((LoggerAdapter)log2).getDelegate(), true);
+
 		log2 = LoggerFactory.getLogger("anotherclass");
 		verifySame(log, log2, false); //sameness of delegates depends on grey.logger.sinkstdio system property
-		log.info("dummy log1");
-		log2.info("dummy log2");
+
+		// the output of these logs just needs to be examined manually
+		log.info("Dummy msg");
+		log.info("Dummy msg with param1={} and param2={}", "val1", "val2");
+		log.error("Dummy error msg with param1={} and param2={}", "val1", "val2", new Exception("Dumy Exception"));
+		log2.info("Dummy log2 msg");
 	}
 
 	private static void verifySame(Object o1, Object o2, boolean same) {

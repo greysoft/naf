@@ -1,4 +1,5 @@
-NAF (Network Application Framework) is a Java API that implements a reactive event-driven framework based on the NIO interface, that supports non-blocking I/O over TCP, UDP and SSL.
+NAF (Network Application Framework) is an open-source framework for non-blocking sockets I/O and timers.
+It is a Java API that implements a reactive event-driven framework based on the NIO interface, that supports non-blocking I/O over TCP, UDP and SSL.
 It is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3). 
 
 Home page: http://www.greyware.co.uk/naf
@@ -15,23 +16,27 @@ You can then ignore sections A and B below.
 
 Section A - Building NAF From Source
 =====================================
-NAF (Network Application Framework) is an open-source framework for non-blocking sockets I/O and timers.
-The source code is available for download at: http://www.greyware.co.uk/naf
-
 Prerequisites:
 - You will need to have the Java JDK (Java 8 or later) on your Path
-- You will need to have the Maven build tool (3.5+) on your Path
+- You will need to have the Maven build tool (3.8+) on your Path
 
-NAF is now available on GitHub, and can be built locally as follows:
-- Clone https://github.com/greysoft/greybuild (contains required parent POM)
+NAF is available on GitHub, and can be built locally in these simple steps:
+
+Step 1) Build grey-build-common, if needed
+If the version of com.github.greysoft.greybuild:grey-build-common (contains required parent POM) referenced by this project (see root POM) has not yet been published on Maven Central, then you will have to install that locally before building this project.
+The master branches of these two projects will always be in synch with each other.
+Build grey-build-common as follows:
+- Clone/download https://github.com/greysoft/greybuild to local workspace
 - Run this in greybuild project root: 
-	mvn -Dgrey.logger.level=WARN clean install
-- Clone https://github.com/greysoft/naf
+	mvn clean install
+
+Step 2) Build NAF
+- Clone/download https://github.com/greysoft/naf to local workspace
 - Run this in naf project root: 
 	mvn -Dgrey.logger.level=WARN clean install
 The logger setting shown is recommended to reduce the build noise.
 
-The NAF jars and their dependencies will now all be under pkg/target/dependency and each individual Jar will also be under the 'target' directory of its own sub-project, eg. greylog/target, greynaf/target, etc.
+After building NAF, its jars and their dependencies will all be under pkg/target/dependency and each individual Jar will also be under the 'target' directory of its own sub-project, eg. greylog/target, greynaf/target, etc.
 
 The Javadocs will have been generated under pkg/target/site/apidocs
 
@@ -43,8 +48,6 @@ The sample apps will also have been built, and their Jars can be found under:
 This build also creates a distribution package (in two formats):
 - pkg/target/naf-VERSION.zip
 - pkg/target/naf-VERSION.tar.gz
-
-     -------------------------------------------------------------
 
 Section B - Contents of Distribution Package
 ==============================================
@@ -61,8 +64,6 @@ You "install" it simply by unpacking, and the extracted contents are:
 - These text files (README and licencing info)
 
 From now on, we'll refer to this root directory of the installed binary release as NAFHOME.
-
-     -------------------------------------------------------------
 
 Section C - Demo Apps
 ======================
