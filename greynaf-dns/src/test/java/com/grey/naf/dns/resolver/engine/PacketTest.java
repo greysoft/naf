@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 Yusef Badri - All rights reserved.
+ * Copyright 2015-2022 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.resolver.engine;
@@ -8,8 +8,6 @@ import com.grey.base.utils.ByteOps;
 import com.grey.base.utils.ByteChars;
 import com.grey.base.utils.DynLoader;
 import com.grey.naf.dns.resolver.ResolverDNS;
-import com.grey.naf.dns.resolver.engine.PacketDNS;
-import com.grey.naf.dns.resolver.engine.ResourceData;
 import com.grey.naf.reactor.TimerNAF;
 
 import java.net.InetSocketAddress;

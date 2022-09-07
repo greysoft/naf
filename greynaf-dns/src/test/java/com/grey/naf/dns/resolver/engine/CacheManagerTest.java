@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2021 Yusef Badri - All rights reserved.
+ * Copyright 2014-2022 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.resolver.engine;
@@ -15,11 +15,6 @@ import com.grey.naf.ApplicationContextNAF;
 import com.grey.naf.dns.integration.ResolverTester;
 import com.grey.naf.dns.resolver.ResolverConfig;
 import com.grey.naf.dns.resolver.ResolverDNS;
-import com.grey.naf.dns.resolver.engine.CacheManager;
-import com.grey.naf.dns.resolver.engine.PacketDNS;
-import com.grey.naf.dns.resolver.engine.ResolverAnswer;
-import com.grey.naf.dns.resolver.engine.ResolverService;
-import com.grey.naf.dns.resolver.engine.ResourceData;
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.config.DispatcherConfig;
 import com.grey.naf.dns.TestUtils;
