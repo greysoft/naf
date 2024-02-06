@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 Yusef Badri - All rights reserved.
+ * Copyright 2015-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.server;
@@ -29,7 +29,7 @@ public class DnsServerConfig
 
 
 	public static class Builder {
-		private ConcurrentListenerConfig.Builder<?> listenerConfig = defaultListener();
+		private final ConcurrentListenerConfig.Builder<?> listenerConfig = defaultListener();
 		private boolean recursionOffered;
 
 		public ConcurrentListenerConfig.Builder<?> getListenerConfig() {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2021 Yusef Badri - All rights reserved.
+ * Copyright 2010-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.nafman;
@@ -103,9 +103,7 @@ public class NafManCommand
 	// detach() and attached(), to ensure visibility of this object in the Secondary threads.
 	synchronized void getAttachedAgents(java.util.ArrayList<NafManAgent> lst)
 	{
-		for (int idx = 0; idx != routeTo.size(); idx++) {
-			lst.add(routeTo.get(idx));
-		}
+		lst.addAll(routeTo);
 	}
 
 	//can be called by any thread

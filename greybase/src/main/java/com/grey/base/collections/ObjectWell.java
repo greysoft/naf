@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2015 Yusef Badri - All rights reserved.
+ * Copyright 2010-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.collections;
@@ -122,7 +122,7 @@ public final class ObjectWell<T>
 			T obj = null;
 			if (factory == null) {
 				try {
-					obj = clss.newInstance();
+					obj = clss.getDeclaredConstructor().newInstance();
 				} catch (Exception ex) {
 					throw new RuntimeException("Failed to populate ObjectWell="+name+" at pop="+totalpop+"/"+maxpop, ex);
 				}

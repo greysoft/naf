@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2021 Yusef Badri - All rights reserved.
+ * Copyright 2010-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.resolver.engine;
@@ -530,9 +530,7 @@ public class ResolverService
 		answerbuf.set(sts, qtype, qname);
 		if (sts == ResolverAnswer.STATUS.OK) {
 			if (rrlist != null) {
-				for (int idx = 0; idx != rrlist.size(); idx++) {
-					answerbuf.rrdata.add(rrlist.get(idx));
-				}
+				answerbuf.rrdata.addAll(rrlist);
 			} else {
 				answerbuf.rrdata.add(rr);
 			}

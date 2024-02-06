@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2022 Yusef Badri - All rights reserved.
+ * Copyright 2010-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -320,7 +320,7 @@ public final class DynLoaderTest
 			} else {
 				clss = Class.forName(targetclass, true, cld);
 			}
-			Object obj = clss.newInstance();
+			Object obj = clss.getDeclaredConstructor().newInstance();
 			org.junit.Assert.assertEquals(targetclass, obj.getClass().getName());
 			// verify that our own class resolver can access any class the above forName() calls can
 			org.junit.Assert.assertSame(clss, DynLoader.loadClass(targetclass));

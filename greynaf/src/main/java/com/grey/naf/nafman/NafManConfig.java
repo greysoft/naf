@@ -17,7 +17,7 @@ public class NafManConfig
 	private final boolean surviveDownstream; //if false, Primary agent halts its Dispatcher if any secondary agents halt
 	private final long idleConnectionTimeout; //idle timeout the NAFMAN server applies to incoming connections
 	private final ConcurrentListenerConfig listenerConfig; //the NAFMAN server
-	private BufferGenerator.BufferConfig bufferConfig;
+	private final BufferGenerator.BufferConfig bufferConfig;
 
 	// these are TTLs for cached responses in NAFMAN server
 	private final long dynamicResourceTTL;

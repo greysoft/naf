@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2021 Yusef Badri - All rights reserved.
+ * Copyright 2010-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -705,7 +705,7 @@ public class Dispatcher
 	}
 
 	public NafManAgent getNafManAgent() {
-		return (NafManAgent)getNamedItem(NafManAgent.class.getName(), null);
+		return getNamedItem(NafManAgent.class.getName(), null);
 	}
 
 	/**

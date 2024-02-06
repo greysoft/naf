@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2018 Yusef Badri - All rights reserved.
+ * Copyright 2010-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -77,7 +77,8 @@ public class PkgInfo
 	// Beware of gaps in the package hierarchy if no classes exist at that level - just keep rewinding.
 	private static Package getVersionedPackage(String pkgnam)
 	{
-		Package pkg = Package.getPackage(pkgnam);
+		ClassLoader cld = PkgInfo.class.getClassLoader();
+		Package pkg = cld.getDefinedPackage(pkgnam);
 		String title = (pkg == null ? null : pkg.getSpecificationTitle());
 
 		if (title == null) {
@@ -85,7 +86,7 @@ public class PkgInfo
 			if (lastdot == -1) return null;
 			return getVersionedPackage(pkgnam.substring(0, lastdot));
 		}
-		return Package.getPackage(pkgnam);
+		return pkg;
 	}
 
 	public static void dumpEnvironment(Class<?> clss, java.io.PrintStream strm)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2018 Yusef Badri - All rights reserved.
+ * Copyright 2010-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.crypto;
@@ -18,7 +18,7 @@ public class Base64
 	private static final int MASK6 = 0x3f;   // mask for lower 6 bits of an int
 	private static final byte[] EMPTYBYTES = new byte[0];
 
-	private static StringBuilder tmpstrbuf = new StringBuilder(64);
+	private static final StringBuilder tmpstrbuf = new StringBuilder(64);
 	static {
 		for (char ch = 'A'; ch <= 'Z'; ch++) tmpstrbuf.append(ch);
 		for (char ch = 'a'; ch <= 'z'; ch++) tmpstrbuf.append(ch);

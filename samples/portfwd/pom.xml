@@ -1,5 +1,5 @@
 <!--
-  Copyright 2010-2021 Yusef Badri - All rights reserved.
+  Copyright 2010-2024 Yusef Badri - All rights reserved.
   NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -25,7 +25,7 @@
 		<dependency>
 			<groupId>ch.qos.logback</groupId>
 			<artifactId>logback-classic</artifactId>
-			<version>1.2.3</version>
+			<version>1.4.14</version>
 		</dependency>
 	</dependencies>
 	<build>

@@ -5,7 +5,7 @@
 package org.slf4j.impl;
 
 /*
- * This was adaptered from slf4j-simple package (but in fact slf4j-log4j version is the same)
+ * This was adapted from slf4j-simple package (but in fact slf4j-log4j version is the same)
  */
 public class StaticMarkerBinder
 	implements org.slf4j.spi.MarkerFactoryBinder

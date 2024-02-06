@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2018 Yusef Badri - All rights reserved.
+ * Copyright 2010-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.collections;
@@ -970,7 +970,7 @@ public class HashedMapTest
 	{
 		final int cap = SOAK_SIZE; //ramp up to investigate manually
 		final String nullvalkey = "0";
-		final Integer nullval = new Integer(cap * 2);
+		final Integer nullval = Integer.valueOf(cap * 2);
 		final java.util.Map<String,Integer> map = allocMapIntValue(0, 5);
 		int alloc_cnt = -1;
 		// general put-get

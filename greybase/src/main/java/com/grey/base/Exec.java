@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2018 Yusef Badri - All rights reserved.
+ * Copyright 2010-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base;
@@ -89,7 +89,7 @@ public class Exec
 			String name = argv[argc++];
 			Class<?> clss = DynLoader.loadClass(name);
 			System.out.println("Loaded class="+clss.getName());
-			Object obj = clss.newInstance();
+			Object obj = clss.getDeclaredConstructor().newInstance();
 			System.out.println("Created Object: "+obj);
 		} else {
 			System.out.println("Unrecognised command [" + cmd + "]");

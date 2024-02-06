@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2015 Yusef Badri - All rights reserved.
+ * Copyright 2014-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.collections;
@@ -58,7 +58,7 @@ public final class HashedMapEntries<K,V>
 	private int threshold;
 	private int hashmask;
 
-	private java.util.ArrayList<MapEntry<K,V>> freepool = new java.util.ArrayList<MapEntry<K,V>>(); //stack
+	private final java.util.ArrayList<MapEntry<K,V>> freepool = new java.util.ArrayList<MapEntry<K,V>>(); //stack
 	private int alloc_count;
 	private int entrycnt;
 
