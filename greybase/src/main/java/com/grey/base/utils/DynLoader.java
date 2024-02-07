@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2018 Yusef Badri - All rights reserved.
+ * Copyright 2010-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -178,11 +178,6 @@ public class DynLoader
 	{
 		try {
 			java.lang.reflect.Field fld = getFieldDef(clss, fldnam);
-			java.lang.reflect.Field meta = java.lang.reflect.Field.class.getDeclaredField("modifiers");
-			if ((fld.getModifiers() & java.lang.reflect.Modifier.FINAL) != 0) {
-				meta.setAccessible(true);
-				meta.setInt(fld, fld.getModifiers() & ~java.lang.reflect.Modifier.FINAL);
-			}
 			fld.set(obj, fldval);
 		} catch (Exception ex) {
 			throw new RuntimeException("Failed to set field="+clss.getName()+":"+fldnam+", Object="+obj, ex);

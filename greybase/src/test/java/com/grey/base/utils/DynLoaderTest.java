@@ -198,7 +198,6 @@ public final class DynLoaderTest
 			IllegalAccessException, java.lang.reflect.InvocationTargetException
 	{
 		boolean hackflag = DynLoader.CLDHACK;
-		DynLoader.setField(DynLoader.class, "CLDHACK", Boolean.valueOf(false), null);
 
 		// populate a directory tree which we've ensured was previously empty
 		FileOps.deleteDirectory(workdir);
@@ -253,13 +252,11 @@ public final class DynLoaderTest
 			if (!hackflag) DynLoader.unload(DynLoader.getClassLoader());
 		}
 
-		// we're now finished with out temp work area
+		// we're now finished with our temp work area
 		FileOps.deleteDirectory(workdir);
 		org.junit.Assert.assertFalse(dh.exists());
 
-		// now test loading from non-existent directory - disable hack so we can test classloader state as well
-		boolean prevhack = DynLoader.CLDHACK;
-		DynLoader.setField(DynLoader.class, "CLDHACK", Boolean.valueOf(false), null);
+		// now test loading from non-existent directory
 		ClassLoader cld = DynLoader.getClassLoader();
 		newcp = DynLoader.loadFromDir(workdir);
 		org.junit.Assert.assertTrue(newcp == null || newcp.size() == 0);
@@ -269,7 +266,6 @@ public final class DynLoaderTest
 		newcp = DynLoader.load(workdir+"/nonsuch.jar");
 		org.junit.Assert.assertTrue(newcp == null || newcp.size() == 0);
 		org.junit.Assert.assertTrue(DynLoader.getClassLoader() == cld);
-		DynLoader.setField(DynLoader.class, "CLDHACK", Boolean.valueOf(prevhack), null);
 	}
 
 	private String verifyLoad(String target, int flags, boolean expect)
