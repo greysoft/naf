@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2021 Yusef Badri - All rights reserved.
+ * Copyright 2010-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.nafman;
@@ -39,7 +39,7 @@ public class PrimaryAgent
 	{
 		super(dsptch, reg);
 		this.surviveDownstream = cfg.isSurviveDownstream();
-		events = new Producer<Object>("NAFMAN-Agent-events", Object.class, dsptch, this);
+		events = new Producer<>("NAFMAN-Agent-events", dsptch, this);
 		lstnr = ConcurrentListener.create(dsptch, this, null, cfg.getListenerConfig());
 		dsptch.getLogger().info("NAFMAN-Primary="+dsptch.getName()+": survive_downstream="+surviveDownstream+", lstnr="+lstnr);
 
@@ -71,7 +71,7 @@ public class PrimaryAgent
 
 		// Loop on a copy of the secondaries list, as the Dispatcher stop() command may reentrantly call
 		// back into our producerIndication() method below and modify the list while we're looping on it.
-		SecondaryAgent[] arr = secondaries.toArray(new SecondaryAgent[secondaries.size()]);
+		SecondaryAgent[] arr = secondaries.toArray(new SecondaryAgent[0]);
 		for (int idx = 0; idx != arr.length; idx++) {
 			arr[idx].getDispatcher().stop();
 		}

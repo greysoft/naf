@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2021 Yusef Badri - All rights reserved.
+ * Copyright 2010-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.resolver.distributed;
@@ -43,7 +43,7 @@ public class DistributedResolver
 		if (getMasterDispatcher() != dsptch) {
 			// the resolver engine is not running in this thread, so we will access it via the Producer's message-passing API
 			cancelledCallers = new HashedSet<>();
-			proxyReceiver = new Producer<>("DNS-distrib-proxyrsp", Request.class, dsptch, this);
+			proxyReceiver = new Producer<>("DNS-distrib-proxyrsp", dsptch, this);
 			Supplier<Request> reqFactory = () -> new Request(this);
 			reqPool = new ObjectPool<>(reqFactory);
 		} else {
@@ -93,14 +93,14 @@ public class DistributedResolver
 	// which is really only intended to be used during shutdown (to prevent callbacks into a destroyed object),
 	// in which case there would be no future calls.
 	@Override
-	public int cancel(ResolverDNS.Client caller) throws java.io.IOException {
+	public int cancel(ResolverDNS.Client caller) {
 		int cnt = getProxy().cancel(this, caller);
 		if (cnt == -1) cancelledCallers.add(caller);
 		return cnt;
 	}
 
 	@Override
-	public void producerIndication(Producer<Request> p) throws java.io.IOException {
+	public void producerIndication(Producer<Request> p) {
 		Request req;
 		while ((req = proxyReceiver.consume()) != null) {
 			if (req.caller != null && !cancelledCallers.contains(req.caller)) {

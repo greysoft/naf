@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2021 Yusef Badri - All rights reserved.
+ * Copyright 2010-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -37,7 +37,7 @@ public class IOExecWriter
 	IOExecWriter(com.grey.naf.BufferGenerator spec)
 	{
 		bufspec = spec;
-		xmtq = new com.grey.base.collections.ObjectQueue<Object>(Object.class, 4, 4);
+		xmtq = new com.grey.base.collections.ObjectQueue<>(4, 4);
 	}
 
 	void initChannel(CM_Stream cm)
@@ -263,7 +263,7 @@ public class IOExecWriter
 	{
 		Object obj = xmtq.remove();
 		if (obj == null) return;
-		boolean is_fw = (is_filewrite == null ? obj.getClass() == FileWrite.class : is_filewrite.booleanValue());
+		boolean is_fw = (is_filewrite == null ? obj.getClass() == FileWrite.class : is_filewrite);
 		if (is_fw) {
 			releaseFileWrite((FileWrite)obj);
 		} else {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2022 Yusef Badri - All rights reserved.
+ * Copyright 2012-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -43,8 +43,8 @@ class SSLConnection
 	private long lastShakeTime;
 	private TimerNAF tmr_shake;
 
-	private boolean setFlag(int f) {if (isFlagSet(f)) return false; iostate |= f; return true;}
-	private boolean clearFlag(int f) {if (!isFlagSet(f)) return false; iostate &= ~f; return true;}
+	private boolean setFlag(int f) {if (isFlagSet(f)) return false; iostate |= (byte) f; return true;}
+	private boolean clearFlag(int f) {if (!isFlagSet(f)) return false; iostate &= (byte) ~f; return true;}
 	private boolean isFlagSet(int f) {return ((iostate & f) != 0);}
 
 	public SSLConnection(CM_Stream chanmon)
@@ -426,7 +426,7 @@ class SSLConnection
 		public XmitQueue(SSLConnection conn, CM_Stream cm) {
 			this.conn = conn;
 			this.cm = cm;
-			bufq = new com.grey.base.collections.ObjectQueue<>(java.nio.ByteBuffer.class, 1, 1);
+			bufq = new com.grey.base.collections.ObjectQueue<>(1, 1);
 		}
 
 		public void enqueue(java.nio.ByteBuffer inbuf) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Yusef Badri - All rights reserved.
+ * Copyright 2012-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.collections;
@@ -11,11 +11,11 @@ public class ObjectQueueTest
 	{
 		int initcap = 5;
 		int incr = 2;
-		ObjectQueue<String> strq = new ObjectQueue<String>(String.class, initcap, incr);
+		ObjectQueue<String> strq = new ObjectQueue<String>(initcap, incr);
 		org.junit.Assert.assertEquals(0, strq.size());
 		org.junit.Assert.assertEquals(initcap, strq.capacity());
 		org.junit.Assert.assertNull(strq.peek());
-		org.junit.Assert.assertTrue(strq.toString().contains("=0/head="));
+		org.junit.Assert.assertTrue(strq.toString(), strq.toString().contains("=0/cap="));
 		String str = strq.remove();
 		org.junit.Assert.assertEquals(0, strq.size());
 		org.junit.Assert.assertEquals(initcap, strq.capacity());
@@ -75,7 +75,7 @@ public class ObjectQueueTest
 	@org.junit.Test
 	public void wraparound()
 	{
-		ObjectQueue<String> strq = new ObjectQueue<String>(String.class);
+		ObjectQueue<String> strq = new ObjectQueue<String>();
 		int initcap = strq.capacity();
 		for (int idx = 0; idx != strq.capacity(); idx++) {
 			strq.add(Integer.toString(idx));
@@ -116,9 +116,9 @@ public class ObjectQueueTest
 	@org.junit.Test
 	public void arrays()
 	{
-		ObjectQueue<String> strq = new ObjectQueue<String>(String.class);
+		ObjectQueue<String> strq = new ObjectQueue<String>();
 		// test empty array conversion
-		String[] arr = strq.toArray();
+		String[] arr = strq.toArray(new String[0]);
 		org.junit.Assert.assertEquals(0, strq.size());
 		org.junit.Assert.assertEquals(arr.length, 0);
 		// with some content
@@ -126,7 +126,7 @@ public class ObjectQueueTest
 			strq.add(Integer.toString(idx));
 		}
 		int prevsize = strq.size();
-		arr = strq.toArray();
+		arr = strq.toArray(new String[0]);
 		org.junit.Assert.assertEquals(prevsize, strq.size());
 		org.junit.Assert.assertEquals(arr.length, strq.size());
 		for (int idx = 0; idx != arr.length; idx++) {
@@ -142,7 +142,7 @@ public class ObjectQueueTest
 		}
 
 		// make sure toArray() works on a wrapped queue
-		strq = new ObjectQueue<String>(String.class, 4, 10);
+		strq = new ObjectQueue<String>(4, 10);
 		strq.add("One");
 		strq.add("Two");
 		strq.add("Three");
@@ -160,7 +160,7 @@ public class ObjectQueueTest
 		org.junit.Assert.assertEquals(4, strq.size());
 		org.junit.Assert.assertEquals(4, strq.capacity());
 		org.junit.Assert.assertEquals("Two", strq.peek());
-		arr = strq.toArray();
+		arr = strq.toArray(new String[0]);
 		org.junit.Assert.assertEquals(strq.size(), arr.length);
 		org.junit.Assert.assertEquals("Two", arr[0]);
 		org.junit.Assert.assertEquals("Three", arr[1]);
@@ -172,7 +172,7 @@ public class ObjectQueueTest
 	public void specialConstructors()
 	{
 		int incr = 2;
-		ObjectQueue<String> strq = new ObjectQueue<String>(String.class, 0, incr);
+		ObjectQueue<String> strq = new ObjectQueue<String>(0, incr);
 		org.junit.Assert.assertEquals(0, strq.capacity());
 		org.junit.Assert.assertEquals(0, strq.size());
 		org.junit.Assert.assertNull(strq.peek());
@@ -192,7 +192,7 @@ public class ObjectQueueTest
 
 		// test a queue with a fixed capacity
 		int initcap = 2;
-		strq = new ObjectQueue<String>(String.class, initcap, 0);
+		strq = new ObjectQueue<String>(initcap, 0);
 		org.junit.Assert.assertEquals(initcap, strq.capacity());
 		org.junit.Assert.assertEquals(0, strq.size());
 		org.junit.Assert.assertNull(strq.peek());
@@ -209,7 +209,7 @@ public class ObjectQueueTest
 		} catch (UnsupportedOperationException ex) {}
 
 		// test a constant empty queue
-		strq = new ObjectQueue<String>(String.class, 0, 0);
+		strq = new ObjectQueue<String>(0, 0);
 		org.junit.Assert.assertEquals(0, strq.capacity());
 		org.junit.Assert.assertEquals(0, strq.size());
 		org.junit.Assert.assertNull(strq.peek());

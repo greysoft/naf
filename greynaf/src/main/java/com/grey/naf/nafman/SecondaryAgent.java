@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2021 Yusef Badri - All rights reserved.
+ * Copyright 2010-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.nafman;
@@ -26,7 +26,7 @@ public class SecondaryAgent
 		if (primary == null) {
 			throw new IllegalStateException("Dispatcher="+dsptch.getName()+": Cannot create Secondary NAFMAN before Primary");
 		}
-		requests = new Producer<NafManCommand>("NAFMAN-Agent-cmds", NafManCommand.class, dsptch, this);
+		requests = new Producer<>("NAFMAN-Agent-cmds", dsptch, this);
 	}
 
 	@Override

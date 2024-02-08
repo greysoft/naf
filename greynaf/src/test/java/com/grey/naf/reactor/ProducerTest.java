@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2021 Yusef Badri - All rights reserved.
+ * Copyright 2011-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -32,7 +32,7 @@ public class ProducerTest
 				.withSurviveHandlers(false)
 				.build();
 		Dispatcher dsptch = Dispatcher.create(appctx, def, logger);
-		Producer<String> prod = new Producer<String>("utest-workflow", String.class, dsptch, this);
+		Producer<String> prod = new Producer<>("utest-workflow", dsptch, this);
 		dsptch.loadRunnable(prod);
 		setProducedItems();
 		produced_cnt = produced_items.size();
@@ -65,7 +65,7 @@ public class ProducerTest
 				.withSurviveHandlers(false)
 				.build();
 		Dispatcher dsptch = Dispatcher.create(appctx, def, logger);
-		Producer<String> p = new Producer<String>("utest-bulk", String.class, dsptch, this);
+		Producer<String> p = new Producer<>("utest-bulk", dsptch, this);
 		dsptch.loadRunnable(p);
 		dsptch.start();
 		long systime1 = System.currentTimeMillis();

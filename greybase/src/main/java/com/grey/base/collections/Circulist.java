@@ -1,8 +1,10 @@
 /*
- * Copyright 2010-2013 Yusef Badri - All rights reserved.
+ * Copyright 2010-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.collections;
+
+import java.util.Arrays;
 
 /**
  * This class implements an array-backed circular list.
@@ -14,25 +16,21 @@ package com.grey.base.collections;
  */
 public final class Circulist<T>
 {
-	private final Class<T> clss;
-	private final int increment;
+	private final int growthIncrement;
 
-	private T[] arr;
+	private Object[] buffer;
 	private int count;
 	private int head = 0;
 	private int tail = -1;
 
 	public int size() {return count;}
-	public int capacity() {return arr.length;}
+	public int capacity() {return buffer.length;}
 
-	public Circulist(Class<?> clss) {this(clss, 64, 64);}
+	public Circulist() {this(64, 64);}
 
-	public Circulist(Class<?> clss, int initcap, int incr)
+	public Circulist(int initcap, int incr)
 	{
-		@SuppressWarnings("unchecked")
-		Class<T> unchecked_clss = (Class<T>)clss;
-		this.clss = unchecked_clss;  //minimised scope of Suppress annotation
-		increment = incr;
+		growthIncrement = incr;
 		grow(initcap);
 	}
 
@@ -41,20 +39,22 @@ public final class Circulist<T>
 		head = 0;
 		tail = -1;
 		count = 0;
-		java.util.Arrays.fill(arr, null);  // release the vacated slots' object references, to let GC do its work
+		Arrays.fill(buffer, null);  // release the vacated slots' object references, to let GC do its work
 	}
 
 	// As with all methods, the caller supplies an index relative to Head, so pos=0 means the first element, wherever it is
 	public T get(int pos)
 	{
-		return arr[physicalIndex(pos)];
+		int physpos = physicalIndex(pos);
+		@SuppressWarnings("unchecked") T val = (T)buffer[physpos];
+		return val;
 	}
 	
 	public T set(int pos, T newval)
 	{
 		int physpos = physicalIndex(pos);
-		T oldval = arr[physpos];
-		arr[physpos] = newval;
+		@SuppressWarnings("unchecked") T oldval = (T)buffer[physpos];
+		buffer[physpos] = newval;
 		return oldval;
 	}
 
@@ -70,34 +70,34 @@ public final class Circulist<T>
 
 	public void insert(int pos, T obj)
 	{
-		if (count == arr.length) {
+		if (count == buffer.length) {
 			// time to grow the array
-			if (increment == 0) throw new UnsupportedOperationException(getClass().getName()+"/"+clss.getName()+" has max capacity="+arr.length);
-			grow(increment);
+			if (growthIncrement == 0) throw new UnsupportedOperationException("At capacity="+buffer.length+" with no growth allowed");
+			grow(growthIncrement);
 		}
 
 		if (pos == count) {
 			// append at tail - checking for this first means we take care of incrementing tail on first element (when it might be -1)
-			if (++tail == arr.length) tail = 0;
-			arr[tail] = obj;
+			if (++tail == buffer.length) tail = 0;
+			buffer[tail] = obj;
 		} else if (pos == 0) {
 			// prepend - the Head pointer simply retreats, to avoid any copying or shifting
-			if (head-- == 0) head = arr.length - 1;
-			arr[head] = obj;
+			if (head-- == 0) head = buffer.length - 1;
+			buffer[head] = obj;
 		} else {
 			// yes, if we grew the array above, we will do yet another copy here, but Grows are presumed infrequent
 			int physpos = physicalIndex(pos);
 			if (head == 0 || physpos < head) {
 				// shift tail segment up - physpos<head means list has already wrapped, and either way, above grow() means tail has room to advance
 				tail++;
-				System.arraycopy(arr, physpos, arr, physpos + 1, tail - physpos);
+				System.arraycopy(buffer, physpos, buffer, physpos + 1, tail - physpos);
 			} else {
 				// list is a single segment, offset from start of array - shift down the leading elements to make room for the new one
-				System.arraycopy(arr, head, arr, head - 1, physpos - head);
+				System.arraycopy(buffer, head, buffer, head - 1, physpos - head);
 				head--;
 				physpos--;
 			}
-			arr[physpos] = obj;
+			buffer[physpos] = obj;
 		}
 		count++;
 	}
@@ -105,15 +105,15 @@ public final class Circulist<T>
 	public T remove(int pos)
 	{
 		int physpos = physicalIndex(pos);
-		T obj = arr[physpos];
+		@SuppressWarnings("unchecked") T obj = (T)buffer[physpos];
 
 		// we can optimise a bit when removing head or tail - the head advances and the tail retreats
 		if (pos == 0) { //means physpos==head
-			arr[head] = null;  //release the vacated slot's object reference
-			if (++head == arr.length) head = 0;
+			buffer[head] = null;  //release the vacated slot's object reference
+			if (++head == buffer.length) head = 0;
 		} else if (physpos == tail) {
-			arr[tail] = null;  //release the vacated slot's object reference
-			if (tail-- == 0) tail = arr.length - 1;
+			buffer[tail] = null;  //release the vacated slot's object reference
+			if (tail-- == 0) tail = buffer.length - 1;
 		} else {
 			if (head == 0 || physpos < head) {
 				// Need to do a shift to fill the deleted element's slot.
@@ -125,12 +125,12 @@ public final class Circulist<T>
 				// Our bias is to shift up if possible, but the most efficient limits test is head==0 which (if satisfied) tells us there's
 				// definitely room to shift down. It doesn't necessarily preclude shifting up, but it's less efficient to test for the tail
 				// limit (tail==arr.length-1) which would preclude that.
-				System.arraycopy(arr, physpos + 1, arr, physpos, tail - physpos);
-				arr[tail--] = null;  // release the vacated tail slot's object reference
+				System.arraycopy(buffer, physpos + 1, buffer, physpos, tail - physpos);
+				buffer[tail--] = null;  // release the vacated tail slot's object reference
 			} else {
 				// the list is not wrapped, and we go for our preferred option of shifting up (see above comment)
-				System.arraycopy(arr, head, arr, head + 1, physpos - head);
-				arr[head++] = null;  // release the vacated head slot's object reference
+				System.arraycopy(buffer, head, buffer, head + 1, physpos - head);
+				buffer[head++] = null;  // release the vacated head slot's object reference
 			}
 		}
 		count--;
@@ -177,10 +177,10 @@ public final class Circulist<T>
 		if (off >= head) {
 			// start position is in the head segment
 			int limit = head + count;
-			if (limit > arr.length) limit = arr.length;
+			if (limit > buffer.length) limit = buffer.length;
 
 			for (int idx = off; idx != limit; idx++) {
-				if (arr[idx] == obj) return idx - head;
+				if (buffer[idx] == obj) return idx - head;
 			}
 			if (tail > head) {
 				// list is not wrapped, so the head segment (which we've now searched) was the the entire list
@@ -193,7 +193,7 @@ public final class Circulist<T>
 		// scan the tail segment
 		int limit = tail + 1;
 		for (int idx = off; idx != limit; idx++) {
-			if (arr[idx] == obj) return idx + (arr.length - head);
+			if (buffer[idx] == obj) return idx + (buffer.length - head);
 		}
 		return -1;
 	}
@@ -207,63 +207,66 @@ public final class Circulist<T>
 	private int physicalIndex(int logicalIndex)
 	{
 		if (logicalIndex < 0 || logicalIndex >= count) {
-			throw new IllegalArgumentException("Circulist index="+logicalIndex+"/"+count+" - Head="+head+"/Tail="+tail+"/Cap="+arr.length);
+			throw new IllegalArgumentException("Circulist index="+logicalIndex+"/"+count+" - Head="+head+"/Tail="+tail+"/Cap="+buffer.length);
 		}
 		int physpos = head + logicalIndex;
-		int wrap = physpos - arr.length;
+		int wrap = physpos - buffer.length;
 		if (wrap >= 0) physpos = wrap;
 		return physpos;
-	}
-	
-	public T[] toArray()
-	{
-		return toArray(null);
 	}
 
 	public T[] toArray(T[] arrcopy)
 	{
-		if (arrcopy == null) arrcopy = alloc(count);
-		if (count == 0) return arrcopy;
+		if (count == 0)
+			return arrcopy;
+		if (arrcopy.length < count) {
+			@SuppressWarnings("unchecked") T[] arr = (T[])Arrays.copyOf(buffer, count, arrcopy.getClass());
+			if (head == 0)
+				return arr;
+			arrcopy = arr;
+		}
 
 		if (tail < head) {
 			// head and tail have wrapped, and we know head segment extends all way to end of buffer
-			int hcount = arr.length - head;
-			System.arraycopy(arr, head, arrcopy, 0, hcount);
-			System.arraycopy(arr, 0, arrcopy, hcount, tail + 1);
+			int hcount = buffer.length - head;
+			System.arraycopy(buffer, head, arrcopy, 0, hcount);
+			System.arraycopy(buffer, 0, arrcopy, hcount, tail + 1);
 		} else {
-			System.arraycopy(arr, head, arrcopy, 0, count);
+			System.arraycopy(buffer, head, arrcopy, 0, count);
 		}
 		return arrcopy;
 	}
 
 	private int grow(int delta)
 	{
-		int oldcap = (arr == null ? 0 : arr.length);
+		int oldcap = (buffer == null ? 0 : buffer.length);
 		int newcap = oldcap + delta;
 		T[] arrnew = alloc(newcap);
-		arr = toArray(arrnew);
+		buffer = toArray(arrnew);
 		head = 0;
 		tail = count - 1;
 		return delta;
 	}
 
-	@SuppressWarnings("unchecked")
-	private final T[] alloc(int cap)
+	private T[] alloc(int cap)
 	{
-		return (T[])java.lang.reflect.Array.newInstance(clss, cap);
+		@SuppressWarnings("unchecked") T[] arr = (T[])new Object[cap];
+		return arr;
 	}
 
 	@Override
 	public String toString()
 	{
-		String txt = "Circulist#"+System.identityHashCode(this)+"="+count+"/head="+head+"/tail="+tail+"/cap="+arr.length;
+		StringBuilder sb = new StringBuilder();
+		sb.append("Circulist#").append(System.identityHashCode(this)).append('=').append(count).append("/cap=").append(buffer.length)
+			.append("/head=").append(head).append("/tail=").append(tail);
 		String dlm = " [";
 		for (int idx = 0; idx != count; idx++) {
-			int phys = (head+idx)%arr.length;
-			txt += dlm+phys+"#"+arr[phys];
+			int phys = (head+idx)%buffer.length;
+			sb.append(dlm).append(phys).append('#').append(buffer[phys]);
 			dlm = "; ";
 		}
-		txt += "]";
-		return txt;
+		sb.append(']');
+		return sb.toString();
 	}
 }

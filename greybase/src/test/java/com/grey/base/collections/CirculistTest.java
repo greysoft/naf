@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2012 Yusef Badri - All rights reserved.
+ * Copyright 2010-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.collections;
@@ -10,14 +10,14 @@ public class CirculistTest
 	private final java.lang.reflect.Field fld_head = getClassField("head");
 	private final java.lang.reflect.Field fld_tail = getClassField("tail");
 	private final java.lang.reflect.Field fld_count = getClassField("count");
-	private final java.lang.reflect.Field fld_arr = getClassField("arr");
+	private final java.lang.reflect.Field fld_arr = getClassField("buffer");
 
 	@org.junit.Test
 	public void testOrdering()
 	{
-		clst = new Circulist<String>(String.class);
+		clst = new Circulist<>();
 		org.junit.Assert.assertEquals(0, clst.size());
-		org.junit.Assert.assertTrue(clst.toString().contains("=0/head="));
+		org.junit.Assert.assertTrue(clst.toString(), clst.toString().contains("=0/cap=64/head=0/tail=-1"));
 		clst.prepend("1a");
 		clst.append("1b");
 		clst.prepend("1c");
@@ -29,7 +29,7 @@ public class CirculistTest
 		org.junit.Assert.assertEquals(-1, clst.indexOf(1, "1c"));
 		org.junit.Assert.assertEquals(1, clst.indexOf(1, "1a"));
 		org.junit.Assert.assertEquals(2, clst.indexOf(1, "1b"));
-		org.junit.Assert.assertTrue(clst.toString().contains("="+clst.size()+"/head="));
+		org.junit.Assert.assertTrue(clst.toString(), clst.toString().contains("="+clst.size()+"/cap=64/head=63/tail=1"));
 		clst.insert(0, "2a");
 		clst.insert(clst.size(), "2b");
 		clst.insert(2, "2c");
@@ -54,9 +54,9 @@ public class CirculistTest
 	}
 
 	@org.junit.Test
-	public void testWrap() throws IllegalAccessException
+	public void testWrap() throws Exception
 	{
-		clst = new Circulist<String>(String.class, 5, 2);
+		clst = new Circulist<>(5, 2);
 		org.junit.Assert.assertEquals(0, clst.size());
 		//populate to capacity
 		clst.append("One");
@@ -145,10 +145,10 @@ public class CirculistTest
 	}
 
 	@org.junit.Test
-	public void testInitialEmpty() throws IllegalAccessException
+	public void testInitialEmpty() throws Exception
 	{
 		int incr = 5;
-		clst = new Circulist<String>(String.class, 0, incr);
+		clst = new Circulist<>(0, incr);
 		org.junit.Assert.assertNull(clst.remove());
 		org.junit.Assert.assertEquals(0, clst.size());
 		org.junit.Assert.assertEquals(-1, clst.indexOf("fred"));
@@ -164,9 +164,9 @@ public class CirculistTest
 	}
 
 	@org.junit.Test
-	public void testViolations() throws IllegalAccessException
+	public void testViolations() throws Exception
 	{
-		clst = new Circulist<String>(String.class);
+		clst = new Circulist<>();
 		clst.append("One");
 		try {
 			clst.get(-1);
@@ -195,7 +195,7 @@ public class CirculistTest
 		for (int idx = 0; idx != items.length; idx++) {
 			org.junit.Assert.assertEquals(items[idx], clst.get(idx));
 		}
-		String[] arr = clst.toArray();
+		String[] arr = clst.toArray(new String[0]);
 		org.junit.Assert.assertEquals(items.length, arr.length);
 		for (int idx = 0; idx != items.length; idx++) {
 			org.junit.Assert.assertEquals(items[idx], arr[idx]);

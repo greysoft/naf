@@ -38,7 +38,7 @@ import com.grey.logging.Logger.LEVEL;
 public class Dispatcher
 	implements Runnable, TimerNAF.TimeProvider, EntityReaper, Producer.Consumer<Object>
 {
-	public enum STOPSTATUS {STOPPED, ALIVE, FORCED};
+	public enum STOPSTATUS {STOPPED, ALIVE, FORCED}
 
 	private static final boolean INTERRUPT_FRIENDLY = SysProps.get("greynaf.dispatchers.interrupts", false);
 	private static final long TMT_FORCEDSTOP = SysProps.getTime("greynaf.dispatchers.forcestoptmt", "1s");
@@ -61,8 +61,8 @@ public class Dispatcher
 	private final ArrayList<DispatcherRunnable> dynamicRunnables = new ArrayList<>();
 	private final ArrayList<EntityReaper> reapers = new ArrayList<>();
 	private final HashedMapIntKey<ChannelMonitor> activeChannels = new HashedMapIntKey<>(); //keyed on cm_id
-	private final Circulist<TimerNAF> activeTimers = new Circulist<>(TimerNAF.class);
-	private final ObjectQueue<TimerNAF> pendingTimers = new ObjectQueue<>(TimerNAF.class);  //timers which have expired and are ready to fire
+	private final Circulist<TimerNAF> activeTimers = new Circulist<>();
+	private final ObjectQueue<TimerNAF> pendingTimers = new ObjectQueue<>();  //timers which have expired and are ready to fire
 	private final ObjectPool<TimerNAF> timerPool;
 	private final ObjectPool<IOExecWriter.FileWrite> fileWritePool;
 	private final java.nio.channels.Selector slct;
@@ -157,7 +157,7 @@ public class Dispatcher
 		fileWritePool = new ObjectPool<>(() -> new FileWrite());
 		slct = java.nio.channels.Selector.open();
 
-		dynamicLoader = new Producer<>("DispatcherRunnables", Object.class, this, this);
+		dynamicLoader = new Producer<>("DispatcherRunnables", this, this);
 
 		flusher = new Flusher(this, def.getFlushInterval());
 		if (getLogger() != initlog) flusher.register(getLogger());
@@ -202,8 +202,10 @@ public class Dispatcher
 		getLogger().info("Dispatcher="+getName()+" thread has terminated with abort="+error_abort+" - heapwait="+HEAPWAIT);
 		
 		if (ObjectPool.DEBUG) {
-			if (timerPool.getActiveCount() != 0) throw new IllegalStateException("Dispatcher="+getName()+" has active timers on exit - count="+timerPool.getActiveCount());
-			if (fileWritePool.getActiveCount() != 0) throw new IllegalStateException("Dispatcher="+getName()+" has active FileWrites on exit - count="+fileWritePool.getActiveCount());
+			if (timerPool.getActiveCount() != 0)
+				throw new IllegalStateException("Dispatcher="+getName()+" has active timers on exit - count="+timerPool.getActiveCount());
+			if (fileWritePool.getActiveCount() != 0)
+				throw new IllegalStateException("Dispatcher="+getName()+" has active FileWrites on exit - count="+fileWritePool.getActiveCount());
 		}
 
 		if (HEAPWAIT) {
@@ -257,7 +259,7 @@ public class Dispatcher
 			getLogger().log(LEVEL.INFO, ex, false, "Dispatcher="+getName()+": Failed to close NIO Selector");
 		}
 
-		int reaper_cnt = 0;
+		int reaper_cnt;
 		synchronized (reapers) {
 			reaper_cnt = reapers.size();
 			while (reapers.size() != 0) {

@@ -1,94 +1,79 @@
 /*
- * Copyright 2014-2021 Yusef Badri - All rights reserved.
+ * Copyright 2014-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.client;
+
+import java.util.concurrent.CompletableFuture;
+import java.io.IOException;
 
 import com.grey.naf.dns.resolver.ResolverDNS;
 import com.grey.naf.dns.resolver.engine.ResolverAnswer;
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.Producer;
 import com.grey.naf.errors.NAFException;
+import com.grey.base.utils.ByteChars;
 import com.grey.logging.Logger;
 
 public class DNSClient
 {
-	public interface QueryCallback {
-		void dnsQueryCompleted(ResolverAnswer answer);
-	}
-
 	private final Dispatcher dsptch;
-	private final Producer<RequestBlock> reqSubmitter; //the consumer side of this runs inside 'dsptch'
-	private final QueryCallback asyncCallback;
+	private final Producer<RequestBlock> reqSubmitter; //the consumer side of this runs inside Dispatcher
 
-	public DNSClient(ResolverDNS resolver, QueryCallback cb) throws java.io.IOException {
+	public DNSClient(ResolverDNS resolver) throws IOException {
 		dsptch = resolver.getMasterDispatcher();
-		asyncCallback = cb;
 		RequestHandler reqHandler = new RequestHandler(resolver);
-		reqSubmitter = new Producer<RequestBlock>("DNS-Client-reqs", RequestBlock.class, dsptch, reqHandler);
+		reqSubmitter = new Producer<>("DNS-Client-requests", dsptch, reqHandler);
 		dsptch.loadRunnable(reqSubmitter);
 	}
 
 	// Can be called from any thread and is safe to call multiple times.
-	public void shutdown() throws java.io.IOException {
+	public void shutdown() throws IOException {
 		dsptch.unloadRunnable(reqSubmitter);
 	}
 
-	public ResolverAnswer resolveHostname(CharSequence hostname) throws java.io.IOException {
+	public CompletableFuture<ResolverAnswer> resolveHostname(CharSequence hostname) throws IOException {
 		return issueDomainRequest(ResolverDNS.QTYPE_A, hostname);
 	}
 
-	public ResolverAnswer resolveIP(int ipaddr) throws java.io.IOException {
-		RequestBlock dnsreq = new RequestBlock(ResolverDNS.QTYPE_PTR, ipaddr, asyncCallback);
-		return issueRequest(dnsreq);
-	}
-
-	public ResolverAnswer resolveNameServer(CharSequence domnam) throws java.io.IOException {
+	public CompletableFuture<ResolverAnswer> resolveNameServer(CharSequence domnam) throws IOException {
 		return issueDomainRequest(ResolverDNS.QTYPE_NS, domnam);
 	}
 
-	public ResolverAnswer resolveMailDomain(CharSequence maildom) throws java.io.IOException {
+	public CompletableFuture<ResolverAnswer> resolveMailDomain(CharSequence maildom) throws IOException {
 		return issueDomainRequest(ResolverDNS.QTYPE_MX, maildom);
 	}
 
-	public ResolverAnswer resolveSOA(CharSequence domnam) throws java.io.IOException {
+	public CompletableFuture<ResolverAnswer> resolveSOA(CharSequence domnam) throws IOException {
 		return issueDomainRequest(ResolverDNS.QTYPE_SOA, domnam);
 	}
 
-	public ResolverAnswer resolveSRV(CharSequence domnam) throws java.io.IOException {
+	public CompletableFuture<ResolverAnswer> resolveSRV(CharSequence domnam) throws IOException {
 		return issueDomainRequest(ResolverDNS.QTYPE_SRV, domnam);
 	}
 
-	public ResolverAnswer resolveTXT(CharSequence domnam) throws java.io.IOException {
+	public CompletableFuture<ResolverAnswer> resolveTXT(CharSequence domnam) throws IOException {
 		return issueDomainRequest(ResolverDNS.QTYPE_TXT, domnam);
 	}
 
-	public ResolverAnswer resolveAAAA(CharSequence domnam) throws java.io.IOException {
+	public CompletableFuture<ResolverAnswer> resolveAAAA(CharSequence domnam) throws IOException {
 		return issueDomainRequest(ResolverDNS.QTYPE_AAAA, domnam);
 	}
 
-	private ResolverAnswer issueDomainRequest(byte qtype, CharSequence qname) throws java.io.IOException {
-		RequestBlock dnsreq = new RequestBlock(qtype, qname, asyncCallback);
+	private CompletableFuture<ResolverAnswer> issueDomainRequest(byte qtype, CharSequence qname) throws IOException {
+		RequestBlock dnsreq = new RequestBlock(qtype, qname);
 		return issueRequest(dnsreq);
 	}
 
-	private ResolverAnswer issueRequest(RequestBlock dnsreq) throws java.io.IOException {
+	public CompletableFuture<ResolverAnswer> resolveIP(int ipaddr) throws IOException {
+		RequestBlock dnsreq = new RequestBlock(ResolverDNS.QTYPE_PTR, ipaddr);
+		return issueRequest(dnsreq);
+	}
+
+	private CompletableFuture<ResolverAnswer> issueRequest(RequestBlock dnsreq) throws IOException {
 		dnsreq.answer.set(null, (byte)0, null);
 		reqSubmitter.produce(dnsreq);
-		if (asyncCallback != null) return null;
-
-		synchronized (dnsreq.lock) {
-			long t1 = dsptch.getRealTime();
-			long limit = t1 + 120_000; //DNS Resolver should always indicate timeout, so this is safety measure
-			while (dnsreq.answer.result == null) {
-				long tmt = limit - dsptch.getRealTime();
-				if (tmt <= 0) throw new NAFException("Timed out on DNS query="+dnsreq.qtype+"/"+dnsreq.qname);
-				try {
-					dnsreq.lock.wait(tmt);
-				} catch (InterruptedException ex) {}
-			}
-		}
-		return dnsreq.answer;
+		return dnsreq.future;
 	}
 
 
@@ -139,14 +124,16 @@ public class DNSClient
 				} catch (Throwable ex) {
 					boolean dumpstack = NAFException.isError(ex);
 					dsptch.getLogger().log(Logger.LEVEL.ERR, ex, dumpstack, "Synchronous-DNS query failed for "+dnsreq.qtype+"/"+dnsreq.qname+"/"+dnsreq.qip+" - "+ex);
-					answer = new ResolverAnswer();
+					answer = dnsreq.answer;
 					if (dnsreq.qtype == ResolverDNS.QTYPE_PTR) {
 						answer.set(ResolverAnswer.STATUS.ERROR, dnsreq.qtype, dnsreq.qip);
 					} else {
 						answer.set(ResolverAnswer.STATUS.ERROR, dnsreq.qtype, dnsreq.qname);
 					}
 				}
-				if (answer != null) issueResponse(answer, dnsreq); //synchronous answer
+				
+				if (answer != null)
+					issueResponse(answer, dnsreq); //synchronous response
 			}
 		}
 
@@ -156,15 +143,9 @@ public class DNSClient
 		}
 
 		private void issueResponse(ResolverAnswer answer, RequestBlock dnsreq) {
-			if (dnsreq.asyncCallback != null) {
-				dnsreq.asyncCallback.dnsQueryCompleted(answer);
-				return;
-			}
-			synchronized (dnsreq.lock) {
-				//Answer will be reused as soon as this method returns, so copy to persistent instance for requesting thread
-				dnsreq.answer.set(answer);
-				dnsreq.lock.notify();
-			}
+			if (answer != dnsreq.answer)
+				dnsreq.answer.set(answer); //because 'answer' param will be overwritten when this call returns
+			dnsreq.future.complete(dnsreq.answer);
 		}
 	}
 
@@ -172,24 +153,21 @@ public class DNSClient
 	private static final class RequestBlock
 	{
 		public final byte qtype;
-		public final com.grey.base.utils.ByteChars qname;
+		public final ByteChars qname;
 		public final int qip;
 		public final ResolverAnswer answer = new ResolverAnswer();
-		private final QueryCallback asyncCallback;
-		public final Object lock = new Object();
+		public final CompletableFuture<ResolverAnswer> future = new CompletableFuture<>();
 
-		public RequestBlock(byte qt, CharSequence qn, QueryCallback cb) {
+		public RequestBlock(byte qt, CharSequence qn) {
 			qtype = qt;
-			qname = new com.grey.base.utils.ByteChars(qn);
+			qname = new ByteChars(qn);
 			qip = 0;
-			asyncCallback = cb;
 		}
 
-		public RequestBlock(byte qt, int ip, QueryCallback cb) {
+		public RequestBlock(byte qt, int ip) {
 			qtype = qt;
 			qip = ip;
 			qname = null;
-			asyncCallback = cb;
 		}
 	}
 }

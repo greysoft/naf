@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 Yusef Badri - All rights reserved.
+ * Copyright 2012-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.resolver.distributed;
@@ -60,7 +60,7 @@ class Proxy
 	{
 		dsptch.getLogger().info(LOGLABEL+": Master Dispatcher="+dsptch.getName()+" is creating Proxy");
 		rslvr = new ResolverService(dsptch, cfg);
-		distributedReceiver = new Producer<>("DNS-distrib-proxyreq", Request.class, dsptch, this);
+		distributedReceiver = new Producer<>("DNS-distrib-proxyreq", dsptch, this);
 	}
 
 	protected void clientStarted(DistributedResolver clnt) throws java.io.IOException

@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2021 Yusef Badri - All rights reserved.
+ * Copyright 2011-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -17,9 +17,7 @@ import com.grey.logging.Logger.LEVEL;
  * which may well be running in a different thread (hence the Dispatcher thread is also known as the
  * Consumer thread).
  * Although this class is called Producer and is owned by the Dispatcher, the actual producer is the
- * external entity who calls its produce() methods. So it is a Producer from the point of view of the
- * Dispatcher (which acts as its consumer) rather than a mechanism by which the Dispatcher acts as a
- * producer.
+ * external entity who calls its produce() methods, and this class is their proxy.
  */
 public class Producer<T> implements DispatcherRunnable
 {
@@ -32,7 +30,6 @@ public class Producer<T> implements DispatcherRunnable
 	private final Circulist<T> exchgq;  //MT queue, on which Dispatcher receives items from producer
 	private final Circulist<T> availq;  //non-MT staging queue, only accessed by the Dispatcher
 	private final AlertsPipe<T> alertspipe;
-	private final Class<T> itemClass;
 	private final com.grey.logging.Logger logger;
 	private boolean in_shutdown;
 
@@ -43,13 +40,12 @@ public class Producer<T> implements DispatcherRunnable
 	@Override
 	public boolean stopDispatcherRunnable() {shutdown(false); return true;}
 
-	public Producer(String producerName, Class<T> itemClass, Dispatcher dsptch, Consumer<T> itemConsumer) throws java.io.IOException {
-		name = producerName+"/"+itemClass.getName();
-		this.itemClass = itemClass;
+	public Producer(String producerName, Dispatcher dsptch, Consumer<T> itemConsumer) throws java.io.IOException {
+		name = producerName;
 		consumer = itemConsumer;
-		exchgq = new Circulist<T>(itemClass);
-		availq = new Circulist<T>(itemClass);
-		alertspipe = new AlertsPipe<T>(dsptch, this);
+		exchgq = new Circulist<>();
+		availq = new Circulist<>();
+		alertspipe = new AlertsPipe<>(dsptch, this);
 		logger = dsptch.getLogger();
 	}
 
@@ -164,7 +160,7 @@ public class Producer<T> implements DispatcherRunnable
 
 	@Override
 	public String toString() {
-		return super.toString()+" Name="+getName()+"/"+itemClass.getName()+" with consumer="+consumer.getClass().getName()+"/"+consumer
+		return super.toString()+" Name="+getName()+" with consumer="+consumer.getClass().getName()+"/"+consumer
 				+" - Dispatcher="+alertspipe.getDispatcher().getName()+", alertspipe="+alertspipe.getCMID();
 	}
 

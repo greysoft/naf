@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2013 Yusef Badri - All rights reserved.
+ * Copyright 2010-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.collections;
@@ -18,14 +18,13 @@ public final class ObjectQueue<T>
 	public int size() {return lst.size();}
 	public int capacity() {return lst.capacity();}
 	public void clear() {lst.clear();}
-	public T[] toArray() {return lst.toArray();}
 	public T[] toArray(T[] arrcopy) {return lst.toArray(arrcopy);}
 
-	public ObjectQueue(Class<?> clss) {this(clss, 64, 64);}
+	public ObjectQueue() {this(64, 64);}
 
-	public ObjectQueue(Class<?> clss, int initcap, int incr)
+	public ObjectQueue(int initcap, int incr)
 	{
-		lst = new Circulist<T>(clss, initcap, incr);
+		lst = new Circulist<>(initcap, incr);
 	}
 
 	// add to end of queue

@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2021 Yusef Badri - All rights reserved.
+ * Copyright 2014-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.integration;
@@ -62,18 +62,18 @@ public class SynchronousTest
 		init("std", true, true, true);
 		String hostname = "101.25.32.1"; //any old IP
 		int ip = IP.convertDottedIP(hostname);
-		ResolverAnswer answer = resolver.resolveHostname(hostname);
+		ResolverAnswer answer = resolver.resolveHostname(hostname).join();
 		assertAnswer(ResolverAnswer.STATUS.OK, ResolverDNS.QTYPE_A, ip, answer);
 
 		hostname = "localhost";
-		answer = resolver.resolveHostname(hostname);
+		answer = resolver.resolveHostname(hostname).join();
 		assertAnswer(ResolverAnswer.STATUS.OK, ResolverDNS.QTYPE_A, IP.IP_LOCALHOST, answer);
 
-		answer = resolver.resolveIP(IP.IP_LOCALHOST);
+		answer = resolver.resolveIP(IP.IP_LOCALHOST).join();
 		assertAnswer(ResolverAnswer.STATUS.OK, ResolverDNS.QTYPE_PTR, "localhost", answer);
 
 		hostname = "bad.domain..";
-		answer = resolver.resolveHostname(hostname);
+		answer = resolver.resolveHostname(hostname).join();
 		logger.info("UTEST: Answer for bad syntax: "+answer);
 		org.junit.Assert.assertEquals(ResolverAnswer.STATUS.BADNAME, answer.result);
 		org.junit.Assert.assertEquals(0, answer.size());
@@ -81,43 +81,43 @@ public class SynchronousTest
 		org.junit.Assert.assertTrue(StringOps.sameSeq(hostname, answer.qname));
 
 		long time1 = System.nanoTime();
-		answer = resolver.resolveHostname(queryTargetA);
+		answer = resolver.resolveHostname(queryTargetA).join();
 		long time_a = System.nanoTime() - time1;
 		assertAnswer(ResolverAnswer.STATUS.OK, ResolverDNS.QTYPE_A, 0, answer);
-		answer = resolver.resolveHostname(queryTargetCNAME);
+		answer = resolver.resolveHostname(queryTargetCNAME).join();
 		assertAnswer(ResolverAnswer.STATUS.OK, ResolverDNS.QTYPE_A, 0, answer);
 		ip = IP.convertDottedIP(queryTargetPTR);
-		answer = resolver.resolveIP(ip);
+		answer = resolver.resolveIP(ip).join();
 		assertAnswer(ResolverAnswer.STATUS.OK, ResolverDNS.QTYPE_PTR, null, answer);
-		answer = resolver.resolveNameServer(queryTargetNS);
+		answer = resolver.resolveNameServer(queryTargetNS).join();
 		assertAnswer(ResolverAnswer.STATUS.OK, ResolverDNS.QTYPE_NS, 0, answer);
-		answer = resolver.resolveMailDomain(queryTargetMX);
+		answer = resolver.resolveMailDomain(queryTargetMX).join();
 		assertAnswer(ResolverAnswer.STATUS.OK, ResolverDNS.QTYPE_MX, 0, answer);
-		answer = resolver.resolveSOA(queryTargetSOA);
+		answer = resolver.resolveSOA(queryTargetSOA).join();
 		assertAnswer(ResolverAnswer.STATUS.OK, ResolverDNS.QTYPE_SOA, 0, answer);
-		answer = resolver.resolveSRV(queryTargetSRV);
+		answer = resolver.resolveSRV(queryTargetSRV).join();
 		assertAnswer(ResolverAnswer.STATUS.OK, ResolverDNS.QTYPE_SRV, 0, answer);
-		answer = resolver.resolveTXT(queryTargetTXT);
+		answer = resolver.resolveTXT(queryTargetTXT).join();
 		assertAnswer(ResolverAnswer.STATUS.OK, ResolverDNS.QTYPE_TXT, 0, answer);
-		answer = resolver.resolveAAAA(queryTargetAAAA);
+		answer = resolver.resolveAAAA(queryTargetAAAA).join();
 		assertAnswer(ResolverAnswer.STATUS.OK, ResolverDNS.QTYPE_AAAA, 0, answer);
 
-		answer = resolver.resolveHostname("no-such-host.nosuchdomain1");
+		answer = resolver.resolveHostname("no-such-host.nosuchdomain1").join();
 		assertAnswer(ResolverAnswer.STATUS.NODOMAIN, ResolverDNS.QTYPE_A, 0, answer);
-		answer = resolver.resolveNameServer("nosuchdomain2a.nosuchdomain2b");
+		answer = resolver.resolveNameServer("nosuchdomain2a.nosuchdomain2b").join();
 		assertAnswer(ResolverAnswer.STATUS.NODOMAIN, ResolverDNS.QTYPE_NS, 0, answer);
-		answer = resolver.resolveMailDomain("nosuchdomain3");
+		answer = resolver.resolveMailDomain("nosuchdomain3").join();
 		assertAnswer(ResolverAnswer.STATUS.NODOMAIN, ResolverDNS.QTYPE_MX, 0, answer);
 
 		if (mockserver != null) {
-			answer = resolver.resolveNameServer("forced-truncation.net"); //must not be the last query
+			answer = resolver.resolveNameServer("forced-truncation.net").join(); //must not be the last query
 			assertAnswer(ResolverAnswer.STATUS.OK, ResolverDNS.QTYPE_NS, 0, answer);
-			answer = resolver.resolveNameServer("no-resolvable-nameservers.net");
+			answer = resolver.resolveNameServer("no-resolvable-nameservers.net").join();
 			assertAnswer(ResolverAnswer.STATUS.NODOMAIN, ResolverDNS.QTYPE_NS, 0, answer);
-			answer = resolver.resolveMailDomain("no-resolvable-mailservers.net");
+			answer = resolver.resolveMailDomain("no-resolvable-mailservers.net").join();
 			assertAnswer(ResolverAnswer.STATUS.NODOMAIN, ResolverDNS.QTYPE_MX, 0, answer);
 			time1 = System.nanoTime();
-			answer = resolver.resolveHostname("simulate-timeout.net");
+			answer = resolver.resolveHostname("simulate-timeout.net").join();
 			long time_a2 = System.nanoTime() - time1;
 			assertAnswer(ResolverAnswer.STATUS.OK, ResolverDNS.QTYPE_A, 0, answer);
 			org.junit.Assert.assertTrue(time_a2 > time_a);
@@ -130,17 +130,17 @@ public class SynchronousTest
 	{
 		org.junit.Assume.assumeTrue(HAVE_DNS_SERVICE || USE_REAL_DNS);
 		init("delegation", true, false, false);
-		ResolverAnswer answer = resolver.resolveNameServer("ny.us.ibm.com"); //there are no more delegations under ibm.com
+		ResolverAnswer answer = resolver.resolveNameServer("ny.us.ibm.com").join(); //there are no more delegations under ibm.com
 		assertAnswer(ResolverAnswer.STATUS.NODOMAIN, ResolverDNS.QTYPE_NS, 0, answer);
-		answer = resolver.resolveHostname("e31.co.us.ibm.com");
+		answer = resolver.resolveHostname("e31.co.us.ibm.com").join();
 		assertAnswer(ResolverAnswer.STATUS.OK, ResolverDNS.QTYPE_A, 0, answer);
-		answer = resolver.resolveNameServer("e31.co.us.ibm.com");
+		answer = resolver.resolveNameServer("e31.co.us.ibm.com").join();
 		assertAnswer(ResolverAnswer.STATUS.NODOMAIN, ResolverDNS.QTYPE_NS, 0, answer);
-		answer = resolver.resolveMailDomain("jcom.home.ne.jp"); //delegation at home, after gap at ne.jp
+		answer = resolver.resolveMailDomain("jcom.home.ne.jp").join(); //delegation at home, after gap at ne.jp
 		assertAnswer(ResolverAnswer.STATUS.OK, ResolverDNS.QTYPE_MX, 0, answer);
-		answer = resolver.resolveMailDomain("mipunto.com"); //there are delegation gaps in the MX hostnames
+		answer = resolver.resolveMailDomain("mipunto.com").join(); //there are delegation gaps in the MX hostnames
 		assertAnswer(ResolverAnswer.STATUS.OK, ResolverDNS.QTYPE_MX, 0, answer);
-		answer = resolver.resolveHostname("no-such-host.home.ne.jp");
+		answer = resolver.resolveHostname("no-such-host.home.ne.jp").join();
 		assertAnswer(ResolverAnswer.STATUS.NODOMAIN, ResolverDNS.QTYPE_A, 0, answer);
 	}
 
@@ -151,7 +151,7 @@ public class SynchronousTest
 	{
 		org.junit.Assume.assumeTrue(HAVE_DNS_SERVICE || USE_REAL_DNS);
 		init("avoidloop", true, false, false);
-		ResolverAnswer answer = resolver.resolveNameServer("dns.pipex.net");
+		ResolverAnswer answer = resolver.resolveNameServer("dns.pipex.net").join();
 		assertAnswer(ResolverAnswer.STATUS.OK, ResolverDNS.QTYPE_NS, 0, answer);
 	}
 
@@ -165,9 +165,9 @@ public class SynchronousTest
 	{
 		org.junit.Assume.assumeTrue(HAVE_DNS_SERVICE || USE_REAL_DNS);
 		init("authredirect", true, false, false);
-		ResolverAnswer answer = resolver.resolveMailDomain("415digital.com"); //comes with glue records
+		ResolverAnswer answer = resolver.resolveMailDomain("415digital.com").join(); //comes with glue records
 		assertAnswer(ResolverAnswer.STATUS.OK, ResolverDNS.QTYPE_MX, 0, answer);
-		answer = resolver.resolveMailDomain("anglia.nl"); //response has no glue
+		answer = resolver.resolveMailDomain("anglia.nl").join(); //response has no glue
 		assertAnswer(ResolverAnswer.STATUS.OK, ResolverDNS.QTYPE_MX, 0, answer);
 	}
 
@@ -211,7 +211,7 @@ public class SynchronousTest
 			Assert.assertSame(dsptchOther, r2.getDispatcher());
 			Assert.assertSame(dsptchOther, r2.getMasterDispatcher());
 		}
-		resolver = new DNSClient(r1, null);
+		resolver = new DNSClient(r1);
 		dsptch.start();
 		dsptchOther.start();
 	}
