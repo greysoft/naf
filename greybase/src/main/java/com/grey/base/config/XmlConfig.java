@@ -1,8 +1,11 @@
 /*
- * Copyright 2010-2021 Yusef Badri - All rights reserved.
+ * Copyright 2010-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.config;
+
+import java.util.HashMap;
+import java.util.Map;
 
 import com.grey.base.utils.StringOps;
 import com.grey.base.utils.XML;
@@ -30,6 +33,7 @@ public class XmlConfig
 	private org.w3c.dom.Node cfgsect;
 	private XmlConfig cfgDefaults;
 	private String label;
+	private final Map<String,String> overrides = new HashMap<>(); //this exists purely to aid unit tests
 
 	public boolean exists() {return (cfgsect != null);}
 
@@ -261,8 +265,9 @@ public class XmlConfig
 
 	private String getValue(Object cfg, String xpath, boolean mdty, String dflt, boolean disable_nullmarker)
 	{
+		String cfgval = overrides.get(xpath);
+		if (cfgval != null) return cfgval;
 		org.w3c.dom.Node elem = null;
-		String cfgval = null;
 
 		if (cfg != null) {
 			try {
@@ -292,6 +297,10 @@ public class XmlConfig
 	{
 		String str = "CONFIG ERROR: "+msg+" - "+label+ELEM_SEP+xpath;
 		throw new XmlConfigException(str);
+	}
+
+	public void setOverride(String xpath, String val) {
+		overrides.put(xpath, val);
 	}
 
 	@Override

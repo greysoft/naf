@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Yusef Badri - All rights reserved.
+ * Copyright 2022-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.greylog_slf4j;
@@ -28,6 +28,7 @@ public class LoggerProvider implements SLF4JServiceProvider {
 	public void initialize() {
 	}
 
+	@Override
 	public ILoggerFactory getLoggerFactory() {
 		return loggerFactory;
 	}

@@ -94,7 +94,7 @@ public class BufferGenerator
 	@Override
 	public String toString()
 	{
-		String txt = "rcvbuf="+rcvbufsiz+", directbufs="+directbufs+", xmtpool="+(xmtpool != null);
+		String txt = "BufferGenerator{rcvbuf="+rcvbufsiz+", directbufs="+directbufs+", xmtpool="+(xmtpool != null)+"}";
 		if (chenc != null) txt += " - charset="+chenc.charset().displayName();
 		return txt;
 	}

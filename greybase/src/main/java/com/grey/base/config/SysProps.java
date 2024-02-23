@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2021 Yusef Badri - All rights reserved.
+ * Copyright 2010-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.config;
@@ -47,7 +47,7 @@ public class SysProps
 	{
 		String val = getEnvironment(name);
 		if (val == null || val.isEmpty()) {
-			String envName = name.replace('.', '_').toUpperCase();
+			String envName = name.replace('.', '_').replace('-', '_').toUpperCase();
 			val = getEnvironment(envName);
 		}
 		if (val == null || val.isEmpty()) {

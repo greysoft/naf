@@ -59,7 +59,7 @@ public class Dispatcher
 
 	private final Map<String, Object> namedItems = new ConcurrentHashMap<>();
 	private final ArrayList<DispatcherRunnable> dynamicRunnables = new ArrayList<>();
-	private final ArrayList<EntityReaper> reapers = new ArrayList<>();
+	private final ArrayList<EntityReaper> reapers = new ArrayList<>(); //objects that wish to be infomed of our shutdown
 	private final HashedMapIntKey<ChannelMonitor> activeChannels = new HashedMapIntKey<>(); //keyed on cm_id
 	private final Circulist<TimerNAF> activeTimers = new Circulist<>();
 	private final ObjectQueue<TimerNAF> pendingTimers = new ObjectQueue<>();  //timers which have expired and are ready to fire

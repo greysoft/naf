@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2021 Yusef Badri - All rights reserved.
+ * Copyright 2010-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -8,13 +8,15 @@ import com.grey.base.config.SysProps;
 import com.grey.base.utils.TimeOps;
 import com.grey.logging.Logger;
 import com.grey.logging.Logger.LEVEL;
+import com.grey.naf.AssignableReapable;
+import com.grey.naf.EntityReaper;
 import com.grey.naf.errors.NAFException;
 
 /**
  * This is the base class for all entities who wish to monitor an NIO-based I/O channel, and receive
  * event callbacks for it.
  */
-public abstract class ChannelMonitor
+public abstract class ChannelMonitor implements AssignableReapable
 {
 	static final boolean halfduplex = SysProps.get("greynaf.io.halfduplex", false);
 	private static final long minbootdiff = SysProps.getTime("greynaf.dumpcm.minbootdiff", 5000);
@@ -37,7 +39,7 @@ public abstract class ChannelMonitor
 	private short cmstate; //records which of the S_... state flags above are in effect
 	private byte regOps; //JDK flags - shadows/mirrors regkey.interestOps()
 	private long start_time;
-	private com.grey.naf.EntityReaper reaper;
+	private EntityReaper reaper;
 
 	abstract void ioIndication(int readyOps) throws java.io.IOException;
 
@@ -54,8 +56,10 @@ public abstract class ChannelMonitor
 	public java.nio.channels.SocketChannel getSocketChannel() {return (java.nio.channels.SocketChannel)getChannel();}
 	public java.nio.channels.DatagramChannel getDatagramChannel() {return (java.nio.channels.DatagramChannel)getChannel();}
 
-	public com.grey.naf.EntityReaper getReaper() {return reaper;}
-	public void setReaper(com.grey.naf.EntityReaper rpr) {reaper = rpr;}
+	@Override
+	public EntityReaper getReaper() {return reaper;}
+	@Override
+	public void setReaper(EntityReaper rpr) {reaper = rpr;}
 
 	java.nio.channels.SelectionKey getRegistrationKey() {return regkey;}
 	void setRegistrationKey(java.nio.channels.SelectionKey key) {regkey = key;}
