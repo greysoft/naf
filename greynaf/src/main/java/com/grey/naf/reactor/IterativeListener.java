@@ -1,12 +1,12 @@
 /*
- * Copyright 2010-2021 Yusef Badri - All rights reserved.
+ * Copyright 2010-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
 
 import com.grey.logging.Logger.LEVEL;
 import com.grey.naf.reactor.config.ListenerConfig;
-import com.grey.naf.EntityReaper;
+import com.grey.naf.EventListenerNAF;
 import com.grey.naf.errors.NAFException;
 
 public class IterativeListener
@@ -16,19 +16,25 @@ public class IterativeListener
 
 	public CM_Server getConnectionHandler() {return cnxhandler;}
 
-	public static IterativeListener create(Dispatcher d, EntityReaper rpr, ListenerConfig config) throws java.io.IOException {
-		return new IterativeListener(d, rpr, config);
+	public static IterativeListener create(Dispatcher d, EventListenerNAF evtl, ListenerConfig config) throws java.io.IOException {
+		return new IterativeListener(d, evtl, config);
 	}
 
-	private IterativeListener(Dispatcher d, EntityReaper rpr, ListenerConfig config) throws java.io.IOException {
-		super(d, null, rpr, config);
+	private IterativeListener(Dispatcher d, EventListenerNAF evtl, ListenerConfig config) throws java.io.IOException {
+		super(d, null, evtl, config);
 		cnxhandler = getServerFactory().createServer();
 		getLogger().info("Iterative Listener="+getName()+" created with handler="+cnxhandler.getClass().getName());
 	}
 
 	@Override
-	public void entityStopped(Object obj) {
-		if (getReporter() != null) getReporter().listenerNotification(Reporter.EVENT.STOPPED, cnxhandler);
+	public void eventIndication(Object obj, String eventId) {
+		if (getEventListener() != null) {
+			getEventListener().eventIndication(obj, eventId);
+		}
+		if (obj != cnxhandler || !ChannelMonitor.EVENTID_CM_DISCONNECTED.equals(eventId)) {
+			getLogger().info("Iterative Listener="+getName()+" discarding unexpected event="+obj.getClass().getName()+"/"+eventId);
+			return;
+		}
 		try {
 			enableListen();
 		} catch (Throwable ex) {
@@ -51,7 +57,10 @@ public class IterativeListener
 				stop(true);
 				return;
 			}
-			if (getReporter() != null) getReporter().listenerNotification(Reporter.EVENT.STARTED, cnxhandler);
+
+			if (getEventListener() != null) {
+				getEventListener().eventIndication(cnxhandler, EVENTID_LISTENER_CNXREQ);
+			}
 
 			try {
 				cnxhandler.accepted(connsock, this);

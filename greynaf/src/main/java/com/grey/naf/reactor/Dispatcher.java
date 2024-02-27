@@ -23,7 +23,7 @@ import com.grey.base.collections.ObjectPool;
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
 import com.grey.naf.Naflet;
-import com.grey.naf.EntityReaper;
+import com.grey.naf.EventListenerNAF;
 import com.grey.naf.nafman.NafManAgent;
 import com.grey.naf.nafman.NafManConfig;
 import com.grey.naf.nafman.NafManRegistry;
@@ -36,7 +36,7 @@ import com.grey.logging.Logger;
 import com.grey.logging.Logger.LEVEL;
 
 public class Dispatcher
-	implements Runnable, TimerNAF.TimeProvider, EntityReaper, Producer.Consumer<Object>
+	implements Runnable, TimerNAF.TimeProvider, EventListenerNAF, Producer.Consumer<Object>
 {
 	public enum STOPSTATUS {STOPPED, ALIVE, FORCED}
 
@@ -59,7 +59,7 @@ public class Dispatcher
 
 	private final Map<String, Object> namedItems = new ConcurrentHashMap<>();
 	private final ArrayList<DispatcherRunnable> dynamicRunnables = new ArrayList<>();
-	private final ArrayList<EntityReaper> reapers = new ArrayList<>(); //objects that wish to be infomed of our shutdown
+	private final ArrayList<EventListenerNAF> eventListeners = new ArrayList<>(); //objects that wish to be infomed of our shutdown
 	private final HashedMapIntKey<ChannelMonitor> activeChannels = new HashedMapIntKey<>(); //keyed on cm_id
 	private final Circulist<TimerNAF> activeTimers = new Circulist<>();
 	private final ObjectQueue<TimerNAF> pendingTimers = new ObjectQueue<>();  //timers which have expired and are ready to fire
@@ -166,7 +166,7 @@ public class Dispatcher
 				+", NAFMan="+(appctx.getNafManConfig()!=null)+", survive_handlers="+surviveHandlers
 				+", flush="+TimeOps.expandMilliTime(def.getFlushInterval())
 				+"\n\tSelector="+slct.getClass().getCanonicalName()+", Provider="+slct.provider().getClass().getCanonicalName()
-				+" - half-duplex="+ChannelMonitor.halfduplex+", timer-jitter="+TimerNAF.JITTER_THRESHOLD
+				+" - half-duplex="+ChannelMonitor.HALF_DUPLEX+", timer-jitter="+TimerNAF.JITTER_THRESHOLD
 				+", wbufs="+IOExecWriter.MAXBUFSIZ+"/"+IOExecWriter.FILEBUFSIZ);
 	}
 
@@ -259,20 +259,20 @@ public class Dispatcher
 			getLogger().log(LEVEL.INFO, ex, false, "Dispatcher="+getName()+": Failed to close NIO Selector");
 		}
 
-		int reaper_cnt;
-		synchronized (reapers) {
-			reaper_cnt = reapers.size();
-			while (reapers.size() != 0) {
-				EntityReaper r = reapers.remove(reapers.size()-1);
-				r.entityStopped(this);
+		int lcnt;
+		synchronized (eventListeners) {
+			lcnt = eventListeners.size();
+			while (!eventListeners.isEmpty()) {
+				EventListenerNAF l = eventListeners.remove(eventListeners.size()-1);
+				l.eventIndication(this, EventListenerNAF.EVENTID_ENTITY_STOPPED);
 			}
 		}
 		if (getNafManAgent() != null) getNafManAgent().stop();
 
-		if (activeChannels.size() != 0) {
+		if (!activeChannels.isEmpty()) {
 			getLogger().trace("Channels: "+activeChannels);
 			closeAllChannels();
-			getLogger().info("Issued Disconnects - remaining channels="+(activeChannels.size()==0?Integer.valueOf(0):activeChannels));
+			getLogger().info("Issued Disconnects - remaining channels="+(activeChannels.isEmpty() ?Integer.valueOf(0):activeChannels));
 		}
 
 		List<DispatcherRunnable> lst = new ArrayList<>(dynamicRunnables);// take copy of list to prevent concurrent modification
@@ -290,8 +290,8 @@ public class Dispatcher
 
 		getLogger().info("Dispatcher="+getName()+": Shutdown completed - Runnables="+dynamicRunnables.size()+"/"+getNafletCount()+", Channels="+activeChannels.size()
 				+", Timers="+activeTimers.size()+":"+pendingTimers.size()
-				+", reapers="+reaper_cnt);
-		if (dynamicRunnables.size() != 0) getLogger().trace("Dynamic Runnables: "+dynamicRunnables);
+				+", event-listeners="+lcnt);
+		if (!dynamicRunnables.isEmpty()) getLogger().trace("Dynamic Runnables: "+dynamicRunnables);
 		if (activeTimers.size()+pendingTimers.size() != 0) getLogger().trace("Timers: Active="+activeTimers+" - Pending="+pendingTimers);
 		shutdownPerformed = true;
 	}
@@ -575,10 +575,14 @@ public class Dispatcher
 	}
 
 	@Override
-	public void entityStopped(Object entity) {
+	public void eventIndication(Object entity, String eventId) {
+		if (!EventListenerNAF.EVENTID_ENTITY_STOPPED.equals(eventId)) {
+			getLogger().info("Dispatcher="+getName()+" discarding unexpected event="+entity.getClass().getName()+"/"+eventId);
+			return;
+		}
 		verifyIsDispatcherThread();
 		boolean exists = (entity instanceof DispatcherRunnable ? dynamicRunnables.remove(entity) : false);
-		getLogger().info("Dispatcher="+getName()+" has received entity termination with exists="+exists+", runnables="+dynamicRunnables.size()+"/"+getNafletCount()+" - "+entity);
+		getLogger().info("Dispatcher="+getName()+" has received event="+entity.getClass().getName()+"/"+eventId+", with exists="+exists+", runnables="+dynamicRunnables.size()+"/"+getNafletCount()+" - "+entity);
 	}
 
 	@Override
@@ -660,16 +664,16 @@ public class Dispatcher
 	}
 
 	// This can be called from other threads
-	public void registerReaper(EntityReaper reaper) {
-		synchronized (reapers) {
-			if (!reapers.contains(reaper)) reapers.add(reaper);
+	public void registerEventListener(EventListenerNAF l) {
+		synchronized (eventListeners) {
+			if (!eventListeners.contains(l)) eventListeners.add(l);
 		}
 	}
 
 	// This can be called from other threads
-	public void cancelReaper(EntityReaper reaper) {
-		synchronized (reapers) {
-			reapers.remove(reaper);
+	public void cancelEventListener(EventListenerNAF l) {
+		synchronized (eventListeners) {
+			eventListeners.remove(l);
 		}
 	}
 

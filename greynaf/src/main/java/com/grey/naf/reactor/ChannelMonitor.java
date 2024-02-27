@@ -8,17 +8,18 @@ import com.grey.base.config.SysProps;
 import com.grey.base.utils.TimeOps;
 import com.grey.logging.Logger;
 import com.grey.logging.Logger.LEVEL;
-import com.grey.naf.AssignableReapable;
-import com.grey.naf.EntityReaper;
+import com.grey.naf.EventListenerNAF;
 import com.grey.naf.errors.NAFException;
 
 /**
  * This is the base class for all entities who wish to monitor an NIO-based I/O channel, and receive
  * event callbacks for it.
  */
-public abstract class ChannelMonitor implements AssignableReapable
+public abstract class ChannelMonitor
 {
-	static final boolean halfduplex = SysProps.get("greynaf.io.halfduplex", false);
+	public static final String EVENTID_CM_DISCONNECTED = "ChannelMonitor_Disconnected";
+
+	static final boolean HALF_DUPLEX = SysProps.get("greynaf.io.halfduplex", false);
 	private static final long minbootdiff = SysProps.getTime("greynaf.dumpcm.minbootdiff", 5000);
 
 	static final int S_ISCONN = 1 << 0; //the iochan endpoint is connected to its remote peer
@@ -39,13 +40,13 @@ public abstract class ChannelMonitor implements AssignableReapable
 	private short cmstate; //records which of the S_... state flags above are in effect
 	private byte regOps; //JDK flags - shadows/mirrors regkey.interestOps()
 	private long start_time;
-	private EntityReaper reaper;
+	private EventListenerNAF listener;
 
 	abstract void ioIndication(int readyOps) throws java.io.IOException;
 
 	boolean shutdownChannel(boolean linger) {return true;}
 	protected void ioDisconnected(CharSequence diagnostic) throws java.io.IOException {disconnect();}
-	protected void eventError(Throwable ex) throws java.io.IOException {}
+	protected void eventError(Throwable ex) {}
 	protected StringBuilder dumpAppState(StringBuilder sb) {return sb;}
 
 	public int getCMID() {return cm_id;}
@@ -56,10 +57,8 @@ public abstract class ChannelMonitor implements AssignableReapable
 	public java.nio.channels.SocketChannel getSocketChannel() {return (java.nio.channels.SocketChannel)getChannel();}
 	public java.nio.channels.DatagramChannel getDatagramChannel() {return (java.nio.channels.DatagramChannel)getChannel();}
 
-	@Override
-	public EntityReaper getReaper() {return reaper;}
-	@Override
-	public void setReaper(EntityReaper rpr) {reaper = rpr;}
+	public EventListenerNAF getEventListener() {return listener;}
+	public void setEventListener(EventListenerNAF l) {listener = l;}
 
 	java.nio.channels.SelectionKey getRegistrationKey() {return regkey;}
 	void setRegistrationKey(java.nio.channels.SelectionKey key) {regkey = key;}
@@ -68,8 +67,8 @@ public abstract class ChannelMonitor implements AssignableReapable
 	public boolean disconnect(boolean linger) {return disconnect(linger, false);}
 
 	boolean isFlagSetCM(int f) {return ((cmstate & f) == f);}
-	void setFlagCM(int f) {cmstate |= f;}
-	void clearFlagCM(int f) {cmstate &= ~f;}
+	void setFlagCM(int f) {cmstate |= (short) f;}
+	void clearFlagCM(int f) {cmstate &= (short) ~f;}
 
 	// conveniences to enable shorter references to common methods than via getDispatcher()
 	public Logger getLogger() {return getDispatcher().getLogger();}
@@ -94,7 +93,6 @@ public abstract class ChannelMonitor implements AssignableReapable
 		cmstate = S_INIT;
 	}
 
-	//Note that setReaper() can be called before this
 	void initChannel(java.nio.channels.SelectableChannel chan, boolean takeOwnership) throws java.io.IOException
 	{
 		if (!isFlagSetCM(S_INIT)) initChannelMonitor();
@@ -134,10 +132,10 @@ public abstract class ChannelMonitor implements AssignableReapable
 			iochan = null;
 		}
 
-		if (reaper != null && !no_reap) {
-			com.grey.naf.EntityReaper rpr = reaper;
-			reaper = null;
-			rpr.entityStopped(this);
+		if (listener != null && !no_reap) {
+			EventListenerNAF l = listener;
+			listener = null;
+			l.eventIndication(this, EVENTID_CM_DISCONNECTED);
 		}
 		return true;
 	}
@@ -176,7 +174,7 @@ public abstract class ChannelMonitor implements AssignableReapable
 	boolean enableRead() throws java.io.IOException
 	{
 		setFlagCM(S_INREAD);
-		if (halfduplex && isFlagSetCM(S_INWRITE)) return false;
+		if (HALF_DUPLEX && isFlagSetCM(S_INWRITE)) return false;
 		return monitorIO_HandleError(regOps | java.nio.channels.SelectionKey.OP_READ, false, "register-Read");
 	}
 
@@ -198,7 +196,7 @@ public abstract class ChannelMonitor implements AssignableReapable
 	{
 		setFlagCM(S_INWRITE);
 		int opflags = (regOps | java.nio.channels.SelectionKey.OP_WRITE);
-		if (halfduplex) opflags &= ~java.nio.channels.SelectionKey.OP_READ;
+		if (HALF_DUPLEX) opflags &= ~java.nio.channels.SelectionKey.OP_READ;
 		monitorIO_HandleError(opflags, false, "register-Write");
 	}
 
@@ -207,7 +205,7 @@ public abstract class ChannelMonitor implements AssignableReapable
 	{
 		clearFlagCM(S_INWRITE);
 		int opflags = regOps & ~java.nio.channels.SelectionKey.OP_WRITE;
-		if (halfduplex && isFlagSetCM(S_INREAD)) opflags |= java.nio.channels.SelectionKey.OP_READ;
+		if (HALF_DUPLEX && isFlagSetCM(S_INREAD)) opflags |= java.nio.channels.SelectionKey.OP_READ;
 		try {
 			monitorIO_HandleError(opflags, true, "deregister-Write");
 		} catch (Exception ex) {

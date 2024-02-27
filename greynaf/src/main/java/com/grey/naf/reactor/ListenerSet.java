@@ -1,20 +1,21 @@
 /*
- * Copyright 2012-2021 Yusef Badri - All rights reserved.
+ * Copyright 2012-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.grey.naf.EventListenerNAF;
 import com.grey.naf.errors.NAFConfigException;
 import com.grey.naf.reactor.config.ConcurrentListenerConfig;
 
 public class ListenerSet
-	implements com.grey.naf.EntityReaper
+	implements EventListenerNAF
 {
 	public final String name;
 	private final Dispatcher dsptch;
-	private final com.grey.naf.EntityReaper reaper;
+	private final EventListenerNAF eventListener;
 	private final CM_Listener[] listeners;
 	private final AtomicInteger listenerCount = new AtomicInteger();
 
@@ -22,13 +23,13 @@ public class ListenerSet
 	public int count() {return listenerCount.get();}
 	public CM_Listener getListener(int idx) {return listeners[idx];}
 
-	public ListenerSet(String grpname, Dispatcher d, Object controller, com.grey.naf.EntityReaper rpr, ConcurrentListenerConfig[] config) throws java.io.IOException {
-		this(grpname, d, controller, rpr, config, false);
+	public ListenerSet(String grpname, Dispatcher d, Object controller, EventListenerNAF evtl, ConcurrentListenerConfig[] config) throws java.io.IOException {
+		this(grpname, d, controller, evtl, config, false);
 	}
 
-	public ListenerSet(String grpname, Dispatcher d, Object controller, com.grey.naf.EntityReaper rpr, ConcurrentListenerConfig[] config, boolean iterative) throws java.io.IOException {
+	public ListenerSet(String grpname, Dispatcher d, Object controller, EventListenerNAF evtl, ConcurrentListenerConfig[] config, boolean iterative) throws java.io.IOException {
 		dsptch = d;
-		reaper = rpr;
+		eventListener = evtl;
 		name = "Listeners-"+d.getName()+"-"+grpname;
 		if (config == null || config.length == 0) {
 			listeners = null;
@@ -40,7 +41,7 @@ public class ListenerSet
 
 		for (int idx = 0; idx != config.length; idx++) {
 			if (iterative) {
-				listeners[idx] = IterativeListener.create(d, reaper, config[idx]);
+				listeners[idx] = IterativeListener.create(d, this, config[idx]);
 			} else {
 				listeners[idx] = ConcurrentListener.create(d, controller, this, config[idx]);
 			}
@@ -88,8 +89,12 @@ public class ListenerSet
 	}
 
 	@Override
-	public void entityStopped(Object obj) {
-		CM_Listener lstnr = CM_Listener.class.cast(obj);
+	public void eventIndication(Object obj, String eventId) {
+		if (!(obj instanceof CM_Listener) || !EventListenerNAF.EVENTID_ENTITY_STOPPED.equals(eventId)) {
+			if (eventListener != null) eventListener.eventIndication(obj, eventId);
+			return;
+		}
+		CM_Listener lstnr = (CM_Listener)obj;
 
 		for (int idx = 0; idx != listeners.length; idx++) {
 			if (listeners[idx] == lstnr) {
@@ -99,13 +104,10 @@ public class ListenerSet
 			}
 		}
 		int cnt = listenerCount.get();
-		dsptch.getLogger().info(name+": Listener="+lstnr.getName()+" has terminated - remaining="+cnt+" - reaper="+reaper);
-		if (cnt == 0 && reaper != null) reaper.entityStopped(this);
-	}
-
-	public void setReporter(CM_Listener.Reporter r) {
-		for (CM_Listener l : listeners) {
-			if (l != null) l.setReporter(r);
+		dsptch.getLogger().info(name+": Listener="+lstnr.getName()+" has terminated - remaining="+cnt+" - event-listener="+eventListener);
+		
+		if (cnt == 0 && eventListener != null) {
+			eventListener.eventIndication(this, EventListenerNAF.EVENTID_ENTITY_STOPPED);
 		}
 	}
 }

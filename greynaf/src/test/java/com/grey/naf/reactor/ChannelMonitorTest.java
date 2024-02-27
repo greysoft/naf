@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 Yusef Badri - All rights reserved.
+ * Copyright 2012-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -8,10 +8,11 @@ import com.grey.base.utils.ByteArrayRef;
 import com.grey.base.utils.FileOps;
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
+import com.grey.naf.EventListenerNAF;
 import com.grey.naf.TestUtils;
 
 public class ChannelMonitorTest
-	implements com.grey.naf.EntityReaper
+	implements EventListenerNAF
 {
 	private static final String rootdir = TestUtils.initPaths(ChannelMonitorTest.class);
 	private static final int xmtsiz = 33 * 1024;
@@ -79,7 +80,7 @@ public class ChannelMonitorTest
 				org.junit.Assert.assertFalse(cm.isBrokenPipe());
 				org.junit.Assert.assertNull(cm.getChannel());
 				org.junit.Assert.assertNull(cm.getChannel());
-				org.junit.Assert.assertNull(cm.getReaper());
+				org.junit.Assert.assertNull(cm.getEventListener());
 			}
 			org.junit.Assert.assertEquals(cmw.xmtbytes, cmr.rcvbytes);
 			org.junit.Assert.assertFalse(cmr.isConnected());
@@ -92,7 +93,7 @@ public class ChannelMonitorTest
 	}
 
 	@Override
-	public void entityStopped(Object obj) {
+	public void eventIndication(Object obj, String eventId) {
 		if (obj.getClass() == CMR.class) {
 			reapcnt_receivers++;
 		} else if (obj.getClass() == CMW.class) {
@@ -101,7 +102,7 @@ public class ChannelMonitorTest
 			throw new IllegalArgumentException("Reaped unexpected object="+obj.getClass().getName()+" - "+obj);
 		}
 		TestMonitor cm = (TestMonitor)obj;
-		org.junit.Assert.assertNull(cm.getReaper());
+		org.junit.Assert.assertNull(cm.getEventListener());
 	}
 
 
@@ -122,15 +123,15 @@ public class ChannelMonitorTest
 			harness = h;
 			harness.cmcnt++;
 			org.junit.Assert.assertFalse(isConnected());
-			org.junit.Assert.assertNull(getReaper());
-			setReaper(harness);
-			org.junit.Assert.assertTrue(getReaper() == harness);
+			org.junit.Assert.assertNull(getEventListener());
+			setEventListener(harness);
+			org.junit.Assert.assertTrue(getEventListener() == harness);
 		}
 
 		@Override
 		public void startDispatcherRunnable() throws java.io.IOException {
 			registerConnectedChannel(chan, takeOwnership);
-			org.junit.Assert.assertTrue(getReaper() == harness);
+			org.junit.Assert.assertTrue(getEventListener() == harness);
 			org.junit.Assert.assertTrue(isConnected());
 			org.junit.Assert.assertTrue(getChannel() == chan);
 			org.junit.Assert.assertFalse(getChannel().isRegistered());

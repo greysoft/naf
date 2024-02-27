@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2021 Yusef Badri - All rights reserved.
+ * Copyright 2014-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -9,11 +9,12 @@ import com.grey.base.utils.ByteOps;
 import com.grey.base.utils.FileOps;
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
+import com.grey.naf.EventListenerNAF;
 import com.grey.naf.reactor.config.ListenerConfig;
 import com.grey.naf.TestUtils;
 
 public class IterativeListenerTest
-	implements com.grey.naf.EntityReaper
+	implements EventListenerNAF
 {
 	private static class Factory implements IterativeListener.ServerFactory
 	{
@@ -29,7 +30,10 @@ public class IterativeListenerTest
 	private static final int NUMCONNS = 5;
 	private static final int INTSIZE = 4;
 
+	private int startcnt_servers;
+	private int reapcnt_servers;
 	private int reapcnt;
+	
 
 	@org.junit.Test
 	public void test() throws java.io.IOException
@@ -78,13 +82,21 @@ public class IterativeListenerTest
 		org.junit.Assert.assertTrue(srvr.completed);
 		org.junit.Assert.assertEquals(clients.length, srvr.conncount);
 		org.junit.Assert.assertEquals(0, srvr.opencount);
-		org.junit.Assert.assertEquals(1, reapcnt);
+		org.junit.Assert.assertEquals(clients.length, startcnt_servers);
+		org.junit.Assert.assertEquals(clients.length, reapcnt_servers);
+		org.junit.Assert.assertEquals(reapcnt_servers+1, reapcnt); //+1 for listener stopping
 	}
 
 	@Override
-	public void entityStopped(Object obj) {
-		reapcnt++;
-		org.junit.Assert.assertEquals(IterativeListener.class, obj.getClass());
+	public void eventIndication(Object obj, String eventId) {
+		if (CM_Listener.EVENTID_LISTENER_CNXREQ.equals(eventId)) {
+			startcnt_servers++;
+		} else if (ChannelMonitor.EVENTID_CM_DISCONNECTED.equals(eventId)) {
+			reapcnt_servers++;
+			reapcnt++;
+		} else if (EventListenerNAF.EVENTID_ENTITY_STOPPED.equals(eventId)) {
+			reapcnt++;
+		}
 	}
 
 

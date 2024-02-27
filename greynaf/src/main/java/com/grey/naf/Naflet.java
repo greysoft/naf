@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2019 Yusef Badri - All rights reserved.
+ * Copyright 2010-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf;
@@ -39,7 +39,7 @@ abstract public class Naflet implements DispatcherRunnable
 	/**
 	 * Applications that are not based on naf.xml style config would pass a null XmlConfig arg in here
 	 */
-	protected Naflet(String name, Dispatcher d, XmlConfig cfg) throws java.io.IOException {
+	protected Naflet(String name, Dispatcher d, XmlConfig cfg) {
 		naflet_name = name;
 		dsptch = d;
 		taskcfg = cfg;
@@ -67,7 +67,7 @@ abstract public class Naflet implements DispatcherRunnable
 
 	protected void nafletStopped() {
 		getDispatcher().getLogger().info("Naflet="+naflet_name+" in Dispatcher="+dsptch.getName()+" has terminated");
-		dsptch.entityStopped(this);
+		dsptch.eventIndication(this, EventListenerNAF.EVENTID_ENTITY_STOPPED);
 	}
 
 	@Override

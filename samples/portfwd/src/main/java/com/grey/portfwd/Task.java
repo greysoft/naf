@@ -1,12 +1,12 @@
 /*
- * Copyright 2012-2021 Yusef Badri - All rights reserved.
+ * Copyright 2012-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.portfwd;
 
 import com.grey.base.config.XmlConfig;
 import com.grey.naf.Naflet;
-import com.grey.naf.EntityReaper;
+import com.grey.naf.EventListenerNAF;
 import com.grey.naf.NAFConfig;
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.ListenerSet;
@@ -16,7 +16,7 @@ import com.grey.naf.nafman.NafManRegistry;
 
 public class Task
 	extends Naflet
-	implements NafManCommand.Handler, EntityReaper
+	implements NafManCommand.Handler, EventListenerNAF
 {
 	private static final String NAFMAN_FAMILY = "Port-Forwarder";
 	public static final String CMD_SHOWCONNS = "SHOWCONNS";
@@ -57,8 +57,11 @@ public class Task
 	}
 
 	@Override
-	public void entityStopped(Object obj) {
-		ListenerSet.class.cast(obj); //can only be our ListenerSet, but do a cast to assert that
+	public void eventIndication(Object obj, String eventId) {
+		if (!(obj instanceof ListenerSet) || !EventListenerNAF.EVENTID_ENTITY_STOPPED.equals(eventId)) {
+			getDispatcher().getLogger().info("Discarding unexpected event="+obj.getClass().getName()+"/"+eventId);
+			return;
+		}
 		nafletStopped();
 	}
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2022 Yusef Badri - All rights reserved.
+ * Copyright 2013-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -10,7 +10,7 @@ import com.grey.base.utils.FileOps;
 import com.grey.base.utils.IP;
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
-import com.grey.naf.EntityReaper;
+import com.grey.naf.EventListenerNAF;
 import com.grey.naf.reactor.config.ConcurrentListenerConfig;
 import com.grey.naf.reactor.config.SSLConfig;
 import com.grey.naf.TestUtils;
@@ -19,7 +19,7 @@ import com.grey.naf.TestUtils;
  * Note that this test class also exercises ListenerSet, ConcurrentListener and the Naflet class.
  */
 public class SSLConnectionTest
-	implements EntityReaper, CM_Listener.Reporter, TimerNAF.Handler
+	implements EventListenerNAF, TimerNAF.Handler
 {
 	private enum FAILTYPE {NONE, NOCONNECT, BADCERT_PURE, BADCERT_SWITCH}
 	private static final String rootdir = TestUtils.initPaths(SSLConnectionTest.class);
@@ -165,7 +165,6 @@ public class SSLConnectionTest
 			org.junit.Assert.assertEquals(1, listeners.configured());
 			org.junit.Assert.assertEquals(1, listeners.count());
 			srvport = listeners.getListener(0).getPort();
-			listeners.setReporter(this);
 		} else {
 			ConcurrentListenerConfig lcfg = new ConcurrentListenerConfig.Builder<>()
 					.withName(lname)
@@ -174,7 +173,6 @@ public class SSLConnectionTest
 					.build();
 			ConcurrentListener lstnr = ConcurrentListener.create(dsptch, this, this, lcfg);
 			srvport = lstnr.getPort();
-			lstnr.setReporter(this);
 			dsptch.loadRunnable(lstnr);
 		}
 
@@ -222,7 +220,7 @@ public class SSLConnectionTest
 		org.junit.Assert.assertEquals(1, reapcnt_clients);
 		org.junit.Assert.assertEquals(failtype == FAILTYPE.NOCONNECT ? 0 : 1, reapcnt_servers);
 		org.junit.Assert.assertEquals(reapcnt_servers, startcnt_servers);
-		org.junit.Assert.assertEquals(reapcnt_clients+1, reapcnt); //+1 for ListenerSet or Listener
+		org.junit.Assert.assertEquals(reapcnt_servers+reapcnt_clients+1, reapcnt); //+1 for ListenerSet or Listener
 
 		if (fail_step != -1) {
 			//don't check client's progress, as it may have sent an extra message before it received disconnect
@@ -261,28 +259,21 @@ public class SSLConnectionTest
 	}
 
 	@Override
-	public void entityStopped(Object obj)
+	public void eventIndication(Object obj, String eventId)
 	{
-		reapcnt++;
-		if (obj.getClass().equals(SSLC.class)) {
-			reapcnt_clients++;
-			entityStoppedTCP();
-		}
-	}
-
-	@Override
-	public void listenerNotification(EVENT evt, CM_Server s)
-	{
-		if (evt == EVENT.STARTED) {
+		if (CM_Listener.EVENTID_LISTENER_CNXREQ.equals(eventId)) {
 			startcnt_servers++;
-			return;
-		}
-		if (evt == EVENT.STOPPED) {
-			reapcnt_servers++;
+		} else if (ChannelMonitor.EVENTID_CM_DISCONNECTED.equals(eventId)) {
+			if (obj.getClass().equals(SSLC.class)) {
+				reapcnt_clients++;
+			} else {
+				reapcnt_servers++;
+			}
+			reapcnt++;
 			entityStoppedTCP();
-			return;
+		} else if (EventListenerNAF.EVENTID_ENTITY_STOPPED.equals(eventId)) {
+			reapcnt++;
 		}
-		throw new IllegalArgumentException("Missing handler for Reporter.EVENT="+evt);
 	}
 
 	private void entityStoppedTCP()
@@ -330,7 +321,7 @@ public class SSLConnectionTest
 	{
 		public final EntityState state = new EntityState();
 		private final com.grey.naf.reactor.config.SSLConfig sslconfig;
-		private final EntityReaper rpr;
+		private final EventListenerNAF eventLstener;
 		private final int srvport;
 		private java.nio.channels.SelectableChannel chan;
 		public boolean completed;
@@ -344,9 +335,9 @@ public class SSLConnectionTest
 		@Override
 		public String getName() {return "SSLConnectionTest.SSLC";}
 
-		public SSLC(Dispatcher d, XmlConfig cfg, int port, EntityReaper rpr) throws java.io.IOException {
+		public SSLC(Dispatcher d, XmlConfig cfg, int port, EventListenerNAF evtl) throws java.io.IOException {
 			super(d, new com.grey.naf.BufferGenerator(cfg, "niobuffers", 256, 128), new com.grey.naf.BufferGenerator(cfg, "niobuffers", 256, 128));
-			this.rpr = rpr;
+			this.eventLstener = evtl;
 			srvport = port;
 			XmlConfig sslcfg = (cfg == null ? XmlConfig.NULLCFG : cfg.getSection("ssl"));
 			if (sslcfg == null || !sslcfg.exists()) {
@@ -364,7 +355,7 @@ public class SSLConnectionTest
 		public void startDispatcherRunnable() throws java.io.IOException {
 			com.grey.base.utils.TSAP srvr = com.grey.base.utils.TSAP.build(null, srvport);
 			initChannelMonitor();
-			setReaper(rpr);
+			setEventListener(eventLstener);
 			connect(srvr.sockaddr);
 		}
 

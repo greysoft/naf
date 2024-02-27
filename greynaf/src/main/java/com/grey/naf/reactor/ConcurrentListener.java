@@ -1,12 +1,12 @@
 /*
- * Copyright 2010-2021 Yusef Badri - All rights reserved.
+ * Copyright 2010-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
 
 import com.grey.base.collections.HashedSet;
 import com.grey.base.collections.ObjectPool;
-import com.grey.naf.EntityReaper;
+import com.grey.naf.EventListenerNAF;
 import com.grey.naf.reactor.config.ConcurrentListenerConfig;
 import com.grey.logging.Logger.LEVEL;
 
@@ -22,12 +22,12 @@ public class ConcurrentListener
 		return create(d, null, null, config);
 	}
 
-	public static ConcurrentListener create(Dispatcher d, Object controller, EntityReaper rpr, ConcurrentListenerConfig config) throws java.io.IOException {
-		return new ConcurrentListener(d, controller, rpr, config);
+	public static ConcurrentListener create(Dispatcher d, Object controller, EventListenerNAF evtl, ConcurrentListenerConfig config) throws java.io.IOException {
+		return new ConcurrentListener(d, controller, evtl, config);
 	}
 
-	private ConcurrentListener(Dispatcher d, Object controller, EntityReaper rpr, ConcurrentListenerConfig config) throws java.io.IOException {
-		super(d, controller, rpr, config);
+	private ConcurrentListener(Dispatcher d, Object controller, EventListenerNAF evtl, ConcurrentListenerConfig config) throws java.io.IOException {
+		super(d, controller, evtl, config);
 		int srvmin = config.getMinServers();
 		int srvmax = config.getMaxServers();
 		int srvincr = config.getServersIncrement();
@@ -47,15 +47,24 @@ public class ConcurrentListener
 		}
 		getLogger().info("Listener="+getName()+" stopped "+(arr.length - activeservers.size())+"/"+arr.length+" servers");
 		in_sync_stop = false;
-		return (activeservers.size() == 0);
+		return (activeservers.isEmpty());
 	}
 
 	@Override
-	public void entityStopped(Object obj) {
+	public void eventIndication(Object obj, String eventId) {
+		if (getEventListener() != null) {
+			getEventListener().eventIndication(obj, eventId);
+		}
+		if (!(obj instanceof CM_Server) || !ChannelMonitor.EVENTID_CM_DISCONNECTED.equals(eventId)) {
+			getLogger().info("Listener="+getName()+" discarding unexpected event="+obj.getClass().getName()+"/"+eventId);
+			return;
+		}
 		CM_Server srvr = (CM_Server)obj;
-		if (getReporter() != null) getReporter().listenerNotification(Reporter.EVENT.STOPPED, srvr);
 		boolean not_dup = deallocateServer(srvr);
-		if (not_dup && inShutdown() && !in_sync_stop && activeservers.size() == 0) stopped(true);
+
+		if (not_dup && inShutdown() && !in_sync_stop && activeservers.isEmpty()) {
+			stopped(true);
+		}
 	}
 
 	// We know that the readyOps argument must indicate an Accept (that's all we registered for), so don't bother checking it.
@@ -87,7 +96,10 @@ public class ConcurrentListener
 			return;
 		}
 		activeservers.add(srvr);
-		if (getReporter() != null) getReporter().listenerNotification(Reporter.EVENT.STARTED, srvr);
+
+		if (getEventListener() != null) {
+			getEventListener().eventIndication(srvr, EVENTID_LISTENER_CNXREQ);
+		}
 		boolean ok = false;
 
 		try {
@@ -95,7 +107,7 @@ public class ConcurrentListener
 			ok = true;
 		} finally {
 			if (!ok) {
-				entityStopped(srvr);
+				eventIndication(srvr, EVENTID_CM_DISCONNECTED);
 				getDispatcher().conditionalDeregisterIO(srvr);
 				connsock.close();
 			}

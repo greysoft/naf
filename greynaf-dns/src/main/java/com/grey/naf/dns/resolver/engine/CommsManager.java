@@ -1,15 +1,17 @@
 /*
- * Copyright 2014-2021 Yusef Badri - All rights reserved.
+ * Copyright 2014-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.resolver.engine;
 
 import com.grey.base.collections.ObjectPool;
 import com.grey.base.utils.TSAP;
+import com.grey.naf.EventListenerNAF;
+import com.grey.naf.reactor.ChannelMonitor;
 import com.grey.naf.dns.resolver.ResolverConfig;
 
 class CommsManager
-	implements com.grey.naf.EntityReaper
+	implements EventListenerNAF
 {
 	private final java.net.InetSocketAddress[] localNameServers; //local name servers to which we can issue queries
 	private final EndPointUDP[] udpLocal; //the UDP sockets on which we issue our outgoing queries
@@ -80,12 +82,13 @@ class CommsManager
 
 	public EndPointTCP allocateTCP() {
 		EndPointTCP cm = tcpstore.extract();
-		cm.setReaper(this);
+		cm.setEventListener(this);
 		return cm;
 	}
 
 	@Override
-	public void entityStopped(Object obj) {
-		tcpstore.store((EndPointTCP)obj);
+	public void eventIndication(Object obj, String eventId) {
+		if (obj instanceof EndPointTCP && ChannelMonitor.EVENTID_CM_DISCONNECTED.equals(eventId))
+			tcpstore.store((EndPointTCP)obj);
 	}
 }

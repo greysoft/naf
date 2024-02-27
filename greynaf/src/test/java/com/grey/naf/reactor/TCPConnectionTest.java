@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2021 Yusef Badri - All rights reserved.
+ * Copyright 2014-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -10,12 +10,12 @@ import com.grey.base.utils.FileOps;
 import com.grey.base.utils.IP;
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
-import com.grey.naf.EntityReaper;
+import com.grey.naf.EventListenerNAF;
 import com.grey.naf.reactor.config.ConcurrentListenerConfig;
 import com.grey.naf.TestUtils;
 
 public class TCPConnectionTest
-	implements EntityReaper, CM_Listener.Reporter
+	implements EventListenerNAF
 {
 	private static final String rootdir = TestUtils.initPaths(TCPConnectionTest.class);
 	private static final int NUM_CLIENTS = 10; //must be even and greater than 2
@@ -54,7 +54,6 @@ public class TCPConnectionTest
 				.withPort(0)
 				.build();
 		CM_Listener lstnr = ConcurrentListener.create(dsptch, this, this, lcfg);
-		lstnr.setReporter(this);
 		dsptch.loadRunnable(lstnr);
 
 		// set up the clients
@@ -76,7 +75,7 @@ public class TCPConnectionTest
 		org.junit.Assert.assertTrue(dsptch.completedOK());
 		org.junit.Assert.assertTrue(completed_ok);
 		org.junit.Assert.assertEquals(NUM_CLIENTS, reapcnt_clients);
-		org.junit.Assert.assertEquals(reapcnt_clients+1, reapcnt); //+1 for listener
+		org.junit.Assert.assertEquals(reapcnt_clients+reapcnt_servers+1, reapcnt); //+1 for listener
 		org.junit.Assert.assertEquals(NUM_CLIENTS / 2, clientcnt_good);
 		org.junit.Assert.assertEquals(NUM_CLIENTS / 2, clientcnt_bad);
 		org.junit.Assert.assertEquals(NUM_CLIENTS / 2, reapcnt_servers); //only half the clients connected
@@ -85,37 +84,24 @@ public class TCPConnectionTest
 	}
 
 	@Override
-	public void entityStopped(Object obj)
+	public void eventIndication(Object obj, String eventId)
 	{
-		reapcnt++;
-		if (obj.getClass() == ClientTCP.class) entityStoppedTCP((ClientTCP)obj);
-	}
-
-	@Override
-	public void listenerNotification(EVENT evt, CM_Server s)
-	{
-		if (evt == EVENT.STARTED) {
+		if (CM_Listener.EVENTID_LISTENER_CNXREQ.equals(eventId)) {
 			startcnt_servers++;
-			return;
-		}
-		if (evt == EVENT.STOPPED) {
-			org.junit.Assert.assertEquals(INTSIZE*2, ((ServerTCP)s).rcvbytes);
-			entityStoppedTCP(s);
-			return;
-		}
-		throw new IllegalArgumentException("Missing handler for Reporter.EVENT="+evt);
-	}
-
-	private void entityStoppedTCP(CM_TCP obj)
-	{
-		if (obj.getClass() == ClientTCP.class) {
-			reapcnt_clients++;
-		} else {
-			reapcnt_servers++;
-		}
-		if (reapcnt_clients == NUM_CLIENTS && reapcnt_servers == (NUM_CLIENTS / 2)) {
-			dsptch.stop();
-			completed_ok = true;
+		} else if (ChannelMonitor.EVENTID_CM_DISCONNECTED.equals(eventId)) {
+			if (obj.getClass().equals(ClientTCP.class)) {
+				reapcnt_clients++;
+			} else {
+				reapcnt_servers++;
+				org.junit.Assert.assertEquals(INTSIZE*2, ((ServerTCP)obj).rcvbytes);
+			}
+			reapcnt++;
+			if (reapcnt_clients == NUM_CLIENTS && reapcnt_servers == (NUM_CLIENTS / 2)) {
+				dsptch.stop();
+				completed_ok = true;
+			}
+		} else if (EventListenerNAF.EVENTID_ENTITY_STOPPED.equals(eventId)) {
+			reapcnt++;
 		}
 	}
 
@@ -143,7 +129,7 @@ public class TCPConnectionTest
 		public void startDispatcherRunnable() throws java.io.IOException {
 			org.junit.Assert.assertFalse(isConnected());
 			initChannelMonitor();
-			setReaper(harness);
+			setEventListener(harness);
 			connect(srvaddr);
 		}
 
