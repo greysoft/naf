@@ -89,12 +89,12 @@ public class ListenerSet
 	}
 
 	@Override
-	public void eventIndication(Object obj, String eventId) {
-		if (!(obj instanceof CM_Listener) || !EventListenerNAF.EVENTID_ENTITY_STOPPED.equals(eventId)) {
-			if (eventListener != null) eventListener.eventIndication(obj, eventId);
+	public void eventIndication(String eventId, Object evtsrc, Object data) {
+		if (!(evtsrc instanceof CM_Listener) || !EventListenerNAF.EVENTID_ENTITY_STOPPED.equals(eventId)) {
+			if (eventListener != null) eventListener.eventIndication(eventId, evtsrc, data);
 			return;
 		}
-		CM_Listener lstnr = (CM_Listener)obj;
+		CM_Listener lstnr = (CM_Listener)evtsrc;
 
 		for (int idx = 0; idx != listeners.length; idx++) {
 			if (listeners[idx] == lstnr) {
@@ -107,7 +107,7 @@ public class ListenerSet
 		dsptch.getLogger().info(name+": Listener="+lstnr.getName()+" has terminated - remaining="+cnt+" - event-listener="+eventListener);
 		
 		if (cnt == 0 && eventListener != null) {
-			eventListener.eventIndication(this, EventListenerNAF.EVENTID_ENTITY_STOPPED);
+			eventListener.eventIndication(EventListenerNAF.EVENTID_ENTITY_STOPPED, this, null);
 		}
 	}
 }

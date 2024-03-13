@@ -67,7 +67,7 @@ abstract public class Naflet implements DispatcherRunnable
 
 	protected void nafletStopped() {
 		getDispatcher().getLogger().info("Naflet="+naflet_name+" in Dispatcher="+dsptch.getName()+" has terminated");
-		dsptch.eventIndication(this, EventListenerNAF.EVENTID_ENTITY_STOPPED);
+		dsptch.eventIndication(EventListenerNAF.EVENTID_ENTITY_STOPPED, this, null);
 	}
 
 	@Override

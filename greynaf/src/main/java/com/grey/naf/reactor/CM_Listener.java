@@ -109,7 +109,7 @@ public abstract class CM_Listener
 		getLogger().info("Listener="+getName()+" has stopped with notify="+notify+" - listener="+lstnr);
 		serverFactory.shutdownServerFactory();
 		getDispatcher().getApplicationContext().deregister(this);
-		if (notify && lstnr != null) lstnr.eventIndication(this, EventListenerNAF.EVENTID_ENTITY_STOPPED);
+		if (notify && lstnr != null) lstnr.eventIndication(EventListenerNAF.EVENTID_ENTITY_STOPPED, this, null);
 	}
 
 	@Override

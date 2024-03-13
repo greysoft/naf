@@ -7,5 +7,5 @@ package com.grey.naf;
 public interface EventListenerNAF {
 	String EVENTID_ENTITY_STOPPED = "EventListenerNAF_EntityStopped";
 	
-	void eventIndication(Object reportingEntity, String eventId);
+	void eventIndication(String eventId, Object eventSource, Object eventData);
 }

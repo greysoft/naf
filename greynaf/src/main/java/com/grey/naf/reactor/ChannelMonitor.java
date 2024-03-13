@@ -135,7 +135,7 @@ public abstract class ChannelMonitor
 		if (listener != null && !no_reap) {
 			EventListenerNAF l = listener;
 			listener = null;
-			l.eventIndication(this, EVENTID_CM_DISCONNECTED);
+			l.eventIndication(EVENTID_CM_DISCONNECTED, this, null);
 		}
 		return true;
 	}

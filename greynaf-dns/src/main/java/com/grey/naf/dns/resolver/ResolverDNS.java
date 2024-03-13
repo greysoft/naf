@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2021 Yusef Badri - All rights reserved.
+ * Copyright 2010-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.resolver;
@@ -103,9 +103,10 @@ public abstract class ResolverDNS implements DispatcherRunnable
 		answerLocalIP.rrdata.add(new ResourceData.RR_PTR(new ByteChars("localhost"), IP.IP_LOCALHOST, Long.MAX_VALUE));
 	}
 
-	public final ResolverAnswer resolveHostname(ByteChars hostname, Client caller, Object cbdata, int flags)
+	public final ResolverAnswer resolveHostname(CharSequence hostnameStr, Client caller, Object cbdata, int flags)
 			throws java.io.IOException
 	{
+		ByteChars hostname = ByteChars.valueOf(hostnameStr);
 		boolean allowDottedIP = ((flags & FLAG_NODOTTEDIP) == 0);
 		boolean have_ip = false;
 		int ipaddr = 0;
@@ -142,45 +143,46 @@ public abstract class ResolverDNS implements DispatcherRunnable
 		return resolve(QTYPE_PTR, ipaddr, caller, cbdata, flags);
 	}
 
-	public final ResolverAnswer resolveMailDomain(ByteChars maildom, Client caller, Object cbdata, int flags)
+	public final ResolverAnswer resolveMailDomain(CharSequence maildom, Client caller, Object cbdata, int flags)
 			throws java.io.IOException
 	{
 		return resolveDomain(QTYPE_MX, maildom, caller, cbdata, flags, true);
 	}
 
-	public final ResolverAnswer resolveNameServer(ByteChars domnam, Client caller, Object cbdata, int flags)
+	public final ResolverAnswer resolveNameServer(CharSequence domnam, Client caller, Object cbdata, int flags)
 			throws java.io.IOException
 	{
 		return resolveDomain(QTYPE_NS, domnam, caller, cbdata, flags, true);
 	}
 
-	public final ResolverAnswer resolveSOA(ByteChars domnam, Client caller, Object cbdata, int flags)
+	public final ResolverAnswer resolveSOA(CharSequence domnam, Client caller, Object cbdata, int flags)
 			throws java.io.IOException
 	{
 		return resolveDomain(QTYPE_SOA, domnam, caller, cbdata, flags, true);
 	}
 
-	public final ResolverAnswer resolveSRV(ByteChars domnam, Client caller, Object cbdata, int flags)
+	public final ResolverAnswer resolveSRV(CharSequence domnam, Client caller, Object cbdata, int flags)
 			throws java.io.IOException
 	{
 		return resolveDomain(QTYPE_SRV, domnam, caller, cbdata, flags, true);
 	}
 
-	public final ResolverAnswer resolveTXT(ByteChars domnam, Client caller, Object cbdata, int flags)
+	public final ResolverAnswer resolveTXT(CharSequence domnam, Client caller, Object cbdata, int flags)
 			throws java.io.IOException
 	{
 		return resolveDomain(QTYPE_TXT, domnam, caller, cbdata, flags, true);
 	}
 
-	public final ResolverAnswer resolveAAAA(ByteChars domnam, Client caller, Object cbdata, int flags)
+	public final ResolverAnswer resolveAAAA(CharSequence domnam, Client caller, Object cbdata, int flags)
 			throws java.io.IOException
 	{
 		return resolveDomain(QTYPE_AAAA, domnam, caller, cbdata, flags, true);
 	}
 
-	private ResolverAnswer resolveDomain(byte qtype, ByteChars qname, Client caller, Object cbdata, int flags, boolean verify)
+	private ResolverAnswer resolveDomain(byte qtype, CharSequence qnameStr, Client caller, Object cbdata, int flags, boolean verify)
 			throws java.io.IOException
 	{
+		ByteChars qname = ByteChars.valueOf(qnameStr);
 		if (verify) {
 			ResolverAnswer answer = verifyQuery(qtype, qname, flags);
 			if (answer != null) return answer;

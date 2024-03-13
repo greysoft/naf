@@ -259,7 +259,7 @@ public class SSLConnectionTest
 	}
 
 	@Override
-	public void eventIndication(Object obj, String eventId)
+	public void eventIndication(String eventId, Object obj, Object data)
 	{
 		if (CM_Listener.EVENTID_LISTENER_CNXREQ.equals(eventId)) {
 			startcnt_servers++;

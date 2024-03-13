@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Yusef Badri - All rights reserved.
+ * Copyright 2018-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -95,5 +95,23 @@ public class ByteArrayRef extends ArrayRef<byte[]>
 
 	protected static int arraySize(byte[] buf) {
 		return (buf == null ? 0 : buf.length);
+	}
+
+	// This is predicated on the byte array representing 8-bit chars, which is the case for most text-based network protocols
+	public CharSequence toString(StringBuilder sb, int off, int len) {
+		if (off + len > size())
+			throw new ArrayIndexOutOfBoundsException(off+"/"+len+" in "+this);
+		if (sb == null)
+			sb = new StringBuilder(size());
+		off += offset();
+		int lmt = off + len;
+		for (int idx = off; idx != lmt; idx++) {
+			sb.append((char)buffer()[idx]);
+		}
+		return sb;
+	}
+
+	public CharSequence toString(StringBuilder sb) {
+		return toString(sb, 0, size());
 	}
 }

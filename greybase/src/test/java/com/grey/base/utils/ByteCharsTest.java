@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2018 Yusef Badri - All rights reserved.
+ * Copyright 2011-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -58,6 +58,7 @@ public class ByteCharsTest
 		verify(ah, 0, len, len);
 		org.junit.Assert.assertEquals(src_str.charAt(1), ah.byteAt(0));
 		org.junit.Assert.assertEquals(src_str.charAt(len), ah.byteAt(len-1));
+		org.junit.Assert.assertEquals(0, ah.offset());
 
 		ByteChars src_ah = new ByteChars(src_str);
 		ah = new ByteChars(src_ah, false);
@@ -67,6 +68,15 @@ public class ByteCharsTest
 		org.junit.Assert.assertFalse(src_ah.buffer() == ah.buffer());
 		org.junit.Assert.assertEquals(src_ah.byteAt(1), ah.byteAt(0));
 		org.junit.Assert.assertEquals(src_ah.byteAt(len), ah.byteAt(len-1));
+
+		ah = new ByteChars(src_str);
+		org.junit.Assert.assertEquals(src_str.length(), ah.size());
+		org.junit.Assert.assertEquals(src_str.length(), ah.buffer().length);
+		org.junit.Assert.assertEquals(src_str, ah.toString());
+		ah = new ByteChars(ah.buffer(), 1, src_str.length() - 2, false);
+		org.junit.Assert.assertEquals(src_str.length() - 2, ah.size());
+		org.junit.Assert.assertEquals(src_str.length(), ah.buffer().length);
+		org.junit.Assert.assertEquals("BCD", ah.toString());
 
 		//not actually constructors, but test these here
 		ah = new ByteChars(-1);

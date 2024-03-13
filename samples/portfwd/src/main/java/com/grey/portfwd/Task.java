@@ -57,9 +57,9 @@ public class Task
 	}
 
 	@Override
-	public void eventIndication(Object obj, String eventId) {
-		if (!(obj instanceof ListenerSet) || !EventListenerNAF.EVENTID_ENTITY_STOPPED.equals(eventId)) {
-			getDispatcher().getLogger().info("Discarding unexpected event="+obj.getClass().getName()+"/"+eventId);
+	public void eventIndication(String eventId, Object evtsrc, Object data) {
+		if (!(evtsrc instanceof ListenerSet) || !EventListenerNAF.EVENTID_ENTITY_STOPPED.equals(eventId)) {
+			getDispatcher().getLogger().info("Discarding unexpected event="+eventId+"/"+evtsrc.getClass().getName()+"/"+data);
 			return;
 		}
 		nafletStopped();

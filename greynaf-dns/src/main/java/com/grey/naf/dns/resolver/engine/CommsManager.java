@@ -87,8 +87,8 @@ class CommsManager
 	}
 
 	@Override
-	public void eventIndication(Object obj, String eventId) {
-		if (obj instanceof EndPointTCP && ChannelMonitor.EVENTID_CM_DISCONNECTED.equals(eventId))
-			tcpstore.store((EndPointTCP)obj);
+	public void eventIndication(String eventId, Object eventSource, Object data) {
+		if (eventSource instanceof EndPointTCP && ChannelMonitor.EVENTID_CM_DISCONNECTED.equals(eventId))
+			tcpstore.store((EndPointTCP)eventSource);
 	}
 }

@@ -27,12 +27,12 @@ public class IterativeListener
 	}
 
 	@Override
-	public void eventIndication(Object obj, String eventId) {
+	public void eventIndication(String eventId, Object evtsrc, Object data) {
 		if (getEventListener() != null) {
-			getEventListener().eventIndication(obj, eventId);
+			getEventListener().eventIndication(eventId, evtsrc, data);
 		}
-		if (obj != cnxhandler || !ChannelMonitor.EVENTID_CM_DISCONNECTED.equals(eventId)) {
-			getLogger().info("Iterative Listener="+getName()+" discarding unexpected event="+obj.getClass().getName()+"/"+eventId);
+		if (evtsrc != cnxhandler || !ChannelMonitor.EVENTID_CM_DISCONNECTED.equals(eventId)) {
+			getLogger().info("Iterative Listener="+getName()+" discarding unexpected event="+evtsrc.getClass().getName()+"/"+eventId);
 			return;
 		}
 		try {
@@ -59,7 +59,7 @@ public class IterativeListener
 			}
 
 			if (getEventListener() != null) {
-				getEventListener().eventIndication(cnxhandler, EVENTID_LISTENER_CNXREQ);
+				getEventListener().eventIndication(EVENTID_LISTENER_CNXREQ, cnxhandler, null);
 			}
 
 			try {

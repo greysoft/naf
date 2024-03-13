@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2018 Yusef Badri - All rights reserved.
+ * Copyright 2010-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -17,7 +17,7 @@ public final class ByteChars
 {
 	private static final int INCR = 16;
 
-	// Note that constructors based on ByteChars params as deliberately omitted, as the Charsequence
+	// Note that constructors based on ByteChars params are deliberately omitted, as the Charsequence
 	// constructors handle the copy case, while new ByteChars(0).pointAt() will do for no-copy.
 	public ByteChars() {this(INCR);}
 	public ByteChars(int cap) {super(cap);}
@@ -396,17 +396,21 @@ public final class ByteChars
 		return new ByteChars(digest);
 	}
 
+	public static ByteChars valueOf(CharSequence src) {
+		return convertCharSequence(src, null);
+	}
+
 	public static ByteChars convertCharSequence(CharSequence src, ByteChars buf)
 	{
 		if (src == null || src.getClass() == ByteChars.class) return (ByteChars)src;
-		if (buf == null) buf = new ByteChars(src.length());
+		if (buf == null) return new ByteChars(src);
 		return buf.populate(src);
 	}
 
 	public static java.util.ArrayList<ByteChars> parseTerms(byte[] barr, int off, int len, byte dlm,
 			java.util.ArrayList<ByteChars> terms, com.grey.base.collections.ObjectWell<ByteChars> store)
 	{
-		if (terms == null) terms = new java.util.ArrayList<ByteChars>();
+		if (terms == null) terms = new java.util.ArrayList<>();
 		final int lmt = off + len;
 		int arg0 = off;
 		for (int idx = off; idx <= lmt; idx++)

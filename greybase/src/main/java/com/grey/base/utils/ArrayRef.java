@@ -85,7 +85,7 @@ public class ArrayRef<T>
 		if (buffer() == null)
 			throw new UnsupportedOperationException("No prototype buffer - cannot alloc cap="+capacity+" on "+this);
 		return allocBuffer(buffer().getClass(), capacity);
-	};
+	}
 
 	public ArrayRef<T> set(T buf, int off, int len)
 	{

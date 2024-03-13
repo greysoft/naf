@@ -51,15 +51,15 @@ public class ConcurrentListener
 	}
 
 	@Override
-	public void eventIndication(Object obj, String eventId) {
+	public void eventIndication(String eventId, Object evtsrc, Object data) {
 		if (getEventListener() != null) {
-			getEventListener().eventIndication(obj, eventId);
+			getEventListener().eventIndication(eventId, evtsrc, data);
 		}
-		if (!(obj instanceof CM_Server) || !ChannelMonitor.EVENTID_CM_DISCONNECTED.equals(eventId)) {
-			getLogger().info("Listener="+getName()+" discarding unexpected event="+obj.getClass().getName()+"/"+eventId);
+		if (!(evtsrc instanceof CM_Server) || !ChannelMonitor.EVENTID_CM_DISCONNECTED.equals(eventId)) {
+			getLogger().info("Listener="+getName()+" discarding unexpected event="+evtsrc.getClass().getName()+"/"+eventId);
 			return;
 		}
-		CM_Server srvr = (CM_Server)obj;
+		CM_Server srvr = (CM_Server)evtsrc;
 		boolean not_dup = deallocateServer(srvr);
 
 		if (not_dup && inShutdown() && !in_sync_stop && activeservers.isEmpty()) {
@@ -98,7 +98,7 @@ public class ConcurrentListener
 		activeservers.add(srvr);
 
 		if (getEventListener() != null) {
-			getEventListener().eventIndication(srvr, EVENTID_LISTENER_CNXREQ);
+			getEventListener().eventIndication(EVENTID_LISTENER_CNXREQ, srvr, null);
 		}
 		boolean ok = false;
 
@@ -107,7 +107,7 @@ public class ConcurrentListener
 			ok = true;
 		} finally {
 			if (!ok) {
-				eventIndication(srvr, EVENTID_CM_DISCONNECTED);
+				eventIndication(EVENTID_CM_DISCONNECTED, srvr, null);
 				getDispatcher().conditionalDeregisterIO(srvr);
 				connsock.close();
 			}

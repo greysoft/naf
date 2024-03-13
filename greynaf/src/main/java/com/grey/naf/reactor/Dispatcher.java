@@ -264,7 +264,7 @@ public class Dispatcher
 			lcnt = eventListeners.size();
 			while (!eventListeners.isEmpty()) {
 				EventListenerNAF l = eventListeners.remove(eventListeners.size()-1);
-				l.eventIndication(this, EventListenerNAF.EVENTID_ENTITY_STOPPED);
+				l.eventIndication(EventListenerNAF.EVENTID_ENTITY_STOPPED, this, null);
 			}
 		}
 		if (getNafManAgent() != null) getNafManAgent().stop();
@@ -575,14 +575,14 @@ public class Dispatcher
 	}
 
 	@Override
-	public void eventIndication(Object entity, String eventId) {
+	public void eventIndication(String eventId, Object eventSource, Object data) {
 		if (!EventListenerNAF.EVENTID_ENTITY_STOPPED.equals(eventId)) {
-			getLogger().info("Dispatcher="+getName()+" discarding unexpected event="+entity.getClass().getName()+"/"+eventId);
+			getLogger().info("Dispatcher="+getName()+" discarding unexpected event="+eventId+"/"+eventSource.getClass().getName()+"/"+data);
 			return;
 		}
 		verifyIsDispatcherThread();
-		boolean exists = (entity instanceof DispatcherRunnable ? dynamicRunnables.remove(entity) : false);
-		getLogger().info("Dispatcher="+getName()+" has received event="+entity.getClass().getName()+"/"+eventId+", with exists="+exists+", runnables="+dynamicRunnables.size()+"/"+getNafletCount()+" - "+entity);
+		boolean exists = (eventSource instanceof DispatcherRunnable ? dynamicRunnables.remove(eventSource) : false);
+		getLogger().info("Dispatcher="+getName()+" has received event="+eventSource.getClass().getName()+"/"+eventId+", with exists="+exists+", runnables="+dynamicRunnables.size()+"/"+getNafletCount()+" - "+eventSource);
 	}
 
 	@Override
