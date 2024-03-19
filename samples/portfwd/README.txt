@@ -13,11 +13,12 @@ However you can also rebuild it from here as follows:
 When running PortFwd, replace "VERSION" in all the commands below with the version you see embedded in the Jar name in the 'target' directory.
 Note that dotted system properties transpose to upper-case environment variables with underscores, eg. -Dgrey.logger.configfile is equivalent to the env var GREY_LOGGER_CONFIGFILE=src/main/config/logging.xml
 
-The basic run command is:
-	java -jar target/samples-portfwd-VERSION.jar -c src/main/config/portfwd.xml
+The basic run command is as follows (replacing "dev-SNAPSHOT" with whatever version string is there, if different):
+	cd  samples/portfwd
+	java -jar target/samples-portfwd-dev-SNAPSHOT.jar -c src/main/config/portfwd.xml
 
 Run this to get help on the usage:
-	java -cp target/samples-portfwd-VERSION.jar com.grey.portfwd.App -help
+	java -jar target/samples-portfwd-VERSION.jar -help
 
 Although this README tends to use the the classpath-and-main-class invocation syntax shown above, the PortFwd Jar is executable and can be run more simply like this:
 	java -jar target/samples-portfwd-VERSION.jar -help
@@ -27,19 +28,19 @@ The portfwd.xml config file specifies that the two relay services should listen 
 LOGGING
 --------
 To use NAF's native GreyLog logger with the supplied GreyLog config, you can run as either of these commands. They create a Dispatcher log under var/logs and a boot logger on stdout.
-	java -Dgrey.logger.configfile=src/main/config/logging.xml -cp target/samples-portfwd-VERSION.jar com.grey.portfwd.App -c src/main/config/portfwd.xml
+	java -Dgrey.logger.configfile=src/main/config/logging.xml -jar target/samples-portfwd-VERSION.jar -c src/main/config/portfwd.xml
 OR
-	GREY_LOGGER_CONFIGFILE=src/main/config/logging.xml java -cp target/samples-portfwd-VERSION.jar com.grey.portfwd.App -c src/main/config/portfwd.xml
+	GREY_LOGGER_CONFIGFILE=src/main/config/logging.xml java -jar target/samples-portfwd-VERSION.jar -c src/main/config/portfwd.xml
 
 If you do not specify any logging config at all, NAF applications will use a native GreyLog logger which is directed to stdout.
-	java -cp target/samples-portfwd-VERSION.jar com.grey.portfwd.App -c src/main/config/portfwd.xml
+	java -jar target/samples-portfwd-VERSION.jar -c src/main/config/portfwd.xml
 
 To get diagnostic logging on the logging setup itself, set -Dgrey.logger.diagnostics=true on the command line (or set the env var GREY_LOGGER_DIAGNOSTICS=true).
 
 INTEGRATION WITH SLF4J LOGGERS
 -------------------------------
 This sample app has been compiled with the SLF4J logger LogBack (see pom.xml) so if you want to do your logging via LogBack instead of using NAF's native GreyLog logger, then you can run the app like this, to delegate all logging to SLF4J.
-	java -Dgrey.logger.class=com.grey.logging.adapters.AdapterSLF4J -cp target/samples-portfwd-VERSION.jar com.grey.portfwd.App -c src/main/config/portfwd.xml
+	java -Dgrey.logger.class=com.grey.logging.adapters.AdapterSLF4J -jar target/samples-portfwd-VERSION.jar -c src/main/config/portfwd.xml
 
 Note that the same effect could be achieved with the logging.xml config file, if you changed the 'class' attribute from NAF's LatinLogger to com.grey.logging.adapters.AdapterSLF4J.
 
@@ -54,9 +55,9 @@ You can click on any of the commands to execute them and see their output.
 
 You can also execute NAFMAN commands from the command line.
 This runs the SHOWCONNS command, which  display the current set of relayed connections:
-	java -cp target/samples-portfwd-VERSION.jar com.grey.portfwd.App -remote localhost:13000 -cmd showconns?nohttp=y
+	java -jar target/samples-portfwd-VERSION.jar -remote localhost:13000 -cmd showconns?nohttp=y
 This runs a generic NAFMAN command to show the available NAFMAN commands:
-	java -cp target/samples-portfwd-VERSION.jar com.grey.portfwd.App -remote localhost:13000 -cmd showcmds?nohttp=y
+	java -jar target/samples-portfwd-VERSION.jar -remote localhost:13000 -cmd showcmds?nohttp=y
 
 You can also use the executable NAF jar to run NAFMAN commands. Run this command from the root of the repo.
 	java -jar pkg/target/dependency/greynaf-VERSION.jar -remote localhost:13000 -cmd showconns

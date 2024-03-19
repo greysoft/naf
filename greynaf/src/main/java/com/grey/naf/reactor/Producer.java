@@ -4,12 +4,16 @@
  */
 package com.grey.naf.reactor;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.Pipe;
 import java.util.List;
 
 import com.grey.base.collections.Circulist;
 import com.grey.base.utils.ByteArrayRef;
 import com.grey.base.utils.NIOBuffers;
 import com.grey.naf.BufferGenerator;
+import com.grey.logging.Logger;
 import com.grey.logging.Logger.LEVEL;
 
 /*
@@ -22,7 +26,7 @@ import com.grey.logging.Logger.LEVEL;
 public class Producer<T> implements DispatcherRunnable
 {
 	public interface Consumer<T> {
-		void producerIndication(Producer<T> p) throws java.io.IOException;
+		void producerIndication(Producer<T> p) throws IOException;
 	}
 
 	private final String name;
@@ -30,7 +34,7 @@ public class Producer<T> implements DispatcherRunnable
 	private final Circulist<T> exchgq;  //MT queue, on which Dispatcher receives items from producer
 	private final Circulist<T> availq;  //non-MT staging queue, only accessed by the Dispatcher
 	private final AlertsPipe<T> alertspipe;
-	private final com.grey.logging.Logger logger;
+	private final Logger logger;
 	private boolean in_shutdown;
 
 	@Override
@@ -40,17 +44,20 @@ public class Producer<T> implements DispatcherRunnable
 	@Override
 	public boolean stopDispatcherRunnable() {shutdown(false); return true;}
 
-	public Producer(String producerName, Dispatcher dsptch, Consumer<T> itemConsumer) throws java.io.IOException {
+	public Producer(String producerName, Dispatcher dsptch, Consumer<T> itemConsumer) throws IOException {
 		name = producerName;
 		consumer = itemConsumer;
 		exchgq = new Circulist<>();
 		availq = new Circulist<>();
-		alertspipe = new AlertsPipe<>(dsptch, this);
 		logger = dsptch.getLogger();
+
+		BufferGenerator.BufferConfig bufcfg = new BufferGenerator.BufferConfig(0, false, null, null); //we will do our own reads
+		BufferGenerator bufgen = new BufferGenerator(bufcfg);
+		alertspipe = new AlertsPipe<>(dsptch, bufgen, this);
 	}
 
 	@Override
-	public void startDispatcherRunnable() throws java.io.IOException {
+	public void startDispatcherRunnable() throws IOException {
 		logger.info("Dispatcher="+getDispatcher().getName()+" starting Producer="+this);
 		alertspipe.start();
 	}
@@ -82,7 +89,7 @@ public class Producer<T> implements DispatcherRunnable
 		return availq.remove();
 	}
 
-	public void produce(T item) throws java.io.IOException {
+	public void produce(T item) throws IOException {
 		int cnt;
 		synchronized (exchgq) {
 			cnt = exchgq.size();
@@ -91,7 +98,7 @@ public class Producer<T> implements DispatcherRunnable
 		produce(cnt);
 	}
 
-	public void produce(List<T> items) throws java.io.IOException {
+	public void produce(List<T> items) throws IOException {
 		int cnt;
 		synchronized (exchgq) {
 			cnt = exchgq.size();
@@ -102,7 +109,7 @@ public class Producer<T> implements DispatcherRunnable
 		produce(cnt);
 	}
 
-	public void produce(T[] items, int off, int len) throws java.io.IOException {
+	public void produce(T[] items, int off, int len) throws IOException {
 		int lmt = off + len;
 		int cnt;
 		synchronized (exchgq) {
@@ -114,7 +121,7 @@ public class Producer<T> implements DispatcherRunnable
 		produce(cnt);
 	}
 
-	public void produce(T[] items) throws java.io.IOException {
+	public void produce(T[] items) throws IOException {
 		produce(items, 0, items.length);
 	}
 
@@ -127,7 +134,7 @@ public class Producer<T> implements DispatcherRunnable
 	// the AlertsPipe to signal the owner Dispatcher.
 	// If exchgq already had unconsumed items on it, then we assume the owner Dispatcher has already been signalled,
 	// so we can skip the I/O cost of sending it a redundant signal.
-	private void produce(int exchq_prevsize) throws java.io.IOException {
+	private void produce(int exchq_prevsize) throws IOException {
 		if (getDispatcher().isDispatcherThread()) {
 			producerEvent(); //we can synchronously call the Consumer
 		} else {
@@ -173,18 +180,18 @@ public class Producer<T> implements DispatcherRunnable
 	 */
 	static final class AlertsPipe<T> extends CM_Stream {
 		private final Producer<T> producer;
-		private final java.nio.channels.Pipe.SinkChannel wep;   //Write end-point of pipe
-		private final java.nio.channels.Pipe.SourceChannel rep; //Read end-point of pipe
-		private final java.nio.ByteBuffer rcvbuf;
+		private final Pipe.SinkChannel wep;   //Write end-point of pipe
+		private final Pipe.SourceChannel rep; //Read end-point of pipe
+		private final ByteBuffer rcvbuf;
 
 		public Producer<T> getProducer() {return producer;}
 
 		// Note that 'rep' and 'CM_Stream.iochan' are one and the same, but recording it as rep allows us to avoid casting iochan.
-		private AlertsPipe(Dispatcher d, Producer<T> p) throws java.io.IOException {
-			super(d, new BufferGenerator(0, 0), null); //we will do our own reads
+		private AlertsPipe(Dispatcher d, BufferGenerator bufgen, Producer<T> p) throws IOException {
+			super(d, bufgen, null);
 			producer = p;
 
-			java.nio.channels.Pipe pipe = java.nio.channels.Pipe.open();
+			Pipe pipe = Pipe.open();
 			rep = pipe.source(); //Read end-point
 			wep = pipe.sink();
 			wep.configureBlocking(false); //guaranteed not to block in practice
@@ -192,12 +199,12 @@ public class Producer<T> implements DispatcherRunnable
 		}
 
 		// enable event notifications on the read (consumer) endpoint of our pipe		
-		private void start() throws java.io.IOException {
+		private void start() throws IOException {
 			registerConnectedChannel(rep, true);
 			getReader().receive(0);
 		}
 
-		private void shutdown() throws java.io.IOException {
+		private void shutdown() throws IOException {
 			wep.close();
 			disconnect();
 		}
@@ -206,15 +213,15 @@ public class Producer<T> implements DispatcherRunnable
 		// We don't care if the write() returns zero because it's blocked. We are not sending data which the
 		// consumer has to read, but merely kicking it into action, and if the pipe is full, then the
 		// consumer will surely be signalled that I/O is pending.
-		private synchronized void signalConsumer() throws java.io.IOException {
-			java.nio.ByteBuffer buf = NIOBuffers.create(1, false);
+		private synchronized void signalConsumer() throws IOException {
+			ByteBuffer buf = NIOBuffers.create(1, false);
 			wep.write(buf);
 		}
 
 		// This happens within the Dispatcher (consumer) thread.
 		// We don't care what's in rcvbuf, we just read it off to clear the I/O notification.
 		@Override
-		public void ioReceived(ByteArrayRef data) throws java.io.IOException {
+		public void ioReceived(ByteArrayRef data) throws IOException {
 			rcvbuf.clear();
 			rep.read(rcvbuf);
 			producer.producerEvent();

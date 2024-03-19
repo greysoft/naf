@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 Yusef Badri - All rights reserved.
+ * Copyright 2012-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.nafman;
@@ -14,14 +14,14 @@ import com.grey.naf.TestUtils;
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.config.DispatcherConfig;
 
-public class ClientTest
+public class NafmanClientTest
 {
-	private static final String rootdir = com.grey.naf.TestUtils.initPaths(ClientTest.class);
+	private static final String rootdir = com.grey.naf.TestUtils.initPaths(NafmanClientTest.class);
 	private static final NafManRegistry.DefCommand fakecmd1 = new NafManRegistry.DefCommand("fake-cmd-1", "utest", "fake1", null, false);
 	private static final NafManRegistry.DefCommand fakecmd2 = new NafManRegistry.DefCommand("fake-cmd-2", "utest", "fake2", null, false);
 	private static final com.grey.logging.Logger logger = com.grey.logging.Factory.getLoggerNoEx("");
 
-	public ClientTest() throws java.io.IOException {
+	public NafmanClientTest() throws java.io.IOException {
 		FileOps.deleteDirectory(rootdir);
 	}
 
@@ -31,15 +31,18 @@ public class ClientTest
 	{
 		java.net.URL url = DynLoader.getResource("/naf.xml", getClass());
 		String cfgpath = new java.io.File(url.toURI()).getCanonicalPath();
-		ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, cfgpath, true);
+		ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, cfgpath, true, logger);
 		NafManRegistry nafreg = NafManRegistry.get(appctx);
 		NafManRegistry.DefCommand stopcmd = nafreg.getCommand(NafManRegistry.CMD_STOP);
 
 		String dname = "testdispatcher1";
-		XmlConfig dcfg = appctx.getConfig().getDispatcher(dname);
-		DispatcherConfig def = new DispatcherConfig.Builder().withXmlConfig(dcfg).build();
+		XmlConfig dcfg = appctx.getNafConfig().getDispatcherConfigNode(dname);
+		DispatcherConfig def = DispatcherConfig.builder()
+				.withXmlConfig(dcfg)
+				.withAppContext(appctx)
+				.build();
 
-		Dispatcher dsptch = Dispatcher.create(appctx, def, logger);
+		Dispatcher dsptch = Dispatcher.create(def);
 		NafManAgent agent = dsptch.getNafManAgent();
 		org.junit.Assert.assertTrue(agent.isPrimary());
 		org.junit.Assert.assertSame(agent, appctx.getNamedItem(PrimaryAgent.class.getName(), null));
@@ -47,14 +50,14 @@ public class ClientTest
 		com.grey.naf.Launcher.main(new String[] {"-q", "-cmd", stopcmd.code, "-remote", String.valueOf(agent.getPort())});
 		waitStopped(dsptch);
 
-		dsptch = Dispatcher.create(appctx, def, logger);
+		dsptch = Dispatcher.create(def);
 		agent = dsptch.getNafManAgent();
 		dsptch.start();
 		com.grey.naf.Launcher.main(new String[] {"-q", "-cmd", stopcmd.code,
 				"-remote", "localhost:"+String.valueOf(agent.getPort())});
 		waitStopped(dsptch);
 
-		dsptch = Dispatcher.create(appctx, def, logger);
+		dsptch = Dispatcher.create(def);
 		agent = dsptch.getNafManAgent();
 		dsptch.start();
 		// this should be ignored by the Dispatcher as it has no handlers
@@ -79,18 +82,19 @@ public class ClientTest
 	@org.junit.Test
 	public void testStopMulti() throws Exception
 	{
-		ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, true);
+		ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, true, logger);
 		NafManRegistry nafreg = NafManRegistry.get(appctx);
 		NafManRegistry.DefCommand stopcmd = nafreg.getCommand(NafManRegistry.CMD_STOP);
-		DispatcherConfig def = new com.grey.naf.reactor.config.DispatcherConfig.Builder()
+		DispatcherConfig def = com.grey.naf.reactor.config.DispatcherConfig.builder()
 				.withName("utest_d1")
+				.withAppContext(appctx)
 				.withSurviveHandlers(false)
 				.build();
-		Dispatcher dp = Dispatcher.create(appctx, def, logger);
-		def = new com.grey.naf.reactor.config.DispatcherConfig.Builder(def).withName("utest_d2").build();
-		Dispatcher ds1 = Dispatcher.create(appctx, def, logger);
-		def = new com.grey.naf.reactor.config.DispatcherConfig.Builder(def).withName("utest_d3").build();
-		Dispatcher ds2 = Dispatcher.create(appctx, def, logger);
+		Dispatcher dp = Dispatcher.create(def);
+		def = def.mutate().withName("utest_d2").build();
+		Dispatcher ds1 = Dispatcher.create(def);
+		def = def.mutate().withName("utest_d3").build();
+		Dispatcher ds2 = Dispatcher.create(def);
 		dp.start();
 		ds1.start();
 		ds2.start();
@@ -112,14 +116,15 @@ public class ClientTest
 	@org.junit.Test
 	public void testCommands() throws Exception
 	{
-		ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, true);
+		ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, true, logger);
 		NafManRegistry reg = NafManRegistry.get(appctx);
 		NafManRegistry.DefCommand stopcmd = reg.getCommand(NafManRegistry.CMD_STOP);
-		DispatcherConfig def = new com.grey.naf.reactor.config.DispatcherConfig.Builder()
+		DispatcherConfig def = com.grey.naf.reactor.config.DispatcherConfig.builder()
 				.withName("utest_allcmds")
 				.withSurviveHandlers(false)
+				.withAppContext(appctx)
 				.build();
-		Dispatcher dsptch = Dispatcher.create(appctx, def, logger);
+		Dispatcher dsptch = Dispatcher.create(def);
 		dsptch.start();
 		int port = dsptch.getNafManAgent().getPort();
 

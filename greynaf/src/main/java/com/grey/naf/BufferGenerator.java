@@ -13,7 +13,7 @@ public class BufferGenerator
 {
 	//defaults to false as Direct buffers don't have backing array in standard JDK implementation
 	public static final boolean directniobufs = SysProps.get("greynaf.nio.directbufs", false);
-	private static final BufferConfig DefaultConfig = new BufferConfig(0, false, directniobufs, null);
+	private static final BufferConfig DefaultConfig = new BufferConfig(0, null, null, null);
 
 	public final int rcvbufsiz;
 	public final boolean directbufs;
@@ -21,22 +21,6 @@ public class BufferGenerator
 	private final java.nio.charset.CharsetEncoder chenc;
 
 	public String charsetName() {return (chenc == null ? "n/a" : chenc.charset().displayName());}
-
-	public BufferGenerator(int rcvsiz, int xmtsiz) {
-		this(null, null, rcvsiz, xmtsiz);
-	}
-
-	public BufferGenerator(int rcvsiz, int xmtsiz, boolean direct, String charset) {
-		this(null, null, rcvsiz, xmtsiz, direct, charset);
-	}
-
-	public BufferGenerator(XmlConfig cfg, String xpath, int rcvsiz, int xmtsiz) {
-		this(cfg, xpath, rcvsiz, xmtsiz, DefaultConfig.directbufs, DefaultConfig.charset);
-	}
-
-	public BufferGenerator(XmlConfig cfg, String xpath, int rcvsiz, int xmtsiz, boolean direct, String charset) {
-		this(BufferConfig.create(cfg, xpath, new BufferConfig(rcvsiz, xmtsiz==0?false:true, direct, charset)));
-	}
 	
 	public BufferGenerator(BufferConfig cfg) {
 		rcvbufsiz = cfg.rcvbufsiz;
@@ -56,6 +40,12 @@ public class BufferGenerator
 		} else {
 			xmtpool = null;
 		}
+	}
+
+	public static BufferGenerator create(XmlConfig cfg, String xpath, int rcvsiz, int xmtsiz) {
+		BufferGenerator.BufferConfig bufcfg = new BufferGenerator.BufferConfig(rcvsiz, xmtsiz==0?false:true, null, null);
+		bufcfg = BufferGenerator.BufferConfig.create(cfg, xpath, bufcfg);
+		return new BufferGenerator(bufcfg);
 	}
 
 	public java.nio.ByteBuffer encode(CharSequence content, java.nio.ByteBuffer bybuf)
@@ -106,10 +96,10 @@ public class BufferGenerator
 		public final boolean directbufs;
 		public final String charset;
 
-		public BufferConfig(int rcvbufsiz, boolean withXmitPool, boolean directbufs, String charset) {
+		public BufferConfig(int rcvbufsiz, Boolean withXmitPool, Boolean directbufs, String charset) {
 			this.rcvbufsiz = rcvbufsiz;
-			this.withXmitPool = withXmitPool;
-			this.directbufs = directbufs;
+			this.withXmitPool = (withXmitPool == null ? false : withXmitPool);
+			this.directbufs = (directbufs == null ? directniobufs : directbufs);
 			this.charset = charset;
 		}
 

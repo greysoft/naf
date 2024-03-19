@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2022 Yusef Badri - All rights reserved.
+ * Copyright 2014-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.resolver.engine;
@@ -12,6 +12,7 @@ import com.grey.base.collections.HashedMap;
 import com.grey.base.collections.HashedMapIntKey;
 import com.grey.base.utils.IP;
 import com.grey.naf.ApplicationContextNAF;
+import com.grey.naf.NAFConfig;
 import com.grey.naf.dns.integration.ResolverTester;
 import com.grey.naf.dns.resolver.ResolverConfig;
 import com.grey.naf.dns.resolver.ResolverDNS;
@@ -22,11 +23,12 @@ import com.grey.naf.dns.TestUtils;
 public class CacheManagerTest
 {
 	private static final String rootdir = TestUtils.initPaths(CacheManagerTest.class);
-	private static final com.grey.logging.Logger logger = com.grey.logging.Factory.getLoggerNoEx("no-such-logger");
 	private static final java.io.File CFGFILE_ROOTS = new java.io.File(rootdir+"/rootservers");
 
 	// disable NAFMAN to prevent any deregisterIO ops in dsptch.stop, since we never actually start it
-	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, false);
+	private static final ApplicationContextNAF appctx = ApplicationContextNAF.builder()
+			.withNafConfig(new NAFConfig.Builder().withBasePort(NAFConfig.RSVPORT_ANON).build())
+			.build();
 	private Dispatcher dsptch;
 	private CacheManager cmgr;
 
@@ -450,10 +452,11 @@ public class CacheManagerTest
 		throws java.io.IOException, javax.naming.NamingException
 	{
 		if (dnscfg == null) dnscfg = XmlConfig.NULLCFG;
-		DispatcherConfig def = new DispatcherConfig.Builder()
+		DispatcherConfig def = DispatcherConfig.builder()
 				.withName("CacheManagerTest")
+				.withAppContext(appctx)
 				.build();
-		dsptch = Dispatcher.create(appctx, def, logger);
+		dsptch = Dispatcher.create(def);
 		ResolverConfig config = new ResolverConfig.Builder()
 				.withXmlConfig(dnscfg)
 				.withCacheLoWaterA(4)

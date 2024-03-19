@@ -55,7 +55,7 @@ public class ResolverNAFMAN
 		resolver = rslvr;
 		isRecursive = config.isRecursive();
 		logger = dsptch.getLogger();
-		fh_dump = new java.io.File(dsptch.getApplicationContext().getConfig().getPathVar()+"/DNSdump-"+dsptch.getName()+".txt");
+		fh_dump = new java.io.File(dsptch.getApplicationContext().getNafConfig().getPathVar()+"/DNSdump-"+dsptch.getName()+".txt");
 
 		if (dsptch.getNafManAgent() != null) {
 			NafManRegistry reg = dsptch.getNafManAgent().getRegistry();

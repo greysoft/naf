@@ -34,7 +34,7 @@ public class BatchTask
 
 	public BatchTask(String name, Dispatcher dsptch, XmlConfig cfg)throws java.io.IOException {
 		super(name, dsptch, cfg);
-		config = new BatchConfig(taskConfig(), dsptch.getApplicationContext().getConfig());
+		config = new BatchConfig(taskConfig(), dsptch.getApplicationContext().getNafConfig());
 		logger = dsptch.getLogger();
 
 		java.io.InputStream fin = (config.getFilenameIn() == null ? System.in : new java.io.FileInputStream(config.getFilenameIn()));

@@ -1,10 +1,11 @@
 /*
- * Copyright 2018-2021 Yusef Badri - All rights reserved.
+ * Copyright 2018-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf;
 
 import java.util.Map;
+import java.io.IOException;
 import java.util.Collection;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -17,6 +18,9 @@ import com.grey.naf.reactor.CM_Listener;
 import com.grey.naf.nafman.NafManConfig;
 import com.grey.naf.nafman.NafManAgent;
 import com.grey.naf.nafman.PrimaryAgent;
+import com.grey.logging.Parameters;
+import com.grey.logging.Factory;
+import com.grey.logging.Logger;
 import com.grey.naf.errors.NAFConfigException;
 
 public class ApplicationContextNAF {
@@ -35,21 +39,21 @@ public class ApplicationContextNAF {
 	private final NAFConfig nafConfig;
 	private final NafManConfig nafmanConfig;
 	private final ExecutorService threadpool;
+	private final Logger bootLogger; //refered to as boot logger as each Dispatcher typically has its own
 
 	public String getName() {return ctxname;}
-	public NAFConfig getConfig() {return nafConfig;}
+	public NAFConfig getNafConfig() {return nafConfig;}
 	public NafManConfig getNafManConfig() {return nafmanConfig;}
 	public ExecutorService getThreadpool() {return threadpool;}
+	public Logger getBootLogger() {return bootLogger;}
 
-	public static ApplicationContextNAF create(String name, NAFConfig cfg, NafManConfig nafmanConfig) {
-		if (name == null) name = "AnonAppContext-"+anonCount.incrementAndGet();
-		ApplicationContextNAF ctx = new ApplicationContextNAF(name, cfg, nafmanConfig);
-
+	private static ApplicationContextNAF create(Builder bldr) throws IOException {
+		ApplicationContextNAF ctx = new ApplicationContextNAF(bldr);
 		ApplicationContextNAF dup = contextsByName.putIfAbsent(ctx.getName(), ctx);
 		if (dup != null) throw new NAFConfigException("Duplicate app-context="+ctx+" - prev="+dup);
 
-		if (ctx.getConfig().getBasePort() != NAFConfig.RSVPORT_ANON) {
-			dup = contextsByPort.putIfAbsent(ctx.getConfig().getBasePort(), ctx);
+		if (ctx.getNafConfig().getBasePort() != NAFConfig.RSVPORT_ANON) {
+			dup = contextsByPort.putIfAbsent(ctx.getNafConfig().getBasePort(), ctx);
 			if (dup != null) {
 				contextsByName.remove(ctx.getName());
 				throw new NAFConfigException("Duplicate app-context port for "+ctx+" - prev="+dup);
@@ -58,15 +62,20 @@ public class ApplicationContextNAF {
 		return ctx;
 	}
 
-	private ApplicationContextNAF(String name, NAFConfig cfg, NafManConfig nafmanConfig) {
-		ctxname = name;
-		nafConfig = cfg;
-		this.nafmanConfig = nafmanConfig;
+	private ApplicationContextNAF(Builder bldr) throws IOException {
+		ctxname = (bldr.ctxname == null ? "AnonAppContext-"+anonCount.incrementAndGet() : bldr.ctxname);
+		bootLogger = (bldr.bootLogger == null ? Factory.getLogger(new Parameters.Builder().build(), "bootlogger-appcx-"+ctxname) : bldr.bootLogger);
+		nafConfig = (bldr.nafConfig == null ? new NAFConfig.Builder().build() : bldr.nafConfig);
+		nafmanConfig = bldr.nafmanConfig;
 
-		if (nafConfig.getThreadPoolSize() == -1) {
-			threadpool = Executors.newCachedThreadPool();
+		if (bldr.threadpool == null) {
+			if (nafConfig.getThreadPoolSize() == -1) {
+				threadpool = Executors.newCachedThreadPool();
+			} else {
+				threadpool = Executors.newFixedThreadPool(nafConfig.getThreadPoolSize());
+			}
 		} else {
-			threadpool = Executors.newFixedThreadPool(nafConfig.getThreadPoolSize());
+			threadpool = bldr.threadpool;
 		}
 	}
 
@@ -127,7 +136,55 @@ public class ApplicationContextNAF {
 	@Override
 	public String toString() {
 		String txt = "ApplicationContext-"+getName();
-		if (getConfig().getBasePort() != NAFConfig.RSVPORT_ANON) txt += ":"+getConfig().getBasePort();
+		if (getNafConfig().getBasePort() != NAFConfig.RSVPORT_ANON) txt += ":"+getNafConfig().getBasePort();
 		return txt;
+	}
+
+	public static Builder builder() {
+		return new Builder();
+	}
+
+
+	public static class Builder {
+		private String ctxname;
+		private NAFConfig nafConfig;
+		private NafManConfig nafmanConfig;
+		private ExecutorService threadpool;
+		private Logger bootLogger;
+
+		private Builder() {}
+
+		public Builder withName(String v) {
+			ctxname = v;
+			return this;
+		}
+
+		public Builder withNafConfig(NAFConfig v) {
+			nafConfig = v;
+			return this;
+		}
+
+		public Builder withNafManConfig(NafManConfig v) {
+			nafmanConfig = v;
+			return this;
+		}
+
+		public Builder withThreadPool(ExecutorService v) {
+			threadpool = v;
+			return this;
+		}
+
+		public Builder withBootLogger(Logger v) {
+			bootLogger = v;
+			return this;
+		}
+
+		public ApplicationContextNAF build() {
+			try {
+				return ApplicationContextNAF.create(this);
+			} catch (Exception ex) {
+				throw new NAFConfigException("Failed to create ApplicationContext="+ctxname, ex);
+			}
+		}
 	}
 }

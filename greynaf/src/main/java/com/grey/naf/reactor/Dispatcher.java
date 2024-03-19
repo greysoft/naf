@@ -12,6 +12,7 @@ import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
+import java.io.IOException;
 import java.time.Clock;
 
 import com.grey.base.config.SysProps;
@@ -103,15 +104,9 @@ public class Dispatcher
 	private boolean error_abort;
 	public boolean completedOK() {return thread_completed && !error_abort;}
 
-	public static Dispatcher create(ApplicationContextNAF appctx, DispatcherConfig def, Logger log) throws java.io.IOException {
-		if (def == null) {
-			def = new DispatcherConfig.Builder().build();
-		}
-		if (def.getName() == null || def.getName().isEmpty()) {
-			String name = appctx.getName()+"-AnonDispatcher-"+anonDispatcherCount.incrementAndGet();
-			def = new DispatcherConfig.Builder(def).withName(name).build();
-		}
-		Dispatcher dsptch = new Dispatcher(appctx, def, log);
+	public static Dispatcher create(DispatcherConfig def) throws IOException {
+		Dispatcher dsptch = new Dispatcher(def);
+		ApplicationContextNAF appctx = dsptch.getApplicationContext();
 		appctx.register(dsptch);
 
 		// Create the NAFMAN agent (if any)
@@ -135,20 +130,24 @@ public class Dispatcher
 		return dsptch;
 	}
 
-	private Dispatcher(ApplicationContextNAF appctx, DispatcherConfig def, Logger initlog) throws java.io.IOException {
-		this.appctx = appctx;
-		dname = def.getName();
+	private Dispatcher(DispatcherConfig def) throws java.io.IOException {
+		appctx = (def.getAppContext() == null ? ApplicationContextNAF.builder().build() : def.getAppContext());
 		surviveHandlers = def.isSurviveHandlers();
-
 		clock = def.getClock();
 		timeBoot = clock.millis();
 		systime_msecs = timeBoot;
+		
+		if (def.getName() == null || def.getName().isEmpty()) {
+			dname = appctx.getName()+"-AnonDispatcher-"+anonDispatcherCount.incrementAndGet();
+		} else {
+			dname = def.getName();
+		}
 
 		String logname = def.getLogName();
-		Logger dlog = initlog;
-		if (logname != null || initlog == null) dlog = com.grey.logging.Factory.getLogger(logname == null ? dname : logname);
+		Logger dlog = appctx.getBootLogger();
+		if (dlog == null || logname != null) dlog = com.grey.logging.Factory.getLogger(logname == null ? dname : logname);
 		logger = dlog;
-		if (initlog != null) initlog.info("Initialising Dispatcher="+dname+" in AppCtx="+appctx.getName()+" - Logger="+logname+" => "+dlog);
+		if (appctx.getBootLogger() != null) appctx.getBootLogger().info("Initialising Dispatcher="+dname+" in AppCtx="+appctx.getName()+" - Logger="+logname+" => "+dlog);
 
 		threadMain = new Thread(this, "Dispatcher-"+dname);
 		threadInitial = Thread.currentThread();
@@ -160,9 +159,9 @@ public class Dispatcher
 		dynamicLoader = new Producer<>("DispatcherRunnables", this, this);
 
 		flusher = new Flusher(this, def.getFlushInterval());
-		if (getLogger() != initlog) flusher.register(getLogger());
+		if (getLogger() != appctx.getBootLogger()) flusher.register(getLogger());
 
-		getLogger().info("Dispatcher="+dname+": Initialised with baseport="+appctx.getConfig().getBasePort()
+		getLogger().info("Dispatcher="+dname+": Initialised with baseport="+appctx.getNafConfig().getBasePort()
 				+", NAFMan="+(appctx.getNafManConfig()!=null)+", survive_handlers="+surviveHandlers
 				+", flush="+TimeOps.expandMilliTime(def.getFlushInterval())
 				+"\n\tSelector="+slct.getClass().getCanonicalName()+", Provider="+slct.provider().getClass().getCanonicalName()

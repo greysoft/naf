@@ -39,7 +39,7 @@ public class ClientSession
 			com.grey.base.config.XmlConfig cfg = (com.grey.base.config.XmlConfig)factoryConfig;
 			com.grey.base.config.XmlConfig[] servicecfg = cfg.getSections("services/service");
 			com.grey.base.config.XmlConfig balancercfg = cfg.getSection("loadbalancer");
-			bufspec = new com.grey.naf.BufferGenerator(cfg, "niobuffers", 1024, 512);
+			bufspec = com.grey.naf.BufferGenerator.create(cfg, "niobuffers", 1024, 512);
 			tmt_idle = cfg.getTime("services/@timeout", 0);
 
 			if (servicecfg == null) {

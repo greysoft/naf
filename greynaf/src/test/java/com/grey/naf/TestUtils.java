@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2021 Yusef Badri - All rights reserved.
+ * Copyright 2013-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf;
@@ -8,6 +8,7 @@ import com.grey.base.config.SysProps;
 import com.grey.base.utils.DynLoader;
 import com.grey.base.utils.FileOps;
 import com.grey.naf.nafman.NafManConfig;
+import com.grey.logging.Logger;
 
 public class TestUtils {
 
@@ -26,19 +27,24 @@ public class TestUtils {
 		return rootpath;
 	}
 
-	public static ApplicationContextNAF createApplicationContext(String name, String cfgpath, boolean withNafman) {
+	public static ApplicationContextNAF createApplicationContext(String name, String cfgpath, boolean withNafman, Logger bootLogger) {
 		NAFConfig nafcfg = new NAFConfig.Builder().withConfigFile(cfgpath).build();
-		return createApplicationContext(name, nafcfg, withNafman);
+		return createApplicationContext(name, nafcfg, withNafman, bootLogger);
 	}
 
-	public static ApplicationContextNAF createApplicationContext(String name, boolean withNafman) {
+	public static ApplicationContextNAF createApplicationContext(String name, boolean withNafman, Logger bootLogger) {
 		NAFConfig nafcfg = new NAFConfig.Builder().withBasePort(NAFConfig.RSVPORT_ANON).build();
-		return createApplicationContext(name, nafcfg, withNafman);
+		return createApplicationContext(name, nafcfg, withNafman, bootLogger);
 	}
 
-	public static ApplicationContextNAF createApplicationContext(String name, NAFConfig nafcfg, boolean withNafman) {
+	private static ApplicationContextNAF createApplicationContext(String name, NAFConfig nafcfg, boolean withNafman, Logger bootLogger) {
 		NafManConfig nafmanConfig = (withNafman ? new NafManConfig.Builder(nafcfg).build() : null);
-		return ApplicationContextNAF.create(name, nafcfg, nafmanConfig);
+		return ApplicationContextNAF.builder()
+				.withName(name)
+				.withNafConfig(nafcfg)
+				.withNafManConfig(nafmanConfig)
+				.withBootLogger(bootLogger)
+				.build();
 	}
 
 	// NB: The concept of mapping a resource URL to a File is inherently flawed, but this utility works because the resources we're

@@ -20,6 +20,7 @@ import com.grey.naf.NAFConfig;
 import com.grey.naf.dns.resolver.ResolverConfig;
 import com.grey.naf.dns.resolver.ResolverDNS;
 import com.grey.naf.dns.resolver.engine.ResolverAnswer;
+import com.grey.naf.nafman.NafManConfig;
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.TimerNAF;
 import com.grey.naf.reactor.config.DispatcherConfig;
@@ -413,15 +414,21 @@ public class ResolverTest
 	{
 		Class<?> clss_resolver = com.grey.naf.dns.resolver.embedded.EmbeddedResolver.class;
 		com.grey.naf.NAFConfig nafcfg = setConfig(null, clss_resolver, flags);
-		ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, nafcfg, true);
-		DispatcherConfig def = new DispatcherConfig.Builder()
+		NafManConfig nafmanConfig = new NafManConfig.Builder(nafcfg).build();
+		ApplicationContextNAF appctx = ApplicationContextNAF.builder()
+				.withNafConfig(nafcfg)
+				.withNafManConfig(nafmanConfig)
+				.withBootLogger(logger)
+				.build();
+		DispatcherConfig def = DispatcherConfig.builder()
 				.withName(dispatcher_name)
 				.withSurviveHandlers(false)
+				.withAppContext(appctx)
 				.build();
 		ResolverConfig rcfg = new ResolverConfig.Builder()
 				.withXmlConfig(nafcfg.getNode("dnsresolver"))
 				.build();
-		Dispatcher dsptch = Dispatcher.create(appctx, def, logger);
+		Dispatcher dsptch = Dispatcher.create(def);
 		ResolverDNS.create(dsptch, rcfg);
 		return dsptch;
 	}
@@ -444,17 +451,23 @@ public class ResolverTest
 			nafcfg = setConfig(d2name, clss_resolver, flags);
 		}
 		//we need NAFMAN (enabled by default) to propagate the dsptch.stop() in handleDnsResult() to the other Dispatcher
-		ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, nafcfg, true);
-		DispatcherConfig def = new DispatcherConfig.Builder()
+		NafManConfig nafmanConfig = new NafManConfig.Builder(nafcfg).build();
+		ApplicationContextNAF appctx = ApplicationContextNAF.builder()
+				.withNafConfig(nafcfg)
+				.withNafManConfig(nafmanConfig)
+				.withBootLogger(logger)
+				.build();
+		DispatcherConfig def = DispatcherConfig.builder()
 				.withName(d1name)
 				.withSurviveHandlers(false)
+				.withAppContext(appctx)
 				.build();
 		ResolverConfig rcfg = new ResolverConfig.Builder()
 				.withXmlConfig(nafcfg.getNode("dnsresolver"))
 				.build();
-		Dispatcher d1 = Dispatcher.create(appctx, def, logger);
-		def = new DispatcherConfig.Builder(def).withName(d2name).build();
-		Dispatcher d2 = Dispatcher.create(appctx, def, logger);
+		Dispatcher d1 = Dispatcher.create(def);
+		def = def.mutate().withName(d2name).build();
+		Dispatcher d2 = Dispatcher.create(def);
 		if (local_master) { //first resolver to be created becomes the master
 			ResolverDNS.create(d1, rcfg);
 			ResolverDNS.create(d2, rcfg);

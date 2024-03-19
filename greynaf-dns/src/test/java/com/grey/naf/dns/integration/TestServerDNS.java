@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 Yusef Badri - All rights reserved.
+ * Copyright 2015-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.integration;
@@ -8,7 +8,6 @@ import com.grey.base.utils.ByteChars;
 import com.grey.base.utils.IP;
 import com.grey.base.utils.StringOps;
 import com.grey.base.utils.TimeOps;
-import com.grey.logging.Logger;
 import com.grey.base.collections.HashedMap;
 import com.grey.base.collections.HashedMapIntKey;
 import com.grey.naf.ApplicationContextNAF;
@@ -39,12 +38,12 @@ class TestServerDNS
 	public TestServerDNS(ApplicationContextNAF appctx) throws java.io.IOException {
 		populateAnswers();
 		total_answers = unused_answers.size();
-		com.grey.naf.reactor.config.DispatcherConfig def = new com.grey.naf.reactor.config.DispatcherConfig.Builder()
+		com.grey.naf.reactor.config.DispatcherConfig def = com.grey.naf.reactor.config.DispatcherConfig.builder()
 				.withName("Mock-DNS-Server")
 				.withSurviveHandlers(false)
+				.withAppContext(appctx)
 				.build();
-		Logger log = com.grey.logging.Factory.getLoggerNoEx("no-such-initlogger");
-		dsptch = Dispatcher.create(appctx, def, log);
+		dsptch = Dispatcher.create(def);
 
 		DnsServerConfig.Builder bldr = new DnsServerConfig.Builder();
 		bldr.getListenerConfig().withPort(0).withInterface("127.0.0.1");

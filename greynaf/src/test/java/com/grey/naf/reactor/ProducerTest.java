@@ -13,9 +13,8 @@ public class ProducerTest
 	implements Producer.Consumer<String>
 {
 	private static final String rootdir = TestUtils.initPaths(ProducerTest.class);
-	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext("ProducerTest", true);
+	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext("ProducerTest", true, null);
 
-	private static final com.grey.logging.Logger logger = com.grey.logging.Factory.getLoggerNoEx("");
 	private static final String[] items_to_produce = new String[]{"Item1", "Item2a", "Item2b", "Item2c", "Item3a", "Item3b"};
 	private java.util.ArrayList<String> produced_items = new java.util.ArrayList<String>();
 	private int produced_cnt;
@@ -27,11 +26,12 @@ public class ProducerTest
 			throws java.io.IOException, InterruptedException
 	{
 		FileOps.deleteDirectory(rootdir);
-		com.grey.naf.reactor.config.DispatcherConfig def = new com.grey.naf.reactor.config.DispatcherConfig.Builder()
+		com.grey.naf.reactor.config.DispatcherConfig def = com.grey.naf.reactor.config.DispatcherConfig.builder()
+				.withAppContext(appctx)
 				.withName("producertest-workflow")
 				.withSurviveHandlers(false)
 				.build();
-		Dispatcher dsptch = Dispatcher.create(appctx, def, logger);
+		Dispatcher dsptch = Dispatcher.create(def);
 		Producer<String> prod = new Producer<>("utest-workflow", dsptch, this);
 		dsptch.loadRunnable(prod);
 		setProducedItems();
@@ -60,11 +60,12 @@ public class ProducerTest
 		produced_cnt = 1_000_000;
 		benchmark_mode = true;
 		consumed_cnt = 0;
-		com.grey.naf.reactor.config.DispatcherConfig def = new com.grey.naf.reactor.config.DispatcherConfig.Builder()
+		com.grey.naf.reactor.config.DispatcherConfig def = com.grey.naf.reactor.config.DispatcherConfig.builder()
+				.withAppContext(appctx)
 				.withName("producertest-bulk")
 				.withSurviveHandlers(false)
 				.build();
-		Dispatcher dsptch = Dispatcher.create(appctx, def, logger);
+		Dispatcher dsptch = Dispatcher.create(def);
 		Producer<String> p = new Producer<>("utest-bulk", dsptch, this);
 		dsptch.loadRunnable(p);
 		dsptch.start();

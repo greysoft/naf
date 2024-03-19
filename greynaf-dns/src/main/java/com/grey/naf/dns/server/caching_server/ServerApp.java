@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Yusef Badri - All rights reserved.
+ * Copyright 2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.server.caching_server;
@@ -12,7 +12,6 @@ import com.grey.naf.dns.resolver.ResolverConfig;
 import com.grey.naf.dns.server.DnsServerConfig;
 import com.grey.naf.reactor.Dispatcher;
 import com.grey.naf.reactor.config.DispatcherConfig;
-import com.grey.logging.Logger;
 
 public class ServerApp
 	extends com.grey.naf.Launcher
@@ -30,7 +29,7 @@ public class ServerApp
 	}
 
 	@Override
-	protected void appExecute(ApplicationContextNAF appctx, int param1, Logger bootlog) throws IOException, NamingException {
+	protected void appExecute(ApplicationContextNAF appctx, int param1) throws IOException, NamingException {
 		DnsServerConfig.Builder bldr = new DnsServerConfig.Builder()
 				.withRecursionOffered(true);
 		bldr.getListenerConfig().withPort(options.getPort());
@@ -41,17 +40,18 @@ public class ServerApp
 				.withAlwaysTCP(options.isAlwaysTCP())
 				.build();
 
-		DispatcherConfig dcfg = new DispatcherConfig.Builder()
-				.withName(appctx.getName())
+		DispatcherConfig dcfg = DispatcherConfig.builder()
+				.withName("Dispatcher-"+appctx.getName())
+				.withAppContext(appctx)
 				.build();
-		Dispatcher dsptch = Dispatcher.create(appctx, dcfg, bootlog);
+		Dispatcher dsptch = Dispatcher.create(dcfg);
 
 		CachingServer server = new CachingServer(dsptch, cfgServer, cfgResolver);
 		dsptch.loadRunnable(server);
 
-		bootlog.info("DNS-Server: Starting Dispatcher="+dsptch.getName());
+		appctx.getBootLogger().info("DNS-Server: Starting Dispatcher="+dsptch.getName());
 		dsptch.start();
 		dsptch.waitStopped();
-		bootlog.info("DNS-Server: Dispatcher="+dsptch.getName()+" has halted");
+		appctx.getBootLogger().info("DNS-Server: Dispatcher="+dsptch.getName()+" has halted");
 	}
 }

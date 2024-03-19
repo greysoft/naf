@@ -16,6 +16,7 @@ import com.grey.naf.dns.client.DNSClient;
 import com.grey.naf.dns.resolver.ResolverConfig;
 import com.grey.naf.dns.resolver.ResolverDNS;
 import com.grey.naf.dns.resolver.engine.ResolverAnswer;
+import com.grey.naf.nafman.NafManConfig;
 import com.grey.naf.dns.TestUtils;
 
 import org.junit.Assert;
@@ -174,8 +175,13 @@ public class SynchronousTest
 	private void init(String tag, boolean master, boolean recursive, boolean use_mockserver) throws java.io.IOException
 	{
 		String nafcfg_path = createConfig(tag, recursive, use_mockserver);
-		ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, nafcfg_path, true);
-		NAFConfig nafcfg = appctx.getConfig();
+		NAFConfig nafcfg = new NAFConfig.Builder().withConfigFile(nafcfg_path).build();
+		NafManConfig nafmanConfig = new NafManConfig.Builder(nafcfg).build();
+		ApplicationContextNAF appctx = ApplicationContextNAF.builder()
+				.withNafConfig(nafcfg)
+				.withNafManConfig(nafmanConfig)
+				.withBootLogger(logger)
+				.build();
 		String d1name = DNAME+"-"+tag;
 		String d2name = d1name;
 		if (master) {
@@ -185,16 +191,17 @@ public class SynchronousTest
 			d1name += "_slave";
 			d2name += "_master";
 		}
-		DispatcherConfig def = new DispatcherConfig.Builder()
+		DispatcherConfig def = DispatcherConfig.builder()
 				.withName(d1name)
 				.withSurviveHandlers(false)
+				.withAppContext(appctx)
 				.build();
 		ResolverConfig rcfg = new ResolverConfig.Builder()
 				.withXmlConfig(nafcfg.getNode("dnsresolver"))
 				.build();
-		dsptch = Dispatcher.create(appctx, def, logger);
-		def = new DispatcherConfig.Builder(def).withName(d2name).build();
-		dsptchOther = Dispatcher.create(appctx, def, logger);
+		dsptch = Dispatcher.create(def);
+		def = def.mutate().withName(d2name).build();
+		dsptchOther = Dispatcher.create(def);
 		ResolverDNS r1;
 		if (master) {
 			r1 = ResolverDNS.create(dsptch, rcfg);

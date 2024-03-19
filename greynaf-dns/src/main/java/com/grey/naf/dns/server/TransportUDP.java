@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 Yusef Badri - All rights reserved.
+ * Copyright 2015-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.server;
@@ -20,7 +20,7 @@ class TransportUDP
 	public String getName() {return "DNS-Server-UDP";}
 
 	public TransportUDP(Dispatcher d, ServerDNS qh, InetAddress iface, int port) throws java.io.IOException {
-		super(d, new InetSocketAddress(iface, port), new BufferGenerator(ServerDNS.PKTSIZ_UDP, ServerDNS.PKTSIZ_UDP, ServerDNS.DIRECTNIOBUFS, null), ServerDNS.UDPSOCKBUFSIZ);
+		super(d, new InetSocketAddress(iface, port), makeBufferGenerator(), ServerDNS.UDPSOCKBUFSIZ);
 		qryh = qh;
 	}
 
@@ -31,5 +31,10 @@ class TransportUDP
 
 	public void sendResponse(java.nio.ByteBuffer buf, InetSocketAddress remaddr) throws java.io.IOException {
 		transmit(buf, remaddr);
+	}
+	
+	private static BufferGenerator makeBufferGenerator() {
+		BufferGenerator.BufferConfig bufcfg = new BufferGenerator.BufferConfig(ServerDNS.PKTSIZ_UDP, true, ServerDNS.DIRECTNIOBUFS, null);
+		return new BufferGenerator(bufcfg);
 	}
 }

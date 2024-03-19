@@ -34,7 +34,7 @@ public class Task
 	public Task(String name, Dispatcher dsptch, XmlConfig cfg) throws java.io.IOException {
 		super(name, dsptch, cfg);
 		String lname = "Task="+getName();
-		NAFConfig nafcfg = dsptch.getApplicationContext().getConfig();
+		NAFConfig nafcfg = dsptch.getApplicationContext().getNafConfig();
 		ConcurrentListenerConfig[] lcfg = ConcurrentListenerConfig.buildMultiConfig(lname, nafcfg, "listeners/listener", taskConfig(), 0, 0, null, null);
 		listeners = new ListenerSet(lname, dsptch, this, this, lcfg);
 

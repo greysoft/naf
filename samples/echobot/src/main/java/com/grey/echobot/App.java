@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 Yusef Badri - All rights reserved.
+ * Copyright 2012-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.echobot;
@@ -7,7 +7,6 @@ package com.grey.echobot;
 import com.grey.base.utils.FileOps;
 import com.grey.base.utils.TSAP;
 import com.grey.base.utils.CommandParser;
-import com.grey.logging.Logger;
 import com.grey.naf.ApplicationContextNAF;
 import com.grey.naf.BufferGenerator;
 import com.grey.naf.reactor.Dispatcher;
@@ -120,7 +119,7 @@ public class App
 	}
 
 	@Override
-	protected void appExecute(ApplicationContextNAF appctx, int param1, Logger bootlog) throws java.io.IOException
+	protected void appExecute(ApplicationContextNAF appctx, int param1) throws java.io.IOException
 	{
 		if (!options.server_enabled && options.cgrpcnt == 0) {
 			cmdParser.usage(cmdlineArgs, "Must specify client and/or server mode");
@@ -146,11 +145,12 @@ public class App
 		int dcnt = (options.server_solo ? options.cgrpcnt + 1 : options.cgrpcnt);
 		if (dcnt == 0) dcnt++; //need at least one Dispatcher for the server
 
-		DispatcherConfig.Builder dispatcherDefsBuilder = new DispatcherConfig.Builder();
+		DispatcherConfig.Builder dispatcherDefsBuilder = DispatcherConfig.builder().withAppContext(appctx);
 		Dispatcher[] cdispatchers = new Dispatcher[dcnt];
 		ClientGroup[] cgroups = new ClientGroup[options.cgrpcnt];
 		TSAP tsap = TSAP.build(hostport, 0, true);
-		sbufspec = (options.server_enabled ? new BufferGenerator(options.srcvbuf, options.sxmtbuf) : null);
+		BufferGenerator.BufferConfig bufcfg = new BufferGenerator.BufferConfig(options.srcvbuf, options.sxmtbuf==0?false:true, null, null);
+		sbufspec = (options.server_enabled ? new BufferGenerator(bufcfg) : null);
 		byte[] msgbuf = null;
 
 		if (options.cgrpcnt != 0) {
@@ -183,7 +183,7 @@ public class App
 			String dname = (options.server_enabled && idx == 0 ? "DS" : "");  //server resides in first Dispatcher
 			if (hasClients) dname += "DC"+(cgnum+1); //this Dispatcher hosts clients
 			DispatcherConfig def = dispatcherDefsBuilder.withName(dname).build();
-			cdispatchers[idx] = Dispatcher.create(appctx, def, bootlog);
+			cdispatchers[idx] = Dispatcher.create(def);
 			Dispatcher dsptch = cdispatchers[idx];
 
 			if (idx == 0) {
@@ -207,7 +207,8 @@ public class App
 				}
 			}
 			if (hasClients) {
-				BufferGenerator bufspec = new BufferGenerator(options.crcvbuf, options.cxmtbuf);
+				bufcfg = new BufferGenerator.BufferConfig(options.crcvbuf, options.cxmtbuf==0?false:true, null, null);
+				BufferGenerator bufspec = new BufferGenerator(bufcfg);
 				cgroups[cgnum++] = new ClientGroup(this, dsptch, options.udpmode, tsap, options.cgrpsiz, bufspec, msgbuf, options.msgcnt,
 						options.sockbufsiz, options.verify);
 			}
@@ -222,7 +223,7 @@ public class App
 		// by the time all the Dispatchers terminate, all these Joins will have completed
 		for (int idx = 0; idx != dcnt; idx++) {
 			cdispatchers[idx].waitStopped();
-			bootlog.info("Dispatcher "+idx+"/"+dcnt+" has been reaped - "+cdispatchers[idx]);
+			appctx.getBootLogger().info("Dispatcher "+idx+"/"+dcnt+" has been reaped - "+cdispatchers[idx]);
 		}
 
 		// report stats

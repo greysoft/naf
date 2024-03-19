@@ -10,8 +10,10 @@ import com.grey.base.utils.FileOps;
 import com.grey.base.utils.IP;
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
+import com.grey.naf.BufferGenerator;
 import com.grey.naf.EventListenerNAF;
 import com.grey.naf.reactor.config.ConcurrentListenerConfig;
+import com.grey.naf.reactor.config.DispatcherConfig;
 import com.grey.naf.TestUtils;
 
 public class TCPConnectionTest
@@ -23,7 +25,7 @@ public class TCPConnectionTest
 	private static final int REQ_INCR = 1000;
 	private static final int RSP_INCR = 1;
 
-	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext("TCPConnectionTest", true);
+	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext("TCPConnectionTest", true, null);
 
 	private Dispatcher dsptch;
 	private int reapcnt_clients;
@@ -41,10 +43,11 @@ public class TCPConnectionTest
 		FileOps.deleteDirectory(rootdir);
 
 		// create the Dispatcher
-		com.grey.naf.reactor.config.DispatcherConfig def = new com.grey.naf.reactor.config.DispatcherConfig.Builder()
+		com.grey.naf.reactor.config.DispatcherConfig def = DispatcherConfig.builder()
+				.withAppContext(appctx)
 				.withSurviveHandlers(false)
 				.build();
-		dsptch = Dispatcher.create(appctx, def, com.grey.logging.Factory.getLogger("no-such-logger"));
+		dsptch = Dispatcher.create(def);
 
 		// set up the server component
 		ConcurrentListenerConfig lcfg = new ConcurrentListenerConfig.Builder<>()
@@ -109,7 +112,7 @@ public class TCPConnectionTest
 	private static class ClientTCP extends CM_Client implements DispatcherRunnable
 	{
 		private final TCPConnectionTest harness;
-		private static final com.grey.naf.BufferGenerator bufspec = new com.grey.naf.BufferGenerator(32, 64);
+		private static final BufferGenerator bufspec = new BufferGenerator(new BufferGenerator.BufferConfig(32, true, null, null));
 		private final int req = System.identityHashCode(this);
 		private final java.net.InetSocketAddress srvaddr;
 		private final boolean expect_ok;
@@ -188,7 +191,7 @@ public class TCPConnectionTest
 
 	private static class ServerTCP extends CM_Server
 	{
-		private static final com.grey.naf.BufferGenerator bufspec = new com.grey.naf.BufferGenerator(32, 64);
+		private static final BufferGenerator bufspec = new BufferGenerator(new BufferGenerator.BufferConfig(32, true, null, null));
 		private java.nio.channels.SelectableChannel chan;
 		private boolean sent_response;
 		public int rcvbytes;

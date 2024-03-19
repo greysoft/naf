@@ -12,8 +12,6 @@ However you can also rebuild it from here as follows:
 
 RUN
 ----
-When running the batch resolver, replace "VERSION" in all the commands below with the version you see embedded in the Jar name in the 'target' directory.
-
 The supplied batchresolver.xml resolves a list of DNS domains of a specified type, which is specified in batchresolver.xml as MX (see 'dnstype' setting).
 The list of DNS domains is in an input file, which is specified in batchresolver.xml as $HOME/infile.txt.
 So you can create infile.txt with something as simple as the following 2 lines:
@@ -22,8 +20,9 @@ So you can create infile.txt with something as simple as the following 2 lines:
 This means you are asking the batch-resolver to return the mailservers (MX RRs) for these two domains, and localhost should obviously return not-found.
 See the NAF Programmer's Guide for the full config options.
 
-Then run the batch resolver like this:
-	java -jar target/samples-dnsbatchresolver-VERSION.jar -c batchresolver.xml
+Then run the batch resolver like this (replacing "dev-SNAPSHOT" with whatever version string is there, if different).
+	cd samples/dns-batchresolver
+	java -jar target/samples-dnsbatchresolver-dev-SNAPSHOT.jar -c batchresolver.xml
 
 This will generate:
 - The DNS resolution results in $HOME/outfile.txt

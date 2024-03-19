@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 Yusef Badri - All rights reserved.
+ * Copyright 2012-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -10,6 +10,7 @@ import com.grey.base.utils.ByteArrayRef;
 import com.grey.base.utils.FileOps;
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
+import com.grey.naf.BufferGenerator;
 import com.grey.base.utils.NIOBuffers;
 import com.grey.naf.TestUtils;
 
@@ -18,25 +19,30 @@ import org.mockito.Mockito;
 public class IOExecReaderTest
 {
 	private static final String rootdir = TestUtils.initPaths(IOExecReaderTest.class);
-	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext("IORtest", true);
+	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext("IORtest", true, null);
 
 	@org.junit.Test
 	public void testDirectBuffer() throws java.io.IOException
 	{
-		launch(new com.grey.naf.BufferGenerator(25, 0, true, null));
+		BufferGenerator.BufferConfig bufcfg = new BufferGenerator.BufferConfig(25, false, true, null);
+		BufferGenerator bufgen = new BufferGenerator(bufcfg);
+		launch(bufgen);
 	}
 
 	@org.junit.Test
 	public void testHeapBuffer() throws java.io.IOException
 	{
-		launch(new com.grey.naf.BufferGenerator(25, 0, false, null));
+		BufferGenerator.BufferConfig bufcfg = new BufferGenerator.BufferConfig(25, false, false, null);
+		BufferGenerator bufgen = new BufferGenerator(bufcfg);
+		launch(bufgen);
 	}
 
 	@org.junit.Test
 	public void testOffsetBuffer() throws java.io.IOException
 	{
 		int offset = 5;
-		com.grey.naf.BufferGenerator bufspec = new com.grey.naf.BufferGenerator(25, 0, false, null);
+		BufferGenerator.BufferConfig bufcfg = new BufferGenerator.BufferConfig(25, false, false, null);
+		BufferGenerator bufspec = new BufferGenerator(bufcfg);
 		bufspec = Mockito.spy(bufspec);
 		Mockito.when(bufspec.createReadBuffer()).thenReturn(((ByteBuffer)NIOBuffers.create(bufspec.rcvbufsiz+offset, bufspec.directbufs).position(offset)).slice());
 		launch(bufspec);
@@ -45,10 +51,11 @@ public class IOExecReaderTest
 	private void launch(com.grey.naf.BufferGenerator bufspec) throws java.io.IOException
 	{
 		FileOps.deleteDirectory(rootdir);
-		com.grey.naf.reactor.config.DispatcherConfig def = new com.grey.naf.reactor.config.DispatcherConfig.Builder()
+		com.grey.naf.reactor.config.DispatcherConfig def = com.grey.naf.reactor.config.DispatcherConfig.builder()
+				.withAppContext(appctx)
 				.withSurviveHandlers(false)
 				.build();
-		Dispatcher dsptch = Dispatcher.create(appctx, def, com.grey.logging.Factory.getLogger("no-such-logger"));
+		Dispatcher dsptch = Dispatcher.create(def);
 		java.nio.channels.Pipe pipe = java.nio.channels.Pipe.open();
 		java.nio.channels.Pipe.SourceChannel rep = pipe.source();
 		java.nio.channels.Pipe.SinkChannel wep = pipe.sink();

@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2021 Yusef Badri - All rights reserved.
+ * Copyright 2013-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -17,7 +17,7 @@ public class UDPReaderTest
 {
 	private static final String rootdir = TestUtils.initPaths(UDPReaderTest.class);
 	static final String[] iomessages = new String[]{"Message 1", "Message 2", "Here is another message", "The final message"};
-	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext("UDPReaderTest", true);
+	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext("UDPReaderTest", true, null);
 
 	@org.junit.Test
 	public void testDirectBuffers() throws java.io.IOException
@@ -36,13 +36,16 @@ public class UDPReaderTest
 		FileOps.deleteDirectory(rootdir);
 
 		// set up Dispatcher
-		com.grey.naf.reactor.config.DispatcherConfig def = new com.grey.naf.reactor.config.DispatcherConfig.Builder()
+		com.grey.naf.reactor.config.DispatcherConfig def = com.grey.naf.reactor.config.DispatcherConfig.builder()
+				.withAppContext(appctx)
 				.withSurviveHandlers(false)
 				.build();
-		Dispatcher dsptch = Dispatcher.create(appctx, def, com.grey.logging.Factory.getLogger("no-such-logger"));
+		Dispatcher dsptch = Dispatcher.create(def);
 
 		// set up UDP reader
-		Reader rdr = new Reader(dsptch, directbufs);
+		BufferGenerator.BufferConfig bufcfg = new BufferGenerator.BufferConfig(1024, false, directbufs, null);
+		BufferGenerator bufgen = new BufferGenerator(bufcfg);
+		Reader rdr = new Reader(dsptch, bufgen);
 		dsptch.loadRunnable(rdr);
 
 		// queue up incoming messages on the UDP reader
@@ -77,8 +80,8 @@ public class UDPReaderTest
 		@Override
 		public String getName() {return "UTEST-Reader-UDP";}
 
-		public Reader(Dispatcher d, boolean directbufs) throws java.io.IOException {
-			super(d, makeAddress(), new BufferGenerator(1024, 0, directbufs, null), 0);
+		public Reader(Dispatcher d, BufferGenerator bufgen) throws java.io.IOException {
+			super(d, makeAddress(), bufgen, 0);
 		}
 
 		@Override

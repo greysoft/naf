@@ -32,10 +32,10 @@ public class ConfigTest
 		org.junit.Assert.assertTrue(cfg.isAnonymousBasePort());
 
 		String dname = "testdispatcher9";
-		XmlConfig dcfg = cfg.getDispatcher(dname);
+		XmlConfig dcfg = cfg.getDispatcherConfigNode(dname);
 		XmlConfig[] nafletsConfig = dcfg.getSections("naflets/naflet"+XmlConfig.XPATH_ENABLED);
 		org.junit.Assert.assertNotNull(dcfg);
-		DispatcherConfig def = new DispatcherConfig.Builder().withXmlConfig(dcfg).build();
+		DispatcherConfig def = DispatcherConfig.builder().withXmlConfig(dcfg).build();
 		org.junit.Assert.assertEquals(dname, def.getName());
 		org.junit.Assert.assertTrue(def.isSurviveHandlers());
 		org.junit.Assert.assertEquals(2, nafletsConfig.length);
@@ -49,12 +49,12 @@ public class ConfigTest
 
 		NAFConfig cfg = new NAFConfig.Builder().withConfigFile(path).build();
 		org.junit.Assert.assertTrue(cfg.isAnonymousBasePort());
-		XmlConfig dcfg = cfg.getDispatcher("no-such-dispatcher");
+		XmlConfig dcfg = cfg.getDispatcherConfigNode("no-such-dispatcher");
 		org.junit.Assert.assertNull(dcfg);
 
-		dcfg = cfg.getDispatcher(dname);
+		dcfg = cfg.getDispatcherConfigNode(dname);
 		org.junit.Assert.assertNotNull(dcfg);
-		DispatcherConfig def = new DispatcherConfig.Builder().withXmlConfig(dcfg).build();
+		DispatcherConfig def = DispatcherConfig.builder().withXmlConfig(dcfg).build();
 		verifyConfig(def, dname);
 	}
 

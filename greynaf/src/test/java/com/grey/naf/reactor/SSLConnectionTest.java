@@ -10,6 +10,7 @@ import com.grey.base.utils.FileOps;
 import com.grey.base.utils.IP;
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
+import com.grey.naf.BufferGenerator;
 import com.grey.naf.EventListenerNAF;
 import com.grey.naf.reactor.config.ConcurrentListenerConfig;
 import com.grey.naf.reactor.config.SSLConfig;
@@ -61,7 +62,7 @@ public class SSLConnectionTest
 		"This is the second message from the client",
 		"The final message"};
 
-	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext("SSLConnectionTest", true);
+	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext("SSLConnectionTest", true, null);
 
 	private Dispatcher dsptch;
 	private SSLTask ctask;
@@ -149,17 +150,18 @@ public class SSLConnectionTest
 		FileOps.deleteDirectory(rootdir);
 
 		// create the Dispatcher
-		com.grey.naf.reactor.config.DispatcherConfig def = new com.grey.naf.reactor.config.DispatcherConfig.Builder()
+		com.grey.naf.reactor.config.DispatcherConfig def = com.grey.naf.reactor.config.DispatcherConfig.builder()
+				.withAppContext(appctx)
 				.withSurviveHandlers(false)
 				.build();
-		dsptch = Dispatcher.create(appctx, def, com.grey.logging.Factory.getLogger("no-such-logger"));
+		dsptch = Dispatcher.create(def);
 
 		// set up the server component
 		expected_tcpentities = (failtype == FAILTYPE.NOCONNECT ? 1 : 2);
 		ListenerSet listeners = null;
 		String lname = "utest_SSL";
 		if (lset) {
-			ConcurrentListenerConfig[] lcfg = ConcurrentListenerConfig.buildMultiConfig(lname, appctx.getConfig(), "listeners/listener", srvcfg, 0, 0, TestServerFactory.class, null);
+			ConcurrentListenerConfig[] lcfg = ConcurrentListenerConfig.buildMultiConfig(lname, appctx.getNafConfig(), "listeners/listener", srvcfg, 0, 0, TestServerFactory.class, null);
 			listeners = new ListenerSet(lname, dsptch, this, this, lcfg);
 			listeners.start(false);
 			org.junit.Assert.assertEquals(1, listeners.configured());
@@ -169,7 +171,7 @@ public class SSLConnectionTest
 			ConcurrentListenerConfig lcfg = new ConcurrentListenerConfig.Builder<>()
 					.withName(lname)
 					.withServerFactory(TestServerFactory.class, null)
-					.withXmlConfig(srvcfg, appctx.getConfig())
+					.withXmlConfig(srvcfg, appctx.getNafConfig())
 					.build();
 			ConcurrentListener lstnr = ConcurrentListener.create(dsptch, this, this, lcfg);
 			srvport = lstnr.getPort();
@@ -182,7 +184,11 @@ public class SSLConnectionTest
 			cport = srvport + 1000; //hopefully no such port exists
 			if (cport > (Short.MAX_VALUE & 0xffff)) cport = Short.MAX_VALUE - 10;
 		}
-		SSLC clnt = new SSLC(dsptch, clntcfg, cport, this);
+		BufferGenerator.BufferConfig bufcfg = new BufferGenerator.BufferConfig(256, true, null, null);
+		bufcfg = BufferGenerator.BufferConfig.create(clntcfg, "niobuffers", bufcfg);
+		BufferGenerator rbufspec = new BufferGenerator(bufcfg);
+		BufferGenerator wbufspec = new BufferGenerator(bufcfg);
+		SSLC clnt = new SSLC(dsptch, clntcfg, cport, this, rbufspec, wbufspec);
 		dsptch.loadRunnable(clnt);
 
 		// set up a no-op Naflet which simply goes through the motions
@@ -335,8 +341,8 @@ public class SSLConnectionTest
 		@Override
 		public String getName() {return "SSLConnectionTest.SSLC";}
 
-		public SSLC(Dispatcher d, XmlConfig cfg, int port, EventListenerNAF evtl) throws java.io.IOException {
-			super(d, new com.grey.naf.BufferGenerator(cfg, "niobuffers", 256, 128), new com.grey.naf.BufferGenerator(cfg, "niobuffers", 256, 128));
+		public SSLC(Dispatcher d, XmlConfig cfg, int port, EventListenerNAF evtl, BufferGenerator rbufspec, BufferGenerator wbufspec) throws java.io.IOException {
+			super(d, rbufspec, wbufspec);
 			this.eventLstener = evtl;
 			srvport = port;
 			XmlConfig sslcfg = (cfg == null ? XmlConfig.NULLCFG : cfg.getSection("ssl"));
@@ -345,7 +351,7 @@ public class SSLConnectionTest
 			} else {
 				sslconfig = new SSLConfig.Builder()
 						.withIsClient(true)
-						.withXmlConfig(sslcfg, d.getApplicationContext().getConfig())
+						.withXmlConfig(sslcfg, d.getApplicationContext().getNafConfig())
 						.build();
 				org.junit.Assert.assertNotNull(getSSLConfig());
 			}
@@ -566,7 +572,7 @@ public class SSLConnectionTest
 		public TestServerFactory(com.grey.naf.reactor.CM_Listener l, Object cfg) {
 			lstnr = l;
 			com.grey.base.config.XmlConfig xmlcfg = (com.grey.base.config.XmlConfig)cfg;
-			bufspec = new com.grey.naf.BufferGenerator(xmlcfg, "niobuffers", 8 * 1024, 128);
+			bufspec = BufferGenerator.create(xmlcfg, "niobuffers", 8 * 1024, 128);
 			org.junit.Assert.assertNotNull(lstnr.getSSLConfig());
 		}
 	}

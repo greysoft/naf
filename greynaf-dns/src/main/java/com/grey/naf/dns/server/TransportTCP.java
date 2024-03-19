@@ -1,10 +1,11 @@
 /*
- * Copyright 2015-2021 Yusef Badri - All rights reserved.
+ * Copyright 2015-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.server;
 
 import com.grey.base.utils.ByteArrayRef;
+import com.grey.naf.BufferGenerator;
 import com.grey.naf.dns.resolver.engine.PacketDNS;
 
 class TransportTCP
@@ -21,7 +22,8 @@ class TransportTCP
 		public ServerFactory(com.grey.naf.reactor.CM_Listener l, Object cfg) {
 			lstnr = l;
 			//we only receive queries, so TCP BufferSpec receive-size need not be expanded
-			bufspec = new com.grey.naf.BufferGenerator(ServerDNS.PKTSIZ_UDP, ServerDNS.PKTSIZ_TCP, ServerDNS.DIRECTNIOBUFS, null);
+			BufferGenerator.BufferConfig bufcfg = new BufferGenerator.BufferConfig(ServerDNS.PKTSIZ_UDP, true, ServerDNS.DIRECTNIOBUFS, null);
+			bufspec = new BufferGenerator(bufcfg);
 		}
 	}
 	

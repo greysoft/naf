@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2021 Yusef Badri - All rights reserved.
+ * Copyright 2010-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf;
@@ -75,7 +75,7 @@ public class NAFConfig
 		// One thing we can't do however, is link the location of logging.xml to our pathConf setting,
 		// since GreyLog has probably already set its path in stone before this class ever got invoked.
 		String val = SysProps.get(SYSPROP_DIRPATH_LOGS);
-		if (val == null || val.length() == 0) SysProps.set(SYSPROP_DIRPATH_LOGS, pathLogs);
+		if (val == null || val.isEmpty()) SysProps.set(SYSPROP_DIRPATH_LOGS, pathLogs);
 	}
 
 	public String getPathRoot() {
@@ -129,8 +129,8 @@ public class NAFConfig
 		return configRoot.getSections(xpath);
 	}
 
-	public XmlConfig getDispatcher(String name) {
-		if (name == null || name.length() == 0) {
+	public XmlConfig getDispatcherConfigNode(String name) {
+		if (name == null || name.isEmpty()) {
 			XmlConfig[] all = getDispatchers();
 			return (all != null && all.length == 1 ? all[0] : null);
 		}
@@ -177,7 +177,7 @@ public class NAFConfig
 	// NB: This is purely about constructing a path, not necessarily one that corresponds to an existing file
 	private String makePath(String path) throws java.io.IOException
 	{
-		if (path == null || path.length() == 0) return path;
+		if (path == null || path.isEmpty()) return path;
 		path = tokenisePaths(path);
 		if (path.startsWith(FileOps.URLPFX_FILE+"/")) path = path.substring(FileOps.URLPFX_FILE.length());
 		java.io.File fh = new java.io.File(path);
@@ -187,7 +187,7 @@ public class NAFConfig
 
 	private String tokenisePaths(String template)
 	{
-		if (template == null || template.length() == 0) return template;
+		if (template == null || template.isEmpty()) return template;
 		if (pathRoot != null) template = template.replace(DIRTOKEN_ROOT, pathRoot);
 		if (pathConf != null) template = template.replace(DIRTOKEN_CONF, pathConf);
 		if (pathVar != null) template = template.replace(DIRTOKEN_VAR, pathVar);

@@ -9,6 +9,7 @@ import com.grey.base.utils.ByteOps;
 import com.grey.base.utils.FileOps;
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
+import com.grey.naf.BufferGenerator;
 import com.grey.naf.EventListenerNAF;
 import com.grey.naf.reactor.config.ListenerConfig;
 import com.grey.naf.TestUtils;
@@ -26,7 +27,7 @@ public class IterativeListenerTest
 	}
 
 	private static final String rootdir = TestUtils.initPaths(IterativeListenerTest.class);
-	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext("IterativeListenerTest", true);
+	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext("IterativeListenerTest", true, null);
 	private static final int NUMCONNS = 5;
 	private static final int INTSIZE = 4;
 
@@ -42,10 +43,11 @@ public class IterativeListenerTest
 		java.net.Socket clients[] = new java.net.Socket[NUMCONNS];
 
 		// set up Dispatcher
-		com.grey.naf.reactor.config.DispatcherConfig def = new com.grey.naf.reactor.config.DispatcherConfig.Builder()
+		com.grey.naf.reactor.config.DispatcherConfig def = com.grey.naf.reactor.config.DispatcherConfig.builder()
+				.withAppContext(appctx)
 				.withSurviveHandlers(false)
 				.build();
-		Dispatcher dsptch = Dispatcher.create(appctx, def, com.grey.logging.Factory.getLogger("no-such-logger"));
+		Dispatcher dsptch = Dispatcher.create(def);
 
 		ListenerConfig lcfg = new ListenerConfig.Builder<>()
 				.withName("utest_IterativeListener")
@@ -103,7 +105,7 @@ public class IterativeListenerTest
 	private static class TestServer
 		extends CM_Server
 	{
-		private static final com.grey.naf.BufferGenerator bufspec = new com.grey.naf.BufferGenerator(32, 64);
+		private static final BufferGenerator bufspec = new BufferGenerator(new BufferGenerator.BufferConfig(32, true, null, null));
 		public boolean completed;
 		public int conncount;
 		private int opencount;

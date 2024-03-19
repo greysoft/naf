@@ -7,6 +7,7 @@ package com.grey.naf.dns.resolver.engine;
 import com.grey.base.collections.ObjectPool;
 import com.grey.base.utils.TSAP;
 import com.grey.naf.EventListenerNAF;
+import com.grey.naf.BufferGenerator;
 import com.grey.naf.reactor.ChannelMonitor;
 import com.grey.naf.dns.resolver.ResolverConfig;
 
@@ -23,8 +24,10 @@ class CommsManager
 	{
 		ResolverConfig cfg = rslvr.getConfig();
 		//we only transmit queries, so TCP BufferSpec transmit-size need not be expanded to the TCP limit
-		com.grey.naf.BufferGenerator bufspec_udp = new com.grey.naf.BufferGenerator(ResolverConfig.PKTSIZ_UDP, ResolverConfig.PKTSIZ_UDP, ResolverConfig.DIRECTNIOBUFS, null);
-		com.grey.naf.BufferGenerator bufspec_tcp = new com.grey.naf.BufferGenerator(ResolverConfig.PKTSIZ_TCP, ResolverConfig.PKTSIZ_UDP, ResolverConfig.DIRECTNIOBUFS, null);
+		BufferGenerator.BufferConfig bufcfg = new BufferGenerator.BufferConfig(ResolverConfig.PKTSIZ_UDP, true, ResolverConfig.DIRECTNIOBUFS, null);
+		BufferGenerator bufspec_udp = new BufferGenerator(bufcfg);
+		bufcfg = new BufferGenerator.BufferConfig(ResolverConfig.PKTSIZ_TCP, true, ResolverConfig.DIRECTNIOBUFS, null);
+		BufferGenerator bufspec_tcp = new BufferGenerator(bufcfg);
 
 		if (!cfg.isRecursive()) {
 			localNameServers = null;

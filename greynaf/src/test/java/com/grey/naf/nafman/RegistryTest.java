@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2021 Yusef Badri - All rights reserved.
+ * Copyright 2013-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.nafman;
@@ -17,9 +17,7 @@ import com.grey.naf.TestUtils;
 
 public class RegistryTest
 {
-	private static final com.grey.logging.Logger logger = com.grey.logging.Factory.getLoggerNoEx("");
-
-	private final ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, true);
+	private final ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, true, null);
 	private final NafManRegistry nafreg = NafManRegistry.get(appctx);
 	private final String rootdir = com.grey.naf.TestUtils.initPaths(RegistryTest.class);
 	private final NafManRegistry.DefCommand fakecmd1 = new NafManRegistry.DefCommand("fake-cmd-1", "utest", "fake1", null, false);
@@ -85,10 +83,10 @@ public class RegistryTest
 		@SuppressWarnings("unchecked")
 		Map<String, List<?>> reg_handlers = (Map<String, List<?>>)DynLoader.getField(nafreg, "commandHandlers");
 		com.grey.base.collections.HashedMap<String, java.util.List<NafManCommand.Handler>> dsptch_handlers = new com.grey.base.collections.HashedMap<>();
-		DispatcherConfig def = new DispatcherConfig.Builder().build();
-		Dispatcher dsptch1 = Dispatcher.create(appctx, def, logger);
-		def = new com.grey.naf.reactor.config.DispatcherConfig.Builder(def).withName(null).build();
-		Dispatcher dsptch2 = Dispatcher.create(appctx, def, logger);
+		DispatcherConfig def = DispatcherConfig.builder().withAppContext(appctx).build();
+		Dispatcher dsptch1 = Dispatcher.create(def);
+		def = def.mutate().withName(null).build();
+		Dispatcher dsptch2 = Dispatcher.create(def);
 		nafreg.loadCommands(new NafManRegistry.DefCommand[]{fakecmd1});
 		nafreg.loadCommands(new NafManRegistry.DefCommand[]{fakecmd2});
 		reg_handlers.clear();

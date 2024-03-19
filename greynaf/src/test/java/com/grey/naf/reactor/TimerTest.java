@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 Yusef Badri - All rights reserved.
+ * Copyright 2012-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -14,7 +14,7 @@ public class TimerTest
 		TestUtils.initPaths(TimerTest.class);
 	}
 
-	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext("TimerTest", true);
+	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext("TimerTest", true, null);
 
 	private static class Handler
 		implements TimerNAF.Handler
@@ -62,13 +62,12 @@ public class TimerTest
 	@org.junit.Test
 	public void test() throws java.io.IOException
 	{
-		com.grey.naf.reactor.config.DispatcherConfig def = new com.grey.naf.reactor.config.DispatcherConfig.Builder()
+		com.grey.naf.reactor.config.DispatcherConfig def = com.grey.naf.reactor.config.DispatcherConfig.builder()
+				.withAppContext(appctx)
 				.withSurviveHandlers(false)
 				.build();
-		Dispatcher dsptch = Dispatcher.create(appctx, def, com.grey.logging.Factory.getLogger("no-such-logger"));
+		Dispatcher dsptch = Dispatcher.create(def);
 		Handler handler = new Handler();
-
-		handler.tmr2 = dsptch.setTimer(0, 2, handler);
 		handler.tmr3 = dsptch.setTimer(50, 3, handler);
 		dsptch.setTimer(0, 1, handler);
 

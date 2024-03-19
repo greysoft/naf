@@ -151,7 +151,7 @@ public class ResolverService
 		new ResolverNAFMAN(this, config);
 
 		pkt_tmp = new PacketDNS(Math.max(ResolverConfig.PKTSIZ_TCP, ResolverConfig.PKTSIZ_UDP), ResolverConfig.DIRECTNIOBUFS, config.getInitialMinTTL(), dsptch);
-		fh_dump = new java.io.File(dsptch.getApplicationContext().getConfig().getPathVar()+"/DNSdump-"+dsptch.getName()+".txt");
+		fh_dump = new java.io.File(dsptch.getApplicationContext().getNafConfig().getPathVar()+"/DNSdump-"+dsptch.getName()+".txt");
 
 		bcstore = new ObjectPool<>(() -> new ByteChars());
 		anstore = new ObjectPool<>(() -> new ResolverAnswer());

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 Yusef Badri - All rights reserved.
+ * Copyright 2012-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor;
@@ -24,19 +24,21 @@ public class IOExecWriterTest
 	private static final int filesize = 8 * 1024 * 1024;
 	private static final String initialchar = "z";
 
-	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext("IOWtest", true);
+	private static final ApplicationContextNAF appctx = TestUtils.createApplicationContext("IOWtest", true, null);
 
 	@org.junit.Test
 	public void testBlocking() throws Exception
 	{
 		FileOps.deleteDirectory(rootdir);
-		final BufferGenerator bufspec = new BufferGenerator(0, 10);
+		BufferGenerator.BufferConfig bufcfg = new BufferGenerator.BufferConfig(0, true, null, null);
+		BufferGenerator bufspec = new BufferGenerator(bufcfg);
 		BlockingQueue<BlockingTestData> blockingQueue = new ArrayBlockingQueue<>(5);
 
-		com.grey.naf.reactor.config.DispatcherConfig def = new com.grey.naf.reactor.config.DispatcherConfig.Builder()
+		com.grey.naf.reactor.config.DispatcherConfig def = com.grey.naf.reactor.config.DispatcherConfig.builder()
+				.withAppContext(appctx)
 				.withSurviveHandlers(false)
 				.build();
-		Dispatcher dsptch = Dispatcher.create(appctx, def, com.grey.logging.Factory.getLogger("no-such-logger"));
+		Dispatcher dsptch = Dispatcher.create(def);
 		java.nio.channels.Pipe pipe = java.nio.channels.Pipe.open();
 		java.nio.channels.Pipe.SourceChannel rep = pipe.source();
 		java.nio.channels.Pipe.SinkChannel wep = pipe.sink();
@@ -82,7 +84,8 @@ public class IOExecWriterTest
 	public void testFile() throws java.io.IOException
 	{
 		FileOps.deleteDirectory(rootdir);
-		final BufferGenerator bufspec = new BufferGenerator(0, 0);
+		BufferGenerator.BufferConfig bufcfg = new BufferGenerator.BufferConfig(0, false, null, null);
+		BufferGenerator bufspec = new BufferGenerator(bufcfg);
 
 		// create the file
 		final char chval = 'A';
@@ -103,10 +106,11 @@ public class IOExecWriterTest
 		org.junit.Assert.assertEquals(filebody.length, fh.length());
 
 		// create the Dispatcher and write channel
-		com.grey.naf.reactor.config.DispatcherConfig def = new com.grey.naf.reactor.config.DispatcherConfig.Builder()
+		com.grey.naf.reactor.config.DispatcherConfig def = com.grey.naf.reactor.config.DispatcherConfig.builder()
+				.withAppContext(appctx)
 				.withSurviveHandlers(false)
 				.build();
-		Dispatcher dsptch = Dispatcher.create(appctx, def, com.grey.logging.Factory.getLogger("no-such-logger"));
+		Dispatcher dsptch = Dispatcher.create(def);
 		java.nio.channels.Pipe pipe = java.nio.channels.Pipe.open();
 		java.nio.channels.Pipe.SourceChannel rep = pipe.source();
 		java.nio.channels.Pipe.SinkChannel wep = pipe.sink();

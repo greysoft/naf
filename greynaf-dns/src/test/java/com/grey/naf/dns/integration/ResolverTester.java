@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 Yusef Badri - All rights reserved.
+ * Copyright 2015-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.dns.integration;
@@ -12,11 +12,12 @@ import com.grey.base.utils.StringOps;
 import com.grey.base.utils.IP;
 import com.grey.base.utils.DynLoader;
 import com.grey.naf.ApplicationContextNAF;
+import com.grey.naf.NAFConfig;
 import com.grey.naf.dns.resolver.ResolverDNS;
 import com.grey.naf.dns.resolver.engine.PacketDNS;
 import com.grey.naf.dns.resolver.engine.ResolverAnswer;
 import com.grey.naf.dns.resolver.engine.ResourceData;
-import com.grey.naf.dns.TestUtils;
+import com.grey.naf.nafman.NafManConfig;
 
 public class ResolverTester
 {
@@ -75,7 +76,13 @@ public class ResolverTester
 	public static void beforeClass() throws java.io.IOException
 	{
 		if (!USE_REAL_DNS) {
-			ApplicationContextNAF appctx = TestUtils.createApplicationContext(null, true);
+			NAFConfig nafcfg = new NAFConfig.Builder().withBasePort(NAFConfig.RSVPORT_ANON).build();
+			NafManConfig nafmanConfig = new NafManConfig.Builder(nafcfg).build();
+			ApplicationContextNAF appctx = ApplicationContextNAF.builder()
+					.withNafConfig(nafcfg)
+					.withNafManConfig(nafmanConfig)
+					.withBootLogger(logger)
+					.build();
 			mockserver = new TestServerDNS(appctx);
 			mockserver.start();
 		}

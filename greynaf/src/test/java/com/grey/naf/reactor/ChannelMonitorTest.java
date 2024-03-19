@@ -8,6 +8,7 @@ import com.grey.base.utils.ByteArrayRef;
 import com.grey.base.utils.FileOps;
 import com.grey.base.utils.TimeOps;
 import com.grey.naf.ApplicationContextNAF;
+import com.grey.naf.BufferGenerator;
 import com.grey.naf.EventListenerNAF;
 import com.grey.naf.TestUtils;
 
@@ -40,13 +41,15 @@ public class ChannelMonitorTest
 		final int paircnt = 64;
 		final int numsends = 5;  //only the write() calls from CMR count towards this total, not the calls below
 		final CMR[] receivers = new CMR[paircnt];
-		final com.grey.naf.BufferGenerator bufspec = new com.grey.naf.BufferGenerator(xmtsiz - 1, xmtsiz, directbufs, null);
+		BufferGenerator.BufferConfig bufcfg = new BufferGenerator.BufferConfig(xmtsiz-1,true, directbufs, null);
+		BufferGenerator bufspec = new BufferGenerator(bufcfg);
 
-		ApplicationContextNAF appctx = TestUtils.createApplicationContext("CMTEST-"+directbufs, true);
-		com.grey.naf.reactor.config.DispatcherConfig def = new com.grey.naf.reactor.config.DispatcherConfig.Builder()
+		ApplicationContextNAF appctx = TestUtils.createApplicationContext("CMTEST-"+directbufs, true, null);
+		com.grey.naf.reactor.config.DispatcherConfig def = com.grey.naf.reactor.config.DispatcherConfig.builder()
+				.withAppContext(appctx)
 				.withSurviveHandlers(false)
 				.build();
-		Dispatcher dsptch = Dispatcher.create(appctx, def, com.grey.logging.Factory.getLogger("no-such-logger"));
+		Dispatcher dsptch = Dispatcher.create(def);
 
 		for (int idx = 0; idx != receivers.length; idx++) {
 			java.nio.channels.Pipe pipe = java.nio.channels.Pipe.open();

@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2021 Yusef Badri - All rights reserved.
+ * Copyright 2010-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf;
@@ -134,13 +134,18 @@ public class Launcher
 		NafManConfig nafmanConfig = configureNafMan(nafcfg);
 		bootlog.info("Configured NAFMAN config="+nafmanConfig);
 
-		ApplicationContextNAF appctx = ApplicationContextNAF.create(appname, nafcfg, nafmanConfig);
+		ApplicationContextNAF appctx = ApplicationContextNAF.builder()
+				.withName(appname)
+				.withNafConfig(nafcfg)
+				.withNafManConfig(nafmanConfig)
+				.withBootLogger(bootlog)
+				.build();
 		bootlog.info("Created Application Context - "+appctx);
 
 		if (nafmanConfig != null) {
 			setupNafMan(appctx);
 		}
-		appExecute(appctx, param1, bootlog);
+		appExecute(appctx, param1);
 	}
 
 	/**
@@ -151,12 +156,12 @@ public class Launcher
 	 * Conversely, there isn't much point in overriding this for applications which do have a naf.xml config file, as
 	 * this represents the logical control flow for them.
 	 */
-	protected void appExecute(ApplicationContextNAF appctx, int param1, Logger bootlog) throws Exception {
+	protected void appExecute(ApplicationContextNAF appctx, int param1) throws Exception {
 		if (param1 != cmdlineArgs.length) { //we don't expect any params
 			cmdParser.usage(cmdlineArgs, 0, "Excess params="+(cmdlineArgs.length-param1));
 			return;
 		}
-		executeDispatchers(appctx, bootlog);
+		executeDispatchers(appctx);
 	}
 
 	private NAFConfig loadConfigFile(NAFConfig.Builder bldrNafConfig, Logger bootlog) {
@@ -191,11 +196,12 @@ public class Launcher
 		return nafmanConfig;
 	}
 
-	private static void executeDispatchers(ApplicationContextNAF appctx, Logger bootlog) throws java.io.IOException {
+	private static void executeDispatchers(ApplicationContextNAF appctx) throws java.io.IOException {
 		long systime_boot = clock.millis();
+		Logger bootlog = appctx.getBootLogger();
 		bootlog.info("NAF BOOTING in "+new java.io.File(".").getCanonicalPath());
 
-		java.util.List<Dispatcher> dispatchers = launchConfiguredDispatchers(appctx, bootlog);
+		java.util.List<Dispatcher> dispatchers = launchConfiguredDispatchers(appctx);
 		if (dispatchers == null) throw new NAFConfigException("No Dispatchers are configured");
 
 		long systime2 = clock.millis();
@@ -203,7 +209,7 @@ public class Launcher
 		FileOps.flush(bootlog);
 
 		// wait for Dispatchers to exit - if they ever do
-		while (dispatchers.size() != 0) {
+		while (!dispatchers.isEmpty()) {
 			for (int idx = 0; idx != dispatchers.size(); idx++) {
 				Dispatcher d = dispatchers.get(idx);
 				Dispatcher.STOPSTATUS stopsts = d.waitStopped(5000, false);
@@ -218,18 +224,22 @@ public class Launcher
 		FileOps.flush(bootlog);
 	}
 
-	public static List<Dispatcher> launchConfiguredDispatchers(ApplicationContextNAF appctx, Logger log) throws java.io.IOException {
-		NAFConfig nafcfg = appctx.getConfig();
+	public static List<Dispatcher> launchConfiguredDispatchers(ApplicationContextNAF appctx) throws java.io.IOException {
+		NAFConfig nafcfg = appctx.getNafConfig();
 		XmlConfig[] cfgdispatchers = nafcfg.getDispatchers();
 		if (cfgdispatchers == null) return null;
 		List<Dispatcher> dlst = new ArrayList<>(cfgdispatchers.length);
-		log.info("NAF: Launching configured Dispatchers="+cfgdispatchers.length);
+		Logger bootlog = appctx.getBootLogger();
+		bootlog.info("NAF: Launching configured Dispatchers="+cfgdispatchers.length);
 
 		// Do separate loops to create and start the Dispatchers, so that they're all guaranteed to be in single-threaded
 		// mode until all have initialised.
 		for (XmlConfig dcfg : cfgdispatchers) {
-			DispatcherConfig def = new DispatcherConfig.Builder().withXmlConfig(dcfg).build();
-			Dispatcher dsptch = Dispatcher.create(appctx, def, log);
+			DispatcherConfig def = DispatcherConfig.builder()
+					.withAppContext(appctx)
+					.withXmlConfig(dcfg)
+					.build();
+			Dispatcher dsptch = Dispatcher.create(def);
 			dlst.add(dsptch);
 
 			/*
@@ -256,7 +266,7 @@ public class Launcher
 
 		// log the initial config
 		String txt = dumpConfig(appctx);
-		log.info("Initialisation of the configured NAF Dispatchers is now complete\n"+txt);
+		bootlog.info("Initialisation of the configured NAF Dispatchers is now complete\n"+txt);
 
 		// Now starts the multi-threaded phase
 		for (int idx = 0; idx != dlst.size(); idx++) {
