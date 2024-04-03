@@ -135,9 +135,16 @@ public class ApplicationContextNAF {
 
 	@Override
 	public String toString() {
-		String txt = "ApplicationContext-"+getName();
-		if (getNafConfig().getBasePort() != NAFConfig.RSVPORT_ANON) txt += ":"+getNafConfig().getBasePort();
-		return txt;
+		return "ApplicationContextNAF["
+				+"ctxname=" + ctxname
+				+", nafConfig=" + nafConfig
+				+", nafmanConfig=" + nafmanConfig
+				+", bootLogger=" + bootLogger
+				+", threadpool="+ threadpool
+				+", dispatchers=" + dispatchers
+				+", listeners=" + listeners
+				+", namedItems=" + namedItems
+				+"]";
 	}
 
 	public static Builder builder() {

@@ -82,10 +82,10 @@ public class BufferGenerator
 	}
 
 	@Override
-	public String toString()
-	{
-		String txt = "BufferGenerator{rcvbuf="+rcvbufsiz+", directbufs="+directbufs+", xmtpool="+(xmtpool != null)+"}";
-		if (chenc != null) txt += " - charset="+chenc.charset().displayName();
+	public String toString() {
+		String txt = "BufferGenerator[rcvbuf="+rcvbufsiz+", directbufs="+directbufs+", xmtpool="+(xmtpool != null);
+		if (chenc != null) txt += ", charset="+chenc.charset().displayName();
+		txt += "]";
 		return txt;
 	}
 
@@ -101,6 +101,14 @@ public class BufferGenerator
 			this.withXmitPool = (withXmitPool == null ? false : withXmitPool);
 			this.directbufs = (directbufs == null ? directniobufs : directbufs);
 			this.charset = charset;
+		}
+
+		@Override
+		public String toString() {
+			String txt = "BufferConfig[rcvbuf="+rcvbufsiz+", directbufs="+directbufs+", xmtpool="+withXmitPool;
+			if (charset != null) txt += ", charset="+charset;
+			txt += "]";
+			return txt;
 		}
 
 		public static BufferConfig create(XmlConfig cfg, String xpath, BufferConfig dflts) {

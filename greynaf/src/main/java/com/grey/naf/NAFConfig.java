@@ -196,6 +196,20 @@ public class NAFConfig
 		return template;
 	}
 
+	@Override
+	public String toString() {
+		return "NAFConfig["
+				+"basePort=" + basePort
+				+", nextPort=" + nextPort
+				+", threadPoolSize=" + threadPoolSize
+				+", pathRoot=" + pathRoot
+				+", pathConf=" + pathConf
+				+", pathVar=" + pathVar
+				+", pathLogs=" + pathLogs
+				+", pathTemp=" + pathTemp
+				+"]";
+	}
+
 
 	public static Object createEntity(XmlConfig cfg, Class<?> dflt_clss, Class<?> basetype, boolean hasName, Class<?>[] ctorSig, Object[] ctorArgs)
 	{

@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2021 Yusef Badri - All rights reserved.
+ * Copyright 2011-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.logging;
@@ -137,7 +137,9 @@ public class Parameters
 	public String toString()
 	{
 		StringBuilder sb = new StringBuilder(super.toString());
-		sb.append(": Dest=");
+		sb.append(getClass().getName());
+		sb.append("[Level=").append(logLevel);
+		sb.append(", Dest=");
 		if ( getPathname() != null) {
 			sb.append( getPathname());
 		} else if (getStream() == System.out) {
@@ -165,6 +167,7 @@ public class Parameters
 			sb.append('/');
 			TimeOps.expandMilliTime(getFlushInterval(), sb, false);
 		}
+		sb.append("]");
 		return sb.toString();
 	}
 

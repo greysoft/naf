@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2021 Yusef Badri - All rights reserved.
+ * Copyright 2013-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.nafman;
@@ -58,7 +58,13 @@ public class NafManConfig
 
 	@Override
 	public String toString() {
-		return super.toString()+" on port="+getListenerConfig().getPort()+" with survive-downstream="+isSurviveDownstream();
+		return "NafManConfig["
+				+"surviveDownstream=" + surviveDownstream
+				+", idleConnectionTimeout=" + idleConnectionTimeout
+				+", listenerConfig=" + listenerConfig
+				+ ", bufferConfig="+ bufferConfig
+				+ ", dynamicResourceTTL=" + dynamicResourceTTL
+				+ ", declaredStaticTTL=" + declaredStaticTTL + "]";
 	}
 
 

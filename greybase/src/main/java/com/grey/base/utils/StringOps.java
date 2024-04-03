@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2022 Yusef Badri - All rights reserved.
+ * Copyright 2010-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.base.utils;
@@ -32,6 +32,7 @@ public class StringOps
 	public static boolean sameSeqNoCase(CharSequence str1, int off1, int len1, CharSequence str2, int off2, int len2) {return sameSeq(true, str1, off1, len1, str2, off2, len2);}
 	public static String stripQuotes(String str) {return stripQuotes(str, DFLT_QUOTE);}
 	public static long parseNumber(CharSequence cs, int radix) {return parseNumber(cs, 0, (cs == null ? 0 : cs.length()), radix);}
+	public static boolean isBlank(CharSequence s) {return (s == null || s.length() == 0);}
 
 	public static boolean stringAsBool(String strval)
 	{

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2021 Yusef Badri - All rights reserved.
+ * Copyright 2015-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.naf.reactor.config;
@@ -34,6 +34,13 @@ public class ConcurrentListenerConfig extends ListenerConfig
 
 	public int getServersIncrement() {
 		return serversIncrement;
+	}
+
+	@Override
+	public String toString() {
+		return super.toString()+" - ConcurrentListenerConfig["
+				+"servers="+serversMin+"-"+serversMax+", incr="+ serversIncrement
+				+"]";
 	}
 
 

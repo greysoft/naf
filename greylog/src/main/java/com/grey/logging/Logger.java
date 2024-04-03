@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2021 Yusef Badri - All rights reserved.
+ * Copyright 2010-2024 Yusef Badri - All rights reserved.
  * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
  */
 package com.grey.logging;
@@ -120,10 +120,12 @@ abstract public class Logger
 
 		set_level(params.getLogLevel());
 
-		String desc = (name == null ? "" : "Name="+name+" ");
-		desc += params.toString();
-		if (isMT) desc += " MT";
-		this_string = desc;
+		this_string = getClass().getName()+"["
+				+"name="+name
+				+", MT="+isMT
+				+", path="+pthnam_tmpl
+				+", max-size="+maxsize
+				+"]";
 	}
 
 	// This has to be called after the constructor, else this logger won't be fully operartional.
