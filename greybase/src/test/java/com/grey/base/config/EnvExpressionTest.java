@@ -1,13 +1,13 @@
+/*
+ * Copyright 2010-2024 Yusef Badri - All rights reserved.
+ * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
+ */
 package com.grey.base.config;
 
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-/*
- * Copyright 2010-2021 Yusef Badri - All rights reserved.
- * NAF is distributed under the terms of the GNU Affero General Public License, Version 3 (AGPLv3).
- */
 public class EnvExpressionTest {
 	@Before
 	public void setup() {
@@ -50,6 +50,15 @@ public class EnvExpressionTest {
 	public void testMissingEnvWithBlankDefault() {
 		String s = EnvExpression.eval("${KEY1:}");
 		Assert.assertNull(s);
+	}
+
+	@Test
+	public void testMissingEnvWithEnvDefault() {
+		SysProps.setAppEnv("KEY2", "val2");
+		String s = EnvExpression.eval("${KEY1:${KEY2:dflt2}}");
+		Assert.assertEquals("val2", s);
+		s = EnvExpression.eval("${KEY1:${KEY3:dflt3}}");
+		Assert.assertEquals("dflt3", s);
 	}
 
 	@Test

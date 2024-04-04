@@ -263,7 +263,7 @@ public class NAFConfig
 
 
 	public static class Builder {
-		private int basePort = SysProps.get(SYSPROP_BASEPORT, 13000);
+		private int basePort = SysProps.get(SYSPROP_BASEPORT, RSVPORT_ANON);
 		private String pathRoot = SysProps.get(SYSPROP_DIRPATH_ROOT, ".");
 		private String pathVar = SysProps.get(SYSPROP_DIRPATH_VAR, pathRoot+"/var");
 		private String pathTemp = SysProps.get(SYSPROP_DIRPATH_TMP, pathVar+"/tmp");

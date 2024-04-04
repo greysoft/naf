@@ -49,6 +49,11 @@ public class ApplicationContextNAF {
 
 	private static ApplicationContextNAF create(Builder bldr) throws IOException {
 		ApplicationContextNAF ctx = new ApplicationContextNAF(bldr);
+		register(ctx);
+		return ctx;
+	}
+
+	private static void register(ApplicationContextNAF ctx) {
 		ApplicationContextNAF dup = contextsByName.putIfAbsent(ctx.getName(), ctx);
 		if (dup != null) throw new NAFConfigException("Duplicate app-context="+ctx+" - prev="+dup);
 
@@ -59,7 +64,13 @@ public class ApplicationContextNAF {
 				throw new NAFConfigException("Duplicate app-context port for "+ctx+" - prev="+dup);
 			}
 		}
-		return ctx;
+	}
+
+	public static void unregister(ApplicationContextNAF ctx) {
+		if (ctx.getNafConfig().getBasePort() != NAFConfig.RSVPORT_ANON) {
+			contextsByPort.remove(ctx.nafConfig.getBasePort());
+		}
+		contextsByName.remove(ctx.ctxname);
 	}
 
 	private ApplicationContextNAF(Builder bldr) throws IOException {
